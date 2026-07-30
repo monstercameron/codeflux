@@ -313,12 +313,18 @@ the identical SHA-256
 Embedding evidence: package tests read the exact embedded
 `000000_bootstrap.sql` and `static/shell.css` paths; the bootstrap migration is
 an intentional no-op and does not pre-implement M03 schema.
-- [ ] `M01-036` Ensure generated files carry a generated-file header.
-- [ ] `M01-037` Ensure generation is reproducible and leaves the worktree clean when rerun.
-- [ ] `M01-038` Add a check that committed generated code matches protobuf sources.
-- [ ] `M01-039` Add a check that migration numbers are unique and ordered.
-- [ ] `M01-040` Add a check that no local SQLite database is committed.
-- [ ] `M01-041 SECURITY` Add a secret-scanning hook or CI step for common provider-key formats.
+- [x] `M01-036` Ensure generated files carry a generated-file header.
+- [x] `M01-037` Ensure generation is reproducible and leaves the worktree clean when rerun.
+- [x] `M01-038` Add a check that committed generated code matches protobuf sources.
+- [x] `M01-039` Add a check that migration numbers are unique and ordered.
+- [x] `M01-040` Add a check that no local SQLite database is committed.
+- [x] `M01-041 SECURITY` Add a secret-scanning hook or CI step for common provider-key formats.
+
+Repository-integrity evidence:
+
+- `generate-check` regenerates beneath a validated `.artifacts/tmp` child, compares the exact `api/gen` tree, and removes only that child.
+- `lint` requires generated headers, contiguous unique migration numbers, no tracked SQLite extension or magic, and no common OpenAI, Anthropic, or GitHub token shape in tracked text.
+- `.githooks/pre-commit` invokes the same lint command; CI enforcement is added separately by M01-050.
 - [ ] `M01-042` Add structured version metadata: semantic version, commit, build date, Go version, schema version, and frontend version.
 - [ ] `M01-043` Add `codeflux version`.
 - [ ] `M01-044` Add `codeflux doctor` skeleton.

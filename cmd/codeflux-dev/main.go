@@ -40,6 +40,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runBuild(ctx, stdout, stderr)
 	case "generate":
 		return runGenerate(ctx, stdout, stderr)
+	case "generate-check":
+		return runGenerateCheck(ctx, stdout, stderr)
 	case "test-fast":
 		return runGo(ctx, stdout, stderr, "test", "./...")
 	case "test-race":
@@ -61,6 +63,7 @@ func printHelp(output io.Writer) {
 	fmt.Fprintln(output, "Commands:")
 	fmt.Fprintln(output, "  build      Compile all packages and write command binaries to .artifacts/bin")
 	fmt.Fprintln(output, "  generate   Regenerate source from pinned protobuf tools")
+	fmt.Fprintln(output, "  generate-check  Regenerate under .artifacts and reject committed drift")
 	fmt.Fprintln(output, "  test-fast  Run the complete fast Go test suite")
 	fmt.Fprintln(output, "  test-race  Run Go race tests on a supported host")
 	fmt.Fprintln(output, "  test-coverage  Write unit coverage to .artifacts/coverage")
@@ -73,16 +76,66 @@ func runGenerate(ctx context.Context, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "codeflux-dev generate: %v\n", err)
 		return exitFailure
 	}
-	return runCommandIn(
+	return runPinnedBuf(
 		ctx,
 		root,
 		stdout,
 		stderr,
-		"go",
-		"run",
-		"github.com/bufbuild/buf/cmd/buf@v1.72.0",
 		"generate",
 	)
+}
+
+func runGenerateCheck(ctx context.Context, stdout, stderr io.Writer) int {
+	root, err := repositoryRoot()
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
+		return exitFailure
+	}
+	staging, err := createArtifactTemp(root, "generate-check-")
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
+		return exitFailure
+	}
+	defer func() {
+		if removeErr := removeArtifactChild(root, staging); removeErr != nil {
+			fmt.Fprintf(stderr, "codeflux-dev generate-check: cleanup: %v\n", removeErr)
+		}
+	}()
+
+	if code := runPinnedBuf(
+		ctx,
+		root,
+		stdout,
+		stderr,
+		"generate",
+		"--output",
+		staging,
+	); code != exitSuccess {
+		return code
+	}
+	if err := compareDirectoryTrees(
+		filepath.Join(root, "api", "gen"),
+		filepath.Join(staging, "api", "gen"),
+	); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
+		return exitFailure
+	}
+	return exitSuccess
+}
+
+func runPinnedBuf(
+	ctx context.Context,
+	root string,
+	stdout io.Writer,
+	stderr io.Writer,
+	args ...string,
+) int {
+	commandArgs := []string{
+		"run",
+		"github.com/bufbuild/buf/cmd/buf@v1.72.0",
+	}
+	commandArgs = append(commandArgs, args...)
+	return runCommandIn(ctx, root, stdout, stderr, "go", commandArgs...)
 }
 
 func runBuild(ctx context.Context, stdout, stderr io.Writer) int {
@@ -178,6 +231,10 @@ func runLint(ctx context.Context, stdout, stderr io.Writer) int {
 		for _, path := range unformatted {
 			fmt.Fprintf(stderr, "  %s\n", path)
 		}
+		return exitFailure
+	}
+	if err := runRepositoryChecks(ctx, root); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev lint: repository check: %v\n", err)
 		return exitFailure
 	}
 	if code := runGoIn(ctx, root, stdout, stderr, "vet", "./..."); code != exitSuccess {

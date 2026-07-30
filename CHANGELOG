@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-008
+Date: 2026-07-30
+Type: Repository integrity and security checks
+Request-or-TODO: M01-036 through M01-041
+Outcome: Added isolated generated-drift comparison, generated-header and
+  migration checks, tracked SQLite rejection, provider-token scanning, and a
+  pre-commit lint hook
+Affected-behavior: Stale generation, malformed migration numbering, local
+  databases, or common live-token shapes now fail before review
+Compatibility-or-migration: Migration names must be contiguous six-digit
+  lower-snake-case files beginning at 000000
+Verification: Check unit tests, isolated generate-check, lint, build, hook
+  invocation, temporary-output cleanup, and negative fixtures passed
+Dev-Log: DL-20260730-009
+
 Change-ID: CL-20260730-007
 Date: 2026-07-30
 Type: Build input embedding

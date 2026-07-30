@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-009
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-008
+Request-or-TODO: M01-036 through M01-041
+Goal: Prevent generated drift, invalid migration ordering, committed databases,
+  and common provider credentials from entering the repository
+Assumptions: Git-tracked files are the review boundary; untracked disposable
+  output is separately constrained to .artifacts
+Decisions: Generate protobuf output into a validated .artifacts/tmp child and
+  compare exact trees; run repository checks as part of lint; scan text only
+Files-or-schemas: cmd/codeflux-dev checks and tests; no runtime schema
+Validation: Repository-check unit tests passed their positive and negative
+  cases; isolated `generate-check`, `lint`, build, and pre-commit hook passed;
+  the generation staging child was removed and no output escaped .artifacts
+Failures-or-discarded-approaches: Rejected in-place regeneration for checks
+  because a stale result would dirty or overwrite the user's worktree; direct
+  `sh` was not on the PowerShell PATH, so hook verification uses Git's
+  cross-platform `git hook run` entry point
+Known-limitations: The initial secret patterns are a defense-in-depth baseline,
+  not proof that arbitrary secrets are detectable; CI enforcement is M01-050
+Next-safe-step: Commit repository integrity, then add structured version
+  metadata, `codeflux version`, and the doctor skeleton in M01-042 through
+  M01-044.
+
 Dev-Log: DL-20260730-008
 Date: 2026-07-30
 Status: Complete
