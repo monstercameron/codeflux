@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-023
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-022
+Request-or-TODO: User request to keep a supplied OpenAI API key out of Git
+Goal: Prevent local environment credential fallbacks from entering commits
+Assumptions: The supplied credential must not be copied into repository files,
+  commands, diffs, logs, SQLite, or diagnostics
+Decisions: Follow docs/plan.md Provider Credentials guidance: prefer the
+  operating-system credential store, ignore `.env` variants as an explicit
+  fallback, and keep example templates eligible for tracking
+Files-or-schemas: .gitignore, CHANGELOG, DEVLOG; no schema change
+Validation: `git check-ignore` recognizes `.env`, `.env.local`, and
+  `.env.development.local`; example-template probes remain unignored; tracked
+  source contains no project-key prefix
+Failures-or-discarded-approaches: Did not persist the supplied key because
+  doing so would duplicate a secret into repository-adjacent state
+Known-limitations: A credential pasted into chat should be rotated at the
+  provider; the repository cannot revoke it
+Next-safe-step: Rotate the exposed key, store its replacement in Windows
+  Credential Manager, then authorize creation and publication of the private
+  GitHub repository needed for M01-G04
+
 Dev-Log: DL-20260730-022
 Date: 2026-07-30
 Status: Complete

@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-022
+Date: 2026-07-30
+Type: Security configuration
+Request-or-TODO: User request to keep a supplied OpenAI API key out of Git
+Outcome: Ignored local environment credential files while preserving
+  trackable example templates
+Affected-behavior: `.env` and `.env.*` files cannot be accidentally staged
+  unless they are explicitly named example templates
+Compatibility-or-migration: No runtime or schema impact; existing credential
+  storage policy remains unchanged
+Verification: Git ignore probes passed for local environment files and failed
+  as intended for example templates; no tracked file contains a project-key
+  prefix
+Dev-Log: DL-20260730-023
+
 Change-ID: CL-20260730-021
 Date: 2026-07-30
 Type: Clean-clone gate evidence

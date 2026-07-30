@@ -1,3 +1,10 @@
 # Sole repository-local root for disposable build, test, package, benchmark,
 # profile, diagnostic, temporary database, log, and staging output.
 /.artifacts/
+
+# Local environment-variable credential fallback. Real credentials belong in
+# the operating-system credential store; example templates remain trackable.
+.env
+.env.*
+!.env.example
+!.env.*.example
