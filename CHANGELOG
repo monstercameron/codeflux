@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-042
+Date: 2026-07-30
+Type: Redaction pipeline and credential gates
+Request-or-TODO: M04-021 through M04-032 and M04-G01 through M04-G03
+Outcome: Added one bounded exact-and-pattern redaction pipeline for prompt,
+  log, UI, and diagnostic boundaries plus streaming, structured, and full
+  mock-task secret-absence tests
+Affected-behavior: Loaded credentials, supported key formats, bearer/header
+  values, and PEM private keys become a constant marker before persistence or
+  delivery; unapproved permission-bearing repository configuration is rejected
+Compatibility-or-migration: No schema or external API change
+Verification: Focused redaction/configuration gates and
+  `go run ./cmd/codeflux-dev test-all` passed; the mock task scans persisted
+  SQLite artifacts and all four output boundaries for known-secret absence
+Dev-Log: DL-20260730-043
+
 Change-ID: CL-20260730-041
 Date: 2026-07-30
 Type: Native credential boundary

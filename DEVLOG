@@ -24,6 +24,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-043
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-042
+Request-or-TODO: M04-021 through M04-032 and M04-G01 through M04-G03
+Goal: Close M04 with one inspectable redaction mechanism and end-to-end secret
+  absence across the currently implemented task boundaries
+Assumptions: Bounded chunk accumulation is sufficient before the later live
+  event-stream milestone; arbitrary entropy is not evidence of a credential
+Decisions: Use a constant marker, longest-first exact matching, provider/header/
+  bearer/PEM patterns, and recursive sensitive-field handling. Bound raw input
+  with a maximum-secret-length guard and bound output again. Keep structured
+  truncation valid JSON. Disable entropy matching until a measured
+  false-positive study authorizes it.
+Files-or-schemas: internal/redact pipeline, corpus/stream/structured/gate tests,
+  configuration permission-escalation test, docs/plan.md, TODOS.md, CHANGELOG,
+  DEVLOG; no schema change
+Validation: Exact and patterned material was removed at all four boundaries.
+  Tests split three fixture classes at every byte boundary and exercised quoted,
+  spaced, header, assignment, private-key, provider-exception, and HTTP forms.
+  Structured fields were redacted before serialization and oversize output
+  remained valid JSON. A real-SQLite mock task persisted redacted prompt/event
+  data and retained the known credential in no output, database, WAL, or
+  shared-memory page. Repository permission/command self-grants were rejected.
+Failures-or-discarded-approaches: Replaced post-limit raw JSON slicing with a
+  small valid truncation object. Entropy detection was not implemented because
+  its required false-positive acceptability evidence does not exist.
+Known-limitations: Live incremental emission is deferred to the M05/M08 session
+  stream; the current stream redactor returns one bounded final result.
+Next-safe-step: Begin M05 with the typed SessionEvent envelope, immutable/
+  droppable classification, and atomic append-before-publish contract.
+
 Dev-Log: DL-20260730-042
 Date: 2026-07-30
 Status: Complete

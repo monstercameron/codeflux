@@ -163,6 +163,9 @@ func TestImportExportIsBoundedStrictAndContainsNoPrivateFields(t *testing.T) {
 	if _, err := ImportJSON([]byte(`{"api_key":"not-a-real-secret"}`)); err == nil {
 		t.Fatal("unknown secret-shaped field was accepted")
 	}
+	if _, err := ImportJSON([]byte(`{"permissions":["network"],"commands":["deploy"]}`)); err == nil {
+		t.Fatal("repository configuration granted itself permissions or commands")
+	}
 	if _, err := ImportJSON(make([]byte, maximumImportBytes+1)); err == nil {
 		t.Fatal("oversize import was accepted")
 	}

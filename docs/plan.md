@@ -3237,6 +3237,19 @@ Approval required:
 
 Maintain local secret-pattern scanning before prompts, logs, and diagnostic exports. Repository-provided Codeflux configuration is displayed and requires first-use approval before it can add commands or permissions.
 
+One redaction pipeline serves prompt persistence, log persistence, UI delivery,
+and diagnostic export. It combines exact currently loaded credential values
+with provider-key, bearer/header, and private-key patterns. A constant
+`[REDACTED]` marker does not preserve source length. Structured sensitive fields
+are replaced before JSON serialization.
+
+Raw input is bounded before matching and guarded against a partial secret at a
+truncation edge; redacted output is bounded again. Stream chunks are accumulated
+within that pre-redaction bound so matches cannot be bypassed by chunk
+boundaries. Entropy detection remains disabled because no measured
+false-positive corpus yet justifies deleting arbitrary high-entropy repository
+or diagnostic content.
+
 ### Plugins and Custom Commands
 
 Do not load arbitrary plugins into the coordinator process.

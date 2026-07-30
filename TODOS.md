@@ -894,24 +894,51 @@ Credential-boundary evidence:
 
 ## Redaction
 
-- [ ] `M04-021 BLOCKER SECURITY` Define a redaction pipeline used before prompt persistence, log persistence, UI delivery, and diagnostic export.
-- [ ] `M04-022 SECURITY` Add exact-value redaction for credentials currently loaded by the process.
-- [ ] `M04-023 SECURITY` Add pattern redaction for supported provider key formats.
-- [ ] `M04-024 SECURITY` Add common private-key and bearer-token redaction.
-- [ ] `M04-025 SECURITY` Add entropy-based detection only if false-positive behavior is acceptable and inspectable.
-- [ ] `M04-026 SECURITY` Mark redacted spans without preserving the original length when length could leak information.
-- [ ] `M04-027 SECURITY` Ensure structured fields are redacted before serialization.
-- [ ] `M04-028 SECURITY` Apply output-size limits before and after redaction.
-- [ ] `M04-029 TEST` Build a corpus of secret-bearing command, provider, HTTP, and exception outputs.
-- [ ] `M04-030 TEST` Test redaction across chunk boundaries in streamed output.
-- [ ] `M04-031 TEST` Test that redaction cannot be bypassed with common whitespace or quoting variations.
-- [ ] `M04-032 TEST` Test diagnostic exports for secret absence.
+- [x] `M04-021 BLOCKER SECURITY` Define a redaction pipeline used before prompt persistence, log persistence, UI delivery, and diagnostic export.
+- [x] `M04-022 SECURITY` Add exact-value redaction for credentials currently loaded by the process.
+- [x] `M04-023 SECURITY` Add pattern redaction for supported provider key formats.
+- [x] `M04-024 SECURITY` Add common private-key and bearer-token redaction.
+- [x] `M04-025 SECURITY` Add entropy-based detection only if false-positive behavior is acceptable and inspectable.
+- [x] `M04-026 SECURITY` Mark redacted spans without preserving the original length when length could leak information.
+- [x] `M04-027 SECURITY` Ensure structured fields are redacted before serialization.
+- [x] `M04-028 SECURITY` Apply output-size limits before and after redaction.
+- [x] `M04-029 TEST` Build a corpus of secret-bearing command, provider, HTTP, and exception outputs.
+- [x] `M04-030 TEST` Test redaction across chunk boundaries in streamed output.
+- [x] `M04-031 TEST` Test that redaction cannot be bypassed with common whitespace or quoting variations.
+- [x] `M04-032 TEST` Test diagnostic exports for secret absence.
+
+Redaction evidence:
+
+- The same boundary-typed pipeline covers prompt/log persistence, UI delivery,
+  and diagnostic export with exact loaded-value, supported provider-key,
+  API/header, bearer-token, and PEM private-key matching.
+- A constant `[REDACTED]` marker leaks no source span length. Structured
+  sensitive fields are replaced before valid JSON serialization.
+- Input is bounded before matching with a maximum-secret-length truncation
+  guard; output is bounded afterward. Oversize structured output becomes a
+  small valid JSON truncation record.
+- The command/provider/HTTP/exception corpus passes at all four boundaries.
+  Every split position for exact, provider-pattern, and bearer fixtures is
+  redacted, as are common quote, whitespace, header, and assignment variants.
+- Entropy detection is deliberately disabled and reported as such because no
+  inspectable false-positive study authorizes it.
 
 ## Gate
 
-- [ ] `M04-G01 GATE` A provider can be configured and tested without writing its secret to SQLite.
-- [ ] `M04-G02 GATE` A full mock task produces no known secret in logs, events, prompts, UI payloads, or diagnostics.
-- [ ] `M04-G03 GATE` Repository configuration cannot grant itself new permissions.
+- [x] `M04-G01 GATE` A provider can be configured and tested without writing its secret to SQLite.
+- [x] `M04-G02 GATE` A full mock task produces no known secret in logs, events, prompts, UI payloads, or diagnostics.
+- [x] `M04-G03 GATE` Repository configuration cannot grant itself new permissions.
+
+Milestone-04 gate evidence:
+
+- Credential-store test and provider-reference persistence use the secret only
+  in memory, then scan closed SQLite pages for its absence.
+- A real-SQLite mock task retrieves a mapped provider credential, redacts prompt,
+  event/log, UI, and structured diagnostic values through their named
+  boundaries, persists the prompt and event, and proves the known value is
+  absent from every output and SQLite artifact.
+- Repository overlays cannot resolve without an approval reference, and strict
+  configuration import rejects unknown `permissions` and `commands` fields.
 
 ---
 
