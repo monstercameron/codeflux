@@ -1378,20 +1378,37 @@ Milestone output: a deterministic, revision-bound Go repository map and explaina
 
 ## Repository Opening
 
-- [ ] `M08-001 BLOCKER` Resolve and canonicalize the user-selected repository path.
-- [ ] `M08-002 SECURITY` Reject paths that do not exist or are not directories.
-- [ ] `M08-003` Detect whether the directory belongs to a Git repository.
-- [ ] `M08-004` Resolve the repository root without following unsafe user-controlled indirection.
-- [ ] `M08-005` Read the current branch, HEAD revision, remotes, and worktree status.
-- [ ] `M08-006` Detect detached HEAD.
-- [ ] `M08-007` Detect merge, rebase, cherry-pick, or bisect state.
-- [ ] `M08-008` Detect submodules and record whether the prototype supports them.
-- [ ] `M08-009` Detect nested repositories.
-- [ ] `M08-010` Detect Git LFS pointers without automatically fetching content.
-- [ ] `M08-011` Detect untracked and ignored files.
-- [ ] `M08-012` Present dirty-state risks before creating a task worktree.
-- [ ] `M08-013` Persist repository identity separately from mutable paths.
-- [ ] `M08-014` Bind every workspace snapshot to a Git revision.
+- [x] `M08-001 BLOCKER` Resolve and canonicalize the user-selected repository path.
+- [x] `M08-002 SECURITY` Reject paths that do not exist or are not directories.
+- [x] `M08-003` Detect whether the directory belongs to a Git repository.
+- [x] `M08-004` Resolve the repository root without following unsafe user-controlled indirection.
+- [x] `M08-005` Read the current branch, HEAD revision, remotes, and worktree status.
+- [x] `M08-006` Detect detached HEAD.
+- [x] `M08-007` Detect merge, rebase, cherry-pick, or bisect state.
+- [x] `M08-008` Detect submodules and record whether the prototype supports them.
+- [x] `M08-009` Detect nested repositories.
+- [x] `M08-010` Detect Git LFS pointers without automatically fetching content.
+- [x] `M08-011` Detect untracked and ignored files.
+- [x] `M08-012` Present dirty-state risks before creating a task worktree.
+- [x] `M08-013` Persist repository identity separately from mutable paths.
+- [x] `M08-014` Bind every workspace snapshot to a Git revision.
+
+Repository-opening evidence:
+
+- A bounded argument-array runner performs only fixed read-only Git discovery
+  commands. The selected directory and reported root are canonicalized, the
+  root must contain the selection, missing/non-directory/non-Git/empty
+  repositories fail with typed errors, and no shell evaluates repository text.
+- Snapshots carry a path-independent Git identity and exact HEAD revision plus
+  branch, sanitized remotes, detached/dirty/conflicted state, in-progress Git
+  operations, changed/untracked/ignored paths, unsupported submodules, nested
+  repositories, and tracked LFS pointers. Existing SQLite repository records
+  keep the stable repository ID/Git identity separate from canonical paths.
+- Real temporary Git tests cover nested selection, path movement, remote
+  credential removal, modified and conflicted status, detached HEAD, operation
+  markers, submodules, nested repositories, LFS pointer non-fetch behavior,
+  ignored/untracked files, unsafe root indirection, empty repositories, command
+  cancellation, and bounded output.
 
 ## Go Repository Map
 

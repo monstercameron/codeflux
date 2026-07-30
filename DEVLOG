@@ -24,6 +24,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-051
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-050
+Request-or-TODO: M08-001 through M08-014
+Goal: Open and inspect a Git repository read-only, producing a deterministic
+  snapshot bound to stable identity and an exact revision
+Assumptions: M08 uses a small bounded command-runner port before M10 adds the
+  full worker tool protocol; Git and filesystem reads are fixed by Codeflux and
+  never constructed from repository instructions
+Decisions: Canonicalize both selection and Git-reported root and require an
+  ancestor relationship. Derive path-independent Git identity from the root
+  commit, retain the existing SQLite repository ID/path separation, sanitize
+  remote user information, parse porcelain-v2 status, inspect operation
+  markers, walk without following symlinks, and scan only bounded tracked-file
+  prefixes for LFS pointers without fetching.
+Files-or-schemas: Workspace discovery implementation/tests and M08 evidence;
+  no schema change
+Validation: Temporary repositories prove nested selection, identity across a
+  path move, exact HEAD binding, branches/remotes/status, detached HEAD,
+  conflicts, merge/rebase/cherry-pick/bisect markers, submodules, nested
+  repositories, LFS pointers, ignored/untracked content, unsafe root rejection,
+  invalid selections, empty history, cancellation, and output bounds. Workspace
+  tests and repository lint pass.
+Failures-or-discarded-approaches: Treating the canonical path as repository
+  identity was rejected because paths move. Parsing human-readable Git status
+  was rejected in favor of NUL-delimited porcelain v2. Repository-provided
+  commands and automatic LFS/submodule network access were excluded.
+Known-limitations: The prototype records submodules as unsupported and does not
+  inspect their content. Root-commit identity changes after destructive history
+  rewriting; the durable Codeflux repository ID remains authoritative.
+Next-safe-step: Build the M08 deterministic Go repository map from the frozen
+  snapshot revision through the bounded command port.
+
 Dev-Log: DL-20260730-050
 Date: 2026-07-30
 Status: Complete

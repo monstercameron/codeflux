@@ -30,6 +30,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-050
+Date: 2026-07-30
+Type: Read-only repository discovery
+Request-or-TODO: M08-001 through M08-014
+Outcome: Added bounded canonical Git repository discovery with revision-bound
+  snapshots, stable identity, sanitized remotes, worktree risk classification,
+  and repository-content marker detection
+Affected-behavior: Codeflux can now open a selected directory without mutation,
+  reject unsafe or invalid roots, and report branch/HEAD/status, operations,
+  detached/conflicted state, submodules, nested repositories, LFS pointers,
+  untracked files, ignored files, and dirty-state warnings deterministically
+Compatibility-or-migration: Additive workspace behavior only; existing
+  repository persistence already separates stable identity from mutable path;
+  no database schema change
+Verification: Real temporary Git repositories exercise clean, moved, dirty,
+  detached, conflicted, operation, submodule, nested, LFS, ignored, untracked,
+  invalid-root, empty-repository, cancellation, and output-limit paths; package
+  tests and repository lint pass
+Dev-Log: DL-20260730-051
+
 Change-ID: CL-20260730-049
 Date: 2026-07-30
 Type: Cross-platform transport security and teardown correction
