@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-004
+Date: 2026-07-30
+Type: Development commands
+Request-or-TODO: M01-026, M01-027
+Outcome: Added cross-platform build and fast-test commands plus the worker
+  executable entry point
+Affected-behavior: `go run ./cmd/codeflux-dev build` compiles all packages and
+  emits both binaries under .artifacts/bin; `test-fast` runs all current tests
+Compatibility-or-migration: Initial command surface; no runtime migration
+Verification: Command unit tests, direct build, direct test-fast, `go vet
+  ./...`, binary inspection, and repository artifact-escape scan passed
+Dev-Log: DL-20260730-005
+
 Change-ID: CL-20260730-003
 Date: 2026-07-30
 Type: Internal package architecture

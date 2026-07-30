@@ -281,8 +281,14 @@ explicitly redistributable, secret-free fixtures.
 
 ## Build and Quality Tooling
 
-- [ ] `M01-026 BLOCKER` Add a single local command that builds server, worker, generated protobuf code, and frontend assets.
-- [ ] `M01-027 BLOCKER` Add a single local command that runs the complete fast test suite.
+- [x] `M01-026 BLOCKER` Add a single local command that builds server, worker, generated protobuf code, and frontend assets.
+- [x] `M01-027 BLOCKER` Add a single local command that runs the complete fast test suite.
+
+Initial command evidence:
+
+- `go run ./cmd/codeflux-dev build` compiles every tracked package and writes `codeflux` and `codeflux-worker` only beneath `.artifacts/bin`.
+- `go run ./cmd/codeflux-dev test-fast` runs the complete current module test suite.
+- Generated protobuf and embedded frontend packages join the all-package build automatically when their later source tasks add them; no generator capability is claimed yet.
 - [ ] `M01-028` Add `go fmt` verification.
 - [ ] `M01-029` Add `go vet` verification.
 - [ ] `M01-030` Choose and configure a Go linter set with low false-positive noise.

@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-005
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-004
+Request-or-TODO: M01-026, M01-027
+Goal: Provide one cross-platform local command for a complete build and one for
+  the fast test suite, with all repository-local output under .artifacts
+Assumptions: At this dependency point no protobuf or frontend generator source
+  exists; compiling all packages is the extension point that will include
+  generated Go and embedded frontend assets when their later TODOs add them
+Decisions: Add only build and test-fast plus help; build all packages before
+  producing codeflux and codeflux-worker binaries in .artifacts/bin
+Files-or-schemas: cmd/codeflux-dev, cmd/codeflux-worker, DEVLOG; no schema
+Validation: `go test ./cmd/codeflux-dev -count=1` passed; direct `build` emitted
+  codeflux.exe and codeflux-worker.exe under .artifacts/bin; direct `test-fast`
+  passed all packages; `go vet ./...` passed; the artifact-escape scan found no
+  repository-local disposable binary or database outside .artifacts
+Failures-or-discarded-approaches: Rejected installing missing protoc or other
+  dependencies before the authorized generator tasks
+Known-limitations: Generation, lint, bootstrap, profiles, and advanced
+  development commands remain unavailable until their own M01 tasks; the
+  command currently uses the invoking Go toolchain
+Next-safe-step: Commit the command pair, then add formatting, vet, linter, race,
+  and coverage enforcement beginning with M01-028.
+
 Dev-Log: DL-20260730-004
 Date: 2026-07-30
 Status: Complete
