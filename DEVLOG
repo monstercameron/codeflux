@@ -24,6 +24,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-029
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-028
+Request-or-TODO: M02-005
+Goal: Verify every stable identity survives storage and transport conversion
+  without losing its kind or bypassing domain validation
+Assumptions: One generated protobuf envelope with an explicit kind enum avoids
+  21 structurally identical messages while typed adapter functions preserve
+  compile-time distinctions
+Decisions: Keep JSON and SQL behavior on the pure domain types; place protobuf
+  adapters in internal/transport; reject nil and kind mismatches before calling
+  the authoritative domain parser; test deterministic protobuf wire encoding
+Files-or-schemas: api/proto/codeflux/v1/identity.proto and generated Go,
+  internal/domain tests, internal/transport identity adapters and tests,
+  TODOS.md, CHANGELOG, DEVLOG; protobuf schema only
+Validation: All 21 kinds pass JSON and SQL round-trips plus generated protobuf
+  deterministic marshal/unmarshal and adapter round-trips. Null, zero,
+  unspecified, wrong-kind, and malformed inputs fail with typed errors.
+  generate-check, repository test-all, lint, and artifact checks pass.
+Failures-or-discarded-approaches: Rejected importing generated transport types
+  into domain and rejected untagged protobuf strings because either would
+  weaken the domain dependency center or identity-kind safety
+Known-limitations: These messages are identity primitives only; M07 remains
+  authoritative for service contracts
+Next-safe-step: Define the task lifecycle states and permitted transitions in
+  M02-007 and M02-008 with exhaustive pure-domain tests
+
 Dev-Log: DL-20260730-028
 Date: 2026-07-30
 Status: Complete

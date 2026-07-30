@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+// StableIdentityKind distinguishes domain identities at transport boundaries.
+enum StableIdentityKind {
+  STABLE_IDENTITY_KIND_UNSPECIFIED = 0;
+  STABLE_IDENTITY_KIND_PROJECT = 1;
+  STABLE_IDENTITY_KIND_REPOSITORY = 2;
+  STABLE_IDENTITY_KIND_WORKSPACE = 3;
+  STABLE_IDENTITY_KIND_THREAD = 4;
+  STABLE_IDENTITY_KIND_MESSAGE = 5;
+  STABLE_IDENTITY_KIND_TASK = 6;
+  STABLE_IDENTITY_KIND_RUN = 7;
+  STABLE_IDENTITY_KIND_EVENT = 8;
+  STABLE_IDENTITY_KIND_CHECKPOINT = 9;
+  STABLE_IDENTITY_KIND_APPROVAL = 10;
+  STABLE_IDENTITY_KIND_GRAPH = 11;
+  STABLE_IDENTITY_KIND_GRAPH_REVISION = 12;
+  STABLE_IDENTITY_KIND_NODE = 13;
+  STABLE_IDENTITY_KIND_EDGE = 14;
+  STABLE_IDENTITY_KIND_VALIDATION = 15;
+  STABLE_IDENTITY_KIND_EVIDENCE = 16;
+  STABLE_IDENTITY_KIND_ARTIFACT = 17;
+  STABLE_IDENTITY_KIND_ATOM = 18;
+  STABLE_IDENTITY_KIND_MODEL_REQUEST = 19;
+  STABLE_IDENTITY_KIND_PROVIDER = 20;
+  STABLE_IDENTITY_KIND_BUDGET = 21;
+}
+
+// StableIdentity carries one canonical typed identity across protobuf
+// boundaries. Domain code remains authoritative for format validation.
+message StableIdentity {
+  StableIdentityKind kind = 1;
+  string value = 2;
+}

@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-028
+Date: 2026-07-30
+Type: Identity boundary adapters
+Request-or-TODO: M02-005
+Outcome: Added exhaustive JSON, SQL, and generated-protobuf identity
+  round-trips for all 21 domain identity kinds
+Affected-behavior: Protobuf boundaries now retain and validate the identity
+  kind instead of transporting an untyped interchangeable string
+Compatibility-or-migration: Adds the initial `StableIdentity` protobuf message
+  and enum; no persisted schema exists
+Verification: Deterministic generation and domain/transport tests pass for
+  every identity kind, including null, wrong-kind, malformed, and zero cases;
+  full repository test and lint suites pass
+Dev-Log: DL-20260730-029
+
 Change-ID: CL-20260730-027
 Date: 2026-07-30
 Type: Domain identity primitives

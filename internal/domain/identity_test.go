@@ -2,6 +2,8 @@ package domain
 
 import (
 	"bytes"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -112,6 +114,72 @@ func TestNewProjectIDGeneratesCanonicalIdentity(t *testing.T) {
 	}
 }
 
+func TestEveryIdentityTypeJSONAndSQLRoundTrips(t *testing.T) {
+	t.Run("project", func(t *testing.T) {
+		assertIdentityCodecs(t, "prj", ParseProjectID)
+	})
+	t.Run("repository", func(t *testing.T) {
+		assertIdentityCodecs(t, "repo", ParseRepositoryID)
+	})
+	t.Run("workspace", func(t *testing.T) {
+		assertIdentityCodecs(t, "wsp", ParseWorkspaceID)
+	})
+	t.Run("thread", func(t *testing.T) {
+		assertIdentityCodecs(t, "thr", ParseThreadID)
+	})
+	t.Run("message", func(t *testing.T) {
+		assertIdentityCodecs(t, "msg", ParseMessageID)
+	})
+	t.Run("task", func(t *testing.T) {
+		assertIdentityCodecs(t, "tsk", ParseTaskID)
+	})
+	t.Run("run", func(t *testing.T) {
+		assertIdentityCodecs(t, "run", ParseRunID)
+	})
+	t.Run("event", func(t *testing.T) {
+		assertIdentityCodecs(t, "evt", ParseEventID)
+	})
+	t.Run("checkpoint", func(t *testing.T) {
+		assertIdentityCodecs(t, "ckp", ParseCheckpointID)
+	})
+	t.Run("approval", func(t *testing.T) {
+		assertIdentityCodecs(t, "apr", ParseApprovalID)
+	})
+	t.Run("graph", func(t *testing.T) {
+		assertIdentityCodecs(t, "grf", ParseGraphID)
+	})
+	t.Run("graph revision", func(t *testing.T) {
+		assertIdentityCodecs(t, "grv", ParseGraphRevisionID)
+	})
+	t.Run("node", func(t *testing.T) {
+		assertIdentityCodecs(t, "nod", ParseNodeID)
+	})
+	t.Run("edge", func(t *testing.T) {
+		assertIdentityCodecs(t, "edg", ParseEdgeID)
+	})
+	t.Run("validation", func(t *testing.T) {
+		assertIdentityCodecs(t, "val", ParseValidationID)
+	})
+	t.Run("evidence", func(t *testing.T) {
+		assertIdentityCodecs(t, "evd", ParseEvidenceID)
+	})
+	t.Run("artifact", func(t *testing.T) {
+		assertIdentityCodecs(t, "art", ParseArtifactID)
+	})
+	t.Run("atom", func(t *testing.T) {
+		assertIdentityCodecs(t, "atm", ParseAtomID)
+	})
+	t.Run("model request", func(t *testing.T) {
+		assertIdentityCodecs(t, "mrq", ParseModelRequestID)
+	})
+	t.Run("provider", func(t *testing.T) {
+		assertIdentityCodecs(t, "prv", ParseProviderID)
+	})
+	t.Run("budget", func(t *testing.T) {
+		assertIdentityCodecs(t, "bdg", ParseBudgetID)
+	})
+}
+
 func TestUUIDv7IsLexicographicallyTimeSortable(t *testing.T) {
 	entropy := bytes.NewReader(make([]byte, 20))
 	first, err := newUUIDv7(time.UnixMilli(1_700_000_000_000), entropy)
@@ -144,5 +212,57 @@ func TestIdentityKindsAreNotAssignableOrConvertible(t *testing.T) {
 func wrapIDParser[T parsedIdentity](parse func(string) (T, error)) func(string) (parsedIdentity, error) {
 	return func(raw string) (parsedIdentity, error) {
 		return parse(raw)
+	}
+}
+
+func assertIdentityCodecs[T parsedIdentity](
+	t *testing.T,
+	prefix string,
+	parse func(string) (T, error),
+) {
+	t.Helper()
+	raw := prefix + "_" + uuidV7Fixture
+	original, err := parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encoded, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal JSON: %v", err)
+	}
+	var fromJSON T
+	if err := json.Unmarshal(encoded, &fromJSON); err != nil {
+		t.Fatalf("unmarshal JSON: %v", err)
+	}
+	if fromJSON.String() != raw {
+		t.Fatalf("JSON identity = %q, want %q", fromJSON.String(), raw)
+	}
+
+	valuer, ok := any(original).(driver.Valuer)
+	if !ok {
+		t.Fatalf("%T does not implement driver.Valuer", original)
+	}
+	sqlValue, err := valuer.Value()
+	if err != nil {
+		t.Fatalf("SQL value: %v", err)
+	}
+	var fromSQL T
+	scanner, ok := any(&fromSQL).(sql.Scanner)
+	if !ok {
+		t.Fatalf("*%T does not implement sql.Scanner", fromSQL)
+	}
+	if err := scanner.Scan(sqlValue); err != nil {
+		t.Fatalf("SQL scan: %v", err)
+	}
+	if fromSQL.String() != raw {
+		t.Fatalf("SQL identity = %q, want %q", fromSQL.String(), raw)
+	}
+
+	if err := json.Unmarshal([]byte("null"), &fromJSON); !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("JSON null error = %v, want ErrInvalidID", err)
+	}
+	if err := scanner.Scan(nil); !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("SQL null error = %v, want ErrInvalidID", err)
 	}
 }

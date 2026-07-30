@@ -529,7 +529,7 @@ Milestone output: transport-independent identity, lifecycle, policy, budget, ris
 - [x] `M02-002` Choose a sortable identifier format suitable for local generation.
 - [x] `M02-003` Implement ID parsing and validation.
 - [x] `M02-004` Reject empty or malformed IDs at domain boundaries.
-- [ ] `M02-005` Add JSON, SQL, and protobuf conversion tests for every ID type.
+- [x] `M02-005` Add JSON, SQL, and protobuf conversion tests for every ID type.
 - [x] `M02-006` Ensure different ID types cannot be accidentally interchanged in Go.
 
 Identity evidence:
@@ -544,8 +544,11 @@ Identity evidence:
   `IDParseError` values that unwrap to `ErrInvalidID`.
 - JSON text and SQL scan/value boundaries reject null, empty, malformed, or
   wrong-representation input instead of admitting an invalid zero identity.
-- M02-005 remains open until every identity kind has exhaustive JSON, SQL, and
-  generated-protobuf round-trip coverage.
+- Every identity kind round-trips through validating JSON text, SQL
+  `driver.Valuer`/`sql.Scanner`, and deterministic generated-protobuf wire
+  encoding. The transport envelope carries an explicit kind enum and rejects
+  nil, unspecified, wrong-kind, empty, and malformed values without importing
+  generated protobuf types into the domain package.
 
 ## Task and Run States
 
