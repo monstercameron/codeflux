@@ -416,8 +416,8 @@ Atom-admission evidence:
 
 Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Development Helper, Local Development Profiles, Generated Code Workflow, and Inner Development Loop.
 
-- [ ] `M01-079 BLOCKER` Create `cmd/codeflux-dev` as the cross-platform development entry point without requiring Make, Bash, PowerShell, Node scripts, or a global task runner.
-- [ ] `M01-080` Define the development command registry with name, purpose, prerequisites, arguments, exit codes, and machine-readable-output capability.
+- [x] `M01-079 BLOCKER` Create `cmd/codeflux-dev` as the cross-platform development entry point without requiring Make, Bash, PowerShell, Node scripts, or a global task runner.
+- [x] `M01-080` Define the development command registry with name, purpose, prerequisites, arguments, exit codes, and machine-readable-output capability.
 - [ ] `M01-081` Implement `codeflux-dev bootstrap` to verify pinned Go, Git, protobuf, GoWebComponents, and generator requirements.
 - [ ] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
 - [ ] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
@@ -442,6 +442,13 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [ ] `M01-102 TEST` Verify `.artifacts/` and every descendant remain ignored, cannot enter a normal commit, and need no tracked placeholder.
 - [ ] `M01-103` Configure CI artifact uploads to select redacted files from `.artifacts/` without creating another staging root.
 - [ ] `M01-104 TEST` Scan the worktree after every CI command and fail on known disposable build/test artifact types outside `.artifacts/`.
+
+Developer-command registry evidence:
+
+- `go run ./cmd/codeflux-dev help` discovers the sorted command surface without Make, shell scripts, Node, or a global task runner.
+- Registry schema v1 records each command's purpose, prerequisites, arguments, availability, stable exit meanings, and current machine-output capability; JSON discovery is deterministic.
+- Every declared command supports text and JSON help. Unimplemented subsystem commands return exit 3 and a versioned unavailable result instead of claiming success.
+- Shared root resolution defaults to a command child beneath `.artifacts`, rejects the repository root, and rejects any repository-local destination outside `.artifacts`.
 
 ## Gate
 

@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	exitSuccess = 0
-	exitFailure = 1
-	exitUsage   = 2
+	exitSuccess     = 0
+	exitFailure     = 1
+	exitUsage       = 2
+	exitUnavailable = 3
 )
 
 func main() {
@@ -28,14 +29,46 @@ func main() {
 
 func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	if len(args) == 0 {
-		printHelp(stderr)
+		_ = printRegistry(stderr, false)
 		return exitUsage
 	}
 
-	switch args[0] {
-	case "help", "--help", "-h":
-		printHelp(stdout)
+	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		jsonOutput := len(args) == 2 && args[1] == "--json"
+		if len(args) > 1 && !jsonOutput {
+			fmt.Fprintf(stderr, "codeflux-dev help: unknown arguments %q\n", args[1:])
+			return exitUsage
+		}
+		if err := printRegistry(stdout, jsonOutput); err != nil {
+			fmt.Fprintf(stderr, "codeflux-dev help: %v\n", err)
+			return exitFailure
+		}
 		return exitSuccess
+	}
+	spec, ok := findCommandSpec(args[0])
+	if !ok {
+		fmt.Fprintf(stderr, "codeflux-dev: unknown command %q\n", args[0])
+		_ = printRegistry(stderr, false)
+		return exitUsage
+	}
+	invocation, err := parseCommandInvocation(args[1:])
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev %s: %v\n", spec.Name, err)
+		return exitUsage
+	}
+	if invocation.Help {
+		if err := printCommandHelp(stdout, spec, invocation.JSON); err != nil {
+			fmt.Fprintf(stderr, "codeflux-dev %s help: %v\n", spec.Name, err)
+			return exitFailure
+		}
+		return exitSuccess
+	}
+	if invocation.JSON && !spec.MachineReadable {
+		fmt.Fprintf(stderr, "codeflux-dev %s: --json is not supported by this command\n", spec.Name)
+		return exitUsage
+	}
+
+	switch spec.Name {
 	case "build":
 		return runBuild(ctx, stdout, stderr)
 	case "generate":
@@ -53,24 +86,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	case "lint":
 		return runLint(ctx, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "codeflux-dev: unknown command %q\n", args[0])
-		printHelp(stderr)
-		return exitUsage
+		return runUnavailable(stderr, spec, invocation)
 	}
-}
-
-func printHelp(output io.Writer) {
-	fmt.Fprintln(output, "Usage: go run ./cmd/codeflux-dev <command>")
-	fmt.Fprintln(output)
-	fmt.Fprintln(output, "Commands:")
-	fmt.Fprintln(output, "  build      Compile all packages and write command binaries to .artifacts/bin")
-	fmt.Fprintln(output, "  ci-failure-artifact  Write allow-listed CI failure context under .artifacts")
-	fmt.Fprintln(output, "  generate   Regenerate source from pinned protobuf tools")
-	fmt.Fprintln(output, "  generate-check  Regenerate under .artifacts and reject committed drift")
-	fmt.Fprintln(output, "  test-fast  Run the complete fast Go test suite")
-	fmt.Fprintln(output, "  test-race  Run Go race tests on a supported host")
-	fmt.Fprintln(output, "  test-coverage  Write unit coverage to .artifacts/coverage")
-	fmt.Fprintln(output, "  lint       Verify formatting, vet, and staticcheck 2026.1")
 }
 
 func runGenerate(ctx context.Context, stdout, stderr io.Writer) int {

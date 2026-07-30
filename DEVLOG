@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-016
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-015
+Request-or-TODO: M01-079, M01-080
+Goal: Make the complete development command surface discoverable through one
+  cross-platform Go entry point before implementing each subsystem binding
+Assumptions: Registry availability and machine-output fields must describe the
+  current repository truth, including skeleton commands and unsupported JSON
+Decisions: Use registry schema v1, stable exits 0/1/2/3, sorted deterministic
+  discovery, per-command help, and a shared safe root resolver
+Files-or-schemas: codeflux-dev registry, dispatcher, and tests; command registry
+  schema version 1; no runtime database schema
+Validation: Registry, help, unavailable JSON, unsupported JSON, and root-boundary
+  unit tests, staged aggregate lint, fast suite, and whitespace checks passed
+Failures-or-discarded-approaches: Initially labeled bootstrap implemented and
+  current commands machine-readable before dispatch supported those claims;
+  corrected registry metadata to reflect current behavior
+Known-limitations: Root overrides and remaining command handlers are declared
+  but are completed by M01-081 through M01-104
+Next-safe-step: Stage and validate the registry cluster, then implement pinned
+  bootstrap and complete generation families.
+
 Dev-Log: DL-20260730-015
 Date: 2026-07-30
 Status: Complete

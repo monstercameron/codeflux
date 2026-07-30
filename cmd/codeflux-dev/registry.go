@@ -1,0 +1,208 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+const commandRegistrySchemaVersion = 1
+
+type commandExitCode struct {
+	Code    int    `json:"code"`
+	Meaning string `json:"meaning"`
+}
+
+type commandSpec struct {
+	Name            string            `json:"name"`
+	Purpose         string            `json:"purpose"`
+	Prerequisites   []string          `json:"prerequisites"`
+	Arguments       []string          `json:"arguments"`
+	ExitCodes       []commandExitCode `json:"exit_codes"`
+	MachineReadable bool              `json:"machine_readable"`
+	Availability    string            `json:"availability"`
+}
+
+type commandInvocation struct {
+	Help       bool
+	JSON       bool
+	Root       string
+	Positional []string
+}
+
+type commandRegistryDocument struct {
+	SchemaVersion int           `json:"schema_version"`
+	Commands      []commandSpec `json:"commands"`
+}
+
+func developmentCommandRegistry() []commandSpec {
+	commonExitCodes := []commandExitCode{
+		{Code: exitSuccess, Meaning: "completed successfully"},
+		{Code: exitFailure, Meaning: "command or exact sub-step failed"},
+		{Code: exitUsage, Meaning: "arguments or command name are invalid"},
+		{Code: exitUnavailable, Meaning: "declared subsystem is not implemented or available"},
+	}
+	specs := []commandSpec{
+		{Name: "benchmark", Purpose: "Run a named benchmark beneath the artifact root.", Prerequisites: []string{"implemented benchmark subsystem"}, Arguments: []string{"[name]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "bootstrap", Purpose: "Verify the pinned development toolchain and generators.", Prerequisites: []string{"Go", "Git", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "build", Purpose: "Compile packages and command binaries beneath the artifact root.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "ci-failure-artifact", Purpose: "Write allow-listed CI failure context.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "doctor", Purpose: "Run environment and product subsystem diagnostics.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "generate", Purpose: "Regenerate every declared generated source family.", Prerequisites: []string{"Go", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "generate-check", Purpose: "Regenerate in isolation and reject committed drift.", Prerequisites: []string{"Go", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "inspect-db", Purpose: "Print a safe structured application database summary.", Prerequisites: []string{"implemented storage subsystem"}, Arguments: []string{"[database]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "lint", Purpose: "Run format, vet, Staticcheck, documentation, schema, and repository checks.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "replay", Purpose: "Replay a redacted event fixture or development session.", Prerequisites: []string{"implemented event subsystem"}, Arguments: []string{"[fixture]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "run", Purpose: "Start the isolated deterministic development profile.", Prerequisites: []string{"implemented coordinator and storage subsystems"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "run-live", Purpose: "Start an explicitly selected live-provider profile.", Prerequisites: []string{"implemented provider, credential, coordinator, and storage subsystems"}, Arguments: []string{"--provider NAME", "--credential-ref REF", "--database PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "seed", Purpose: "Create a named deterministic development scenario.", Prerequisites: []string{"implemented storage and event subsystems"}, Arguments: []string{"[scenario]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-all", Purpose: "Run the required local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-browser", Purpose: "Run browser component and end-to-end scenarios.", Prerequisites: []string{"implemented browser harness"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-coverage", Purpose: "Run unit tests and write a coverage profile beneath the artifact root.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "test-fast", Purpose: "Run unit and pure package tests.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "test-integration", Purpose: "Run real SQLite, Git, process, transport, and migration tests.", Prerequisites: []string{"implemented integration harness"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-race", Purpose: "Run Go race tests on a supported host.", Prerequisites: []string{"Go race detector support"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "test-security", Purpose: "Run path, origin, permission, redaction, secret, and payload cases.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+	}
+	sort.Slice(specs, func(i, j int) bool {
+		return specs[i].Name < specs[j].Name
+	})
+	return specs
+}
+
+func findCommandSpec(name string) (commandSpec, bool) {
+	for _, spec := range developmentCommandRegistry() {
+		if spec.Name == name {
+			return spec, true
+		}
+	}
+	return commandSpec{}, false
+}
+
+func parseCommandInvocation(args []string) (commandInvocation, error) {
+	var invocation commandInvocation
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--help" || argument == "-h":
+			invocation.Help = true
+		case argument == "--json":
+			invocation.JSON = true
+		case argument == "--root":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--root requires a path")
+			}
+			invocation.Root = args[index]
+		case strings.HasPrefix(argument, "--root="):
+			invocation.Root = strings.TrimPrefix(argument, "--root=")
+			if invocation.Root == "" {
+				return commandInvocation{}, fmt.Errorf("--root requires a path")
+			}
+		case strings.HasPrefix(argument, "-"):
+			return commandInvocation{}, fmt.Errorf("unknown option %q", argument)
+		default:
+			invocation.Positional = append(invocation.Positional, argument)
+		}
+	}
+	return invocation, nil
+}
+
+func printRegistry(output io.Writer, jsonOutput bool) error {
+	registry := commandRegistryDocument{
+		SchemaVersion: commandRegistrySchemaVersion,
+		Commands:      developmentCommandRegistry(),
+	}
+	if jsonOutput {
+		encoder := json.NewEncoder(output)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(registry)
+	}
+	fmt.Fprintln(output, "Usage: go run ./cmd/codeflux-dev <command> [options]")
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Commands:")
+	for _, spec := range registry.Commands {
+		fmt.Fprintf(output, "  %-20s %s\n", spec.Name, spec.Purpose)
+	}
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Use '<command> --help' for prerequisites, arguments, and exit codes.")
+	return nil
+}
+
+func printCommandHelp(output io.Writer, spec commandSpec, jsonOutput bool) error {
+	if jsonOutput {
+		encoder := json.NewEncoder(output)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(spec)
+	}
+	fmt.Fprintf(output, "Usage: go run ./cmd/codeflux-dev %s %s\n", spec.Name, strings.Join(spec.Arguments, " "))
+	fmt.Fprintf(output, "\n%s\n", spec.Purpose)
+	fmt.Fprintf(output, "\nAvailability: %s\n", spec.Availability)
+	fmt.Fprintln(output, "Prerequisites:")
+	for _, prerequisite := range spec.Prerequisites {
+		fmt.Fprintf(output, "  - %s\n", prerequisite)
+	}
+	fmt.Fprintln(output, "Exit codes:")
+	for _, exitCode := range spec.ExitCodes {
+		fmt.Fprintf(output, "  %d  %s\n", exitCode.Code, exitCode.Meaning)
+	}
+	return nil
+}
+
+func runUnavailable(output io.Writer, spec commandSpec, invocation commandInvocation) int {
+	if invocation.JSON {
+		result := struct {
+			SchemaVersion int    `json:"schema_version"`
+			Command       string `json:"command"`
+			Status        string `json:"status"`
+			Reason        string `json:"reason"`
+		}{
+			SchemaVersion: 1,
+			Command:       spec.Name,
+			Status:        "unavailable",
+			Reason:        "required subsystem is not implemented at the current repository milestone",
+		}
+		if err := json.NewEncoder(output).Encode(result); err != nil {
+			return exitFailure
+		}
+		return exitUnavailable
+	}
+	fmt.Fprintf(output, "codeflux-dev %s: unavailable: required subsystem is not implemented at the current repository milestone\n", spec.Name)
+	return exitUnavailable
+}
+
+func resolveCommandRoot(repositoryRoot, commandName, requested string) (string, error) {
+	artifactRoot := filepath.Join(repositoryRoot, ".artifacts")
+	target := requested
+	if target == "" {
+		target = filepath.Join(artifactRoot, commandName)
+	} else if !filepath.IsAbs(target) {
+		target = filepath.Join(repositoryRoot, target)
+	}
+	resolved, err := filepath.Abs(target)
+	if err != nil {
+		return "", fmt.Errorf("resolve --root: %w", err)
+	}
+	repositoryRoot, err = filepath.Abs(repositoryRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve repository root: %w", err)
+	}
+	relative, err := filepath.Rel(repositoryRoot, resolved)
+	if err != nil {
+		return "", fmt.Errorf("compare --root with repository: %w", err)
+	}
+	if relative == "." || relative == "" {
+		return "", fmt.Errorf("--root must not be the repository root")
+	}
+	if relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		artifactRelative, err := filepath.Rel(artifactRoot, resolved)
+		if err != nil || artifactRelative == "." || artifactRelative == "" ||
+			artifactRelative == ".." || strings.HasPrefix(artifactRelative, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("repository-local --root must be a child of .artifacts")
+		}
+	}
+	return resolved, nil
+}
