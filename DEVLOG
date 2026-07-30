@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-060
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-059
+Request-or-TODO: M11-028 and M11-G01 public-CI follow-up
+Goal: Preserve exact worker worktree verification across platform path aliases
+Assumptions: A path spelling may differ after process launch while both paths
+  still identify the same directory
+Decisions: Keep the runtime working-directory contract unchanged and compare
+  the child process current directory with the startup worktree through
+  operating-system file identity in the subprocess test
+Files-or-schemas: Worker process integration test only
+Validation: The focused worker suite and full local tests pass. Public CI run
+  30545302566 records exit status 12 from the prior direct string comparison
+  on macOS ARM64 while the Ubuntu job passed.
+Failures-or-discarded-approaches: Comparing os.Getwd text directly repeated the
+  already-known macOS /var-to-/private alias defect. Weakening task worktree
+  confinement was rejected; file identity retains the invariant.
+Known-limitations: Cross-platform confirmation requires the next public CI
+  matrix after this correction is pushed.
+Next-safe-step: Push the correction, require all public CI jobs to pass, and
+  continue the already-started M12 provider lanes.
+
 Dev-Log: DL-20260730-059
 Date: 2026-07-30
 Status: Complete

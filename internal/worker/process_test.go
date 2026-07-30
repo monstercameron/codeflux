@@ -23,8 +23,12 @@ func TestWorkerProcessHelper(t *testing.T) {
 	if err != nil {
 		os.Exit(11)
 	}
-	directory, err := os.Getwd()
-	if err != nil || directory != startup.WorktreePath {
+	currentDirectory, err := os.Stat(".")
+	if err != nil {
+		os.Exit(12)
+	}
+	startupDirectory, err := os.Stat(startup.WorktreePath)
+	if err != nil || !os.SameFile(currentDirectory, startupDirectory) {
 		os.Exit(12)
 	}
 	if os.Getenv("OPENAI_API_KEY") != "" {

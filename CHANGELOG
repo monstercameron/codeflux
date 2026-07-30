@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-059
+Date: 2026-07-30
+Type: Cross-platform worker directory identity
+Request-or-TODO: M11-028 and M11-G01 public-CI follow-up
+Outcome: Compare the launched worker directory by filesystem identity in the
+  subprocess integration test
+Affected-behavior: macOS temporary paths that traverse the /var-to-/private
+  alias now prove the same task-worktree identity without a false string-path
+  mismatch
+Compatibility-or-migration: No schema, API, or runtime behavior change
+Verification: The focused worker suite and full local tests pass; public CI
+  run 30545302566 records the originating macOS ARM64 failure
+Dev-Log: DL-20260730-060
+
 Change-ID: CL-20260730-058
 Date: 2026-07-30
 Type: Coordinator and worker lifecycle
