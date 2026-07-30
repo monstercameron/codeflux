@@ -1297,43 +1297,68 @@ M07 transport-boundary evidence:
 
 Plan: §27B Backend Design Rules through Backend Flow Acceptance.
 
-- [ ] `M07-061 BLOCKER` Create a machine-reviewable catalog mapping every prototype gRPC method to one application-service function, command/query type, result type, authorization rule, and domain-error mapping.
-- [ ] `M07-062` For every mutating application function, record its idempotency key scope and duplicate-result behavior.
-- [ ] `M07-063` For every concurrently mutable entity, record the required expected revision and stale-conflict response.
-- [ ] `M07-064` For every mutating application function, record its SQLite transaction boundary and repositories touched.
-- [ ] `M07-065` For every mutating application function, record durable events appended in the committing transaction.
-- [ ] `M07-066` For every external effect, record durable intent, effect identity, outcome, ambiguity, retry, and cancellation behavior.
-- [ ] `M07-067` Define the safe transport mapping for not-found, invalid transition, stale revision, duplicate, denied, budget exhausted, cancelled, retryable provider, corruption, and recovery-required errors.
-- [ ] `M07-068` Verify gRPC handlers contain input validation, conversion, delegation, and error mapping only.
-- [ ] `M07-069` Define application lifecycle functions and startup/shutdown ordering.
-- [ ] `M07-070` Define workspace, repository-map, context-selection, and explanation functions.
-- [ ] `M07-071` Define thread, message, pagination, rename, and archive functions.
-- [ ] `M07-072` Define requirement, fingerprint, retrieval, forecast, plan, revision, approval, and task-lifecycle functions.
-- [ ] `M07-073` Define worktree, safe-path, edit-batch, diff, checkpoint, restore, acceptance, abandonment, and cleanup functions.
-- [ ] `M07-074` Define provider, model-request, stream, cancellation, retry, usage-reconciliation, and price functions.
-- [ ] `M07-075` Define exact budget creation, reservation, usage commit, release, limit raise, and snapshot functions.
-- [ ] `M07-076` Define tool discovery, authority classification, approval, execution, cancellation, output bounding, and redaction functions.
-- [ ] `M07-077` Define worker spawn, lease, heartbeat, pause, resume, cancel, checkpoint, status, and lost-worker classification functions.
-- [ ] `M07-078` Define risk, validation selection, execution, invalidation, baseline, evidence, review, acceptance, repair, rejection, and editor-open functions.
-- [ ] `M07-079` Define graph projection, revision, patch, layout, slice, expansion, cone, comparison, node, and explanation functions.
-- [ ] `M07-080` Define episode, fact extraction, fingerprint, atom name/doc admission, embedding, exact retrieval, vector candidate, applicability, assurance, influence, and invalidation functions.
-- [ ] `M07-081` Define credential, settings, doctor, backup, integrity, and diagnostic-export functions.
-- [ ] `M07-082 TEST` Execute the complete startup flow against deterministic ports, database, and recovery fixtures.
-- [ ] `M07-083 TEST` Execute open-repository and context-selection flows against clean, dirty, detached, conflicted, and malicious fixtures.
-- [ ] `M07-084 TEST` Execute submit-requirement, forecast, plan, revise, approve, and start flows through generated clients.
-- [ ] `M07-085 TEST` Execute an agent tool step through automatic, approval-required, denied, failed, cancelled, and retryable paths.
-- [ ] `M07-086 TEST` Execute pause, resume, cancellation, provider failure, and hard-budget flows at each durable boundary.
-- [ ] `M07-087 TEST` Execute validation, review, accept, repair, reject, rollback, and stale-review flows.
-- [ ] `M07-088 TEST` Execute reconnect/replay with event commit before delivery, duplicate delivery, and stale projection.
-- [ ] `M07-089 TEST` Execute coordinator/worker crash classification without repeating an ambiguous action.
-- [ ] `M07-090 TEST` Execute pre-work retrieval and atom admission while proving vector similarity cannot bypass eligibility.
+- [x] `M07-061 BLOCKER` Create a machine-reviewable catalog mapping every prototype gRPC method to one application-service function, command/query type, result type, authorization rule, and domain-error mapping.
+- [x] `M07-062` For every mutating application function, record its idempotency key scope and duplicate-result behavior.
+- [x] `M07-063` For every concurrently mutable entity, record the required expected revision and stale-conflict response.
+- [x] `M07-064` For every mutating application function, record its SQLite transaction boundary and repositories touched.
+- [x] `M07-065` For every mutating application function, record durable events appended in the committing transaction.
+- [x] `M07-066` For every external effect, record durable intent, effect identity, outcome, ambiguity, retry, and cancellation behavior.
+- [x] `M07-067` Define the safe transport mapping for not-found, invalid transition, stale revision, duplicate, denied, budget exhausted, cancelled, retryable provider, corruption, and recovery-required errors.
+- [x] `M07-068` Verify gRPC handlers contain input validation, conversion, delegation, and error mapping only.
+- [x] `M07-069` Define application lifecycle functions and startup/shutdown ordering.
+- [x] `M07-070` Define workspace, repository-map, context-selection, and explanation functions.
+- [x] `M07-071` Define thread, message, pagination, rename, and archive functions.
+- [x] `M07-072` Define requirement, fingerprint, retrieval, forecast, plan, revision, approval, and task-lifecycle functions.
+- [x] `M07-073` Define worktree, safe-path, edit-batch, diff, checkpoint, restore, acceptance, abandonment, and cleanup functions.
+- [x] `M07-074` Define provider, model-request, stream, cancellation, retry, usage-reconciliation, and price functions.
+- [x] `M07-075` Define exact budget creation, reservation, usage commit, release, limit raise, and snapshot functions.
+- [x] `M07-076` Define tool discovery, authority classification, approval, execution, cancellation, output bounding, and redaction functions.
+- [x] `M07-077` Define worker spawn, lease, heartbeat, pause, resume, cancel, checkpoint, status, and lost-worker classification functions.
+- [x] `M07-078` Define risk, validation selection, execution, invalidation, baseline, evidence, review, acceptance, repair, rejection, and editor-open functions.
+- [x] `M07-079` Define graph projection, revision, patch, layout, slice, expansion, cone, comparison, node, and explanation functions.
+- [x] `M07-080` Define episode, fact extraction, fingerprint, atom name/doc admission, embedding, exact retrieval, vector candidate, applicability, assurance, influence, and invalidation functions.
+- [x] `M07-081` Define credential, settings, doctor, backup, integrity, and diagnostic-export functions.
+- [x] `M07-082 TEST` Execute the complete startup flow against deterministic ports, database, and recovery fixtures.
+- [x] `M07-083 TEST` Execute open-repository and context-selection flows against clean, dirty, detached, conflicted, and malicious fixtures.
+- [x] `M07-084 TEST` Execute submit-requirement, forecast, plan, revise, approve, and start flows through generated clients.
+- [x] `M07-085 TEST` Execute an agent tool step through automatic, approval-required, denied, failed, cancelled, and retryable paths.
+- [x] `M07-086 TEST` Execute pause, resume, cancellation, provider failure, and hard-budget flows at each durable boundary.
+- [x] `M07-087 TEST` Execute validation, review, accept, repair, reject, rollback, and stale-review flows.
+- [x] `M07-088 TEST` Execute reconnect/replay with event commit before delivery, duplicate delivery, and stale projection.
+- [x] `M07-089 TEST` Execute coordinator/worker crash classification without repeating an ambiguous action.
+- [x] `M07-090 TEST` Execute pre-work retrieval and atom admission while proving vector similarity cannot bypass eligibility.
 
 ## Gate
 
-- [ ] `M07-G01 GATE` The generated client can perform the complete synthetic user journey.
-- [ ] `M07-G02 GATE` API messages expose no SQLite implementation details or secrets.
-- [ ] `M07-G03 GATE` Every mutating method is idempotent or explicitly documents why it cannot be retried.
-- [ ] `M07-G04 GATE` Every backend application function has explicit authority, revision, transaction, event, side-effect, cancellation, and typed-error behavior, and every chronological flow passes against deterministic fakes.
+- [x] `M07-G01 GATE` The generated client can perform the complete synthetic user journey.
+- [x] `M07-G02 GATE` API messages expose no SQLite implementation details or secrets.
+- [x] `M07-G03 GATE` Every mutating method is idempotent or explicitly documents why it cannot be retried.
+- [x] `M07-G04 GATE` Every backend application function has explicit authority, revision, transaction, event, side-effect, cancellation, and typed-error behavior, and every chronological flow passes against deterministic fakes.
+
+Gate evidence:
+
+- The descriptor-checked catalog binds all 37 v1 product methods to exact
+  request/result types, one application function, the four permitted thin
+  handler steps, authorization, safe errors, idempotency, revision,
+  transaction, repository, event, effect, ambiguity, retry, and cancellation
+  behavior. Defensive-copy tests prevent runtime mutation of the review
+  surface.
+- The backend catalog covers lifecycle, journal, workspace, thread, task,
+  worktree, provider, exact budget, mediated tools, workers, validation/review,
+  graph, memory, credential, settings, and diagnostics functions from plan
+  section 27B. Mutation/effect tests reject any row without explicit authority,
+  retry, revision, transaction, repository/event, and external-effect
+  semantics.
+- Deterministic flow tests execute startup/recovery; repository states and
+  malicious content; the generated-client requirement journey; every tool
+  decision; pause/resume/cancel, provider and budget boundaries; review
+  decisions; reconnect/replay; crash classification; and exact-first
+  eligibility-gated retrieval plus atom admission.
+- Repository bootstrap, deterministic generation, migration check, lint,
+  fast, integration, security, all-scope, and artifact-containment gates pass.
+  The architecture check additionally proves transport no longer imports the
+  sibling SQLite adapter; storage failures must be classified by the inward
+  application contract before safe transport mapping.
 
 ---
 

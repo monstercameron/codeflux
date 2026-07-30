@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-049
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-048
+Request-or-TODO: M07-061 through M07-090 and M07-G01 through M07-G04
+Goal: Freeze the complete application-service contract and prove every
+  chronological backend flow against deterministic fakes before repository
+  intelligence begins
+Assumptions: M07 defines contracts and executable acceptance models rather than
+  prematurely implementing M08 and later adapters; product RPC messages and
+  generated bindings remain the authoritative transport vocabulary
+Decisions: Represent every RPC and backend function as typed Go catalog data.
+  Record request/result types, authority, idempotency, duplicate behavior,
+  expected revision, transaction, repositories, events, external-effect
+  intent/outcome/ambiguity/retry, cancellation, and safe errors explicitly.
+  Use generated Bufconn clients for the requirement journey and small
+  deterministic fixtures for the remaining chronological acceptance matrices.
+Files-or-schemas: Coordinator contract catalog and tests, deterministic backend
+  flow fixtures, transport dependency correction, and M07 completion evidence;
+  no protobuf or SQLite schema change
+Validation: All 37 product methods match descriptors and have one thin-handler
+  mapping. Every planned backend category and representative function validates
+  complete mutation/effect semantics. Startup/recovery, repository safety,
+  submit/forecast/plan/revise/approve/start, tool decisions, durable task
+  controls, review decisions, replay, crash classification, retrieval, and atom
+  admission tests pass. Bootstrap, deterministic generation, migration check,
+  lint, fast, integration, security, all-scope, and artifact checks pass.
+Failures-or-discarded-approaches: The first catalog draft left request/result
+  message names and effect outcome/ambiguity/retry behavior implicit; the audit
+  rejected that and made each field descriptor-checked. The first replay
+  fixture used an incorrect retention boundary and was corrected. Full lint
+  exposed an earlier transport import of storage sentinels; direct
+  adapter-to-adapter mapping was removed so application errors cross the inward
+  contract instead.
+Known-limitations: These tests prove the M07 contract and deterministic fake
+  flows, not production implementations of repository discovery, providers,
+  workers, tools, review, graphs, or memory. Browser E2E remains scheduled for
+  the implemented product UI milestone, and the race suite remains authoritative
+  in Ubuntu AMD64 CI because the local host is Windows ARM64.
+Next-safe-step: Begin M08 at repository opening and safe root discovery, using
+  the cataloged WorkspaceService boundary and plan section 27 repository rules.
+
 Dev-Log: DL-20260730-048
 Date: 2026-07-30
 Status: Complete

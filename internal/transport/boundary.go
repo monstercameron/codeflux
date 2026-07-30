@@ -12,7 +12,6 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
-	"codeflux.dev/codeflux/internal/storage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -558,14 +557,6 @@ func MapError(err error) error {
 		detail.Code = codefluxv1.ErrorCode_ERROR_CODE_INVALID_TRANSITION
 		detail.SafeMessage = "The requested state transition is not allowed."
 		grpcCode = codes.FailedPrecondition
-	case errors.Is(err, storage.ErrNotFound):
-		detail.Code = codefluxv1.ErrorCode_ERROR_CODE_NOT_FOUND
-		detail.SafeMessage = "The requested entity was not found."
-		grpcCode = codes.NotFound
-	case errors.Is(err, storage.ErrStaleRevision):
-		detail.Code = codefluxv1.ErrorCode_ERROR_CODE_STALE_REVISION
-		detail.SafeMessage = "The entity changed; refresh and retry."
-		grpcCode = codes.Aborted
 	case errors.Is(err, context.Canceled):
 		detail.Code = codefluxv1.ErrorCode_ERROR_CODE_CANCELLED
 		detail.SafeMessage = "The request was cancelled."

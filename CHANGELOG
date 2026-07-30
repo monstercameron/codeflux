@@ -30,6 +30,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-048
+Date: 2026-07-30
+Type: Backend application contract and deterministic flow gate
+Request-or-TODO: M07-061 through M07-090 and M07-G01 through M07-G04
+Outcome: Added a descriptor-checked RPC/application-function catalog and the
+  complete section 27B backend function catalog, with executable deterministic
+  acceptance flows for lifecycle, repository context, generated-client task
+  planning, tools, durable controls, review, replay, crash recovery, retrieval,
+  and atom admission
+Affected-behavior: Every v1 product RPC and planned backend function now has
+  machine-reviewable authority, retry, revision, transaction, repository,
+  event, effect, ambiguity, cancellation, and safe-error behavior; the
+  generated clients complete the semantic synthetic journey and unsafe vector
+  or ambiguous-effect fallbacks are rejected by tests
+Compatibility-or-migration: Additive internal coordinator contracts and tests;
+  removes a forbidden transport-to-storage adapter dependency; no protobuf or
+  database schema change
+Verification: Descriptor/catalog completeness, function-category, defensive
+  copy, deterministic flow, generated-client Bufconn, transport, vet,
+  bootstrap, generation, migration, lint, fast, integration, security,
+  all-scope, and artifact-containment checks pass
+Dev-Log: DL-20260730-049
+
 Change-ID: CL-20260730-047
 Date: 2026-07-30
 Type: Authenticated product gRPC boundary
