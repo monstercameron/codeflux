@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-058
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-057
+Request-or-TODO: M11-015 through M11-019
+Goal: Establish the minimum safe contract before launching or reconnecting a
+  task worker
+Assumptions: M11 continues with durable leases, live heartbeats, process
+  launch, scheduling, and shutdown on top of this contract
+Decisions: Version every startup/message envelope; require exact task and run
+  identity, absolute non-root worktree, policy and tool-schema revisions,
+  loopback-only coordinator URL, ordered sequence, and constant-time session
+  token authentication. Keep credentials structurally absent. Define bounded
+  container arguments and reconnect policy without implementing ambient retry.
+Files-or-schemas: Worker protocol and focused tests; partial M11 checklist
+Validation: Worker package tests pass
+Failures-or-discarded-approaches: Remote coordinator endpoints, raw credential
+  fields, unversioned payloads, multiple payload variants in one message, and
+  unbounded reconnects were rejected
+Known-limitations: Message transport, heartbeat ownership, process launch, and
+  coordinator recovery remain in the unfinished portion of M11
+Next-safe-step: Add durable worker leases and process metadata, then wire the
+  authenticated heartbeat/control protocol into one worker per active task.
+
 Dev-Log: DL-20260730-057
 Date: 2026-07-30
 Status: Complete

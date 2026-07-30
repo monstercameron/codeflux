@@ -1803,11 +1803,11 @@ Milestone output: authenticated one-worker-per-task subprocess execution with ow
 
 ## Worker Protocol
 
-- [ ] `M11-015 BLOCKER` Define a versioned coordinator/worker protocol.
-- [ ] `M11-016` Define worker startup parameters without raw credentials.
-- [ ] `M11-017` Pass task ID, run ID, worktree path, policy revision, tool schema, and coordinator endpoint.
-- [ ] `M11-018` Authenticate the worker to the coordinator.
-- [ ] `M11-019` Reject protocol-version mismatch.
+- [x] `M11-015 BLOCKER` Define a versioned coordinator/worker protocol.
+- [x] `M11-016` Define worker startup parameters without raw credentials.
+- [x] `M11-017` Pass task ID, run ID, worktree path, policy revision, tool schema, and coordinator endpoint.
+- [x] `M11-018` Authenticate the worker to the coordinator.
+- [x] `M11-019` Reject protocol-version mismatch.
 - [ ] `M11-020` Implement worker heartbeat.
 - [ ] `M11-021` Implement coordinator-issued pause, resume, cancel, and checkpoint requests.
 - [ ] `M11-022` Implement worker status and tool-event reporting.

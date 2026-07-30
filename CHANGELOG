@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-057
+Date: 2026-07-30
+Type: Coordinator-worker protocol foundation
+Request-or-TODO: M11-015 through M11-019
+Outcome: Defined a versioned, ordered, authenticated, credential-free worker
+  bootstrap and message protocol with bounded loopback and reconnect contracts
+Affected-behavior: Workers receive exact task/run/worktree/policy/tool-schema
+  identity and a per-launch session token, reject protocol mismatch and
+  non-loopback coordinators, and cannot receive raw provider credentials
+  through the typed startup contract
+Compatibility-or-migration: No schema change; protocol version begins at 1
+Verification: Worker package tests pass
+Dev-Log: DL-20260730-058
+
 Change-ID: CL-20260730-056
 Date: 2026-07-30
 Type: Mediated tools, permissions, and subprocess execution
