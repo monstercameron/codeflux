@@ -3,6 +3,4 @@
 
 package assets
 
-var Manifest = []Descriptor{
-	{Path: "static/shell.css", SHA256: "95f3f89b6f5c33143fdbc5299734e3e7d282df36d0ca80a324d7396fcc7d2ae9"},
-}
+var Manifest = []Descriptor{}

@@ -310,9 +310,11 @@ the identical SHA-256
 - [x] `M01-034` Add migration embedding through `go:embed`.
 - [x] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
 
-Embedding evidence: package tests read the exact embedded
-`000000_bootstrap.sql` and `static/shell.css` paths; the bootstrap migration is
-an intentional no-op and does not pre-implement M03 schema.
+Embedding and packaging evidence: package tests read the exact embedded
+`000000_bootstrap.sql` path; deterministic frontend packaging accepts the empty
+pre-spike asset set and its generator test packages a Go/WASM fixture. The
+bootstrap migration is an intentional no-op and does not pre-implement M03
+schema.
 - [x] `M01-036` Ensure generated files carry a generated-file header.
 - [x] `M01-037` Ensure generation is reproducible and leaves the worktree clean when rerun.
 - [x] `M01-038` Add a check that committed generated code matches protobuf sources.

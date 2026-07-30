@@ -68,6 +68,25 @@ func TestCheckNoTrackedSecretsRejectsProviderKeyShape(t *testing.T) {
 	}
 }
 
+func TestCheckNoTrackedBrowserSourceRejectsAlternateFrontendStacks(t *testing.T) {
+	for _, path := range []string{
+		"web/client.js",
+		"web/client.ts",
+		"web/index.html",
+		"web/shell.css",
+	} {
+		t.Run(filepath.Ext(path), func(t *testing.T) {
+			err := checkNoTrackedBrowserSource([]string{path})
+			if err == nil || !strings.Contains(err.Error(), "GoWebComponents v5") {
+				t.Fatalf("browser-source error = %v, want GoWebComponents guidance", err)
+			}
+		})
+	}
+	if err := checkNoTrackedBrowserSource([]string{"web/client.go", "web/client.wasm"}); err != nil {
+		t.Fatalf("Go/GWC outputs were rejected: %v", err)
+	}
+}
+
 func TestCompareDirectoryTrees(t *testing.T) {
 	expected := filepath.Join(t.TempDir(), "expected")
 	actual := filepath.Join(t.TempDir(), "actual")

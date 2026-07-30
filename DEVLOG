@@ -24,6 +24,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-024
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-023
+Request-or-TODO: User instruction to remember no JavaScript, HTML, or CSS and
+  use GWC
+Goal: Persist the frontend implementation boundary for every future agent and
+  frontend TODO
+Assumptions: The instruction prohibits handwritten or separately maintained
+  browser-language source while allowing GWC to produce browser-consumable
+  generated projections from Go
+Decisions: Record the boundary in repository-wide AGENTS.md and the detailed
+  GoWebComponents frontend plan; include TypeScript in the prohibition; enforce
+  forbidden tracked extensions in lint; remove the bootstrap CSS and represent
+  the pre-M06 frontend honestly as an empty deterministic asset set
+Files-or-schemas: AGENTS.md, docs/plan.md, TODOS.md, cmd/codeflux-dev
+  repository checks and generator, web/assets packaging, generated version and
+  manifest, CHANGELOG, DEVLOG; no schema change
+Validation: Agent and plan wording agree; generator tests cover a Go/WASM
+  fixture and an absent pre-spike asset directory; tracked source-extension
+  scan, fast tests, lint, and generation drift checks pass
+Failures-or-discarded-approaches: Initial validation found the tracked
+  `web/assets/static/shell.css`; removed it instead of grandfathering a direct
+  violation or weakening the user's frontend boundary
+Known-limitations: The M06 spike still must identify and pin the exact
+  GoWebComponents v5 release before production frontend implementation
+Next-safe-step: Complete M01-G04 on hosted runners, then continue milestones in
+  dependency order while enforcing the Go/GWC-only frontend boundary
+
 Dev-Log: DL-20260730-023
 Date: 2026-07-30
 Status: Complete

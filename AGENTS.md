@@ -39,6 +39,8 @@ The primary interface is a GoWebComponents v5 chat thread with a task-scoped gra
 - Source code, protobuf definitions, SQL migrations, tests, build configuration, and project documentation remain normal Git-tracked files.
 - Provider credentials belong in the operating-system credential store, never SQLite.
 - Workers must not receive raw provider credentials.
+- Author frontend behavior and presentation in Go with GoWebComponents v5. Do not
+  add or maintain handwritten JavaScript, TypeScript, HTML, or CSS source.
 - The initial routing policy remains fixed until baseline telemetry and shadow evaluation authorize adaptation.
 - Vector similarity may discover candidates; it never establishes compatibility, validity, assurance, or permission.
 - External-system behavior remains external. Do not describe contract-checked behavior as fully proven.

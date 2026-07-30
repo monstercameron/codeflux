@@ -3309,6 +3309,11 @@ Do not expose private model reasoning. Display user-visible plans, assumptions, 
 
 GoWebComponents v5 is the fixed frontend framework. Before production implementation, run a bounded spike that pins the exact v5 release and verifies:
 
+Codeflux frontend behavior and presentation are authored in Go through
+GoWebComponents v5. Do not introduce separately maintained handwritten
+JavaScript, TypeScript, HTML, or CSS source; framework-produced browser assets
+remain generated projections of the Go/GWC source.
+
 * WebAssembly build, asset serving, routing, state, and list virtualization;
 * typed client generation from the chosen gRPC contracts;
 * streaming cancellation and reconnect behavior;

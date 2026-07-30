@@ -30,6 +30,24 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-023
+Date: 2026-07-30
+Type: Frontend architecture policy
+Request-or-TODO: User instruction to use GWC without handwritten JavaScript,
+  HTML, or CSS
+Outcome: Made GoWebComponents v5 the required Go-authored frontend path and
+  prohibited separately maintained JavaScript, TypeScript, HTML, and CSS
+  source; removed the existing bootstrap CSS and added lint enforcement
+Affected-behavior: Frontend tasks must implement behavior and presentation in
+  Go/GWC; pre-spike packaging now has an honest empty asset manifest and
+  browser assets may exist only as generated projections
+Compatibility-or-migration: Frontend version changed to the deterministic
+  empty-asset digest; no runtime or schema impact
+Verification: Repository instruction and detailed frontend-plan sections state
+  the same source-language boundary; generator, fast tests, lint, generation
+  drift, and tracked-extension checks pass
+Dev-Log: DL-20260730-024
+
 Change-ID: CL-20260730-022
 Date: 2026-07-30
 Type: Security configuration

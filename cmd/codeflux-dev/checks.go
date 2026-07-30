@@ -44,6 +44,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkNoTrackedSecrets(root, tracked); err != nil {
 		return err
 	}
+	if err := checkNoTrackedBrowserSource(tracked); err != nil {
+		return err
+	}
 	if err := checkInstructionFiles(root, tracked); err != nil {
 		return err
 	}
@@ -204,6 +207,30 @@ func checkNoTrackedSecrets(root string, tracked []string) error {
 					line,
 				)
 			}
+		}
+	}
+	return nil
+}
+
+func checkNoTrackedBrowserSource(tracked []string) error {
+	forbidden := map[string]struct{}{
+		".cjs":  {},
+		".css":  {},
+		".htm":  {},
+		".html": {},
+		".js":   {},
+		".jsx":  {},
+		".mjs":  {},
+		".ts":   {},
+		".tsx":  {},
+	}
+	for _, relative := range tracked {
+		extension := strings.ToLower(filepath.Ext(relative))
+		if _, found := forbidden[extension]; found {
+			return fmt.Errorf(
+				"tracked browser-language source is forbidden; use GoWebComponents v5 from Go: %s",
+				filepath.ToSlash(relative),
+			)
 		}
 	}
 	return nil

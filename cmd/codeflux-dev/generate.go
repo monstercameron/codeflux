@@ -96,6 +96,12 @@ type assetDescriptor struct {
 func frontendAssetDescriptors(root string) ([]assetDescriptor, string, error) {
 	assetRoot := filepath.Join(root, "web", "assets", "static")
 	var descriptors []assetDescriptor
+	if _, err := os.Stat(assetRoot); err != nil {
+		if !os.IsNotExist(err) {
+			return nil, "", fmt.Errorf("inspect frontend asset inputs: %w", err)
+		}
+		return descriptors, frontendAssetVersion(descriptors), nil
+	}
 	err := filepath.WalkDir(assetRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -124,12 +130,15 @@ func frontendAssetDescriptors(root string) ([]assetDescriptor, string, error) {
 	sort.Slice(descriptors, func(i, j int) bool {
 		return descriptors[i].Path < descriptors[j].Path
 	})
+	return descriptors, frontendAssetVersion(descriptors), nil
+}
+
+func frontendAssetVersion(descriptors []assetDescriptor) string {
 	hasher := sha256.New()
 	for _, descriptor := range descriptors {
 		fmt.Fprintf(hasher, "%s\x00%s\x00", descriptor.Path, descriptor.SHA256)
 	}
-	version := "assets-" + hex.EncodeToString(hasher.Sum(nil))[:12]
-	return descriptors, version, nil
+	return "assets-" + hex.EncodeToString(hasher.Sum(nil))[:12]
 }
 
 func eventKindNames(root string) ([]string, error) {
