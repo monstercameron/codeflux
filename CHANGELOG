@@ -30,6 +30,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-053
+Date: 2026-07-30
+Type: Deterministic context selection and persistence
+Request-or-TODO: M08-029 through M08-053 and M08-G01 through M08-G04
+Outcome: Added revision-bound, budgeted, explainable repository-context
+  selection, immutable SQLite manifests, an expandable all-Go card projection,
+  and a serialized untrusted-data prompt boundary
+Affected-behavior: Explicit paths and symbols now lead deterministic context
+  ranking, direct code/test/configuration/history neighbors expand within
+  independent budgets, likely secrets are excluded, stale maps are rejected,
+  and malicious repository instructions cannot gain command, network,
+  credential, or permission authority
+Compatibility-or-migration: Adds migration 000005 with immutable context
+  manifest, item, and exclusion tables; generated schema version advances from
+  4 to 5 with no handwritten frontend assets or API break
+Verification: Workspace and storage tests and vet, migration/generation checks,
+  lint, security tests, and the complete local test matrix pass. Representative
+  and malicious repository fixtures cover deterministic order, budget caps,
+  map invalidation, explanations, secret exclusion, approval gating, escaped
+  fake prompt boundaries, transactional persistence, and immutability.
+Dev-Log: DL-20260730-054
+
 Change-ID: CL-20260730-052
 Date: 2026-07-30
 Type: Deterministic Go repository map

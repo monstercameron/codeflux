@@ -41,6 +41,9 @@ func TestInitialOperationalSchemaContainsEveryRequiredTable(t *testing.T) {
 		"session_events",
 		"session_snapshots",
 		"session_commands",
+		"context_manifests",
+		"context_manifest_items",
+		"context_manifest_exclusions",
 	}
 	for _, table := range expected {
 		var count int

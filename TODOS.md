@@ -1450,41 +1450,75 @@ Go-map evidence:
 
 ## Deterministic Context Selection
 
-- [ ] `M08-029 BLOCKER` Tokenize requirement terms and explicit paths/symbols.
-- [ ] `M08-030` Resolve explicit file references first.
-- [ ] `M08-031` Resolve explicit symbol references second.
-- [ ] `M08-032` Rank exact term matches in paths, symbol names, documentation, and tests.
-- [ ] `M08-033` Expand direct dependency and caller/callee neighbors.
-- [ ] `M08-034` Expand nearby tests and configuration.
-- [ ] `M08-035` Add Git history only for already relevant paths.
-- [ ] `M08-036` Add further context only when a tool result or failure justifies it.
-- [ ] `M08-037` Enforce separate file-count, byte, and estimated-token budgets.
-- [ ] `M08-038` Deduplicate identical or overlapping excerpts.
-- [ ] `M08-039` Preserve line numbers and repository-relative paths.
-- [ ] `M08-040` Mark generated, binary, minified, vendor, and dependency content.
-- [ ] `M08-041` Exclude likely secrets before provider context assembly.
-- [ ] `M08-042` Record why each selected context item was included.
-- [ ] `M08-043` Persist the context manifest and revision binding in SQLite.
-- [ ] `M08-044` Invalidate cached mappings when supporting files change.
-- [ ] `M08-045` Expose selected context to the user through an expandable card.
+- [x] `M08-029 BLOCKER` Tokenize requirement terms and explicit paths/symbols.
+- [x] `M08-030` Resolve explicit file references first.
+- [x] `M08-031` Resolve explicit symbol references second.
+- [x] `M08-032` Rank exact term matches in paths, symbol names, documentation, and tests.
+- [x] `M08-033` Expand direct dependency and caller/callee neighbors.
+- [x] `M08-034` Expand nearby tests and configuration.
+- [x] `M08-035` Add Git history only for already relevant paths.
+- [x] `M08-036` Add further context only when a tool result or failure justifies it.
+- [x] `M08-037` Enforce separate file-count, byte, and estimated-token budgets.
+- [x] `M08-038` Deduplicate identical or overlapping excerpts.
+- [x] `M08-039` Preserve line numbers and repository-relative paths.
+- [x] `M08-040` Mark generated, binary, minified, vendor, and dependency content.
+- [x] `M08-041` Exclude likely secrets before provider context assembly.
+- [x] `M08-042` Record why each selected context item was included.
+- [x] `M08-043` Persist the context manifest and revision binding in SQLite.
+- [x] `M08-044` Invalidate cached mappings when supporting files change.
+- [x] `M08-045` Expose selected context to the user through an expandable card.
+
+Context-selection evidence:
+
+- Requirement parsing normalizes terms and explicit paths/symbols. A stable
+  rank order favors explicit paths, explicit symbols, exact path/symbol/content
+  terms, then direct package/call neighbors, nearby tests/module configuration,
+  and caller-supplied tool/failure paths. Git history is queried only for paths
+  already admitted to the manifest.
+- Selection enforces independent file, byte, and estimated-token caps, retains
+  repository-relative paths and line ranges, deduplicates excerpts, records
+  generated/binary/minified/vendor/dependency flags, and stores sorted reasons
+  for every admitted item. Supporting-file hashes and the exact Git revision
+  invalidate stale maps before selection.
+- Likely secret paths and any content matched by the shared redaction pipeline
+  are excluded before prompt assembly. An immutable SQLite manifest records the
+  repository, repository/map/requirement revisions, policy, budgets, redacted
+  excerpts, explanations, exclusions, and creation time transactionally.
+- The all-Go presentation projection supplies an expandable context card with
+  revision/budget summary, selected paths/ranges, reasons, trust, flags, and
+  exclusions for the later GWC timeline without dumping full source into it.
 
 ## Prompt-Injection Boundary
 
-- [ ] `M08-046 SECURITY` Label repository content as untrusted data in agent prompts.
-- [ ] `M08-047 SECURITY` Prevent repository text from modifying permission policy.
-- [ ] `M08-048 SECURITY` Prevent repository text from granting network or credential access.
-- [ ] `M08-049 SECURITY` Require first-use approval for repository-suggested custom commands.
-- [ ] `M08-050 SECURITY` Show the source and scope of repository-provided instructions.
-- [ ] `M08-051 TEST` Build a malicious-repository fixture containing fake system instructions.
-- [ ] `M08-052 TEST` Verify the fixture cannot bypass command approval.
-- [ ] `M08-053 TEST` Verify the fixture cannot cause secret disclosure.
+- [x] `M08-046 SECURITY` Label repository content as untrusted data in agent prompts.
+- [x] `M08-047 SECURITY` Prevent repository text from modifying permission policy.
+- [x] `M08-048 SECURITY` Prevent repository text from granting network or credential access.
+- [x] `M08-049 SECURITY` Require first-use approval for repository-suggested custom commands.
+- [x] `M08-050 SECURITY` Show the source and scope of repository-provided instructions.
+- [x] `M08-051 TEST` Build a malicious-repository fixture containing fake system instructions.
+- [x] `M08-052 TEST` Verify the fixture cannot bypass command approval.
+- [x] `M08-053 TEST` Verify the fixture cannot cause secret disclosure.
+
+Prompt-boundary evidence:
+
+- Prompt context is a JSON envelope with a fixed policy declaring repository
+  excerpts untrusted and unable to alter permissions or authorize commands,
+  network, or credential access. JSON escaping prevents a repository-supplied
+  fake closing delimiter from replacing that structural boundary.
+- Repository instruction paths retain their source, scope, and untrusted label
+  and require explicit first-use approval before selection. Discovered custom
+  commands remain approval-required rather than becoming executable actions.
+- A committed-in-test malicious repository contains a fake boundary close,
+  fake system instruction, credential-disclosure demand, network command, and
+  provider-key-shaped secret. Tests prove it cannot escape serialization,
+  authorize its command, or place the secret in provider context.
 
 ## Gate
 
-- [ ] `M08-G01 GATE` A representative Go repository opens and produces a revision-bound deterministic map.
-- [ ] `M08-G02 GATE` The same requirement and revision produce the same ordered context manifest.
-- [ ] `M08-G03 GATE` The context card explains every selected file or excerpt.
-- [ ] `M08-G04 GATE` Malicious repository text cannot alter system authority.
+- [x] `M08-G01 GATE` A representative Go repository opens and produces a revision-bound deterministic map.
+- [x] `M08-G02 GATE` The same requirement and revision produce the same ordered context manifest.
+- [x] `M08-G03 GATE` The context card explains every selected file or excerpt.
+- [x] `M08-G04 GATE` Malicious repository text cannot alter system authority.
 
 ---
 

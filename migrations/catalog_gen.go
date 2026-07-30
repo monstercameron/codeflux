@@ -9,4 +9,5 @@ var Catalog = []Descriptor{
 	{Number: 2, Name: "000002_settings_revisions.sql", SHA256: "1bbdf7dde934b679365aa11e8d5c636b47a1702db0715848e17f4d264e228fc0"},
 	{Number: 3, Name: "000003_provider_credential_references.sql", SHA256: "a4dc7037c6300eadbf24335487ec53c41b20bb7987c673c4c4150e7976db3d78"},
 	{Number: 4, Name: "000004_session_event_journal.sql", SHA256: "4ca6de4e74ac21e54e6d31e82e2d6463fe4c6629b091664ea9a0ff3d81cf1cb8"},
+	{Number: 5, Name: "000005_context_manifests.sql", SHA256: "b9fd5e1eda91cdff1ee07222c6008c12410653a888b1c471aefa3a89b13fc3f8"},
 }

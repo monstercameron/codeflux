@@ -77,6 +77,73 @@ type Repositories struct {
 	now      func() time.Time
 }
 
+// ContextManifest is one immutable, revision-bound provider-context selection.
+type ContextManifest struct {
+	ID                  string
+	RepositoryID        domain.RepositoryID
+	RepositoryRevision  string
+	MapRevision         string
+	RequirementSHA256   string
+	SelectionPolicy     int
+	MaxFiles            int
+	MaxBytes            int
+	MaxEstimatedTokens  int
+	UsedFiles           int
+	UsedBytes           int
+	UsedEstimatedTokens int
+	Items               []ContextManifestItem
+	Exclusions          []ContextManifestExclusion
+	CreatedAt           time.Time
+}
+
+// ContextManifestItem is one redacted, explainable excerpt admitted to context.
+type ContextManifestItem struct {
+	Path            string
+	Kind            string
+	StartLine       int
+	EndLine         int
+	ContentRedacted string
+	ContentSHA256   string
+	Reasons         []string
+	Trust           string
+	Generated       bool
+	Binary          bool
+	Minified        bool
+	Vendor          bool
+	Dependency      bool
+	EstimatedTokens int
+}
+
+// ContextManifestExclusion explains why one candidate did not enter context.
+type ContextManifestExclusion struct {
+	Path   string
+	Reason string
+}
+
+// RecordContextManifest declares one complete immutable context selection.
+type RecordContextManifest struct {
+	ID                  string
+	RepositoryID        domain.RepositoryID
+	RepositoryRevision  string
+	MapRevision         string
+	RequirementSHA256   string
+	SelectionPolicy     int
+	MaxFiles            int
+	MaxBytes            int
+	MaxEstimatedTokens  int
+	UsedFiles           int
+	UsedBytes           int
+	UsedEstimatedTokens int
+	Items               []ContextManifestItem
+	Exclusions          []ContextManifestExclusion
+}
+
+// ContextManifestOperations groups immutable context evidence operations.
+type ContextManifestOperations interface {
+	RecordContextManifest(context.Context, RecordContextManifest) (ContextManifest, error)
+	GetContextManifest(context.Context, string) (ContextManifest, error)
+}
+
 // SettingsScope identifies one persisted non-secret configuration layer.
 type SettingsScope string
 
@@ -578,4 +645,5 @@ var (
 	_ TaskOperations             = (*Repositories)(nil)
 	_ ApprovalBudgetOperations   = (*Repositories)(nil)
 	_ RecoveryEvidenceOperations = (*Repositories)(nil)
+	_ ContextManifestOperations  = (*Repositories)(nil)
 )

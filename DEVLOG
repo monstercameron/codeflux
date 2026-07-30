@@ -24,6 +24,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-054
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-053
+Request-or-TODO: M08-029 through M08-053 and M08-G01 through M08-G04
+Goal: Select only targeted, explainable repository context and preserve the
+  exact redacted selection as revision-bound SQLite evidence
+Assumptions: M08 exposes the complete all-Go context-card projection; M16 will
+  render that model in the GWC timeline without introducing handwritten
+  JavaScript, HTML, or CSS
+Decisions: Use deterministic weighted ranking with explicit paths and symbols
+  first, bounded direct-neighbor expansion, history only for admitted paths,
+  separate file/byte/token caps, shared secret detection, and supporting-file
+  hash invalidation. Treat instructions and suggested commands as untrusted and
+  approval-gated. Serialize prompt excerpts as JSON under a fixed policy so
+  repository text cannot terminate a boundary. Persist manifests, ordered
+  excerpts, and exclusions transactionally in immutable strict tables.
+Files-or-schemas: Workspace context selector/card/prompt boundary and tests;
+  context-manifest storage contract/repository/tests; migration 000005 and
+  generated migration/build-version metadata; M08 TODO evidence and ledgers
+Validation: Focused workspace/storage tests and vet, migration-check,
+  generate-check, lint, security tests, and test-all pass. Tests cover stable
+  manifest identity/order, explicit and expanded selection, independent
+  budgets, line/reason/trust metadata, stale-map invalidation, secret path and
+  content exclusion, fake prompt-boundary escaping, approval gating, SQLite
+  round trip/order/foreign keys/accounting/rollback/conflicts, and immutable
+  item enforcement.
+Failures-or-discarded-approaches: Raw XML-like prompt delimiters were rejected
+  because repository content could supply a matching close marker; the final
+  JSON envelope escapes structural characters. Whole-repository context,
+  embeddings, dependency downloads, implicit custom-command approval, and a
+  storage import from the workspace layer were excluded.
+Known-limitations: Call and interface expansion inherits the conservative
+  syntax/method-set limits of the M08 map. The card is a backend presentation
+  model until the planned M16 GWC frontend consumes it.
+Next-safe-step: Implement M09 Git worktree isolation, safe edit application,
+  deterministic diff identity, checkpoints, and cleanup gates.
+
 Dev-Log: DL-20260730-053
 Date: 2026-07-30
 Status: Complete
