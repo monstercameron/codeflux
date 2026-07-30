@@ -385,24 +385,32 @@ Evidence:
 - [ ] `M01-064 DOC` Review agent instructions at each prototype milestone gate and remove rules that have become false, redundant, or unhelpful.
 - [x] `M01-065 TEST` Add an instruction smoke scenario in which a coding agent must identify the relevant plan section and TODO ID before changing a fixture.
 - [x] `M01-066 DOC` Define the required structured Go atom-comment style in `AGENTS.md`. Output: versioned field template covering selection, semantics, contracts, effects, failures, retry, reconciliation, security, dependencies, examples, verification, and retrieval concepts. Verify: the template starts with the Go identifier and distinguishes descriptive comments from correctness authority.
-- [ ] `M01-067 TEST` Add a repository check that every Go atom declaration has a schema-versioned Codeflux atom doc comment.
-- [ ] `M01-068 TEST` Add a repository check that every required atom-comment field is present and is either substantive or `None` with a reason.
-- [ ] `M01-069 TEST` Add a repository check that atom comments begin with their Go identifier and pass Go doc-comment linting.
-- [ ] `M01-070 TEST` Add fixtures for complete, missing-field, empty-field, malformed-version, keyword-stuffed, and identifier-mismatched atom comments.
+- [x] `M01-067 TEST` Add a repository check that every Go atom declaration has a schema-versioned Codeflux atom doc comment.
+- [x] `M01-068 TEST` Add a repository check that every required atom-comment field is present and is either substantive or `None` with a reason.
+- [x] `M01-069 TEST` Add a repository check that atom comments begin with their Go identifier and pass Go doc-comment linting.
+- [x] `M01-070 TEST` Add fixtures for complete, missing-field, empty-field, malformed-version, keyword-stuffed, and identifier-mismatched atom comments.
 - [ ] `M01-071 DOC` Add a reviewed real atom-comment example after the first executable atom exists; do not invent a fake production contract before then.
 - [x] `M01-072 DOC` Define the atom naming grammar in `AGENTS.md`. Output: `<Verb><DomainObject><ImportantQualifier><ObservableOutcome>` guidance with good and bad examples. Verify: it explicitly prefers a longer contextual name over a generic short name.
-- [ ] `M01-073 TEST` Add a naming check that rejects empty, single-generic-word, filler-suffixed, version-encoded, and hash-encoded atom names.
-- [ ] `M01-074 TEST` Add a naming check that requires executable atom names to begin with a recognized concrete action verb or receive an explicit reviewed exception.
-- [ ] `M01-075 TEST` Add a naming check that detects unexplained abbreviations and requires an allowlisted established domain abbreviation.
-- [ ] `M01-076 TEST` Add fixtures for descriptive names, ambiguous names, misleading guarantee names, provider-specific names, semantic-preserving renames, and semantic-breaking renames.
+- [x] `M01-073 TEST` Add a naming check that rejects empty, single-generic-word, filler-suffixed, version-encoded, and hash-encoded atom names.
+- [x] `M01-074 TEST` Add a naming check that requires executable atom names to begin with a recognized concrete action verb or receive an explicit reviewed exception.
+- [x] `M01-075 TEST` Add a naming check that detects unexplained abbreviations and requires an allowlisted established domain abbreviation.
+- [x] `M01-076 TEST` Add fixtures for descriptive names, ambiguous names, misleading guarantee names, provider-specific names, semantic-preserving renames, and semantic-breaking renames.
 - [ ] `M01-077 DOC` Add a naming review checklist to the first real atom pull-request template after repository contribution templates exist.
-- [ ] `M01-078 TEST` Verify canonical Go name, display name, and normalized semantic phrase are deterministically derived and remain traceable to one atom identity.
+- [x] `M01-078 TEST` Verify canonical Go name, display name, and normalized semantic phrase are deterministically derived and remain traceable to one atom identity.
 
 Instruction-check evidence:
 
 - The lint aggregate now requires tracked root instruction files, a thin `CLAUDE.md`, all three authority pointers, the exact pinned community reference, accurate attribution, resolvable repository-relative links, and the strong Markdown-creation prohibition.
 - The synthetic smoke transcript must place an anchored `docs/plan.md` section and declared atomic TODO before its fixture edit; the negative unit case reverses that order and is rejected.
 - Instruction, missing-file, missing-pointer, weakened-rule, missing-link, escaping-link, and smoke-order tests pass.
+
+Atom-admission evidence:
+
+- `//codeflux:atom` establishes the explicit source admission boundary; an orphan marker or admitted declaration without the exact schema v1 header fails lint.
+- The parser requires every v1 field exactly once, substantive text or `None: <reason>`, identifier-first prose, and non-stuffed retrieval material.
+- Named Go fixtures exercise complete, missing, empty, malformed-version, keyword-stuffed, and mismatched comments.
+- Table-driven name fixtures cover descriptive, ambiguous, filler, version, hash, action-exception, abbreviation, misleading-guarantee, provider-specific, and rename classification cases.
+- Deterministic derivation binds canonical name, display name, and normalized phrase to the same explicit atom identity.
 
 ## Developer Command and Package Experience
 

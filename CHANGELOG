@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-014
+Date: 2026-07-30
+Type: Atom documentation and naming enforcement
+Request-or-TODO: M01-067 through M01-070, M01-073 through M01-076, M01-078
+Outcome: Added AST-based atom admission, exact v1 documentation validation,
+  standalone name lint, reviewed exceptions, deterministic name derivation,
+  rename classification, and the required positive/negative fixtures
+Affected-behavior: Lint rejects incomplete, empty, malformed, stuffed, or
+  identifier-mismatched atom comments and ambiguous or misleading atom names
+Compatibility-or-migration: Introduces the source marker and atom comment
+  schema v1 lint contract; no runtime migration
+Verification: Atom fixture, name fixture, derivation, rename, and orphan-marker
+  tests plus aggregate lint, fast suite, and staged whitespace inspection
+Dev-Log: DL-20260730-015
+
 Change-ID: CL-20260730-013
 Date: 2026-07-30
 Type: Instruction integrity tests

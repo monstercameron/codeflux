@@ -47,6 +47,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkInstructionFiles(root, tracked); err != nil {
 		return err
 	}
+	if err := checkAtomDeclarations(root, tracked); err != nil {
+		return err
+	}
 	return nil
 }
 

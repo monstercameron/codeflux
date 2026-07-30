@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-015
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-014
+Request-or-TODO: M01-067 through M01-070, M01-073 through M01-076, M01-078
+Goal: Reject structurally incomplete atom documentation and misleading or
+  retrieval-hostile atom names before later catalog/storage work can admit them
+Assumptions: An exact `//codeflux:atom` directive is the smallest deterministic
+  source declaration boundary until the M21 catalog owns admission records
+Decisions: Parse Go AST comments rather than source regex alone; require schema
+  v1 fields exactly once; allow only narrow reason-bearing name exceptions;
+  derive display and normalized names from one canonical identifier and atom ID
+Files-or-schemas: AGENTS.md directive rules; codeflux-dev atom checks and
+  fixtures; no runtime database schema
+Validation: Narrow atom fixture, name, derivation, rename, and orphan-marker
+  tests, staged aggregate lint, fast suite, and whitespace inspection passed
+Failures-or-discarded-approaches: A direct PowerShell wildcard was not expanded
+  for gofmt; reran formatting with explicit resolved fixture paths
+Known-limitations: The first reviewed production atom example waits for
+  M01-071; durable atom/name/documentation revisions remain M21 work
+Next-safe-step: Commit the atom admission boundary, then expand codeflux-dev
+  into its declared command registry and development profiles.
+
 Dev-Log: DL-20260730-014
 Date: 2026-07-30
 Status: Complete

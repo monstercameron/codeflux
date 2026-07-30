@@ -279,11 +279,21 @@ Every executable, modeled, external-adapter, or graph-native atom realized as Go
 
 The comment does not replace the atom's typed signature, executable applicability predicate, contract, tests, evidence, or version bindings. A comment can help find an atom; it cannot make the atom valid for a task.
 
+Mark each source-authored Go atom declaration with the exact `//codeflux:atom`
+directive inside the declaration's doc-comment group. The directive makes atom
+admission explicit and gives repository lint a deterministic declaration
+boundary; omitting it means the declaration is ordinary Go, not an admitted
+Codeflux atom. A reviewed naming exception must use a neighboring
+`//codeflux:atom-name-exception <kind>: <non-empty reason>` directive, where
+`<kind>` is `action-verb`, `abbreviation <TOKEN>`, `provider-specific`, or
+`guarantee-claim`. Exceptions are narrow review records, not blanket bypasses.
+
 Use this shape:
 
 ```go
 // ReserveFunds reserves an amount against an account without capturing it.
 //
+//codeflux:atom
 // Codeflux atom documentation (schema v1):
 //   Purpose:
 //     Explain the user or domain outcome this atom provides.
