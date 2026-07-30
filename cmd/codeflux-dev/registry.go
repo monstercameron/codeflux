@@ -225,6 +225,12 @@ func resolveCommandRoot(repositoryRoot, commandName, requested string) (string, 
 	}
 	relative, err := filepath.Rel(repositoryRoot, resolved)
 	if err != nil {
+		if !strings.EqualFold(
+			filepath.VolumeName(repositoryRoot),
+			filepath.VolumeName(resolved),
+		) {
+			return resolved, nil
+		}
 		return "", fmt.Errorf("compare --root with repository: %w", err)
 	}
 	if relative == "." || relative == "" {

@@ -180,6 +180,22 @@ func TestResolveCommandRootRejectsRepositoryAndLocalEscape(t *testing.T) {
 	}
 }
 
+func TestResolveCommandRootAcceptsExternalWindowsVolume(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows volume semantics")
+	}
+	repository := filepath.Join(`D:\`, "repository")
+	external := filepath.Join(`C:\`, "temporary", "run")
+
+	got, err := resolveCommandRoot(repository, "run", external)
+	if err != nil {
+		t.Fatalf("external-volume root: %v", err)
+	}
+	if got != external {
+		t.Fatalf("external-volume root = %q, want %q", got, external)
+	}
+}
+
 func TestEveryCommandRejectsRepositoryLocalRootOutsideArtifactsBeforeWriting(t *testing.T) {
 	repository, err := repositoryRoot()
 	if err != nil {

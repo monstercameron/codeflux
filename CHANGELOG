@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-025
+Date: 2026-07-30
+Type: CI portability fix
+Request-or-TODO: M01-G04
+Outcome: Accepted explicit development-helper temporary roots on a different
+  Windows volume while retaining `.artifacts` confinement for repository-local
+  roots
+Affected-behavior: Hosted Windows jobs may keep the checkout on `D:` and create
+  isolated test roots on `C:` without a false unsafe-root rejection
+Compatibility-or-migration: No interface or schema change
+Verification: Added a Windows cross-volume regression test; targeted and full
+  local suites pass; hosted matrix rerun is required before closing M01-G04
+Dev-Log: DL-20260730-026
+
 Change-ID: CL-20260730-024
 Date: 2026-07-30
 Type: Evaluation and refinement policy

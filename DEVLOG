@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-026
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-025
+Request-or-TODO: M01-G04
+Goal: Repair the first public hosted-CI failure without weakening path safety
+Assumptions: An absolute `--root` on a different Windows volume is external to
+  the repository and is an authorized test/output target
+Decisions: Treat different Windows volume names as external only when
+  `filepath.Rel` cannot compare them; preserve every existing rejection for the
+  repository root and repository-local paths outside `.artifacts`
+Files-or-schemas: cmd/codeflux-dev root resolution and tests, CHANGELOG,
+  DEVLOG; no schema change
+Validation: Public CI run 30519748127 passed macOS ARM64, Ubuntu AMD64, Ubuntu
+  race, and Windows ARM64 jobs; Windows Server 2025 failed the deterministic
+  profile test because the checkout was on `D:` and its temporary root on `C:`.
+  The new Windows cross-volume regression and local suites pass.
+Failures-or-discarded-approaches: Rejected removing root confinement or
+  treating every `filepath.Rel` error as safe; only provably different volumes
+  receive the external-root classification
+Known-limitations: M01-G04 remains open until a hosted rerun passes every
+  declared platform
+Next-safe-step: Commit and push the focused fix, then inspect the complete
+  hosted matrix before updating M01-G04 evidence
+
 Dev-Log: DL-20260730-025
 Date: 2026-07-30
 Status: Complete
