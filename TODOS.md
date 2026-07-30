@@ -831,15 +831,31 @@ Milestone output: validated non-secret settings, OS-backed provider credentials,
 
 ## Configuration
 
-- [ ] `M04-001 BLOCKER` Define configuration precedence: defaults, user settings, approved repository settings, task overrides.
-- [ ] `M04-002` Define which settings live in SQLite.
-- [ ] `M04-003` Define which settings may be supplied through environment variables.
-- [ ] `M04-004` Define which repository-provided settings require first-use approval.
-- [ ] `M04-005` Add typed validation for provider endpoints, budgets, timeouts, worktree locations, and policy presets.
-- [ ] `M04-006` Reject unknown security-sensitive settings.
+- [x] `M04-001 BLOCKER` Define configuration precedence: defaults, user settings, approved repository settings, task overrides.
+- [x] `M04-002` Define which settings live in SQLite.
+- [x] `M04-003` Define which settings may be supplied through environment variables.
+- [x] `M04-004` Define which repository-provided settings require first-use approval.
+- [x] `M04-005` Add typed validation for provider endpoints, budgets, timeouts, worktree locations, and policy presets.
+- [x] `M04-006` Reject unknown security-sensitive settings.
 - [ ] `M04-007` Record effective non-secret configuration with every run.
 - [ ] `M04-008` Add a settings revision so tasks can bind to the configuration they used.
-- [ ] `M04-009` Add configuration import/export that excludes credentials and private task data.
+- [x] `M04-009` Add configuration import/export that excludes credentials and private task data.
+
+Configuration-contract evidence:
+
+- Resolution is fixed as defaults, user settings, approved repository settings,
+  then task overrides, with the winning source attributable per field.
+- Any non-empty repository layer requires an explicit approval reference;
+  unapproved settings fail instead of being silently ignored or applied.
+- The only non-secret `CODEFLUX_*` environment inputs are provider endpoint,
+  hard-budget minor units and currency, request timeout, and policy preset.
+  Every other Codeflux environment setting is rejected.
+- Validation requires HTTPS except for loopback HTTP, exact non-negative money,
+  a 1-second-to-10-minute timeout, a clean absolute non-root worktree path, and
+  a declared policy preset.
+- Bounded strict JSON import rejects unknown or trailing fields. Its complete
+  export schema contains no credential, secret, provider-key, transcript,
+  prompt, or private-task-data field.
 
 ## Credential Store
 

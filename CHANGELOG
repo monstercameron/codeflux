@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-039
+Date: 2026-07-30
+Type: Non-secret configuration contract
+Request-or-TODO: M04-001 through M04-006 and M04-009
+Outcome: Added fixed layered configuration resolution, typed boundary
+  validation, mandatory repository approval, a narrow environment allowlist,
+  and strict bounded non-secret JSON import/export
+Affected-behavior: Unapproved repository settings, insecure remote endpoints,
+  invalid budgets/timeouts/worktree roots/policies, unknown Codeflux
+  environment variables, and unknown imported fields fail before use
+Compatibility-or-migration: No schema change; introduces internal/config
+Verification: `go test ./internal/config -count=1 -v` and
+  `go vet ./internal/config` passed precedence, validation, environment,
+  strict-import, size-bound, trailing-data, and secret-shaped-field tests
+Dev-Log: DL-20260730-040
+
 Change-ID: CL-20260730-038
 Date: 2026-07-30
 Type: SQLite durability and replay gates

@@ -24,6 +24,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-040
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-039
+Request-or-TODO: M04-001 through M04-006 and M04-009
+Goal: Establish one inspectable, non-secret configuration contract before
+  adding persistent settings or native credential stores
+Assumptions: Environment values belong to the ephemeral user layer; repository
+  configuration is untrusted even when it contains only ordinary settings;
+  an absent provider endpoint means no provider is configured
+Decisions: Fix precedence as task over approved repository over user over
+  defaults and retain a source for each field. Require approval for every
+  non-empty repository overlay. Allow only five named non-secret environment
+  settings. Permit HTTP only for loopback providers. Bound imports to 64 KiB
+  and reject every unknown field instead of attempting forward compatibility
+  across security-sensitive configuration.
+Files-or-schemas: internal/config package and tests, docs/plan.md, TODOS.md,
+  CHANGELOG, DEVLOG; no schema change
+Validation: Configuration tests passed fixed precedence and source attribution,
+  mandatory repository approval, endpoint/userinfo/TLS rules, non-negative
+  exact budgets, timeout bounds, non-root absolute worktree paths, policy
+  validation, environment allowlisting, strict round-trip import/export,
+  oversize rejection, trailing-data rejection, and secret-shaped unknown-field
+  rejection. Package vet passed.
+Failures-or-discarded-approaches: Kept credentials entirely outside the
+  settings structs rather than representing them as redactable strings.
+  Unknown imported fields are rejected because silently retaining or ignoring
+  a future permission-bearing key would weaken the boundary.
+Known-limitations: SQLite settings revisions, task/run bindings, native
+  credential stores, and redaction are the next incomplete M04 slices.
+Next-safe-step: Add immutable settings revisions and effective run snapshots in
+  SQLite, bind tasks to a settings revision, then implement credential-store
+  interfaces without exposing secret values to formatting or workers.
+
 Dev-Log: DL-20260730-039
 Date: 2026-07-30
 Status: Complete

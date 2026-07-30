@@ -3089,6 +3089,47 @@ The default runner:
 
 The MVP does not promise a perfect cross-platform security sandbox. It provides workspace confinement, mediated commands, explicit approvals, and optional container isolation.
 
+### Configuration Precedence and Storage
+
+Configuration resolves in one fixed order:
+
+```text
+compiled safe defaults
+    -> user settings
+    -> explicitly approved repository settings
+    -> bounded task overrides
+```
+
+Environment values are an ephemeral part of the user-settings layer and
+override stored user values only for the current process. The only non-secret
+configuration environment variables are:
+
+```text
+CODEFLUX_PROVIDER_ENDPOINT
+CODEFLUX_HARD_BUDGET_MINOR
+CODEFLUX_BUDGET_CURRENCY
+CODEFLUX_REQUEST_TIMEOUT
+CODEFLUX_POLICY_PRESET
+```
+
+Provider endpoints, exact hard budgets, request timeouts, worktree roots, and
+policy presets are typed and validated before use. Remote provider endpoints
+require HTTPS; plain HTTP is limited to loopback. Worktree roots are clean,
+absolute, non-root paths. Unknown `CODEFLUX_*` settings and unknown imported
+fields are rejected rather than ignored.
+
+SQLite stores versioned user settings, explicitly approved repository settings,
+task-to-settings bindings, and the effective non-secret configuration used by
+each run. Compiled defaults and ephemeral environment values are not stored as
+independent settings; their resolved values may appear only in the run's
+non-secret effective snapshot. Repository configuration is untrusted and every
+non-empty repository layer requires a first-use approval reference. It cannot
+grant permissions by existing at a higher precedence.
+
+Configuration import and export use a bounded, strict, versioned non-secret
+schema. Credentials, credential values, transcripts, prompts, and private task
+data are not fields in that schema.
+
 ### Provider Credentials
 
 Store provider credentials in the operating-system credential store:
