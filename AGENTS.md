@@ -250,6 +250,7 @@ The current executable commands are:
 ```text
 go run ./cmd/codeflux-dev bootstrap
 go run ./cmd/codeflux-dev build
+go run ./cmd/codeflux-dev build-spike
 go run ./cmd/codeflux-dev generate
 go run ./cmd/codeflux-dev generate-check
 go run ./cmd/codeflux-dev migration-check
@@ -264,6 +265,7 @@ go run ./cmd/codeflux-dev run --once
 go run ./cmd/codeflux-dev benchmark atom-names
 go run ./cmd/codeflux-dev benchmark generation
 go run ./cmd/codeflux-dev artifact-check
+go run ./cmd/codeflux-dev run-spike
 ```
 
 Use `bootstrap` before lint or generation on a fresh clone. It selects the

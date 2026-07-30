@@ -9,7 +9,7 @@ import (
 
 func TestVerifyGeneratorPins(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, filepath.Join(root, "buf.gen.yaml"), `local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go"]`+"\n")
+	writeTestFile(t, filepath.Join(root, "buf.gen.yaml"), `local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]`+"\n"+`local: ["go", "run", "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2"]`+"\n")
 	writeTestFile(t, filepath.Join(root, "cmd", "codeflux-dev", "main.go"), `const tool = "`+pinnedBufModule+`"`)
 	if err := verifyGeneratorPins(root); err != nil {
 		t.Fatalf("valid pins: %v", err)
@@ -23,15 +23,15 @@ func TestVerifyGeneratorPins(t *testing.T) {
 
 func TestVerifyGoWebComponentsBoundary(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, filepath.Join(root, "go.mod"), "module fixture\n\ngo 1.26.0\n")
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module fixture\n\ngo 1.26.0\n\nrequire github.com/monstercameron/GoWebComponents/v5 v5.0.1\n")
 	writeTestFile(t, filepath.Join(root, "TODOS.md"), "- [ ] `M06-001 BLOCKER SPIKE` Locate and pin the exact GoWebComponents v5 module and release.\n")
 	if err := verifyGoWebComponentsBoundary(root); err != nil {
 		t.Fatalf("valid deferred boundary: %v", err)
 	}
 
-	writeTestFile(t, filepath.Join(root, "go.mod"), "module fixture\n\nrequire example.com/GoWebComponents v5.0.0\n")
+	writeTestFile(t, filepath.Join(root, "go.mod"), "module fixture\n\nrequire github.com/monstercameron/GoWebComponents/v5 v5.0.0\n")
 	if err := verifyGoWebComponentsBoundary(root); err == nil {
-		t.Fatal("premature GoWebComponents dependency was accepted")
+		t.Fatal("incorrect GoWebComponents dependency was accepted")
 	}
 }
 

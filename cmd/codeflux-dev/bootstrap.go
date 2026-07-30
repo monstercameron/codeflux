@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	pinnedGoToolchain       = "go1.26.5"
-	pinnedBufModule         = "github.com/bufbuild/buf/cmd/buf@v1.72.0"
-	pinnedProtocGenGoModule = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"
-	pinnedStaticcheckModule = "honnef.co/go/tools/cmd/staticcheck@v0.7.0"
+	pinnedGoToolchain         = "go1.26.5"
+	pinnedBufModule           = "github.com/bufbuild/buf/cmd/buf@v1.72.0"
+	pinnedProtocGenGoModule   = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"
+	pinnedProtocGenGRPCModule = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2"
+	pinnedStaticcheckModule   = "honnef.co/go/tools/cmd/staticcheck@v0.7.0"
 )
 
 type bootstrapCheck struct {
@@ -127,6 +128,7 @@ func bootstrapDevelopmentTools(
 	}{
 		{name: "buf", module: pinnedBufModule, versionArg: []string{"--version"}, want: "1.72.0"},
 		{name: "protoc-gen-go", module: pinnedProtocGenGoModule, versionArg: []string{"--version"}, want: "v1.36.11"},
+		{name: "protoc-gen-go-grpc", module: pinnedProtocGenGRPCModule, versionArg: []string{"--version"}, want: "1.6.2"},
 		{name: "staticcheck", module: pinnedStaticcheckModule, versionArg: []string{"-version"}, want: "2026.1"},
 	}
 	checks := []bootstrapCheck{
@@ -173,9 +175,9 @@ func bootstrapDevelopmentTools(
 	}
 	checks = append(checks, bootstrapCheck{
 		Name:    "GoWebComponents",
-		Status:  "deferred",
-		Version: "M06-001",
-		Detail:  "exact v5 release intentionally awaits the bounded transport spike",
+		Status:  "ok",
+		Version: "v5.0.1",
+		Detail:  "exact v5 release selected by the bounded transport spike",
 	})
 	return bootstrapResult{
 		SchemaVersion: 1,
@@ -192,9 +194,15 @@ func verifyGeneratorPins(repository string) error {
 	}
 	if !bytes.Contains(
 		bufConfig,
-		[]byte(`["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go"]`),
+		[]byte(`["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11"]`),
 	) {
 		return fmt.Errorf("buf.gen.yaml lacks the module-pinned protoc-gen-go invocation")
+	}
+	if !bytes.Contains(
+		bufConfig,
+		[]byte(`["go", "run", "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2"]`),
+	) {
+		return fmt.Errorf("buf.gen.yaml lacks the module-pinned protoc-gen-go-grpc invocation")
 	}
 	mainSource, err := os.ReadFile(filepath.Join(repository, "cmd", "codeflux-dev", "main.go"))
 	if err != nil {
@@ -211,8 +219,8 @@ func verifyGoWebComponentsBoundary(repository string) error {
 	if err != nil {
 		return err
 	}
-	if bytes.Contains(bytes.ToLower(goMod), []byte("gowebcomponents")) {
-		return fmt.Errorf("GoWebComponents dependency exists before M06-001 selects the exact v5 release")
+	if !bytes.Contains(goMod, []byte("github.com/monstercameron/GoWebComponents/v5 v5.0.1")) {
+		return fmt.Errorf("go.mod must pin GoWebComponents v5.0.1")
 	}
 	todos, err := os.ReadFile(filepath.Join(repository, "TODOS.md"))
 	if err != nil {

@@ -30,6 +30,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-045
+Date: 2026-07-30
+Type: GoWebComponents browser transport and rendering decision
+Request-or-TODO: M06-001 through M06-038 and M06-G01 through M06-G05
+Outcome: Pinned GoWebComponents v5.0.1 and GoGRPCBridge v1.1.1, added a
+  retained all-Go/WASM conformance client and same-origin embedded typed gRPC
+  bridge, and recorded measured framework, transport, security, reconnect,
+  accessibility, and rendering results
+Affected-behavior: The development fixture now serves a virtualized 10,000-row
+  thread, reconnectable 10,000-event stream, approval-gated editor capability,
+  and isolated 300-to-1,200-node graph from one loopback Go process with no
+  handwritten frontend source or separately installed proxy
+Compatibility-or-migration: Adds pinned GWC, bridge, gRPC runtime, and gRPC Go
+  generator dependencies plus a retained conformance protobuf; no application
+  database schema or production RPC contract changes
+Verification: Pinned bootstrap, deterministic generation, protobuf lint,
+  Staticcheck, fast/integration/security/all suites, artifact containment,
+  focused transport/security/load tests and benchmark, WASM build, and live
+  browser refresh/restart/history/cancellation/isolation/accessibility tests
+  pass; the local race command correctly defers to Ubuntu AMD64 CI on Windows
+  ARM64
+Dev-Log: DL-20260730-046
+
 Change-ID: CL-20260730-044
 Date: 2026-07-30
 Type: Durable session journal and reconnect stream

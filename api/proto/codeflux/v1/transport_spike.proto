@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+// TransportSpikeService is retained only as a browser-transport conformance
+// fixture. Product service contracts are defined in Milestone 07.
+service TransportSpikeService {
+  rpc CheckHealth(TransportSpikeServiceCheckHealthRequest) returns (TransportSpikeServiceCheckHealthResponse);
+  rpc CheckEditorCapability(TransportSpikeServiceCheckEditorCapabilityRequest) returns (TransportSpikeServiceCheckEditorCapabilityResponse);
+  rpc SubscribeSession(TransportSpikeServiceSubscribeSessionRequest) returns (stream TransportSpikeServiceSubscribeSessionResponse);
+}
+
+message TransportSpikeServiceCheckHealthRequest {}
+
+message TransportSpikeServiceCheckHealthResponse {
+  string status = 1;
+}
+
+message TransportSpikeServiceCheckEditorCapabilityRequest {
+  string relative_path = 1;
+  uint32 line = 2;
+  uint32 column = 3;
+}
+
+message TransportSpikeServiceCheckEditorCapabilityResponse {
+  string decision = 1;
+}
+
+message TransportSpikeServiceSubscribeSessionRequest {
+  uint64 after_sequence = 1;
+  uint32 event_count = 2;
+  uint32 payload_bytes = 3;
+  uint32 batch_milliseconds = 4;
+}
+
+message TransportSpikeServiceSubscribeSessionResponse {
+  uint64 sequence = 1;
+  bytes payload = 2;
+}

@@ -3394,6 +3394,42 @@ Native browser gRPC-Web is not assumed to provide client-side or bidirectional s
 
 Do not add a separate Envoy process to the hobbyist installation unless the spike proves that an embedded bridge is infeasible.
 
+### Recorded M06 Framework and Transport Decision
+
+The completed spike pins
+`github.com/monstercameron/GoWebComponents/v5 v5.0.1` and
+`github.com/monstercameron/GoGRPCBridge v1.1.1`. GoWebComponents v5.0.1
+requires Go 1.26 for the browser/WASM build. All maintained frontend source is
+Go/GWC; the framework shell, Go browser runtime, and WASM binary are generated
+beneath `.artifacts/`.
+
+The selected transport is the bridge's same-origin WebSocket tunnel into the
+coordinator's in-process `grpc.Server`, using ordinary generated Go gRPC client
+and server bindings. The loopback HTTP server issues a host-scoped HttpOnly,
+SameSite=Strict launch cookie because browser WebSockets do not support an
+arbitrary authorization header. A private ignored launch-secret file may be
+used by the development fixture to retain authentication across a deliberate
+coordinator restart; production credentials still never enter source, browser
+storage, or SQLite.
+
+The spike passed unary, server-streaming, cancellation, ordered
+`after_sequence` reconnect, refresh, coordinator-restart, same-origin,
+loopback, authentication, 4 MiB message, 10,000-event, long-list, and
+300-node rendering gates. It measured a 1.556 tunnel/serialized-byte ratio
+(575,700 tunnel bytes for 369,873 protobuf bytes), 717 DOM elements at 300
+graph nodes, and a p95 frame interval no worse than 19.2 ms through 1,200 graph
+nodes on the target Windows 11 ARM64 laptop. The practical degradation
+threshold was therefore not reached by 1,200 SVG nodes; product task slices
+remain targeted near 300 nodes.
+
+Separate Envoy, unary plus server-streaming gRPC-Web, and a new custom
+WebSocket protocol are rejected because the embedded typed bridge passed the
+gate without an installed proxy or another protocol surface. Fixed-height
+virtualization, development-shell CSP `wasm-unsafe-eval`, and browser
+clipboard-permission denial are known spike constraints. The retained
+`internal/transportspike` fixture owns this decision evidence; production
+domain RPCs start in M07.
+
 ## Application Layout
 
 The desktop layout is:
@@ -5843,6 +5879,7 @@ The implemented commands are:
 
 ```text
 go run ./cmd/codeflux-dev build
+go run ./cmd/codeflux-dev build-spike
 go run ./cmd/codeflux-dev test-fast
 go run ./cmd/codeflux-dev lint
 go run ./cmd/codeflux-dev test-coverage
@@ -5854,6 +5891,7 @@ go run ./cmd/codeflux-dev run --once
 go run ./cmd/codeflux-dev benchmark atom-names
 go run ./cmd/codeflux-dev benchmark generation
 go run ./cmd/codeflux-dev artifact-check
+go run ./cmd/codeflux-dev run-spike
 ```
 
 To change protobuf output:
@@ -5866,10 +5904,11 @@ To change protobuf output:
 
 `generate-check` writes regeneration output beneath a validated
 `.artifacts/tmp` child, compares exact file sets and bytes, and removes only
-that child. The current frontend package embeds reviewed source assets directly.
-No WASM generator exists yet, so these instructions do not claim a WASM
-regeneration command; the v5 frontend spike must add and document that workflow
-when it becomes real. (`M01-045`, `M01-046`)
+that child. `build-spike` invokes the pinned GWC v5 scaffold noninteractively,
+copies the selected Go toolchain's `wasm_exec.js`, and builds the reviewed
+`web/client` Go source into ignored `.artifacts/m06-gwc-shell`; `run-spike`
+builds those assets and serves the retained loopback transport fixture.
+(`M01-045`, `M01-046`, `M06-G05`)
 
 ## Development Helper
 

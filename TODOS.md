@@ -453,10 +453,15 @@ Developer-command registry evidence:
 
 Bootstrap evidence:
 
-- `go run ./cmd/codeflux-dev bootstrap --json` selected and verified Go 1.26.5, Git 2.54.0, Buf 1.72.0, protoc-gen-go 1.36.11, and Staticcheck 2026.1.
+- `go run ./cmd/codeflux-dev bootstrap --json` selected and verified Go 1.26.5,
+  Git 2.54.0, Buf 1.72.0, protoc-gen-go 1.36.11, protoc-gen-go-grpc 1.6.2,
+  Staticcheck 2026.1, and GoWebComponents v5.0.1.
 - Pinned tools install beneath `.artifacts/tools/bin`; provider-token, credential, password, and secret-shaped environment variables are removed before tool subprocesses.
 - Bootstrap validates `go.mod`, Buf configuration, and generator source pins before installation.
-- The GoWebComponents check proves the dependency is absent and M06-001 remains the authority for selecting the exact v5 release; this intentional deferred result does not masquerade as an installed framework.
+- The GoWebComponents check now verifies the M06-selected
+  `github.com/monstercameron/GoWebComponents/v5 v5.0.1` dependency exactly;
+  bootstrap also installs and verifies the pinned gRPC generator added by the
+  transport spike.
 
 Generation evidence:
 
@@ -1049,58 +1054,111 @@ Milestone output: a recorded v5 version and transport decision backed by reconne
 
 ## Framework Pin
 
-- [ ] `M06-001 BLOCKER SPIKE` Locate and pin the exact GoWebComponents v5 module and release.
-- [ ] `M06-002 SPIKE` Record its Go and browser compatibility requirements.
-- [ ] `M06-003 SPIKE` Build the smallest v5 component into WebAssembly.
-- [ ] `M06-004 SPIKE` Serve the WASM client from the local Go server.
-- [ ] `M06-005 SPIKE` Verify v5 routing and browser-history behavior.
-- [ ] `M06-006 SPIKE` Verify v5 local component state and shared state primitives.
-- [ ] `M06-007 SPIKE` Verify list virtualization with 10,000 synthetic thread entries.
-- [ ] `M06-008 SPIKE` Verify cancellation and cleanup when a component unmounts.
-- [ ] `M06-009 SPIKE` Verify clipboard behavior.
-- [ ] `M06-010 SPIKE` Verify safe external-editor handoff capabilities.
-- [ ] `M06-011 SPIKE` Verify keyboard, focus, and screen-reader primitives.
-- [ ] `M06-012 SPIKE` Record unsupported or unstable framework APIs.
+- [x] `M06-001 BLOCKER SPIKE` Locate and pin the exact GoWebComponents v5 module and release.
+- [x] `M06-002 SPIKE` Record its Go and browser compatibility requirements.
+- [x] `M06-003 SPIKE` Build the smallest v5 component into WebAssembly.
+- [x] `M06-004 SPIKE` Serve the WASM client from the local Go server.
+- [x] `M06-005 SPIKE` Verify v5 routing and browser-history behavior.
+- [x] `M06-006 SPIKE` Verify v5 local component state and shared state primitives.
+- [x] `M06-007 SPIKE` Verify list virtualization with 10,000 synthetic thread entries.
+- [x] `M06-008 SPIKE` Verify cancellation and cleanup when a component unmounts.
+- [x] `M06-009 SPIKE` Verify clipboard behavior.
+- [x] `M06-010 SPIKE` Verify safe external-editor handoff capabilities.
+- [x] `M06-011 SPIKE` Verify keyboard, focus, and screen-reader primitives.
+- [x] `M06-012 SPIKE` Record unsupported or unstable framework APIs.
 
 ## Transport
 
-- [ ] `M06-013 BLOCKER SPIKE` Inspect and test the v5 typed gRPC bridge.
-- [ ] `M06-014 SPIKE` Confirm whether the bridge uses WebSocket, gRPC-Web, or another transport.
-- [ ] `M06-015 SPIKE` Generate a v5 client for a unary health method.
-- [ ] `M06-016 SPIKE` Generate a v5 client for `SubscribeSession`.
-- [ ] `M06-017 SPIKE` Stream at least 10,000 ordered synthetic events.
-- [ ] `M06-018 SPIKE` Cancel a live subscription from the browser.
-- [ ] `M06-019 SPIKE` Reconnect using `after_sequence`.
-- [ ] `M06-020 SPIKE` Test browser refresh during active streaming.
-- [ ] `M06-021 SPIKE` Test coordinator restart during active streaming.
-- [ ] `M06-022 SPIKE` Measure framing and serialization overhead.
-- [ ] `M06-023 SPIKE` Verify maximum message behavior for graph snapshots and tool summaries.
-- [ ] `M06-024 SPIKE` Verify same-origin enforcement.
-- [ ] `M06-025 SPIKE` Verify loopback binding.
-- [ ] `M06-026 SPIKE` Verify per-launch session-secret authentication.
-- [ ] `M06-027 SPIKE` Determine whether an embedded Go bridge avoids a separate proxy.
-- [ ] `M06-028 SPIKE` If the v5 bridge fails, compare unary plus server-streaming gRPC-Web against a small embedded WebSocket bridge.
-- [ ] `M06-029 SPIKE` Choose one transport and record the rejected alternatives.
+- [x] `M06-013 BLOCKER SPIKE` Inspect and test the v5 typed gRPC bridge.
+- [x] `M06-014 SPIKE` Confirm whether the bridge uses WebSocket, gRPC-Web, or another transport.
+- [x] `M06-015 SPIKE` Generate a v5 client for a unary health method.
+- [x] `M06-016 SPIKE` Generate a v5 client for `SubscribeSession`.
+- [x] `M06-017 SPIKE` Stream at least 10,000 ordered synthetic events.
+- [x] `M06-018 SPIKE` Cancel a live subscription from the browser.
+- [x] `M06-019 SPIKE` Reconnect using `after_sequence`.
+- [x] `M06-020 SPIKE` Test browser refresh during active streaming.
+- [x] `M06-021 SPIKE` Test coordinator restart during active streaming.
+- [x] `M06-022 SPIKE` Measure framing and serialization overhead.
+- [x] `M06-023 SPIKE` Verify maximum message behavior for graph snapshots and tool summaries.
+- [x] `M06-024 SPIKE` Verify same-origin enforcement.
+- [x] `M06-025 SPIKE` Verify loopback binding.
+- [x] `M06-026 SPIKE` Verify per-launch session-secret authentication.
+- [x] `M06-027 SPIKE` Determine whether an embedded Go bridge avoids a separate proxy.
+- [x] `M06-028 SPIKE` If the v5 bridge fails, compare unary plus server-streaming gRPC-Web against a small embedded WebSocket bridge.
+- [x] `M06-029 SPIKE` Choose one transport and record the rejected alternatives.
 
 ## Rendering Load
 
-- [ ] `M06-030 SPIKE` Stream token deltas while updating cost and task state.
-- [ ] `M06-031 SPIKE` Render a synthetic 300-node directed graph.
-- [ ] `M06-032 SPIKE` Apply graph patches while token streaming continues.
-- [ ] `M06-033 SPIKE` Measure frame time, memory, and DOM node count.
-- [ ] `M06-034 SPIKE` Test 30-50 ms token batching.
-- [ ] `M06-035 SPIKE` Test 50-100 ms graph-patch batching.
-- [ ] `M06-036 SPIKE` Determine the SVG node threshold on the target hobbyist laptop.
-- [ ] `M06-037 SPIKE` Verify that chat updates do not rerender the graph subtree.
-- [ ] `M06-038 SPIKE` Verify that graph interaction does not rerender the full thread.
+- [x] `M06-030 SPIKE` Stream token deltas while updating cost and task state.
+- [x] `M06-031 SPIKE` Render a synthetic 300-node directed graph.
+- [x] `M06-032 SPIKE` Apply graph patches while token streaming continues.
+- [x] `M06-033 SPIKE` Measure frame time, memory, and DOM node count.
+- [x] `M06-034 SPIKE` Test 30-50 ms token batching.
+- [x] `M06-035 SPIKE` Test 50-100 ms graph-patch batching.
+- [x] `M06-036 SPIKE` Determine the SVG node threshold on the target hobbyist laptop.
+- [x] `M06-037 SPIKE` Verify that chat updates do not rerender the graph subtree.
+- [x] `M06-038 SPIKE` Verify that graph interaction does not rerender the full thread.
 
 ## Gate
 
-- [ ] `M06-G01 GATE` Record the exact v5 version and transport architecture.
-- [ ] `M06-G02 GATE` Demonstrate ordered reconnectable streaming with no event loss or duplication.
-- [ ] `M06-G03 GATE` Demonstrate responsive simultaneous thread and 300-node graph updates.
-- [ ] `M06-G04 GATE` Confirm the prototype requires no separately installed proxy.
-- [ ] `M06-G05 GATE` Replace all spike-only code with a retained minimal transport test or delete it after recording the decision.
+- [x] `M06-G01 GATE` Record the exact v5 version and transport architecture.
+- [x] `M06-G02 GATE` Demonstrate ordered reconnectable streaming with no event loss or duplication.
+- [x] `M06-G03 GATE` Demonstrate responsive simultaneous thread and 300-node graph updates.
+- [x] `M06-G04 GATE` Confirm the prototype requires no separately installed proxy.
+- [x] `M06-G05 GATE` Replace all spike-only code with a retained minimal transport test or delete it after recording the decision.
+
+Milestone 06 decision and evidence:
+
+- Framework: `github.com/monstercameron/GoWebComponents/v5 v5.0.1`
+  (tag commit `8ad9d2588d93b93e4c1bfaaf7bcbab8fc2585b60`) on
+  Go 1.26/browser WASM. The retained client is authored only in Go/GWC; the
+  framework-generated shell, Go `wasm_exec.js`, and debug WASM stay beneath
+  ignored `.artifacts/`.
+- Transport: `github.com/monstercameron/GoGRPCBridge v1.1.1`
+  (tag commit `c7f7d987504bc36f4ea8d82e8966b9d2e1a91c09`) tunnels
+  generated typed gRPC over same-origin WebSocket directly into an in-process
+  `grpc.Server`. No Envoy, gRPC-Web proxy, or separate process is required.
+  Because browser WebSockets cannot set an arbitrary authorization header, the
+  loopback server issues a host-scoped HttpOnly, SameSite=Strict launch cookie;
+  an ignored private launch-secret file permits authenticated reconnect across
+  an intentional coordinator restart without persisting runtime credentials
+  in source or SQLite.
+- Transport proof: native tests delivered exactly 10,000 strictly ordered
+  events, cancelled live streams, resumed every `after_sequence` boundary, and
+  rejected cross-origin, missing-origin, wrong-secret, wildcard-listener,
+  oversized-count, and payloads above 4 MiB. The final measured tunnel run
+  transferred 575,700 bytes for 369,873 serialized protobuf bytes: 205,827
+  bytes of framing and a 1.556 transport/serialization ratio.
+- Browser proof on Windows 11 ARM64: the visible client completed sequence
+  10,000 after refresh and, during a live coordinator restart, held sequence
+  6,657 while disconnected before resuming to 10,000 with no duplicate or
+  missing sequence. Back and Forward restored `/` and `/details`; cancellation
+  stopped the browser stream; the 10,000-row rail rendered only 14 rows; typed
+  editor capability returned `requires-explicit-approval`; clipboard denial was
+  surfaced without accepting a browser permission.
+- Rendering proof: 40 ms token paints and 75 ms graph patches updated isolated
+  chat and graph components. Chat streaming left the graph render counter
+  unchanged, and graph patch/ArrowRight interactions left the chat render
+  counter unchanged. The 300-node baseline used 717 DOM elements, approximately
+  4.0-7.9 MiB Go heap over the test run, and 60-frame samples of p50
+  17.7-17.9 ms, p95 18.5-19.2 ms, and max 19.1-19.2 ms. At 1,200 SVG nodes the
+  page used 2,517 DOM elements with p50 17.8 ms, p95 19.0 ms, and max 19.6 ms,
+  so this laptop's measured degradation threshold is above 1,200 nodes; the
+  product target remains the safer approximately-300-node task slice.
+- Accessibility proof: semantic landmark/status/listbox/application/image
+  names were exposed, the graph showed a native 1 px visible focus outline,
+  and ArrowRight advanced the active node.
+- Limitations: the spike supports fixed-height virtualization only; GWC's
+  generated development shell requires CSP `wasm-unsafe-eval`; the in-app
+  browser denied clipboard-write permission; debug WASM size is not a product
+  size claim. The conditional fallback comparison in `M06-028` was not
+  triggered because the embedded bridge passed every gate. Separate Envoy,
+  unary/server-streaming gRPC-Web, and a new custom WebSocket bridge were
+  rejected as needless extra installation or protocol surface.
+- Retention: `internal/transportspike`, `cmd/codeflux-spike`, its generated
+  transport conformance protobuf, and focused security/reconnect/load tests
+  remain as the minimal executable decision fixture. Production domain RPCs
+  begin in M07 rather than growing the spike contract.
 
 ---
 

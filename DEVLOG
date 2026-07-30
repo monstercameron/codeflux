@@ -24,6 +24,56 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-046
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-045
+Request-or-TODO: M06-001 through M06-038 and M06-G01 through M06-G05
+Goal: Remove frontend-framework, browser-transport, reconnect, and SVG load
+  uncertainty before production gRPC and UI work
+Assumptions: Spike RPCs are retained conformance fixtures rather than M07
+  product contracts; browser authorization may use a host cookie because the
+  WebSocket API cannot add a custom header; fixed-height thread rows are
+  sufficient for the bounded virtualization experiment
+Decisions: Pin GWC v5.0.1 and GoGRPCBridge v1.1.1. Use the bridge's
+  same-origin WebSocket tunnel into an in-process grpc.Server and reject Envoy,
+  gRPC-Web fallback, and a new custom bridge after all gates pass. Author the
+  client entirely in Go/GWC and generate the shell/runtime/WASM only beneath
+  `.artifacts`. Retain the fixture and security/load tests. Use an ignored
+  private launch-secret file only for intentional restart testing.
+Files-or-schemas: GWC browser client, transport-spike protobuf and generated
+  unary/server-streaming bindings, embedded bridge/service/server and tests,
+  spike server and launch-secret tests, cross-platform build/run helpers,
+  pinned generator/bootstrap checks, module dependencies, plan/TODO evidence,
+  and agent command documentation; no SQLite migration
+Validation: The typed bridge delivered 10,000 ordered events and measured
+  575,700 tunnel bytes for 369,873 protobuf bytes (1.556 ratio). Browser
+  evidence covered cancellation, sequence 6,657 coordinator interruption and
+  exact resume to 10,000, active-stream refresh, Back/Forward, 14 rendered rows
+  from 10,000, isolated chat/graph rerenders, editor approval gating, clipboard
+  denial, semantic names, visible focus, and arrow navigation. The 300-node
+  view used 717 DOM elements at p95 18.5-19.2 ms; 1,200 nodes used 2,517 at p95
+  19.0 ms, so the measured degradation threshold remained above 1,200.
+  Bootstrap, WASM build, generation-check, migration-check, lint,
+  fast/integration/security/all tests, benchmark, and artifact-check pass.
+Failures-or-discarded-approaches: The first real browser load exposed a CSP
+  omission for Go WASM and rejection of a Secure `__Host-` cookie over
+  loopback HTTP; adding `wasm-unsafe-eval` and using a host-scoped HttpOnly
+  SameSite=Strict cookie fixed those failures. Native browser navigation waits
+  block on SPA history, so Back/Forward were asserted with bounded observation
+  of the visible URL/DOM. Initial lint rejected nonconforming RPC message names
+  and deprecated `grpc.WithBlock`; the schema now uses service-prefixed
+  request/response names and nondeprecated dialing. The conditional gRPC-Web
+  versus custom-bridge comparison was discarded because the selected embedded
+  bridge passed.
+Known-limitations: Browser automation did not grant clipboard-write
+  permission, fixed-height virtualization is the proven mode, the development
+  GWC shell requires `wasm-unsafe-eval`, debug WASM size is not a production
+  size result, and Windows ARM64 cannot run Go race instrumentation; Ubuntu
+  AMD64 CI remains the race authority.
+Next-safe-step: Define M07's small domain-oriented production gRPC contracts
+  on the selected transport without expanding the retained spike service.
+
 Dev-Log: DL-20260730-045
 Date: 2026-07-30
 Status: Complete

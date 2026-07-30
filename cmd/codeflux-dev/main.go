@@ -95,6 +95,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runBootstrap(ctx, stdout, stderr, invocation)
 	case "build":
 		return runBuild(ctx, stdout, stderr, invocation)
+	case "build-spike":
+		return runBuildSpike(ctx, stdout, stderr, invocation)
 	case "generate":
 		return runGenerate(ctx, stdout, stderr, invocation)
 	case "generate-check":
@@ -116,6 +118,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runMigrationCheck(ctx, stdout, stderr, invocation)
 	case "run":
 		return runDeterministicProfile(ctx, stdout, stderr, invocation)
+	case "run-spike":
+		return runSpike(ctx, stdout, stderr, invocation)
 	case "run-live":
 		return runLiveGate(stdout, stderr, invocation)
 	case "test-all":
