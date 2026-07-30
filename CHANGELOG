@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-051
+Date: 2026-07-30
+Type: Native bridge test lifecycle correction
+Request-or-TODO: M06-018, M06-019, and M06-G02
+Outcome: Made native conformance teardown close the tracked peer transport and
+  wait for gRPC transport exit before closing the client connection
+Affected-behavior: Linux race tests no longer invoke the pinned bridge
+  adapter's write deadline concurrently with an in-flight Gorilla WebSocket
+  write at the end of any unary or streaming test
+Compatibility-or-migration: Test-harness lifecycle correction only; no runtime,
+  protobuf, dependency, or database change
+Verification: Transport-spike package passes 20 consecutive runs and repository
+  lint locally; public Linux AMD64 race CI provides authoritative confirmation
+Supersedes: CL-20260730-049's narrower stream-EOF teardown explanation
+Dev-Log: DL-20260730-052
+
 Change-ID: CL-20260730-050
 Date: 2026-07-30
 Type: Read-only repository discovery

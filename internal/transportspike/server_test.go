@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -384,17 +386,20 @@ func startConformanceClient(
 		t.Fatalf("dial bridge: %v", err)
 	}
 	return codefluxv1.NewTransportSpikeServiceClient(connection), func() {
+		listener.closeConnections()
+		_ = server.Close()
+		waitForClientTransportExit(connection)
 		_ = connection.Close()
-		_ = server.Shutdown(context.Background())
 	}, service
 }
 
-func startConformanceServer(t *testing.T, secret string) (net.Listener, *http.Server, *Service) {
+func startConformanceServer(t *testing.T, secret string) (*trackedListener, *http.Server, *Service) {
 	t.Helper()
-	listener, err := ListenLoopback()
+	rawListener, err := ListenLoopback()
 	if err != nil {
 		t.Fatal(err)
 	}
+	listener := &trackedListener{Listener: rawListener, connections: make(map[net.Conn]struct{})}
 	service := &Service{}
 	bridge, err := NewHandler(service, secret)
 	if err != nil {
@@ -416,6 +421,20 @@ func startConformanceServer(t *testing.T, secret string) (net.Listener, *http.Se
 	return listener, server, service
 }
 
+func waitForClientTransportExit(connection *grpc.ClientConn) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for {
+		state := connection.GetState()
+		if state != connectivity.Ready && state != connectivity.Connecting {
+			return
+		}
+		if !connection.WaitForStateChange(ctx, state) {
+			return
+		}
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -431,6 +450,35 @@ func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 type countingListener struct {
 	net.Listener
 	written atomic.Uint64
+}
+
+type trackedListener struct {
+	net.Listener
+	mu          sync.Mutex
+	connections map[net.Conn]struct{}
+}
+
+func (listener *trackedListener) Accept() (net.Conn, error) {
+	connection, err := listener.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	listener.mu.Lock()
+	listener.connections[connection] = struct{}{}
+	listener.mu.Unlock()
+	return connection, nil
+}
+
+func (listener *trackedListener) closeConnections() {
+	listener.mu.Lock()
+	connections := make([]net.Conn, 0, len(listener.connections))
+	for connection := range listener.connections {
+		connections = append(connections, connection)
+	}
+	listener.mu.Unlock()
+	for _, connection := range connections {
+		_ = connection.Close()
+	}
 }
 
 func (listener *countingListener) Accept() (net.Conn, error) {

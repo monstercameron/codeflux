@@ -1131,8 +1131,10 @@ Milestone 06 decision and evidence:
   bytes of framing and a 1.556 transport/serialization ratio.
 - Cross-platform CI correction: editor targets reject both slash conventions
   and drive-qualified paths on every host, and cancellation/reconnect tests
-  consume the resumed stream terminator before closing the tunnel so the pinned
-  bridge is not torn down during an outstanding write.
+  consume stream terminators. Native test cleanup closes the tracked peer
+  transport and waits for gRPC to leave Ready/Connecting before closing the
+  client, so the pinned bridge adapter is never given concurrent
+  write/deadline calls that violate Gorilla WebSocket's single-writer contract.
 - Browser proof on Windows 11 ARM64: the visible client completed sequence
   10,000 after refresh and, during a live coordinator restart, held sequence
   6,657 while disconnected before resuming to 10,000 with no duplicate or

@@ -24,6 +24,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-052
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-051
+Request-or-TODO: M06-018, M06-019, and M06-G02
+Goal: Eliminate the remaining Linux race at every native conformance-client
+  teardown without suppressing race coverage or forking the pinned bridge
+Assumptions: Browser WASM uses the bridge's separate JavaScript connection
+  adapter; the reported defect occurs only in native test cleanup when
+  grpc.ClientConn.Close calls SetWriteDeadline concurrently with the native
+  adapter's final Gorilla WebSocket write
+Decisions: Track accepted native test connections, close the peer transport
+  first, wait until the client leaves Ready/Connecting, and only then release
+  the grpc.ClientConn. Keep the race suite enabled and retain v1.1.1 because no
+  newer upstream release exists.
+Files-or-schemas: Native transport-spike test lifecycle and corrected M06
+  evidence/ledgers; no production or schema change
+Validation: Twenty consecutive focused package runs and full repository lint
+  pass locally. The next public Linux AMD64 race job supplies authoritative
+  confirmation.
+Failures-or-discarded-approaches: Receiving EOF fixed the reconnect test but CI
+  reproduced the same dependency race after a maximum-payload response,
+  disproving CL-20260730-049's narrow explanation. Excluding the package from
+  race tests, sleeping, adding a custom bridge, vendoring an unreviewed fork,
+  or modifying the separate upstream repository were rejected.
+Known-limitations: The pinned upstream native adapter still uses a deadline
+  mutex separate from its writer mutex. Codeflux's native conformance lifecycle
+  avoids that unsupported concurrent call pattern; the browser WASM adapter is
+  structurally separate.
+Next-safe-step: Push and confirm the public race matrix, then complete the
+  already-started deterministic Go repository-map slice.
+
 Dev-Log: DL-20260730-051
 Date: 2026-07-30
 Status: Complete
