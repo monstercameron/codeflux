@@ -30,6 +30,18 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-021
+Date: 2026-07-30
+Type: Clean-clone gate evidence
+Request-or-TODO: M01-095, M01-G01 through M01-G09 except M01-G04
+Outcome: Recorded a Git-clean documented contributor journey and successful
+  cross-builds for every declared platform while leaving hosted CI unclaimed
+Affected-behavior: Evidence and checklist state only; no runtime change
+Compatibility-or-migration: None
+Verification: Clean clone bootstrap/build/test/generation/lint/migration/run/
+  benchmark/artifact checks and four target cross-builds passed
+Dev-Log: DL-20260730-022
+
 Change-ID: CL-20260730-020
 Date: 2026-07-30
 Type: Developer safety and artifact confinement

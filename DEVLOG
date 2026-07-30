@@ -24,6 +24,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-022
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-021
+Request-or-TODO: M01-095, M01-G01 through M01-G09 except M01-G04
+Goal: Prove the documented M01 contributor journey from tracked source alone
+  and distinguish local cross-build confidence from hosted runner evidence
+Assumptions: A local no-hardlink Git clone is a valid fresh-clone test for
+  repository completeness but cannot substitute for remote hosted CI execution
+Decisions: Run every documented prerequisite/build/test/generation/lint/start
+  step in the clone; preserve G04 as open rather than converting cross-builds
+  into a false CI claim
+Files-or-schemas: TODOS.md and ledgers only; no source or schema change
+Validation: Clean clone bootstrap/build/test/generate/lint/migration/run/
+  benchmark/artifact checks passed and remained Git-clean; all four platform
+  cross-builds passed; actionlint previously passed; git remote list is empty
+Failures-or-discarded-approaches: None
+Known-limitations: M01-G04 requires a GitHub remote and actual hosted runs on
+  windows-11-arm, windows-2025, macos-15, and ubuntu-24.04
+Next-safe-step: Commit local gate evidence. Do not begin M02 because its
+  dependency list includes M01-G04; obtain authority and a remote CI run.
+
 Dev-Log: DL-20260730-021
 Date: 2026-07-30
 Status: Complete

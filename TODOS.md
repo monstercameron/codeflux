@@ -432,7 +432,7 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [x] `M01-092` Add a package-dependency check that enforces inward domain dependencies and prevents storage/provider/transport code from owning frontend or domain policy.
 - [x] `M01-093` Add a generated-file check that rejects hand edits and generation outside declared paths.
 - [x] `M01-094 DOC` Document the atomic inner loop from plan/TODO selection through targeted test, implementation, broader verification, diff inspection, and completion evidence.
-- [ ] `M01-095 TEST` Run bootstrap, generate-check, lint, and fast tests from a clean clone using only documented commands.
+- [x] `M01-095 TEST` Run bootstrap, generate-check, lint, and fast tests from a clean clone using only documented commands.
 - [x] `M01-096 DOC` Define in `AGENTS.md` that agents may not create any new Markdown file without an explicit user request naming that file.
 - [x] `M01-097 TEST` Add an instruction check that fails if the Markdown-creation rule is removed or weakened.
 - [x] `M01-098 BLOCKER` Configure every development command to place repository-local disposable output beneath `.artifacts/`.
@@ -491,15 +491,23 @@ Developer-safety evidence:
 
 ## Gate
 
-- [ ] `M01-G01 GATE` A fresh clone builds with one documented command.
-- [ ] `M01-G02 GATE` A fresh clone runs the fast tests with one documented command.
-- [ ] `M01-G03 GATE` Regeneration is deterministic and produces no unexplained diff.
+- [x] `M01-G01 GATE` A fresh clone builds with one documented command.
+- [x] `M01-G02 GATE` A fresh clone runs the fast tests with one documented command.
+- [x] `M01-G03 GATE` Regeneration is deterministic and produces no unexplained diff.
 - [ ] `M01-G04 GATE` CI passes on every declared prototype platform.
-- [ ] `M01-G05 GATE` Root `AGENTS.md` and `CLAUDE.md` pass instruction-presence, reference, and link checks without duplicating their authoritative rules.
-- [ ] `M01-G06 GATE` Atom-comment schema, lint rules, and fixtures prevent undocumented or structurally incomplete atoms from entering the reusable catalog.
-- [ ] `M01-G07 GATE` Atom names remain standalone-descriptive, semantically scoped, non-misleading, and deterministically represented for graph and retrieval use.
-- [ ] `M01-G08 GATE` A fresh contributor can discover, generate, lint, test, and start the deterministic development profile through one cross-platform helper and documented commands.
-- [ ] `M01-G09 GATE` Agents create no new Markdown files without an explicit user request naming the file, and all repository-local disposable build/test artifacts remain under the ignored `.artifacts/` root.
+- [x] `M01-G05 GATE` Root `AGENTS.md` and `CLAUDE.md` pass instruction-presence, reference, and link checks without duplicating their authoritative rules.
+- [x] `M01-G06 GATE` Atom-comment schema, lint rules, and fixtures prevent undocumented or structurally incomplete atoms from entering the reusable catalog.
+- [x] `M01-G07 GATE` Atom names remain standalone-descriptive, semantically scoped, non-misleading, and deterministically represented for graph and retrieval use.
+- [x] `M01-G08 GATE` A fresh contributor can discover, generate, lint, test, and start the deterministic development profile through one cross-platform helper and documented commands.
+- [x] `M01-G09 GATE` Agents create no new Markdown files without an explicit user request naming the file, and all repository-local disposable build/test artifacts remain under the ignored `.artifacts/` root.
+
+Gate evidence:
+
+- A local no-hardlink clone under `.artifacts/tmp` ran the documented bootstrap, build, fast tests, generate-check, lint, migration-check, deterministic run self-check, atom-name benchmark, and artifact-check commands successfully; `git diff --exit-code` and `git status --short` were empty.
+- Bootstrap selected Go 1.26.5 and installed all pinned tools inside the clone's ignored `.artifacts/tools`.
+- Instruction, atom documentation, atom naming, root safety, package direction, generated path, cleanup, and artifact policy checks all ran through clean-clone lint.
+- Cross-builds succeeded for Windows ARM64, Windows AMD64, macOS ARM64, and Linux AMD64 without creating repository output.
+- `M01-G04` remains open: `.github/workflows/ci.yml` passes actionlint and names every declared hosted runner, but this repository has no Git remote, so no actual hosted workflow run exists to verify.
 
 ---
 
