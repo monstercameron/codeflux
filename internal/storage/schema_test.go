@@ -44,6 +44,9 @@ func TestInitialOperationalSchemaContainsEveryRequiredTable(t *testing.T) {
 		"context_manifests",
 		"context_manifest_items",
 		"context_manifest_exclusions",
+		"run_tool_schemas",
+		"permission_grant_uses",
+		"custom_commands",
 	}
 	for _, table := range expected {
 		var count int
@@ -162,6 +165,7 @@ func TestInitialSchemaHasRequiredQueryIndexes(t *testing.T) {
 		"session_events_by_thread",
 		"session_events_by_task",
 		"session_snapshots_latest",
+		"permission_decisions_by_task_action",
 	}
 	for _, index := range expected {
 		var count int

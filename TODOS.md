@@ -1678,83 +1678,99 @@ Milestone output: a typed tool protocol, executable permission policy, controlle
 
 ## Tool Protocol
 
-- [ ] `M10-001 BLOCKER` Define a typed internal tool request and result envelope.
-- [ ] `M10-002` Include tool name, arguments, working directory, timeout, authority class, idempotency, and expected side effects.
-- [ ] `M10-003` Define read-file and list-directory tools.
-- [ ] `M10-004` Define symbol/search tools.
-- [ ] `M10-005` Define structured edit tools.
-- [ ] `M10-006` Define diff-inspection tools.
-- [ ] `M10-007` Define command-execution tools.
-- [ ] `M10-008` Define Git-status and history tools.
-- [ ] `M10-009` Define test, build, format, and static-analysis wrappers.
-- [ ] `M10-010` Define user-facing tool summaries.
-- [ ] `M10-011` Version tool schemas and record the version per run.
+- [x] `M10-001 BLOCKER` Define a typed internal tool request and result envelope.
+- [x] `M10-002` Include tool name, arguments, working directory, timeout, authority class, idempotency, and expected side effects.
+- [x] `M10-003` Define read-file and list-directory tools.
+- [x] `M10-004` Define symbol/search tools.
+- [x] `M10-005` Define structured edit tools.
+- [x] `M10-006` Define diff-inspection tools.
+- [x] `M10-007` Define command-execution tools.
+- [x] `M10-008` Define Git-status and history tools.
+- [x] `M10-009` Define test, build, format, and static-analysis wrappers.
+- [x] `M10-010` Define user-facing tool summaries.
+- [x] `M10-011` Version tool schemas and record the version per run.
 
 ## Permission Policy
 
-- [ ] `M10-012 BLOCKER SECURITY` Define automatic read-only actions.
-- [ ] `M10-013 BLOCKER SECURITY` Define task-scoped file-write actions.
-- [ ] `M10-014 BLOCKER SECURITY` Define approval-required actions.
-- [ ] `M10-015 SECURITY` Classify network access.
-- [ ] `M10-016 SECURITY` Classify dependency installation.
-- [ ] `M10-017 SECURITY` Classify writes outside the task worktree.
-- [ ] `M10-018 SECURITY` Classify credential access.
-- [ ] `M10-019 SECURITY` Classify destructive filesystem and Git actions.
-- [ ] `M10-020 SECURITY` Classify privileged commands and process management.
-- [ ] `M10-021 SECURITY` Classify external messaging, deployment, and publication.
-- [ ] `M10-022 SECURITY` Refuse actions with unknown authority classes.
-- [ ] `M10-023 SECURITY` Bind allow-for-task decisions to exact action patterns and scope.
-- [ ] `M10-024 SECURITY` Expire task-scoped permissions when the task ends.
-- [ ] `M10-025 SECURITY` Never infer permission from prior unrelated tasks.
-- [ ] `M10-026 SECURITY` Record requester, reason, exact command/action, scope, decision, and time.
+- [x] `M10-012 BLOCKER SECURITY` Define automatic read-only actions.
+- [x] `M10-013 BLOCKER SECURITY` Define task-scoped file-write actions.
+- [x] `M10-014 BLOCKER SECURITY` Define approval-required actions.
+- [x] `M10-015 SECURITY` Classify network access.
+- [x] `M10-016 SECURITY` Classify dependency installation.
+- [x] `M10-017 SECURITY` Classify writes outside the task worktree.
+- [x] `M10-018 SECURITY` Classify credential access.
+- [x] `M10-019 SECURITY` Classify destructive filesystem and Git actions.
+- [x] `M10-020 SECURITY` Classify privileged commands and process management.
+- [x] `M10-021 SECURITY` Classify external messaging, deployment, and publication.
+- [x] `M10-022 SECURITY` Refuse actions with unknown authority classes.
+- [x] `M10-023 SECURITY` Bind allow-for-task decisions to exact action patterns and scope.
+- [x] `M10-024 SECURITY` Expire task-scoped permissions when the task ends.
+- [x] `M10-025 SECURITY` Never infer permission from prior unrelated tasks.
+- [x] `M10-026 SECURITY` Record requester, reason, exact command/action, scope, decision, and time.
 
 ## Command Execution
 
-- [ ] `M10-027 BLOCKER` Execute commands in the task worker, not the browser.
-- [ ] `M10-028` Pass argument arrays instead of concatenated shell strings where possible.
-- [ ] `M10-029` Set the task worktree as the default working directory.
-- [ ] `M10-030` Validate working directories against task scope.
-- [ ] `M10-031` Apply bounded timeouts.
-- [ ] `M10-032` Support cooperative cancellation.
-- [ ] `M10-033` Kill descendant processes on cancellation where the platform permits.
-- [ ] `M10-034` Bound stdout and stderr capture.
-- [ ] `M10-035` Stream redacted progress without persisting unbounded output.
-- [ ] `M10-036` Preserve exit code, duration, timeout, cancellation, and truncation metadata.
-- [ ] `M10-037` Separate environment allowlists from the coordinator environment.
-- [ ] `M10-038` Remove provider credentials from worker environments.
-- [ ] `M10-039` Record executable identity and resolved path.
-- [ ] `M10-040` Detect commands that exceed approved scope.
-- [ ] `M10-041` Provide a user-readable approval description.
-- [ ] `M10-042` Provide allow-once, allow-for-task, and deny.
-- [ ] `M10-043` Do not silently fall back after denial.
+- [x] `M10-027 BLOCKER` Execute commands in the task worker, not the browser.
+- [x] `M10-028` Pass argument arrays instead of concatenated shell strings where possible.
+- [x] `M10-029` Set the task worktree as the default working directory.
+- [x] `M10-030` Validate working directories against task scope.
+- [x] `M10-031` Apply bounded timeouts.
+- [x] `M10-032` Support cooperative cancellation.
+- [x] `M10-033` Kill descendant processes on cancellation where the platform permits.
+- [x] `M10-034` Bound stdout and stderr capture.
+- [x] `M10-035` Stream redacted progress without persisting unbounded output.
+- [x] `M10-036` Preserve exit code, duration, timeout, cancellation, and truncation metadata.
+- [x] `M10-037` Separate environment allowlists from the coordinator environment.
+- [x] `M10-038` Remove provider credentials from worker environments.
+- [x] `M10-039` Record executable identity and resolved path.
+- [x] `M10-040` Detect commands that exceed approved scope.
+- [x] `M10-041` Provide a user-readable approval description.
+- [x] `M10-042` Provide allow-once, allow-for-task, and deny.
+- [x] `M10-043` Do not silently fall back after denial.
 
 ## Custom Commands and Plugins
 
-- [ ] `M10-044` Store approved custom command definitions in SQLite.
-- [ ] `M10-045` Represent custom command arguments as arrays with typed placeholders.
-- [ ] `M10-046` Require first-use approval for repository-suggested commands.
-- [ ] `M10-047` Record command version and source.
-- [ ] `M10-048` Define the subprocess boundary for future MCP or JSON-RPC plugins.
-- [ ] `M10-049 DEFER` Do not load arbitrary plugin code into the coordinator.
-- [ ] `M10-050 DEFER` Do not implement a plugin marketplace in the prototype.
+- [x] `M10-044` Store approved custom command definitions in SQLite.
+- [x] `M10-045` Represent custom command arguments as arrays with typed placeholders.
+- [x] `M10-046` Require first-use approval for repository-suggested commands.
+- [x] `M10-047` Record command version and source.
+- [x] `M10-048` Define the subprocess boundary for future MCP or JSON-RPC plugins.
+- [x] `M10-049 DEFER` Do not load arbitrary plugin code into the coordinator.
+- [x] `M10-050 DEFER` Do not implement a plugin marketplace in the prototype.
 
 ## Tests
 
-- [ ] `M10-051 TEST` Test automatic read-only actions.
-- [ ] `M10-052 TEST` Test task-scoped edits.
-- [ ] `M10-053 TEST` Test network-command approval.
-- [ ] `M10-054 TEST` Test dependency-install approval.
-- [ ] `M10-055 TEST` Test destructive-command denial.
-- [ ] `M10-056 TEST` Test allow-for-task scope expiration.
-- [ ] `M10-057 TEST` Test timeout and process-tree cancellation.
-- [ ] `M10-058 TEST` Test output truncation and redaction.
-- [ ] `M10-059 TEST` Test a malicious command description cannot change the executed argument array.
+- [x] `M10-051 TEST` Test automatic read-only actions.
+- [x] `M10-052 TEST` Test task-scoped edits.
+- [x] `M10-053 TEST` Test network-command approval.
+- [x] `M10-054 TEST` Test dependency-install approval.
+- [x] `M10-055 TEST` Test destructive-command denial.
+- [x] `M10-056 TEST` Test allow-for-task scope expiration.
+- [x] `M10-057 TEST` Test timeout and process-tree cancellation.
+- [x] `M10-058 TEST` Test output truncation and redaction.
+- [x] `M10-059 TEST` Test a malicious command description cannot change the executed argument array.
+
+M10 test evidence:
+
+- Typed-catalog and policy tests cover every tool family, unknown authority,
+  exact grants, one-use consumption, task expiry, cross-task isolation,
+  network/dependency/destructive classification, exact approved recipes, and
+  capability denial across tool substitution.
+- Real subprocess tests cover absolute executable identity, array-only
+  arguments, confined working directories, minimal credential-free
+  environments, bounded redacted output/progress, cooperative cancellation,
+  timeouts, and representative descendant termination.
+- SQLite tests cover immutable per-run schema bindings, attributable
+  permission facts, reviewed typed custom commands, optimistic command
+  lifecycle metadata, bounded redacted output, idempotency, and stale writes.
+  The plugin contract permits only versioned JSON-RPC or MCP subprocesses with
+  explicit filesystem, network, secret-reference, and side-effect scopes.
 
 ## Gate
 
-- [ ] `M10-G01 GATE` Every non-automatic action has an attributable policy decision.
-- [ ] `M10-G02 GATE` Denied authority cannot be regained through tool substitution.
-- [ ] `M10-G03 GATE` Cancellation terminates representative child-process trees on every supported platform.
+- [x] `M10-G01 GATE` Every non-automatic action has an attributable policy decision.
+- [x] `M10-G02 GATE` Denied authority cannot be regained through tool substitution.
+- [x] `M10-G03 GATE` Cancellation terminates representative child-process trees on every supported platform.
 
 ---
 

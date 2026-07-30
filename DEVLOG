@@ -24,6 +24,49 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-057
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-056
+Request-or-TODO: M10-001 through M10-059 and M10-G01 through M10-G03
+Goal: Let workers inspect, edit, and validate repositories through typed tools
+  without ambient or unattributed authority
+Assumptions: M10 owns policy and the subprocess boundary; M11 will wire these
+  ports into authenticated worker lifecycle, and M16 will expose approval and
+  progress state through the GWC interface
+Decisions: Derive authority from typed side effects and exact command arrays,
+  never from untrusted descriptions or claimed class. Bind grants to task,
+  working directory, arguments, and effects; bind denials to capability and
+  scope so changing tool names cannot regain authority. Require an attribution
+  identifier for every executable task-scoped classification. Launch direct
+  argument arrays in canonical task directories, pass only allowlisted
+  non-secret environment variables, terminate process trees on timeout or
+  cancellation, and redact before bounded persistence/display. Store custom
+  commands as immutable typed templates after repository-source first-use
+  approval. Define future plugins only as separately launched JSON-RPC/MCP
+  subprocesses; do not load arbitrary code or build a marketplace.
+Files-or-schemas: Executor tool protocol, policy, command runner, platform
+  process-tree helpers, plugin boundary, and tests; storage repositories/tests
+  for tool schemas, permission decisions, custom commands, command lifecycle,
+  and redacted output; migration 000007; generated migration/build metadata;
+  M10 checklist evidence and ledgers
+Validation: Focused executor/storage tests, migration-check, generate-check,
+  lint, security tests, and full local test-all pass. Tests cover exact grants,
+  expiry, isolation, denial substitution, malicious display descriptions,
+  credential stripping, output bounds/redaction, timeout/cancel trees,
+  reviewed immutable templates, idempotency, and optimistic lifecycle writes.
+Failures-or-discarded-approaches: Trusting the request's authority label,
+  shell-concatenated commands, ambient coordinator environments, raw plugin
+  secrets, repository-loaded code, mutable custom commands, and unbounded
+  output were rejected. Effect classification was made order-independent so a
+  reordered declaration cannot select weaker authority.
+Known-limitations: Workspace confinement is mediation, not a perfect OS
+  sandbox. Live coordinator/worker wiring belongs to M11, provider calls to
+  M12, and browser presentation/E2E to M16-M20.
+Next-safe-step: Implement M11 coordinator startup, single-instance ownership,
+  authenticated worker protocol, heartbeats, scheduling, shutdown, and crash
+  recovery without broadening the M10 authority boundary.
+
 Dev-Log: DL-20260730-056
 Date: 2026-07-30
 Status: Complete

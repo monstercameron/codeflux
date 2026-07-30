@@ -30,6 +30,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-056
+Date: 2026-07-30
+Type: Mediated tools, permissions, and subprocess execution
+Request-or-TODO: M10-001 through M10-059 and M10-G01 through M10-G03
+Outcome: Added a versioned typed tool protocol, exact task authority policy,
+  controlled subprocess runner, immutable permission/custom-command records,
+  and durable command outcome/output storage
+Affected-behavior: Repository reads and confined edits have explicit policy
+  classes; network, dependency, external, credential, destructive, privileged,
+  and communication effects require exact attributable authority. Commands use
+  argument arrays, confined working directories, credential-free allowlisted
+  environments, bounded timeouts, process-tree cancellation, and redacted
+  bounded output. Denials remain capability-scoped across tool substitution.
+Compatibility-or-migration: Adds migration 000007 for per-run tool schema,
+  exact permission metadata and one-use consumption, immutable reviewed custom
+  commands, and command execution outcome metadata; schema version advances to
+  7. Arbitrary in-process plugins and a marketplace remain deliberately
+  deferred.
+Verification: Migration and generation checks, lint, focused executor/storage
+  suites, security suite, and full local test-all pass. Platform process-tree
+  behavior is exercised by the public Windows, Ubuntu, and macOS CI matrix.
+Dev-Log: DL-20260730-057
+
 Change-ID: CL-20260730-055
 Date: 2026-07-30
 Type: Cross-platform worktree path correction
