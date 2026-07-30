@@ -73,20 +73,40 @@ func trackedFiles(ctx context.Context, root string) ([]string, error) {
 func checkGeneratedHeaders(root string, tracked []string) error {
 	for _, relative := range tracked {
 		base := filepath.Base(relative)
-		if !strings.HasSuffix(base, ".pb.go") && !strings.HasSuffix(base, "_gen.go") {
-			continue
-		}
 		content, err := os.ReadFile(filepath.Join(root, relative))
 		if err != nil {
 			return err
 		}
 		firstLine, _, _ := bytes.Cut(content, []byte{'\n'})
-		if !bytes.HasPrefix(firstLine, []byte("// Code generated ")) ||
-			!bytes.Contains(firstLine, []byte(" DO NOT EDIT.")) {
+		hasGeneratedHeader := bytes.HasPrefix(firstLine, []byte("// Code generated ")) &&
+			bytes.Contains(firstLine, []byte(" DO NOT EDIT."))
+		hasGeneratedSuffix := strings.HasSuffix(base, ".pb.go") || strings.HasSuffix(base, "_gen.go")
+		if !hasGeneratedHeader && !hasGeneratedSuffix {
+			continue
+		}
+		if !isDeclaredGeneratedPath(filepath.ToSlash(relative)) {
+			return fmt.Errorf("generated file is outside a declared path: %s", filepath.ToSlash(relative))
+		}
+		if !hasGeneratedHeader {
 			return fmt.Errorf("generated file %s lacks the required first-line header", filepath.ToSlash(relative))
 		}
 	}
 	return nil
+}
+
+func isDeclaredGeneratedPath(path string) bool {
+	if strings.HasPrefix(path, "api/gen/") && strings.HasSuffix(path, ".pb.go") {
+		return true
+	}
+	switch path {
+	case "internal/buildinfo/versions_gen.go",
+		"internal/events/registry_gen.go",
+		"migrations/catalog_gen.go",
+		"web/assets/manifest_gen.go":
+		return true
+	default:
+		return false
+	}
 }
 
 func checkMigrationNames(root string) error {

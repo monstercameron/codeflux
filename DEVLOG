@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-018
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-017
+Request-or-TODO: M01-082, M01-083
+Goal: Make one deterministic command own every generated source family that
+  exists at M01 and compare all of them without mutating reviewed source
+Assumptions: The event registry is legitimately empty until M05 introduces
+  event directives; frontend generation currently means the embedded source
+  manifest, not a nonexistent WASM build
+Decisions: Hash migration and frontend inputs with SHA-256; derive schema and
+  asset versions; sort all discovered inputs; declare exact generated paths
+Files-or-schemas: Generated registry/catalog/manifest/version sources and
+  generator/check tests; generator schema 1; runtime schema remains 0
+Validation: Generator and checksum tests, staged aggregate lint, isolated
+  generate-check, fast suite, and whitespace checks passed
+Failures-or-discarded-approaches: Initial Buf argument assembly duplicated the
+  `generate` subcommand; corrected before running the generator
+Known-limitations: Event output remains empty until event declarations exist;
+  GoWebComponents/WASM binding generation waits for the M06 spike
+Next-safe-step: Stage generated and source paths, run aggregate checks, inspect
+  the complete diff, then commit the generation family.
+
 Dev-Log: DL-20260730-017
 Date: 2026-07-30
 Status: Complete

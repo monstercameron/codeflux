@@ -419,8 +419,8 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [x] `M01-079 BLOCKER` Create `cmd/codeflux-dev` as the cross-platform development entry point without requiring Make, Bash, PowerShell, Node scripts, or a global task runner.
 - [x] `M01-080` Define the development command registry with name, purpose, prerequisites, arguments, exit codes, and machine-readable-output capability.
 - [x] `M01-081` Implement `codeflux-dev bootstrap` to verify pinned Go, Git, protobuf, GoWebComponents, and generator requirements.
-- [ ] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
-- [ ] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
+- [x] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
+- [x] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
 - [ ] `M01-084` Implement `codeflux-dev run` with temporary SQLite, fake credentials, scripted provider, ephemeral port, and no external network.
 - [ ] `M01-085` Implement `codeflux-dev run-live` with explicit provider, credential reference, database, and visible cost warning.
 - [ ] `M01-086` Implement named `test-fast`, `test-integration`, `test-browser`, `test-security`, `test-race`, and `test-all` commands.
@@ -456,6 +456,13 @@ Bootstrap evidence:
 - Pinned tools install beneath `.artifacts/tools/bin`; provider-token, credential, password, and secret-shaped environment variables are removed before tool subprocesses.
 - Bootstrap validates `go.mod`, Buf configuration, and generator source pins before installation.
 - The GoWebComponents check proves the dependency is absent and M06-001 remains the authority for selecting the exact v5 release; this intentional deferred result does not masquerade as an installed framework.
+
+Generation evidence:
+
+- The single `generate` command now produces protobuf Go types, a directive-derived event registry, checksummed migration catalog, schema/frontend version constants, and a checksummed frontend asset manifest.
+- Every generated Go file has a declared path and first-line generator warning; lint rejects generated suffixes or headers outside those paths.
+- `generate-check` regenerated all five output families beneath a validated `.artifacts/tmp` child, compared exact file sets and bytes, removed the child, and left the worktree unchanged.
+- Generator fixture tests proved byte-identical repeated output, source-family coverage, duplicate event rejection, and embedded migration/asset checksum agreement.
 
 ## Gate
 

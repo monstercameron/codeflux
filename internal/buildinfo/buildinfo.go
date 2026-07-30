@@ -4,13 +4,11 @@ package buildinfo
 
 import "runtime"
 
-const schemaVersion uint32 = 0
-
 var (
 	version         = "0.0.0-dev"
 	commit          = "unknown"
 	buildDate       = "unknown"
-	frontendVersion = "0.0.0-dev"
+	frontendVersion = generatedFrontendVersion
 )
 
 // Info is the structured identity of one Codeflux executable.
@@ -30,7 +28,7 @@ func Current() Info {
 		Commit:          commit,
 		BuildDate:       buildDate,
 		GoVersion:       runtime.Version(),
-		SchemaVersion:   schemaVersion,
+		SchemaVersion:   generatedSchemaVersion,
 		FrontendVersion: frontendVersion,
 	}
 }

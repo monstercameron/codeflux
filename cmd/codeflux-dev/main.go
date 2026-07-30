@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"codeflux.dev/codeflux/internal/buildinfo"
 )
 
 const (
@@ -74,9 +76,9 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	case "build":
 		return runBuild(ctx, stdout, stderr)
 	case "generate":
-		return runGenerate(ctx, stdout, stderr)
+		return runGenerate(ctx, stdout, stderr, invocation)
 	case "generate-check":
-		return runGenerateCheck(ctx, stdout, stderr)
+		return runGenerateCheck(ctx, stdout, stderr, invocation)
 	case "ci-failure-artifact":
 		return runCIFailureArtifact(ctx, stderr)
 	case "test-fast":
@@ -92,22 +94,50 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	}
 }
 
-func runGenerate(ctx context.Context, stdout, stderr io.Writer) int {
+func runGenerate(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev generate: %v\n", err)
 		return exitFailure
 	}
-	return runPinnedBuf(
+	outputRoot := root
+	var bufArgs []string
+	if invocation.Root != "" {
+		outputRoot, err = resolveCommandRoot(root, "generate", invocation.Root)
+		if err != nil {
+			fmt.Fprintf(stderr, "codeflux-dev generate: root: %v\n", err)
+			return exitUsage
+		}
+		bufArgs = []string{"--output", outputRoot}
+	}
+	bufArgs = append([]string{"generate"}, bufArgs...)
+	if code := runPinnedBuf(
 		ctx,
 		root,
 		stdout,
 		stderr,
-		"generate",
-	)
+		bufArgs...,
+	); code != exitSuccess {
+		return code
+	}
+	if err := generateRepositorySource(root, outputRoot); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate: repository outputs: %v\n", err)
+		return exitFailure
+	}
+	return exitSuccess
 }
 
-func runGenerateCheck(ctx context.Context, stdout, stderr io.Writer) int {
+func runGenerateCheck(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
@@ -135,14 +165,41 @@ func runGenerateCheck(ctx context.Context, stdout, stderr io.Writer) int {
 	); code != exitSuccess {
 		return code
 	}
-	if err := compareDirectoryTrees(
-		filepath.Join(root, "api", "gen"),
-		filepath.Join(staging, "api", "gen"),
-	); err != nil {
-		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
+	if err := generateRepositorySource(root, staging); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate-check: repository outputs: %v\n", err)
 		return exitFailure
 	}
+	for _, relative := range generatedRepositoryPaths {
+		if err := compareGeneratedPath(root, staging, relative); err != nil {
+			fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
+			return exitFailure
+		}
+	}
 	return exitSuccess
+}
+
+func compareGeneratedPath(root, staging, relative string) error {
+	expected := filepath.Join(root, filepath.FromSlash(relative))
+	actual := filepath.Join(staging, filepath.FromSlash(relative))
+	info, err := os.Stat(expected)
+	if err != nil {
+		return fmt.Errorf("inspect committed generated path %s: %w", relative, err)
+	}
+	if info.IsDir() {
+		return compareDirectoryTrees(expected, actual)
+	}
+	expectedContent, err := os.ReadFile(expected)
+	if err != nil {
+		return err
+	}
+	actualContent, err := os.ReadFile(actual)
+	if err != nil {
+		return fmt.Errorf("read regenerated %s: %w", relative, err)
+	}
+	if !bytes.Equal(expectedContent, actualContent) {
+		return fmt.Errorf("generated content differs for %s", relative)
+	}
+	return nil
 }
 
 func runPinnedBuf(
@@ -231,7 +288,7 @@ func buildLinkerFlags(ctx context.Context, root string) (string, error) {
 		"-X", prefix + "version=0.0.0-dev",
 		"-X", prefix + "commit=" + commit,
 		"-X", prefix + "buildDate=" + buildDate,
-		"-X", prefix + "frontendVersion=0.0.0-dev",
+		"-X", prefix + "frontendVersion=" + buildinfo.Current().FrontendVersion,
 	}, " "), nil
 }
 

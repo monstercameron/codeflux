@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-017
+Date: 2026-07-30
+Type: Deterministic source generation
+Request-or-TODO: M01-082, M01-083
+Outcome: Extended the sole generation entry point and isolated drift check to
+  protobuf, events, migrations, build versions, and frontend asset manifests
+Affected-behavior: Committed migrations and frontend assets now carry generated
+  checksums and executable identity derives schema/frontend versions from them
+Compatibility-or-migration: Generator schema 1; runtime schema remains 0
+Verification: Determinism and duplicate-event unit cases, generated checksum
+  tests, full suite, isolated generation check, lint, and staged diff checks
+Dev-Log: DL-20260730-018
+
 Change-ID: CL-20260730-016
 Date: 2026-07-30
 Type: Development bootstrap

@@ -21,4 +21,7 @@ func TestCurrentIsCompleteAndHonest(t *testing.T) {
 	if !strings.HasPrefix(info.GoVersion, "go1.") {
 		t.Errorf("GoVersion = %q, want Go runtime version", info.GoVersion)
 	}
+	if !strings.HasPrefix(info.FrontendVersion, "assets-") {
+		t.Errorf("FrontendVersion = %q, want generated asset version", info.FrontendVersion)
+	}
 }
