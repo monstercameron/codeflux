@@ -6696,6 +6696,48 @@ When Codeflux fails or creates serious friction:
 
 Do not patch prompts, permissions, validators, or routing merely to make one hidden test pass. A refinement must state the general failure class it fixes.
 
+### Adversarial Prompt and Process Review
+
+Before any adversarial review, freeze the reviewer prompt, model, input
+allowlist, output schema, no-edit and no-approval authority, execution timing,
+exact budget, and cost accounting. Verify its isolation from hidden acceptance.
+A shared-filesystem subagent is not sufficient isolation for this boundary.
+
+The adversarial reviewer is an evaluation-only role, not Codeflux multi-agent
+execution topology, and cannot influence the active evaluated run. After a
+complete run, it receives only the currently revealed requirement, visible
+tests, versioned plan, worktree diff, and redacted run evidence. It must not
+receive evaluator source, hidden assertions or answers, future requirements,
+unrelated private run content, or live authority. Reviewer time, tokens, cost,
+findings, and resulting interventions are part of the scorecard.
+
+Adversarial findings are hypotheses with `evidence_strength: none`, not
+acceptance evidence. A finding can change the prompt or process only after it
+identifies a general failure class, produces an executable reproduction where
+practical, and survives the controlled refinement loop. The reviewer does not
+approve its own proposed change.
+
+Prompt and process comparisons change one stated invariant at a time and
+version every candidate. Before execution, preregister the exact candidate
+diff, tuning cohort, primary endpoint, minimum effect, exact repetitions,
+analysis method, stop rule, and multiple-comparison treatment. Freeze the model
+revision, reasoning effort, tools, context-selection policy, authority
+envelope, budget, and acceptance criteria. Use five to ten executions per arm
+when stochastic-provider variance is being estimated.
+
+Select at most one candidate on the separate exposed tuning cohort. Keep the
+lineage-unexposed held-out cohort frozen until selection, then allow one
+confirmation run. ReserveFlow hidden-evaluator results are acceptance evidence,
+never a prompt-selection or prompt-revision oracle.
+
+Any regression in correctness, required validation, authority, security,
+secret handling, recovery, or independent acceptance rejects the candidate
+regardless of speed or cost. Exhausting the fixed budget without held-out
+benefit retires the candidate. Retain only a candidate that meets its
+preregistered gate for the named model revision, frozen task distribution,
+tools, and authority envelope; otherwise report the result as inconclusive or
+retired. Do not claim a globally optimal prompt.
+
 ### Dogfood Metrics
 
 Per task, record:

@@ -187,6 +187,34 @@ These rules apply when executing the final §28 ReserveFlow dogfood trial and Mi
 - Test the repair against earlier affected ReserveFlow tasks and an unrelated fixture; reject task-specific prompt patches or fixes that depend on future-requirement knowledge.
 - Record every clarification, approval, redirect, workaround, evaluator action, and refinement outcome in the append-only intervention and defect ledgers.
 - Compare correctness before speed and cost. Include failed cheap attempts, escalation, manual effort, and contaminated runs in the scorecard.
+- Before using an adversarial review agent, freeze its prompt, model, input
+  allowlist, output schema, no-edit/no-approval authority, timing, replay budget,
+  and cost accounting, then verify its isolation from hidden acceptance.
+- The adversarial reviewer is an evaluation-only role, not Codeflux multi-agent
+  execution topology. It cannot influence the active evaluated run. Give it
+  only the currently revealed requirement, visible tests, versioned plan, diff,
+  and redacted run evidence; never give it evaluator source, hidden assertions,
+  hidden answers, future requirements, or live authority.
+- Record reviewer time, tokens, cost, findings, and resulting interventions in
+  the scorecard.
+- Treat adversarial critique as a hypothesis with `evidence_strength: none`
+  until an executable reproduction and independent acceptance support it. The
+  reviewer cannot approve its own proposed prompt or process change.
+- Test prompt and process candidates one general invariant at a time. Before
+  execution, preregister the exact candidate diff, tuning cohort, primary
+  endpoint, minimum effect, repetitions, analysis, stop rule, and
+  multiple-comparison treatment while holding model, effort, tools, context
+  policy, authority, budget, and acceptance criteria fixed.
+- Do not increase the replay budget or keep tuning until a positive result
+  appears. Retire ambiguous or unsupported candidates and preserve the negative
+  result.
+- Select at most one candidate on the exposed tuning cohort, then allow one
+  confirmation on a lineage-unexposed held-out cohort. Never use ReserveFlow
+  hidden-evaluator results to select or revise a prompt.
+- Reject a candidate on any correctness, validation, authority, security,
+  secrecy, or recovery regression regardless of latency or cost. Describe a
+  candidate only as meeting its preregistered gate for the named frozen
+  evaluation stratum, never as an optimal prompt.
 - Treat the result as evidence about this prototype and task sequence, not proof of general coding-agent superiority.
 
 ## Go Engineering Rules

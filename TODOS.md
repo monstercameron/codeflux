@@ -3113,6 +3113,12 @@ For each pair below, the first item opens a new Codeflux task from the prior acc
 - [ ] `M24-188` Reject a repair that passes only the hidden case, relies on future-requirement knowledge, or adds task-specific prompt text without a general invariant.
 - [ ] `M24-189 DATA` Record correctness, speed, cost, UX, DevX, and any newly introduced tradeoff before closing the defect.
 - [ ] `M24-190` Close each defect as fixed, accepted limitation, deferred with owner and trigger, evaluator defect, or product-scope rejection; do not silently discard it.
+- [ ] `M24-216 BLOCKER EVAL` Before use, freeze the adversarial reviewer's prompt, model, input allowlist, output schema, no-edit and no-approval authority, execution timing, exact budget, and cost accounting.
+- [ ] `M24-217 BLOCKER SECURITY TEST` Extend M24-104 isolation to the adversarial reviewer and verify it cannot access evaluator source, hidden assertions or answers, future requirements, or live authority.
+- [ ] `M24-218 DATA` After each complete evaluated run and proposed refinement, run the evaluation-only adversarial reviewer without influencing the active run and record its time, tokens, cost, findings, and resulting interventions.
+- [ ] `M24-219 DATA` Version every prompt or process candidate, change one general invariant at a time, and preregister the exact diff, tuning cohort, primary endpoint, minimum effect, repetitions, analysis, stop rule, multiple-comparison treatment, and frozen execution envelope.
+- [ ] `M24-220 TEST` Select at most one candidate on the exposed tuning cohort, keep the lineage-unexposed held-out cohort frozen until selection, allow one confirmation, and never use ReserveFlow hidden-evaluator results for prompt selection or revision.
+- [ ] `M24-221 GATE` Reject candidates with any correctness, validation, authority, security, secrecy, recovery, or independent-acceptance regression; retain only a candidate meeting its preregistered gate for the named frozen stratum and otherwise report inconclusive or retired.
 
 ## Dogfood Measurement and Comparison
 

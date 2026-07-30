@@ -24,6 +24,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-025
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-024
+Request-or-TODO: User request to E2E test and iteratively refine prompts and
+  process with an adversarial subagent until thesis evidence begins to appear
+Goal: Make refinement empirical, independently challenged, resistant to
+  evaluator leakage and overfitting, and honest about the strength of evidence
+Assumptions: "Optimal prompting" means best observed correctness-constrained
+  performance for a frozen evaluation stratum, not a global optimum
+Decisions: Preserve milestone order; run only the current M01 development
+  profile health smoke now; pre-isolate adversarial review from hidden
+  acceptance; preregister one general invariant under a frozen envelope; allow
+  one held-out confirmation; reject any correctness or safety regression
+Files-or-schemas: AGENTS.md, docs/plan.md, TODOS.md, CHANGELOG, DEVLOG; no
+  runtime schema
+Validation: `codeflux-dev test-all` passed lint, generation drift, fast,
+  integration, and security checks; deterministic `run --once --json` served
+  and probed loopback `/healthz`, declared the scripted-provider profile,
+  created and removed an empty `.sqlite` target, and shut down; it did not
+  execute SQLite, a provider request, the agent loop, browser behavior, or
+  product E2E; an independent read-only adversarial subagent audited the plan,
+  current implementation, evidence thresholds, leakage controls, and stop
+  criteria without inspecting the evaluator repository
+Failures-or-discarded-approaches: Rejected immediate ReserveFlow prompt tuning
+  because the agent loop, browser E2E harness, and dogfood isolation do not
+  exist yet and early exposure would contaminate the frozen benchmark. The
+  adversarial reviewer rejected the first protocol draft for mislabeling a
+  health smoke as E2E, running review before isolation, and permitting hidden
+  acceptance to become a tuning oracle; the corrected draft passed re-review.
+Known-limitations: Current health-smoke evidence validates only the M01
+  development harness and does not support the Codeflux product or compounding
+  thesis; M01-G04 still requires actual hosted CI before M02 can begin
+Next-safe-step: Obtain explicit authority for a private GitHub remote, run and
+  pass hosted M01 CI, then implement milestones in dependency order until the
+  M14 agent loop, M22 E2E harness, and M24 controlled dogfood comparison make
+  measured prompt refinement legitimate
+
 Dev-Log: DL-20260730-024
 Date: 2026-07-30
 Status: Complete

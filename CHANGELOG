@@ -30,6 +30,25 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-024
+Date: 2026-07-30
+Type: Evaluation and refinement policy
+Request-or-TODO: User request for end-to-end adversarial refinement toward
+  better prompting
+Outcome: Added an independently reviewed, leakage-resistant, fixed-budget
+  prompt and process refinement protocol without starting dependency-blocked
+  product tuning
+Affected-behavior: M24 evaluations must pre-isolate adversarial review from
+  hidden acceptance, preregister one-invariant candidates, permit one held-out
+  confirmation, and reject correctness or safety regressions
+Compatibility-or-migration: No runtime or schema impact; adds M24-216 through
+  M24-221 and narrows permissible evaluation claims
+Verification: Current-scope `test-all` and deterministic development-profile
+  loopback health smoke passed; an independent read-only adversarial audit
+  supplied the leakage, evidence, and stop controls and accepted the corrected
+  protocol after rejecting its first draft
+Dev-Log: DL-20260730-025
+
 Change-ID: CL-20260730-023
 Date: 2026-07-30
 Type: Frontend architecture policy
