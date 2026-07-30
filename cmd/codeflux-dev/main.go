@@ -77,7 +77,9 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return exitUsage
 	}
 	if spec.Name != "run-live" &&
-		(invocation.Provider != "" || invocation.CredentialRef != "" || invocation.Database != "") {
+		(invocation.Provider != "" || invocation.Model != "" ||
+			invocation.ModelRevision != "" || invocation.CredentialRef != "" ||
+			invocation.Database != "") {
 		fmt.Fprintf(stderr, "codeflux-dev %s: live-provider options are only valid for run-live\n", spec.Name)
 		return exitUsage
 	}
@@ -121,7 +123,7 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	case "run-spike":
 		return runSpike(ctx, stdout, stderr, invocation)
 	case "run-live":
-		return runLiveGate(stdout, stderr, invocation)
+		return runLiveGate(ctx, stdout, stderr, invocation)
 	case "test-all":
 		return runAllTests(ctx, stdout, stderr, invocation)
 	case "test-integration":

@@ -13,4 +13,5 @@ var Catalog = []Descriptor{
 	{Number: 6, Name: "000006_task_worktree_bindings.sql", SHA256: "b00ce44f5afb7a2653e44c63acb7ed1e3af068f61a4d343c6625b4168072f9ad"},
 	{Number: 7, Name: "000007_tool_authority_and_commands.sql", SHA256: "2818b8b2aca5750dd76781b48edb9251ffb8d01f18c413e9731bb28a49fd377d"},
 	{Number: 8, Name: "000008_worker_lifecycle.sql", SHA256: "c31caad6873e92338efc41ec2c6572b4d067a1b961abc051370f41acb5e95352"},
+	{Number: 9, Name: "000009_provider_accounting.sql", SHA256: "7bb4e933d89784c070445ff8d6ec9730fb61ed49a42543c51333b9135ab9c404"},
 }

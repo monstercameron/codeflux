@@ -24,6 +24,53 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-061
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-060
+Request-or-TODO: M12-001 through M12-055 and M12-G01 through M12-G04
+Goal: Normalize the initial provider set while preserving exact identity,
+  usage, pricing, retry, cancellation, privacy, and recovery evidence
+Assumptions: Provider capabilities and prices are revision-bound evidence;
+  missing usage or pricing is unknown rather than zero; credentials remain in
+  the operating-system store; a provider or model switch always requires
+  explicit user authority
+Decisions: Use one normalized request and ordered stream contract; implement
+  OpenAI Responses, Anthropic Messages, and configurable OpenAI-compatible
+  adapters; reject remote endpoints without approval; persist intent before
+  provider I/O; seal pricing snapshots; reconcile standard and
+  provider-specific categories; block retries after observable partial
+  effects; compensate bounded pre-I/O, accounting, and terminal-write
+  failures; pause after retry exhaustion; redact metadata before UI and again
+  before persistence; keep live requests opt-in, cost-warned, content-free,
+  OS-credential-only, and outside the repository database boundary
+Files-or-schemas: Migration 000009; provider contracts, transports, adapters,
+  retry, pricing, usage, and recovery; coordinator credential, attempt,
+  execution, and recovery services; provider accounting and live-smoke
+  repositories; cross-platform physical path resolution; run-live command and
+  deterministic tests
+Validation: Adapter mock and common-conformance suites, explicit and buffered
+  cancellation, deadline classification, retry safety, exact rational and
+  provider-specific accounting, sealed snapshot, recovery/finalization,
+  Windows junction, no-network live-gate, migration, generation, lint,
+  security, integration, and complete local test-all gates pass. Independent
+  contract, runtime, and storage audits all return ACCEPT.
+Failures-or-discarded-approaches: Cancellation initially raced buffered OpenAI
+  output and mislabeled deadlines; accounting and terminal write failures
+  could strand attribution; pricing components were appendable after snapshot
+  creation; live finalization trusted caller outcomes; retry exhaustion
+  failed to expose recovery choices; provider-specific usage was initially
+  dropped. Each path now has a regression and durable invariant. Raw API keys,
+  environment credential fallback, silent provider switching, unsealed or
+  zero-valued unknown pricing, response-content logging, and repository-local
+  live databases were rejected.
+Known-limitations: Real billable provider smoke execution remains explicitly
+  opt-in and is not run by CI. Browser E2E begins with the planned M16 GWC
+  harness; public CI supplies cross-platform and Ubuntu race evidence after
+  push.
+Next-safe-step: Push M12, require public CI to pass, then implement M13 fixed
+  routing, forecasts, reservations, and hard budget enforcement.
+
 Dev-Log: DL-20260730-060
 Date: 2026-07-30
 Status: Complete

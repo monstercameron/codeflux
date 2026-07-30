@@ -32,6 +32,8 @@ type commandInvocation struct {
 	Once          bool
 	Root          string
 	Provider      string
+	Model         string
+	ModelRevision string
 	CredentialRef string
 	Database      string
 	Positional    []string
@@ -65,7 +67,7 @@ func developmentCommandRegistry() []commandSpec {
 		{Name: "package", Purpose: "Build release packages beneath the artifact root.", Prerequisites: []string{"implemented packaging subsystem"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "replay", Purpose: "Replay a redacted event fixture or development session.", Prerequisites: []string{"implemented event subsystem"}, Arguments: []string{"[fixture]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "run", Purpose: "Start the isolated deterministic development profile.", Prerequisites: []string{"Go", "loopback TCP listener"}, Arguments: []string{"[--root PATH]", "[--once]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
-		{Name: "run-live", Purpose: "Validate and visibly gate an explicitly selected live-provider profile.", Prerequisites: []string{"provider and credential adapters at M04/M12"}, Arguments: []string{"--provider NAME", "--credential-ref os://REF", "--database ABSOLUTE_PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "gated"},
+		{Name: "run-live", Purpose: "Run one attributable opt-in live-provider smoke request.", Prerequisites: []string{"provider and credential adapters at M04/M12"}, Arguments: []string{"--provider NAME", "--model MODEL", "--model-revision REVISION", "--credential-ref os://REF", "--database ABSOLUTE_PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
 		{Name: "run-spike", Purpose: "Build and serve the M06 GWC transport spike on a random loopback port.", Prerequisites: []string{"Go", "GoWebComponents v5.0.1", "loopback TCP listener"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "seed", Purpose: "Create a named deterministic development scenario.", Prerequisites: []string{"implemented storage and event subsystems"}, Arguments: []string{"[scenario]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "test-all", Purpose: "Run the required current-scope local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1", "pinned Buf"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
@@ -121,6 +123,22 @@ func parseCommandInvocation(args []string) (commandInvocation, error) {
 			invocation.Provider = args[index]
 		case strings.HasPrefix(argument, "--provider="):
 			invocation.Provider = strings.TrimPrefix(argument, "--provider=")
+		case argument == "--model":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--model requires a value")
+			}
+			invocation.Model = args[index]
+		case strings.HasPrefix(argument, "--model="):
+			invocation.Model = strings.TrimPrefix(argument, "--model=")
+		case argument == "--model-revision":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--model-revision requires a value")
+			}
+			invocation.ModelRevision = args[index]
+		case strings.HasPrefix(argument, "--model-revision="):
+			invocation.ModelRevision = strings.TrimPrefix(argument, "--model-revision=")
 		case argument == "--credential-ref":
 			index++
 			if index >= len(args) || args[index] == "" {

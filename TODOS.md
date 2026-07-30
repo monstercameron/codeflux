@@ -1886,80 +1886,103 @@ Milestone output: normalized OpenAI, Anthropic, and OpenAI-compatible adapters w
 
 ## Provider Interface
 
-- [ ] `M12-001 BLOCKER` Define provider discovery and capability methods.
-- [ ] `M12-002 BLOCKER` Define streaming response and cancellation.
-- [ ] `M12-003` Define request messages, tool declarations, tool results, and structured-output requirements.
-- [ ] `M12-004` Define normalized stop reasons.
-- [ ] `M12-005` Define normalized usage accounting.
-- [ ] `M12-006` Define provider-specific raw metadata retention after redaction.
-- [ ] `M12-007` Define timeout, retryable, rate-limit, authentication, invalid-request, safety, and unavailable errors.
-- [ ] `M12-008` Define model capabilities: tools, structured output, context length, image input, and reasoning controls.
-- [ ] `M12-009` Define exact provider/model/version identity recorded per request.
-- [ ] `M12-010` Define pricing snapshots separately from mutable current pricing.
-- [ ] `M12-011` Define cancellation semantics and late-response handling.
-- [ ] `M12-012` Define request idempotency where providers support it.
+- [x] `M12-001 BLOCKER` Define provider discovery and capability methods.
+- [x] `M12-002 BLOCKER` Define streaming response and cancellation.
+- [x] `M12-003` Define request messages, tool declarations, tool results, and structured-output requirements.
+- [x] `M12-004` Define normalized stop reasons.
+- [x] `M12-005` Define normalized usage accounting.
+- [x] `M12-006` Define provider-specific raw metadata retention after redaction.
+- [x] `M12-007` Define timeout, retryable, rate-limit, authentication, invalid-request, safety, and unavailable errors.
+- [x] `M12-008` Define model capabilities: tools, structured output, context length, image input, and reasoning controls.
+- [x] `M12-009` Define exact provider/model/version identity recorded per request.
+- [x] `M12-010` Define pricing snapshots separately from mutable current pricing.
+- [x] `M12-011` Define cancellation semantics and late-response handling.
+- [x] `M12-012` Define request idempotency where providers support it.
 
 ## OpenAI Adapter
 
-- [ ] `M12-013` Implement model configuration.
-- [ ] `M12-014` Implement credential lookup.
-- [ ] `M12-015` Implement streaming text.
-- [ ] `M12-016` Implement tool calls and tool results.
-- [ ] `M12-017` Implement structured output needed by the planner.
-- [ ] `M12-018` Implement cancellation.
-- [ ] `M12-019` Normalize usage and stop reasons.
-- [ ] `M12-020` Capture request IDs and safe provider metadata.
-- [ ] `M12-021` Classify errors and retry hints.
-- [ ] `M12-022 TEST` Test against a deterministic mock server.
-- [ ] `M12-023 TEST` Add an opt-in live smoke test.
+- [x] `M12-013` Implement model configuration.
+- [x] `M12-014` Implement credential lookup.
+- [x] `M12-015` Implement streaming text.
+- [x] `M12-016` Implement tool calls and tool results.
+- [x] `M12-017` Implement structured output needed by the planner.
+- [x] `M12-018` Implement cancellation.
+- [x] `M12-019` Normalize usage and stop reasons.
+- [x] `M12-020` Capture request IDs and safe provider metadata.
+- [x] `M12-021` Classify errors and retry hints.
+- [x] `M12-022 TEST` Test against a deterministic mock server.
+- [x] `M12-023 TEST` Add an opt-in live smoke test.
 
 ## Anthropic Adapter
 
-- [ ] `M12-024` Implement model configuration.
-- [ ] `M12-025` Implement credential lookup.
-- [ ] `M12-026` Implement streaming text.
-- [ ] `M12-027` Implement tool calls and tool results.
-- [ ] `M12-028` Implement structured output needed by the planner.
-- [ ] `M12-029` Implement cancellation.
-- [ ] `M12-030` Normalize usage and stop reasons.
-- [ ] `M12-031` Capture request IDs and safe provider metadata.
-- [ ] `M12-032` Classify errors and retry hints.
-- [ ] `M12-033 TEST` Test against a deterministic mock server.
-- [ ] `M12-034 TEST` Add an opt-in live smoke test.
+- [x] `M12-024` Implement model configuration.
+- [x] `M12-025` Implement credential lookup.
+- [x] `M12-026` Implement streaming text.
+- [x] `M12-027` Implement tool calls and tool results.
+- [x] `M12-028` Implement structured output needed by the planner.
+- [x] `M12-029` Implement cancellation.
+- [x] `M12-030` Normalize usage and stop reasons.
+- [x] `M12-031` Capture request IDs and safe provider metadata.
+- [x] `M12-032` Classify errors and retry hints.
+- [x] `M12-033 TEST` Test against a deterministic mock server.
+- [x] `M12-034 TEST` Add an opt-in live smoke test.
 
 ## OpenAI-Compatible Local Adapter
 
-- [ ] `M12-035` Implement configurable loopback or user-approved endpoint.
-- [ ] `M12-036` Support optional credentials.
-- [ ] `M12-037` Implement model listing where the endpoint provides it.
-- [ ] `M12-038` Implement streaming text.
-- [ ] `M12-039` Detect and advertise tool-call support.
-- [ ] `M12-040` Handle endpoints without usage reporting.
-- [ ] `M12-041` Handle nonstandard error bodies safely.
-- [ ] `M12-042` Require approval before connecting to a non-loopback endpoint.
-- [ ] `M12-043 TEST` Test against a local deterministic fake endpoint.
+- [x] `M12-035` Implement configurable loopback or user-approved endpoint.
+- [x] `M12-036` Support optional credentials.
+- [x] `M12-037` Implement model listing where the endpoint provides it.
+- [x] `M12-038` Implement streaming text.
+- [x] `M12-039` Detect and advertise tool-call support.
+- [x] `M12-040` Handle endpoints without usage reporting.
+- [x] `M12-041` Handle nonstandard error bodies safely.
+- [x] `M12-042` Require approval before connecting to a non-loopback endpoint.
+- [x] `M12-043 TEST` Test against a local deterministic fake endpoint.
 
 ## Retry, Fallback, and Accounting
 
-- [ ] `M12-044 BLOCKER` Implement bounded retry for transient transport failures.
-- [ ] `M12-045` Respect provider retry-after guidance within the task deadline and budget.
-- [ ] `M12-046` Do not retry invalid, authentication, or policy errors.
-- [ ] `M12-047` Record each physical request attempt.
-- [ ] `M12-048` Attribute retry usage and cost to the task.
-- [ ] `M12-049` Preserve partial streamed output as non-final evidence.
-- [ ] `M12-050` Pause after retry budget exhaustion.
-- [ ] `M12-051` Offer retry, resume, or explicitly approved provider switch.
-- [ ] `M12-052` Never silently switch providers or models.
-- [ ] `M12-053` Handle missing pricing as unknown rather than zero.
-- [ ] `M12-054` Reconcile estimated and provider-reported usage.
-- [ ] `M12-055` Surface accounting discrepancies.
+- [x] `M12-044 BLOCKER` Implement bounded retry for transient transport failures.
+- [x] `M12-045` Respect provider retry-after guidance within the task deadline and budget.
+- [x] `M12-046` Do not retry invalid, authentication, or policy errors.
+- [x] `M12-047` Record each physical request attempt.
+- [x] `M12-048` Attribute retry usage and cost to the task.
+- [x] `M12-049` Preserve partial streamed output as non-final evidence.
+- [x] `M12-050` Pause after retry budget exhaustion.
+- [x] `M12-051` Offer retry, resume, or explicitly approved provider switch.
+- [x] `M12-052` Never silently switch providers or models.
+- [x] `M12-053` Handle missing pricing as unknown rather than zero.
+- [x] `M12-054` Reconcile estimated and provider-reported usage.
+- [x] `M12-055` Surface accounting discrepancies.
+
+M12 test evidence:
+
+- Deterministic OpenAI Responses, Anthropic Messages, and OpenAI-compatible
+  mock endpoints pass the same normalized text, partial tool-arguments,
+  completed tool-call, usage, stop-reason, identity, and metadata conversation.
+- Provider execution tests cover cancellation-authoritative UI delivery,
+  explicit provider cancellation, deadline classification, late buffered-event
+  suppression, bounded retry, retry-after limits, no retry after observable
+  output or tool effects, and no automatic provider or model switching.
+- SQLite tests cover sealed immutable known and explicit-unknown pricing
+  snapshots, attributable logical and physical requests, exact rational cost,
+  latest-record reconciliation, provider-specific usage, discrepancy states,
+  partial evidence hashes, retry exhaustion pause, and bounded compensation
+  for pre-I/O, accounting, and terminal-write failures.
+- `codeflux-dev run-live` is an opt-in, cost-warned path for OpenAI or
+  Anthropic. It reads only an `os://service/account` credential, requires an
+  external database outside physical repository aliases, emits no response
+  content, and is covered by a deterministic no-network end-to-end test.
+- Lint, generation, migration, fast, integration, security, repeated
+  cancellation/accounting regressions, and the complete local `test-all` gate
+  pass. The real billable live request remains deliberately opt-in and is not
+  executed by CI.
 
 ## Gate
 
-- [ ] `M12-G01 GATE` The same normalized mock conversation passes through all three adapters.
-- [ ] `M12-G02 GATE` Cancellation stops UI streaming and prevents additional tool execution.
-- [ ] `M12-G03 GATE` Every request has attributable provider, model, version, usage, price snapshot, latency, and final status.
-- [ ] `M12-G04 GATE` Provider switching never occurs without explicit user authority.
+- [x] `M12-G01 GATE` The same normalized mock conversation passes through all three adapters.
+- [x] `M12-G02 GATE` Cancellation stops UI streaming and prevents additional tool execution.
+- [x] `M12-G03 GATE` Every request has attributable provider, model, version, usage, price snapshot, latency, and final status.
+- [x] `M12-G04 GATE` Provider switching never occurs without explicit user authority.
 
 ---
 

@@ -50,6 +50,15 @@ func TestInitialOperationalSchemaContainsEveryRequiredTable(t *testing.T) {
 		"worker_leases",
 		"worker_reports",
 		"task_queue_entries",
+		"provider_configuration_revisions",
+		"provider_pricing_revisions",
+		"provider_price_components",
+		"provider_pricing_revision_seals",
+		"provider_logical_requests",
+		"provider_request_attempts",
+		"provider_attempt_accounting",
+		"provider_attempt_evidence",
+		"provider_live_smoke_fixtures",
 	}
 	for _, table := range expected {
 		var count int
@@ -174,6 +183,12 @@ func TestInitialSchemaHasRequiredQueryIndexes(t *testing.T) {
 		"worker_reports_by_run",
 		"task_queue_one_live_entry",
 		"task_queue_dispatch_order",
+		"provider_price_components_standard_unique",
+		"provider_price_components_specific_unique",
+		"provider_logical_requests_for_task",
+		"provider_request_attempts_for_request",
+		"provider_attempt_accounting_for_attempt",
+		"provider_attempt_evidence_for_attempt",
 	}
 	for _, index := range expected {
 		var count int

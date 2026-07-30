@@ -30,6 +30,32 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-060
+Date: 2026-07-30
+Type: Provider abstraction and exact accounting
+Request-or-TODO: M12-001 through M12-055 and M12-G01 through M12-G04
+Outcome: Added normalized OpenAI Responses, Anthropic Messages, and
+  OpenAI-compatible adapters with streaming, tools, structured output,
+  cancellation, bounded retry, immutable pricing evidence, and durable
+  per-attempt attribution
+Affected-behavior: Provider requests now retain exact provider/model/revision
+  identity, sealed known or explicit-unknown pricing, normalized standard and
+  provider-specific usage, exact rational cost, safe metadata, partial-effect
+  evidence, latency, retry decisions, recovery choices, and terminal status.
+  Observable partial work cannot be retried, provider switching requires
+  explicit authority, and an opt-in live gate uses only OS credential
+  references and an external database without printing response content.
+Compatibility-or-migration: Adds migration 000009 for provider configuration,
+  sealed pricing revisions, logical requests, physical attempts, accounting,
+  partial evidence, and live-smoke attribution; schema version advances from
+  8 to 9.
+Verification: Deterministic adapter conformance, mock-server, cancellation,
+  deadline, retry, recovery, provider-specific accounting, migration,
+  generation, integration, security, and complete local test-all gates pass.
+  Three independent adversarial contract, runtime, and storage audits accept
+  the final tree.
+Dev-Log: DL-20260730-061
+
 Change-ID: CL-20260730-059
 Date: 2026-07-30
 Type: Cross-platform worker directory identity
