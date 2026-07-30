@@ -307,8 +307,12 @@ Protobuf generation evidence: Buf 1.72.0 compiles
 `buf.build/protocolbuffers/go:v1.36.11` plugin; a second generation produced
 the identical SHA-256
 `E9E6331D9AD000D782C80EB91663B2CA2DA670D2FB09FBBEC4DAEC639FEE5280`.
-- [ ] `M01-034` Add migration embedding through `go:embed`.
-- [ ] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
+- [x] `M01-034` Add migration embedding through `go:embed`.
+- [x] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
+
+Embedding evidence: package tests read the exact embedded
+`000000_bootstrap.sql` and `static/shell.css` paths; the bootstrap migration is
+an intentional no-op and does not pre-implement M03 schema.
 - [ ] `M01-036` Ensure generated files carry a generated-file header.
 - [ ] `M01-037` Ensure generation is reproducible and leaves the worktree clean when rerun.
 - [ ] `M01-038` Add a check that committed generated code matches protobuf sources.

@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-008
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-007
+Request-or-TODO: M01-034, M01-035
+Goal: Establish compile-time embedding for ordered SQL migration inputs and
+  deterministic frontend assets
+Assumptions: A numbered no-op bootstrap SQL file establishes the mechanism
+  without pre-implementing M03 schema; a minimal CSS asset proves frontend
+  packaging without claiming a finished shell
+Decisions: Expose read-only embedded filesystems; keep assets as reviewed
+  source; test exact paths and non-empty content
+Files-or-schemas: migrations embedded SQL, web/assets embedded CSS, package
+  tests; no application schema
+Validation: gofmt passed; migration and asset package tests read the exact
+  embedded paths and non-empty content; full build, fast suite, vet, and
+  Staticcheck passed
+Failures-or-discarded-approaches: None
+Known-limitations: Migration execution begins in M03; WASM generation and the
+  GoWebComponents shell remain later tasks
+Next-safe-step: Commit embedding, then add generated-file, regeneration,
+  migration-order, database-artifact, and secret checks in M01-036 through
+  M01-041.
+
 Dev-Log: DL-20260730-007
 Date: 2026-07-30
 Status: Complete

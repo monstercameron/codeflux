@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-007
+Date: 2026-07-30
+Type: Build input embedding
+Request-or-TODO: M01-034, M01-035
+Outcome: Added compile-time SQL migration and frontend asset embedding with
+  exact-path tests
+Affected-behavior: Builds now include the immutable migration catalog input and
+  reviewed frontend asset package
+Compatibility-or-migration: The 000000 bootstrap migration is a deliberate
+  no-op; no application schema or UI contract is introduced
+Verification: Migration and asset package tests, full build, fast suite, vet,
+  and Staticcheck passed
+Dev-Log: DL-20260730-008
+
 Change-ID: CL-20260730-006
 Date: 2026-07-30
 Type: Protobuf generation
