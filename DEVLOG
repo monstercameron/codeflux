@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-013
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-012
+Request-or-TODO: M01-055 through M01-059, M01-066, M01-072
+Goal: Put the authoritative repository instructions and thin Claude entry point
+  under version control before executable instruction checks depend on them
+Assumptions: The existing untracked files are the planned M01 instruction
+  outputs, not unrelated user work; their checked TODOs identify them exactly
+Decisions: Keep AGENTS.md authoritative and CLAUDE.md pointer-only; pin the
+  community reference to revision 2c606141936f1eeef17fa3043a72095b4765b9c2
+Files-or-schemas: AGENTS.md, CLAUDE.md, TODOS.md, ledgers; no runtime schema
+Validation: Required sections, pointers, four disciplines, versioned atom
+  template, naming grammar, community attribution, and explicit unofficial
+  status were inspected; the pinned Git revision resolves remotely
+Failures-or-discarded-approaches: The original reference used a moving
+  repository URL and CLAUDE.md did not explicitly state unofficial status;
+  both were corrected before tracking
+Known-limitations: Automated presence, pointer, link, smoke, atom-comment, and
+  atom-name enforcement begin at M01-060
+Next-safe-step: Commit the instruction baseline, then add executable checks and
+  fixtures without creating additional Markdown files.
+
 Dev-Log: DL-20260730-012
 Date: 2026-07-30
 Status: Complete

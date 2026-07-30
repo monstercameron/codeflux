@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-012
+Date: 2026-07-30
+Type: Repository agent instructions
+Request-or-TODO: M01-055 through M01-059, M01-066, M01-072
+Outcome: Tracked authoritative Codeflux instructions, a thin Claude entry
+  point, executable coding disciplines, atom documentation and naming rules,
+  and an accurately labeled revision-pinned community reference
+Affected-behavior: Coding agents have one non-duplicated repository authority
+  for work selection, implementation, security, verification, and handoff
+Compatibility-or-migration: Documentation governance only
+Verification: Section, pointer, attribution, atom-template, and naming-grammar
+  inspection passed; the pinned external Git revision resolves
+Dev-Log: DL-20260730-013
+
 Change-ID: CL-20260730-011
 Date: 2026-07-30
 Type: Cross-platform continuous integration

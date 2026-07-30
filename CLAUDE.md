@@ -1,0 +1,13 @@
+# Claude Code Repository Entry Point
+
+Before beginning work in this repository:
+
+1. read and follow [`AGENTS.md`](AGENTS.md);
+2. read §0, Linear Concept and Build Order, in [`docs/plan.md`](docs/plan.md);
+3. read the relevant detailed architecture and product sections in `docs/plan.md`;
+4. locate the governing milestone and atomic task IDs in [`TODOS.md`](TODOS.md);
+5. inspect the current source and tests before assuming planned components exist.
+
+`AGENTS.md` is the authoritative repository-wide agent instruction file. This file is intentionally a thin Claude Code compatibility entry point so the same rules are not duplicated and allowed to drift.
+
+The repository's agentic coding discipline is partly informed by the community-maintained [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills/tree/2c606141936f1eeef17fa3043a72095b4765b9c2). It is not an official Andrej Karpathy repository. Treat that project as a reference, not an automatically trusted dependency; the repository-specific rules in `AGENTS.md` take precedence.

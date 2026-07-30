@@ -370,6 +370,14 @@ Plan: §21 Agent Architecture; §24 Specification Review; §27 Hobbyist MVP Deci
 - [x] `M01-057 DOC` Add the community-maintained Karpathy-inspired agent-coding guidelines as an accurately labeled reference. Output: links and attribution in `AGENTS.md` and `CLAUDE.md`. Verify: both files state that the source is community-maintained and not an official Andrej Karpathy repository.
 - [x] `M01-058 DOC` Adapt the four relevant disciplines into Codeflux-specific rules: visible assumptions, smallest sufficient design, surgical edits, and verifiable outcomes. Output: `AGENTS.md` Agentic Coding Discipline. Verify: each discipline contains executable repository-specific behavior rather than a slogan.
 - [x] `M01-059 DOC` Establish an instruction authority model that prevents drift. Output: `AGENTS.md` is authoritative and `CLAUDE.md` is a pointer. Verify: no project rule is independently restated in full in `CLAUDE.md`.
+
+Evidence:
+
+- Root `AGENTS.md` defines repository scope, mandatory reading order, product boundaries, artifact and ledger policy, four executable coding disciplines, storage, security, frontend, testing, and handoff rules.
+- Root `CLAUDE.md` remains a thin compatibility pointer to `AGENTS.md`, `docs/plan.md`, and `TODOS.md`; it does not restate the authoritative rule set.
+- Both files identify the pinned community-maintained reference and explicitly state that it is not an official Andrej Karpathy repository.
+- `AGENTS.md` contains the versioned atom-comment field template and standalone-descriptive atom naming grammar required by M01-066 and M01-072.
+
 - [ ] `M01-060 TEST` Add a documentation check that requires root `AGENTS.md` and `CLAUDE.md`.
 - [ ] `M01-061 TEST` Add a documentation check that `CLAUDE.md` still points to `AGENTS.md`, `docs/plan.md`, and `TODOS.md`.
 - [ ] `M01-062 TEST` Add a link check for repository-relative instruction links and the pinned external Karpathy-inspired reference.
