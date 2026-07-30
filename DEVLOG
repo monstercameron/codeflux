@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-006
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-005
+Request-or-TODO: M01-028 through M01-032
+Goal: Enforce formatting, vet, low-noise static analysis, race coverage, and
+  unit coverage through the repository development helper
+Assumptions: Staticcheck 2026.1 already installed on the host is usable without
+  dependency installation; race coverage will execute on a supported CI host
+Decisions: Pin staticcheck 2026.1; verify Go formatting in-process; store
+  coverage only in .artifacts/coverage; report unsupported race hosts clearly
+Files-or-schemas: cmd/codeflux-dev, DEVLOG; no schema
+Validation: Helper unit tests passed; `lint` passed formatting, vet, and
+  Staticcheck 2026.1; `test-coverage` passed and wrote only
+  .artifacts/coverage/unit.out; `test-race` returned the expected explicit
+  unsupported-host failure on Windows ARM64; artifact escape scan was empty
+Failures-or-discarded-approaches: Direct `go test -race ./...` is unsupported
+  on the current windows/arm64 host with CGO disabled; this is a declared host
+  limitation, not a passing race result
+Known-limitations: CI race execution remains governed by M01-051; the current
+  repository has no production concurrency-owning package behavior yet
+Next-safe-step: Commit quality enforcement, then add pinned protobuf,
+  migration-catalog, and frontend generation beginning with M01-033.
+
 Dev-Log: DL-20260730-005
 Date: 2026-07-30
 Status: Complete

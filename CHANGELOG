@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-005
+Date: 2026-07-30
+Type: Quality enforcement
+Request-or-TODO: M01-028 through M01-032
+Outcome: Added deterministic format, vet, pinned Staticcheck, race, and
+  coverage commands to the cross-platform development helper
+Affected-behavior: Lint rejects unformatted or statically invalid Go; coverage
+  stays under .artifacts; unsupported race hosts fail with an explicit route to
+  the declared CI job
+Compatibility-or-migration: Staticcheck 2026.1 is now the pinned linter
+Verification: Helper unit tests, `lint`, `test-coverage`, expected unsupported
+  `test-race` result on Windows ARM64, coverage-file inspection, and artifact
+  escape scan passed
+Dev-Log: DL-20260730-006
+
 Change-ID: CL-20260730-004
 Date: 2026-07-30
 Type: Development commands

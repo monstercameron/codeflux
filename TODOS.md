@@ -289,11 +289,17 @@ Initial command evidence:
 - `go run ./cmd/codeflux-dev build` compiles every tracked package and writes `codeflux` and `codeflux-worker` only beneath `.artifacts/bin`.
 - `go run ./cmd/codeflux-dev test-fast` runs the complete current module test suite.
 - Generated protobuf and embedded frontend packages join the all-package build automatically when their later source tasks add them; no generator capability is claimed yet.
-- [ ] `M01-028` Add `go fmt` verification.
-- [ ] `M01-029` Add `go vet` verification.
-- [ ] `M01-030` Choose and configure a Go linter set with low false-positive noise.
-- [ ] `M01-031` Add race-detector coverage for packages that own concurrency.
-- [ ] `M01-032` Add unit-test coverage reporting without making raw percentage the quality target.
+- [x] `M01-028` Add `go fmt` verification.
+- [x] `M01-029` Add `go vet` verification.
+- [x] `M01-030` Choose and configure a Go linter set with low false-positive noise.
+- [x] `M01-031` Add race-detector coverage for packages that own concurrency.
+- [x] `M01-032` Add unit-test coverage reporting without making raw percentage the quality target.
+
+Quality-command evidence:
+
+- `lint` verifies formatting in-process, runs `go vet ./...`, and requires/runs Staticcheck 2026.1.
+- `test-race` runs `go test -race ./...` on supported hosts and fails explicitly on the current unsupported Windows ARM64 host; the supported CI execution is tracked by M01-051.
+- `test-coverage` writes `.artifacts/coverage/unit.out`; coverage is diagnostic and has no raw-percentage gate.
 - [ ] `M01-033` Add protobuf generation through a pinned tool version.
 - [ ] `M01-034` Add migration embedding through `go:embed`.
 - [ ] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
