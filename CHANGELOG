@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-038
+Date: 2026-07-30
+Type: SQLite durability and replay gates
+Request-or-TODO: M03-G01 through M03-G04
+Outcome: Added deterministic task-event replay with corruption detection and a
+  real child-process forced-termination test that proves committed durability,
+  interrupted transaction rollback, integrity, lineage, and replay equivalence
+Affected-behavior: Persisted task histories can reconstruct state and revision;
+  discontinuous or invalid histories fail as corruption rather than producing
+  a guessed state
+Compatibility-or-migration: No schema or CLI compatibility change
+Verification: `go run ./cmd/codeflux-dev test-all` passed all locally available
+  suites, including forced termination, replay, credential-column and safe
+  diagnostics, migration, backup, restore, and newer-schema refusal
+Dev-Log: DL-20260730-039
+
 Change-ID: CL-20260730-037
 Date: 2026-07-30
 Type: SQLite diagnostics and maintenance

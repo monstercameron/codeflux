@@ -793,10 +793,29 @@ Diagnostics-and-maintenance evidence:
 
 ## Gate
 
-- [ ] `M03-G01 GATE` SQLite survives a forced process termination during representative writes.
-- [ ] `M03-G02 GATE` Replaying persisted task events reconstructs the same task state.
-- [ ] `M03-G03 GATE` No schema column or diagnostic output contains provider credentials.
-- [ ] `M03-G04 GATE` Migration, backup, restoration, and downgrade-refusal tests pass.
+- [x] `M03-G01 GATE` SQLite survives a forced process termination during representative writes.
+- [x] `M03-G02 GATE` Replaying persisted task events reconstructs the same task state.
+- [x] `M03-G03 GATE` No schema column or diagnostic output contains provider credentials.
+- [x] `M03-G04 GATE` Migration, backup, restoration, and downgrade-refusal tests pass.
+
+Milestone-03 gate evidence:
+
+- A child process commits one atomic task transition, opens a second
+  task-and-event transaction, signals after both representative writes, and is
+  forcibly terminated before commit. Reopen preserves the committed fact,
+  removes both uncommitted changes, and passes integrity and foreign-key checks.
+- Ordered replay starts from draft, requires contiguous event sequences,
+  validates every transition through the domain state machine, ignores
+  non-state events for state projection, and matches the persisted state and
+  revision. A deleted sequence is classified as corruption.
+- Schema introspection rejects credential-, secret-, key-, token-, password-,
+  and authorization-shaped columns. Doctor tests use a secret-shaped selected
+  path and prove neither it, executable paths, nor raw database failures are
+  emitted.
+- Empty and every-version migrations, unsupported-newer-schema refusal,
+  disk-space refusal, checksum mismatch, failed/interrupted restoration,
+  stable retry refusal, cross-process migration authority, and direct online
+  backup/restore all pass against real SQLite.
 
 ---
 

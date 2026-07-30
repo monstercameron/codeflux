@@ -180,6 +180,13 @@ type TaskEvent struct {
 	CreatedAt      time.Time
 }
 
+// TaskReplay is the deterministic task state reconstructed from ordered events.
+type TaskReplay struct {
+	State      domain.TaskState
+	Revision   uint64
+	EventCount uint64
+}
+
 // CreateTask declares one initial draft task.
 type CreateTask struct {
 	ID                domain.TaskID
@@ -227,6 +234,7 @@ type TaskOperations interface {
 	GetTask(context.Context, domain.TaskID) (Task, error)
 	TransitionTask(context.Context, TransitionTask) (TransitionedTask, error)
 	AppendTaskEvent(context.Context, AppendTaskEvent) (TaskEvent, error)
+	ReplayTask(context.Context, domain.TaskID) (TaskReplay, error)
 }
 
 // Approval is one durable authority request.

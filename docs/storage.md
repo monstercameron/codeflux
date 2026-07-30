@@ -156,3 +156,19 @@ artifacts use hard-delete-lineage semantics: owned derivatives must be removed
 with the artifact. Every ownership relation, including future graph and vector
 rows, must use foreign keys, and deletion completes only after
 `foreign_key_check` reports no orphaned rows.
+
+## Crash recovery and replay
+
+Task creation establishes the initial `draft` state. Replay reads immutable task
+events in ascending per-task sequence, requires a contiguous sequence, applies
+only declared `task.state-transition` payloads through the domain state
+machine, and rejects malformed, discontinuous, or state-inconsistent history as
+corruption. Non-state task events remain part of the ordered history but do not
+change reconstructed state.
+
+The process-termination gate commits one task transition, starts a second
+transaction that updates both the task aggregate and its transition event, and
+then forcibly terminates the child process before commit. On reopen, SQLite
+must pass full integrity and foreign-key checks, preserve the first transition,
+discard both halves of the interrupted transition, and replay to the same state
+and revision as the aggregate.

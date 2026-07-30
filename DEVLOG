@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-039
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-038
+Request-or-TODO: M03-G01 through M03-G04
+Goal: Close the SQLite milestone with executable evidence for crash durability,
+  event replay equivalence, credential absence, and migration recovery
+Assumptions: Task creation is the implicit draft-state fact for the initial
+  schema; ordinary non-transition task events do not affect task-state replay
+Decisions: Replay ordered immutable events rather than reading the aggregate;
+  require contiguous sequences and domain-valid source/target transitions;
+  classify any mismatch as corruption. Exercise crash recovery through the
+  current test executable as a child so the operating system terminates a real
+  process while both aggregate and event writes are open in one transaction.
+Files-or-schemas: internal/storage repository contract, replay implementation,
+  durability/replay gate tests, docs/storage.md, TODOS.md, CHANGELOG, DEVLOG; no
+  schema change
+Validation: Focused replay and forced-termination tests passed. The killed
+  transaction left neither its task update nor event, while the prior committed
+  transition survived; reopen passed integrity and foreign-key checks and
+  replay matched aggregate state/revision. Existing schema introspection,
+  path-free doctor, migration, online backup/restore, interrupted restoration,
+  and unsupported-newer-schema tests passed in the complete local suite.
+  `go run ./cmd/codeflux-dev test-all` passed lint, generation-drift, fast,
+  integration, and security suites.
+Failures-or-discarded-approaches: Added an affected-row assertion inside the
+  killed transaction so the crash fixture cannot pass without performing the
+  intended aggregate write. Replay rejects gaps instead of silently sorting
+  around missing correctness-bearing history.
+Known-limitations: Browser E2E remains gated on M16. Local race execution is
+  unsupported on Windows ARM64; Ubuntu CI remains the authoritative race run.
+Next-safe-step: Begin M04 from its configuration precedence and typed settings
+  contracts, then add native credential-store boundaries and the shared
+  redaction pipeline without persisting any provider secret.
+
 Dev-Log: DL-20260730-038
 Date: 2026-07-30
 Status: Complete

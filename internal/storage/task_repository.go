@@ -296,6 +296,89 @@ func (repositories *Repositories) AppendTaskEvent(
 	return event, err
 }
 
+// ReplayTask reconstructs task state exclusively from its ordered immutable
+// events. Task creation establishes the implicit draft state.
+func (repositories *Repositories) ReplayTask(
+	ctx context.Context,
+	taskID domain.TaskID,
+) (TaskReplay, error) {
+	if taskID.IsZero() {
+		return TaskReplay{}, errors.New("task ID must not be empty")
+	}
+	var exists int
+	if err := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT 1 FROM tasks WHERE id = ?`,
+		taskID,
+	).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return TaskReplay{}, typedError(ErrNotFound, "replay task", err)
+		}
+		return TaskReplay{}, classify("find task for replay", err)
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		`SELECT sequence, event_type, payload_json
+		 FROM task_events
+		 WHERE task_id = ?
+		 ORDER BY sequence`,
+		taskID,
+	)
+	if err != nil {
+		return TaskReplay{}, classify("read task events for replay", err)
+	}
+	defer rows.Close()
+
+	replay := TaskReplay{State: domain.TaskStateDraft}
+	var expectedSequence uint64 = 1
+	for rows.Next() {
+		var (
+			sequence    uint64
+			eventType   string
+			payloadJSON string
+		)
+		if err := rows.Scan(&sequence, &eventType, &payloadJSON); err != nil {
+			return TaskReplay{}, classify("scan task event for replay", err)
+		}
+		if sequence != expectedSequence {
+			return TaskReplay{}, replayCorruption("task event sequence is not contiguous")
+		}
+		expectedSequence++
+		replay.EventCount++
+		if eventType != "task.state-transition" {
+			continue
+		}
+		var payload struct {
+			From     domain.TaskState            `json:"from"`
+			To       domain.TaskState            `json:"to"`
+			Approval domain.ApprovalRequestState `json:"approval,omitempty"`
+		}
+		if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+			return TaskReplay{}, replayCorruption("task transition payload is invalid")
+		}
+		if payload.From != replay.State {
+			return TaskReplay{}, replayCorruption("task transition source does not match replay state")
+		}
+		if err := domain.ValidateTaskTransition(domain.TaskTransition{
+			From:     payload.From,
+			To:       payload.To,
+			Approval: payload.Approval,
+		}); err != nil {
+			return TaskReplay{}, replayCorruption("task transition violates the state machine")
+		}
+		replay.State = payload.To
+		replay.Revision++
+	}
+	if err := rows.Err(); err != nil {
+		return TaskReplay{}, classify("iterate task events for replay", err)
+	}
+	return replay, nil
+}
+
+func replayCorruption(message string) error {
+	return typedError(ErrCorrupt, "replay task", errors.New(message))
+}
+
 func appendTaskEventTransaction(
 	ctx context.Context,
 	transaction *Transaction,
