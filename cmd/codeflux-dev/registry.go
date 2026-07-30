@@ -29,6 +29,7 @@ type commandSpec struct {
 type commandInvocation struct {
 	Help       bool
 	JSON       bool
+	Once       bool
 	Root       string
 	Positional []string
 }
@@ -56,7 +57,7 @@ func developmentCommandRegistry() []commandSpec {
 		{Name: "inspect-db", Purpose: "Print a safe structured application database summary.", Prerequisites: []string{"implemented storage subsystem"}, Arguments: []string{"[database]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "lint", Purpose: "Run format, vet, Staticcheck, documentation, schema, and repository checks.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "replay", Purpose: "Replay a redacted event fixture or development session.", Prerequisites: []string{"implemented event subsystem"}, Arguments: []string{"[fixture]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
-		{Name: "run", Purpose: "Start the isolated deterministic development profile.", Prerequisites: []string{"implemented coordinator and storage subsystems"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "run", Purpose: "Start the isolated deterministic development profile.", Prerequisites: []string{"Go", "loopback TCP listener"}, Arguments: []string{"[--root PATH]", "[--once]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
 		{Name: "run-live", Purpose: "Start an explicitly selected live-provider profile.", Prerequisites: []string{"implemented provider, credential, coordinator, and storage subsystems"}, Arguments: []string{"--provider NAME", "--credential-ref REF", "--database PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "seed", Purpose: "Create a named deterministic development scenario.", Prerequisites: []string{"implemented storage and event subsystems"}, Arguments: []string{"[scenario]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "test-all", Purpose: "Run the required local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
@@ -91,6 +92,8 @@ func parseCommandInvocation(args []string) (commandInvocation, error) {
 			invocation.Help = true
 		case argument == "--json":
 			invocation.JSON = true
+		case argument == "--once":
+			invocation.Once = true
 		case argument == "--root":
 			index++
 			if index >= len(args) || args[index] == "" {

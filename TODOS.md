@@ -421,12 +421,12 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [x] `M01-081` Implement `codeflux-dev bootstrap` to verify pinned Go, Git, protobuf, GoWebComponents, and generator requirements.
 - [x] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
 - [x] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
-- [ ] `M01-084` Implement `codeflux-dev run` with temporary SQLite, fake credentials, scripted provider, ephemeral port, and no external network.
+- [x] `M01-084` Implement `codeflux-dev run` with temporary SQLite, fake credentials, scripted provider, ephemeral port, and no external network.
 - [ ] `M01-085` Implement `codeflux-dev run-live` with explicit provider, credential reference, database, and visible cost warning.
 - [ ] `M01-086` Implement named `test-fast`, `test-integration`, `test-browser`, `test-security`, `test-race`, and `test-all` commands.
 - [ ] `M01-087` Implement `lint` orchestration for format, vet, selected linters, documentation links, protobuf compatibility, migrations, atom names, and atom comments.
 - [ ] `M01-088` Implement `seed`, `replay`, `inspect-db`, `benchmark`, and `doctor` command skeletons with honest unavailable messages until their subsystems exist.
-- [ ] `M01-089` Define deterministic, interactive-fake, live-provider, and fault-injection development profiles.
+- [x] `M01-089` Define deterministic, interactive-fake, live-provider, and fault-injection development profiles.
 - [ ] `M01-090` Ensure each development command accepts an explicit temporary/application root and never defaults destructive work to the repository root.
 - [ ] `M01-091` Ensure each command supports `--help`, stable non-zero failure codes, and the exact failing sub-step.
 - [ ] `M01-092` Add a package-dependency check that enforces inward domain dependencies and prevents storage/provider/transport code from owning frontend or domain policy.
@@ -463,6 +463,13 @@ Generation evidence:
 - Every generated Go file has a declared path and first-line generator warning; lint rejects generated suffixes or headers outside those paths.
 - `generate-check` regenerated all five output families beneath a validated `.artifacts/tmp` child, compared exact file sets and bytes, removed the child, and left the worktree unchanged.
 - Generator fixture tests proved byte-identical repeated output, source-family coverage, duplicate event rejection, and embedded migration/asset checksum agreement.
+
+Development-profile evidence:
+
+- `go run ./cmd/codeflux-dev run --once --json` created a unique temporary `.sqlite` target, held fake credentials only in memory, exposed a fixed scripted-provider profile, bound `127.0.0.1` on an ephemeral port, passed its bounded health self-check, shut down, and removed the run child.
+- The HTTP client disables proxies and the profile declares external provider access false; no provider credential is read or persisted.
+- Registry data defines deterministic, interactive-fake, live-provider, and 13-boundary fault-injection profiles without claiming their later coordinator/storage/provider subsystems already exist.
+- Unit tests verify loopback-only binding, zero-length new SQLite target, fake state, profile inventory, fault boundaries, and safe artifact-child classification.
 
 ## Gate
 

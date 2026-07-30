@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -26,7 +27,9 @@ const (
 )
 
 func main() {
-	os.Exit(run(context.Background(), os.Stdout, os.Stderr, os.Args[1:]))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	os.Exit(run(ctx, os.Stdout, os.Stderr, os.Args[1:]))
 }
 
 func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
@@ -69,6 +72,10 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		fmt.Fprintf(stderr, "codeflux-dev %s: --json is not supported by this command\n", spec.Name)
 		return exitUsage
 	}
+	if invocation.Once && spec.Name != "run" {
+		fmt.Fprintf(stderr, "codeflux-dev %s: --once is only valid for run\n", spec.Name)
+		return exitUsage
+	}
 
 	switch spec.Name {
 	case "bootstrap":
@@ -89,6 +96,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runCoverage(ctx, stdout, stderr)
 	case "lint":
 		return runLint(ctx, stdout, stderr)
+	case "run":
+		return runDeterministicProfile(ctx, stdout, stderr, invocation)
 	default:
 		return runUnavailable(stderr, spec, invocation)
 	}

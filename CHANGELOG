@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-018
+Date: 2026-07-30
+Type: Deterministic development profile
+Request-or-TODO: M01-084, M01-089
+Outcome: Added an offline loopback profile with a temporary SQLite target,
+  in-memory fake credentials, fixed provider script, ephemeral port, bounded
+  self-check, owned shutdown, and the four declared profile specifications
+Affected-behavior: Contributors can start and verify the current deterministic
+  profile without external network or premature storage/provider dependencies
+Compatibility-or-migration: Run result schema v1; runtime schema remains 0
+Verification: Profile boundary unit tests, real one-shot startup/health/shutdown,
+  cleanup inspection, aggregate lint, fast tests, and staged whitespace checks
+Dev-Log: DL-20260730-019
+
 Change-ID: CL-20260730-017
 Date: 2026-07-30
 Type: Deterministic source generation

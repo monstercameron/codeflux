@@ -116,6 +116,18 @@ func TestCommandRejectsUndeclaredMachineOutput(t *testing.T) {
 	}
 }
 
+func TestCommandRejectsOnceOutsideRun(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), &stdout, &stderr, []string{"build", "--once"})
+	if code != exitUsage {
+		t.Fatalf("build --once exit = %d, want %d", code, exitUsage)
+	}
+	if !strings.Contains(stderr.String(), "--once is only valid for run") {
+		t.Fatalf("build --once error = %q", stderr.String())
+	}
+}
+
 func TestResolveCommandRootRejectsRepositoryAndLocalEscape(t *testing.T) {
 	root := t.TempDir()
 	valid, err := resolveCommandRoot(root, "build", "")

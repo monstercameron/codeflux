@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-019
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-018
+Request-or-TODO: M01-084, M01-089
+Goal: Make the deterministic development profile startable and self-checking
+  before later storage, provider, coordinator, and frontend implementations
+Assumptions: A newly created zero-length `.sqlite` file is the correct
+  uninitialized SQLite target before M03 selects and opens it with a Go driver
+Decisions: Bind only 127.0.0.1 on port 0; keep credentials and provider script
+  in memory; disable proxy use for self-check; own and cancel the server
+  goroutine; clean only validated .artifacts children
+Files-or-schemas: codeflux-dev profile registry, deterministic loopback runner,
+  and tests; run result schema version 1; runtime schema remains 0
+Validation: Profile unit cases, real `run --once --json` startup/health/shutdown,
+  cleanup inspection, staged aggregate lint, fast tests, and whitespace passed
+Failures-or-discarded-approaches: Rejected selecting a SQLite driver in M01
+  because M03-001 is the explicit driver decision gate
+Known-limitations: The M01 server exposes only health/profile diagnostics and
+  reserves the database target; coordinator, storage schema, provider runtime,
+  and frontend are added by their governing milestones
+Next-safe-step: Stage and validate the profile cluster, commit it, then add
+  explicit live-provider gating and the named current-scope test commands.
+
 Dev-Log: DL-20260730-018
 Date: 2026-07-30
 Status: Complete
