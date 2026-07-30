@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-013
+Date: 2026-07-30
+Type: Instruction integrity tests
+Request-or-TODO: M01-060 through M01-062, M01-065
+Outcome: Added offline instruction presence, authority-pointer, pinned-link,
+  attribution, anti-duplication, and pre-edit plan/TODO smoke checks
+Affected-behavior: Repository lint rejects missing or weakened instruction
+  roots, broken relative targets, moving references, or edits selected before
+  their governing plan section and atomic TODO
+Compatibility-or-migration: Development checks only
+Verification: Instruction positive and negative unit cases, aggregate lint,
+  fast tests, and staged whitespace inspection
+Dev-Log: DL-20260730-014
+
 Change-ID: CL-20260730-012
 Date: 2026-07-30
 Type: Repository agent instructions

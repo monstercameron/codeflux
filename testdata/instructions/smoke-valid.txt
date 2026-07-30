@@ -1,0 +1,4 @@
+SCENARIO: Before changing the synthetic target, identify its governing plan section and atomic TODO.
+PLAN: docs/plan.md#27d-prototype-developer-experience
+TODO: M01-065
+EDIT: testdata/instructions/synthetic-target.fixture

@@ -378,12 +378,12 @@ Evidence:
 - Both files identify the pinned community-maintained reference and explicitly state that it is not an official Andrej Karpathy repository.
 - `AGENTS.md` contains the versioned atom-comment field template and standalone-descriptive atom naming grammar required by M01-066 and M01-072.
 
-- [ ] `M01-060 TEST` Add a documentation check that requires root `AGENTS.md` and `CLAUDE.md`.
-- [ ] `M01-061 TEST` Add a documentation check that `CLAUDE.md` still points to `AGENTS.md`, `docs/plan.md`, and `TODOS.md`.
-- [ ] `M01-062 TEST` Add a link check for repository-relative instruction links and the pinned external Karpathy-inspired reference.
+- [x] `M01-060 TEST` Add a documentation check that requires root `AGENTS.md` and `CLAUDE.md`.
+- [x] `M01-061 TEST` Add a documentation check that `CLAUDE.md` still points to `AGENTS.md`, `docs/plan.md`, and `TODOS.md`.
+- [x] `M01-062 TEST` Add a link check for repository-relative instruction links and the pinned external Karpathy-inspired reference.
 - [ ] `M01-063 DOC` Add real build, test, generation, migration, and benchmark commands to `AGENTS.md` only after those commands exist.
 - [ ] `M01-064 DOC` Review agent instructions at each prototype milestone gate and remove rules that have become false, redundant, or unhelpful.
-- [ ] `M01-065 TEST` Add an instruction smoke scenario in which a coding agent must identify the relevant plan section and TODO ID before changing a fixture.
+- [x] `M01-065 TEST` Add an instruction smoke scenario in which a coding agent must identify the relevant plan section and TODO ID before changing a fixture.
 - [x] `M01-066 DOC` Define the required structured Go atom-comment style in `AGENTS.md`. Output: versioned field template covering selection, semantics, contracts, effects, failures, retry, reconciliation, security, dependencies, examples, verification, and retrieval concepts. Verify: the template starts with the Go identifier and distinguishes descriptive comments from correctness authority.
 - [ ] `M01-067 TEST` Add a repository check that every Go atom declaration has a schema-versioned Codeflux atom doc comment.
 - [ ] `M01-068 TEST` Add a repository check that every required atom-comment field is present and is either substantive or `None` with a reason.
@@ -397,6 +397,12 @@ Evidence:
 - [ ] `M01-076 TEST` Add fixtures for descriptive names, ambiguous names, misleading guarantee names, provider-specific names, semantic-preserving renames, and semantic-breaking renames.
 - [ ] `M01-077 DOC` Add a naming review checklist to the first real atom pull-request template after repository contribution templates exist.
 - [ ] `M01-078 TEST` Verify canonical Go name, display name, and normalized semantic phrase are deterministically derived and remain traceable to one atom identity.
+
+Instruction-check evidence:
+
+- The lint aggregate now requires tracked root instruction files, a thin `CLAUDE.md`, all three authority pointers, the exact pinned community reference, accurate attribution, resolvable repository-relative links, and the strong Markdown-creation prohibition.
+- The synthetic smoke transcript must place an anchored `docs/plan.md` section and declared atomic TODO before its fixture edit; the negative unit case reverses that order and is rejected.
+- Instruction, missing-file, missing-pointer, weakened-rule, missing-link, escaping-link, and smoke-order tests pass.
 
 ## Developer Command and Package Experience
 

@@ -24,6 +24,27 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-014
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-013
+Request-or-TODO: M01-060 through M01-062, M01-065
+Goal: Turn repository instruction authority into an offline deterministic lint
+  boundary and prove plan/TODO identification precedes a synthetic edit
+Assumptions: A revision-pinned HTTPS reference is checked structurally during
+  offline lint; its Git revision was separately resolved before tracking
+Decisions: Validate only AGENTS.md and CLAUDE.md links at this stage; require
+  tracked instruction roots and a compact line-count/section duplication guard
+Files-or-schemas: codeflux-dev instruction checks and tests; synthetic text
+  smoke fixture; no runtime schema
+Validation: Positive and negative instruction tests, staged aggregate lint,
+  fast tests, and staged whitespace inspection passed
+Failures-or-discarded-approaches: None
+Known-limitations: The check does not make network requests during normal lint;
+  milestone reviews and real command documentation remain M01-063/M01-064
+Next-safe-step: Commit the instruction harness, then implement atom comment and
+  name validation with the complete required fixture matrix.
+
 Dev-Log: DL-20260730-013
 Date: 2026-07-30
 Status: Complete

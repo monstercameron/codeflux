@@ -44,6 +44,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkNoTrackedSecrets(root, tracked); err != nil {
 		return err
 	}
+	if err := checkInstructionFiles(root, tracked); err != nil {
+		return err
+	}
 	return nil
 }
 
