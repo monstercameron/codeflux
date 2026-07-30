@@ -155,8 +155,9 @@ func (settings Settings) Validate() error {
 		if err != nil ||
 			endpoint.Host == "" ||
 			endpoint.User != nil ||
+			endpoint.RawQuery != "" ||
 			endpoint.Fragment != "" {
-			return errors.New("provider endpoint must be an absolute URL without user information or fragment")
+			return errors.New("provider endpoint must be an absolute URL without user information, query, or fragment")
 		}
 		switch endpoint.Scheme {
 		case "https":

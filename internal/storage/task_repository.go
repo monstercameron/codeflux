@@ -59,12 +59,21 @@ func (repositories *Repositories) CreateTask(
 			return err
 		}
 		if found {
+			settingsRevision, err := taskSettingsRevisionTransaction(
+				ctx,
+				transaction,
+				existing.ID,
+			)
+			if err != nil {
+				return err
+			}
 			if existing.ID != input.ID ||
 				existing.RepositoryID != input.RepositoryID ||
 				existing.PolicyPreset != input.PolicyPreset ||
 				existing.ReasoningEffort != input.ReasoningEffort ||
 				existing.RiskLevel != input.RiskLevel ||
 				existing.RequiredAssurance != input.RequiredAssurance ||
+				settingsRevision != input.SettingsRevision ||
 				!sameMessageID(existing.RequestMessageID, input.RequestMessageID) {
 				return typedError(
 					ErrConflict,
@@ -124,9 +133,38 @@ func (repositories *Repositories) CreateTask(
 				errors.New("thread does not belong to repository"),
 			)
 		}
+		if _, err := transaction.sql.ExecContext(
+			ctx,
+			`INSERT INTO task_settings_bindings (
+				task_id, settings_revision, bound_at_unix_micros
+			) VALUES (?, ?, ?)`,
+			input.ID,
+			input.SettingsRevision,
+			micros,
+		); err != nil {
+			return repositoryWriteError("bind task settings revision", err)
+		}
 		return nil
 	})
 	return task, err
+}
+
+func taskSettingsRevisionTransaction(
+	ctx context.Context,
+	transaction *Transaction,
+	taskID domain.TaskID,
+) (uint64, error) {
+	var revision uint64
+	if err := transaction.sql.QueryRowContext(
+		ctx,
+		`SELECT settings_revision
+		 FROM task_settings_bindings
+		 WHERE task_id = ?`,
+		taskID,
+	).Scan(&revision); err != nil {
+		return 0, classify("read task settings binding", err)
+	}
+	return revision, nil
 }
 
 func (repositories *Repositories) GetTask(

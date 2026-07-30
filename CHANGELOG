@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-040
+Date: 2026-07-30
+Type: Versioned settings persistence
+Request-or-TODO: M04-007 and M04-008
+Outcome: Added schema version 2 with immutable settings revisions,
+  task-to-settings bindings, and content-hashed effective run configurations
+Affected-behavior: Repository-created tasks bind to one settings revision and
+  runs can record only the matching bounded non-secret effective configuration;
+  changed retries and secret-shaped JSON fields are rejected
+Compatibility-or-migration: Forward migration 2 seeds legacy tasks with
+  reserved revision zero; schema version advances from 1 to 2
+Verification: Real-SQLite settings/run repository tests and the complete
+  storage migration matrix pass, including upgrade from versions 0, 1, and 2
+Dev-Log: DL-20260730-041
+
 Change-ID: CL-20260730-039
 Date: 2026-07-30
 Type: Non-secret configuration contract

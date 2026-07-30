@@ -837,8 +837,8 @@ Milestone output: validated non-secret settings, OS-backed provider credentials,
 - [x] `M04-004` Define which repository-provided settings require first-use approval.
 - [x] `M04-005` Add typed validation for provider endpoints, budgets, timeouts, worktree locations, and policy presets.
 - [x] `M04-006` Reject unknown security-sensitive settings.
-- [ ] `M04-007` Record effective non-secret configuration with every run.
-- [ ] `M04-008` Add a settings revision so tasks can bind to the configuration they used.
+- [x] `M04-007` Record effective non-secret configuration with every run.
+- [x] `M04-008` Add a settings revision so tasks can bind to the configuration they used.
 - [x] `M04-009` Add configuration import/export that excludes credentials and private task data.
 
 Configuration-contract evidence:
@@ -856,6 +856,12 @@ Configuration-contract evidence:
 - Bounded strict JSON import rejects unknown or trailing fields. Its complete
   export schema contains no credential, secret, provider-key, transcript,
   prompt, or private-task-data field.
+- Migration 2 stores immutable user or approved-repository revisions, binds
+  repository-created tasks to one revision, and permits a run snapshot only
+  when its revision matches the owning task binding.
+- The storage boundary recursively rejects secret-shaped JSON field names,
+  content-hashes accepted snapshots, and returns the original immutable row for
+  identical retries while rejecting changed retries.
 
 ## Credential Store
 

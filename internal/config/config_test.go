@@ -72,6 +72,12 @@ func TestSettingsValidateSecurityBoundaries(t *testing.T) {
 			},
 		},
 		{
+			name: "endpoint query",
+			change: func(settings *Settings) {
+				settings.ProviderEndpoint = "https://models.example.test/v1?key=value"
+			},
+		},
+		{
 			name: "negative budget",
 			change: func(settings *Settings) {
 				settings.HardBudget.MinorUnits = -1

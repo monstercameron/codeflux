@@ -76,6 +76,61 @@ type Repositories struct {
 	now      func() time.Time
 }
 
+// SettingsScope identifies one persisted non-secret configuration layer.
+type SettingsScope string
+
+const (
+	SettingsScopeUser       SettingsScope = "user"
+	SettingsScopeRepository SettingsScope = "repository"
+)
+
+// SettingsRevision is one immutable, approved non-secret configuration layer.
+type SettingsRevision struct {
+	Revision          uint64
+	Scope             SettingsScope
+	RepositoryID      *domain.RepositoryID
+	ConfigurationJSON string
+	ContentSHA256     string
+	ApprovalReference *string
+	IdempotencyKey    string
+	CreatedAt         time.Time
+}
+
+// CreateSettingsRevision declares one idempotent settings snapshot.
+type CreateSettingsRevision struct {
+	Scope             SettingsScope
+	RepositoryID      *domain.RepositoryID
+	ConfigurationJSON string
+	ApprovalReference *string
+	IdempotencyKey    string
+}
+
+// RunConfiguration is the effective non-secret configuration bound to one run.
+type RunConfiguration struct {
+	RunID            domain.RunID
+	SettingsRevision uint64
+	EffectiveJSON    string
+	SourcesJSON      string
+	ContentSHA256    string
+	CreatedAt        time.Time
+}
+
+// RecordRunConfiguration declares one immutable effective run snapshot.
+type RecordRunConfiguration struct {
+	RunID            domain.RunID
+	SettingsRevision uint64
+	EffectiveJSON    string
+	SourcesJSON      string
+}
+
+// ConfigurationOperations groups versioned settings and effective run facts.
+type ConfigurationOperations interface {
+	CreateSettingsRevision(context.Context, CreateSettingsRevision) (SettingsRevision, error)
+	GetSettingsRevision(context.Context, uint64) (SettingsRevision, error)
+	RecordRunConfiguration(context.Context, RecordRunConfiguration) (RunConfiguration, error)
+	GetRunConfiguration(context.Context, domain.RunID) (RunConfiguration, error)
+}
+
 // NewRepositories creates domain repositories without opening external state.
 func NewRepositories(database *Database, now func() time.Time) (*Repositories, error) {
 	if database == nil {
@@ -197,6 +252,7 @@ type CreateTask struct {
 	ReasoningEffort   domain.ReasoningEffort
 	RiskLevel         domain.RiskLevel
 	RequiredAssurance domain.AssuranceLevel
+	SettingsRevision  uint64
 	IdempotencyKey    string
 }
 

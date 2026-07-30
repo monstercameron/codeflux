@@ -24,6 +24,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-041
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-040
+Request-or-TODO: M04-007 and M04-008
+Goal: Make configuration use attributable and replayable without persisting
+  provider secrets or private task content
+Assumptions: Existing tasks cannot truthfully recover a pre-migration effective
+  configuration, so revision zero represents a legacy/default binding rather
+  than fabricated settings
+Decisions: Store immutable globally numbered user and approved-repository
+  revisions; bind each repository-created task through a foreign-key table;
+  require run snapshots to match that binding through a database trigger;
+  content-hash exact JSON and recursively reject secret-shaped field names at
+  the storage boundary.
+Files-or-schemas: migration 000002, generated migration catalog and schema
+  version, storage configuration repository/contracts/tests, task creation
+  binding, docs/storage.md, TODOS.md, CHANGELOG, DEVLOG
+Validation: Real-SQLite tests passed revision allocation, repository approval
+  lineage, identical retry, changed retry conflict, task binding, effective run
+  record/read/retry, wrong-binding constraint, and nested secret-field
+  rejection. The migration suite passed empty and every-version upgrades
+  through schema 2.
+Failures-or-discarded-approaches: Used a separate task binding table instead of
+  adding a non-null reference column with a synthetic default, because SQLite
+  restricts adding referenced columns with non-null defaults under foreign-key
+  enforcement. The explicit legacy revision avoids inventing historical data.
+Known-limitations: Run creation is still direct storage setup until its later
+  application-service milestone; native credential stores and the shared
+  redaction pipeline remain incomplete.
+Next-safe-step: Define the credential-store interface and opaque secret value,
+  implement the Windows native backend with explicit environment fallback, and
+  prove workers and SQLite never receive raw credentials.
+
 Dev-Log: DL-20260730-040
 Date: 2026-07-30
 Status: Complete

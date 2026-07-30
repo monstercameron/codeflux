@@ -6,4 +6,5 @@ package migrations
 var Catalog = []Descriptor{
 	{Number: 0, Name: "000000_bootstrap.sql", SHA256: "1d7c1ae77ec211363c9054d5e587712db421087d76ad26cf27e0882b74d3a98d"},
 	{Number: 1, Name: "000001_initial_operational_schema.sql", SHA256: "78f02ea4aae92c234f7257c0f4ada9e1c4007d4fe10d66c79eacb2b7d450ef9c"},
+	{Number: 2, Name: "000002_settings_revisions.sql", SHA256: "1bbdf7dde934b679365aa11e8d5c636b47a1702db0715848e17f4d264e228fc0"},
 }

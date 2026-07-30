@@ -172,3 +172,22 @@ then forcibly terminates the child process before commit. On reopen, SQLite
 must pass full integrity and foreign-key checks, preserve the first transition,
 discard both halves of the interrupted transition, and replay to the same state
 and revision as the aggregate.
+
+## Settings revisions
+
+Migration `000002_settings_revisions.sql` adds immutable non-secret settings
+revisions, one foreign-key settings binding per repository-created task, and
+one immutable effective configuration snapshot per run. A reserved revision
+zero binds tasks created before the migration without fabricating their
+historical effective settings.
+
+User and explicitly approved repository layers receive monotonically allocated
+global revisions, exact JSON hashes, bounded idempotency keys, and optional
+repository lineage. Repository revisions require a non-empty approval
+reference. A run configuration can be inserted only when its revision matches
+the owning task's binding.
+
+The storage boundary accepts bounded JSON objects and recursively rejects
+secret-, credential-, key-, token-, password-, and authorization-shaped field
+names before serialization. Effective run snapshots are content-hashed and
+idempotent; a changed retry conflicts.
