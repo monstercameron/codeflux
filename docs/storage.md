@@ -130,3 +130,29 @@ resolution and budget changes use optimistic revisions. Budget reservations and
 actual postings operate only on integer minor units, verify currency, prevent
 integer overflow, and reject any result above the hard cap. Validation and
 evidence writes verify their task/run or task/validation lineage before commit.
+
+## Diagnostics and maintenance
+
+`codeflux doctor` checks the real database when it exists and reports health,
+database and SQLite-sidecar byte counts, the current and supported schema
+versions, and successful and failed migration counts. Diagnostic output does
+not expose the database path, executable paths, raw SQLite errors, or stored
+content.
+
+Users can create a consistent recovery snapshot with `codeflux backup
+--database <path> --output <path>` and run SQLite's full integrity check with
+`codeflux integrity --database <path>`. Both commands fail safely without
+printing selected paths. Application shutdown truncates the WAL after new
+mutations have stopped and reports a busy or failed checkpoint.
+
+Verbose redacted command output is retained for at most 30 days and is bounded
+to the newest 8 MiB per command execution. Retention is a transactional
+database lifecycle operation; it never removes files by scanning the
+filesystem.
+
+Projects and threads use tombstone-then-purge semantics so user-visible
+identity and recovery state can be preserved before final erasure. Learned
+artifacts use hard-delete-lineage semantics: owned derivatives must be removed
+with the artifact. Every ownership relation, including future graph and vector
+rows, must use foreign keys, and deletion completes only after
+`foreign_key_check` reports no orphaned rows.

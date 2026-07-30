@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-038
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-037
+Request-or-TODO: M03-061 through M03-069
+Goal: Complete the M03 operator-facing database lifecycle without leaking
+  storage paths, content, credentials, or raw SQLite failures
+Assumptions: Verbose redacted command output needs a fixed local bound before
+  later settings UI exists; projects and threads preserve identity through a
+  tombstone phase while learned artifact erasure removes owned lineage
+Decisions: Retain only 30 days and the newest 8 MiB per command; use SQLite's
+  online backup API for explicit snapshots and full integrity_check for
+  operator checks; checkpoint WAL in truncate mode on close; require all
+  future graph/vector ownership to use foreign keys and pass an orphan check;
+  report diagnostic counts and versions but no selected filesystem paths
+Files-or-schemas: cmd/codeflux maintenance commands and tests,
+  internal/storage maintenance lifecycle and tests, docs/storage.md, TODOS.md,
+  CHANGELOG, DEVLOG; no schema change
+Validation: Real-SQLite tests passed for health/size/version diagnostics, full
+  integrity, truncate checkpoint, foreign-key lineage, age expiry, newest-byte
+  retention, explicit deletion policy, backup creation, and backup integrity.
+  `go run ./cmd/codeflux-dev test-all` passed lint, generation-drift, fast,
+  integration, and security suites.
+Failures-or-discarded-approaches: Removed resolved Git executable paths from
+  doctor output after security review showed the path was unnecessary
+  diagnostic data. Deferred close calls were replaced with explicit checked
+  shutdowns so checkpoint failure cannot be reported as command success.
+Known-limitations: Browser tests remain unavailable until M16. Local race
+  execution is unsupported on Windows ARM64 and remains assigned to Ubuntu CI.
+  The M03 forced-termination, replay-equivalence, credential-absence, and
+  migration/recovery gates are not yet marked complete.
+Next-safe-step: Add deterministic forced-process-termination and task-event
+  replay tests, prove schema and diagnostic credential absence, then close all
+  four M03 gates before beginning M04.
+
 Dev-Log: DL-20260730-037
 Date: 2026-07-30
 Status: Complete

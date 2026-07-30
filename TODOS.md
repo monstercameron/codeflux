@@ -767,15 +767,29 @@ Transaction-runner evidence:
 
 ## Diagnostics and Maintenance
 
-- [ ] `M03-061` Add `codeflux doctor` database checks.
-- [ ] `M03-062` Add an explicit user-triggered database backup command.
-- [ ] `M03-063` Add an explicit user-triggered integrity check.
-- [ ] `M03-064` Add safe WAL checkpointing on shutdown.
-- [ ] `M03-065` Define retention rules for verbose tool output.
-- [ ] `M03-066` Define deletion semantics for projects, threads, and learned artifacts.
-- [ ] `M03-067` Ensure deletion does not leave unreferenced vector or graph rows.
-- [ ] `M03-068` Add database size reporting to diagnostics.
-- [ ] `M03-069` Add schema and migration versions to diagnostics.
+- [x] `M03-061` Add `codeflux doctor` database checks.
+- [x] `M03-062` Add an explicit user-triggered database backup command.
+- [x] `M03-063` Add an explicit user-triggered integrity check.
+- [x] `M03-064` Add safe WAL checkpointing on shutdown.
+- [x] `M03-065` Define retention rules for verbose tool output.
+- [x] `M03-066` Define deletion semantics for projects, threads, and learned artifacts.
+- [x] `M03-067` Ensure deletion does not leave unreferenced vector or graph rows.
+- [x] `M03-068` Add database size reporting to diagnostics.
+- [x] `M03-069` Add schema and migration versions to diagnostics.
+
+Diagnostics-and-maintenance evidence:
+
+- `codeflux doctor` performs real path-free database health, byte-size, schema,
+  supported-version, and migration-history checks without emitting selected
+  database or executable paths.
+- Explicit backup and integrity commands operate on a user-selected database,
+  return stable non-zero failures, and expose no raw SQLite or filesystem
+  details.
+- Graceful close performs a truncating WAL checkpoint and reports busy or
+  failed checkpoints before closing the pool.
+- Real-SQLite tests enforce the 30-day and newest-8-MiB verbose-output policy,
+  explicit tombstone/purge deletion modes, and a foreign-key orphan check that
+  future graph and vector ownership relations must join.
 
 ## Gate
 

@@ -30,6 +30,24 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-037
+Date: 2026-07-30
+Type: SQLite diagnostics and maintenance
+Request-or-TODO: M03-061 through M03-069
+Outcome: Added path-free database diagnostics, explicit backup and integrity
+  commands, shutdown WAL checkpointing, bounded verbose-output retention, and
+  explicit deletion/orphan policies
+Affected-behavior: Operators can inspect storage health, size, and versions,
+  create consistent snapshots, and run integrity checks without exposing
+  selected paths or raw database details; close and retention now enforce
+  durable lifecycle policy
+Compatibility-or-migration: No schema change; CLI gains backup and integrity
+  commands and doctor accepts an optional explicit database path
+Verification: `go run ./cmd/codeflux-dev test-all` passed lint,
+  generation-drift, fast, real-SQLite integration, and security suites;
+  browser remains gated on M16 and race verification runs in Ubuntu CI
+Dev-Log: DL-20260730-038
+
 Change-ID: CL-20260730-036
 Date: 2026-07-30
 Type: Task, authority, budget, and evidence repositories

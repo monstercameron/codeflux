@@ -235,18 +235,15 @@ func (database *Database) CheckHealth(ctx context.Context) (Health, error) {
 func (database *Database) Close(ctx context.Context) error {
 	database.closeOnce.Do(func() {
 		var checkpointErr error
-		var busy, logFrames, checkpointed int
-		if err := database.sql.QueryRowContext(
-			ctx,
-			"PRAGMA wal_checkpoint(TRUNCATE)",
-		).Scan(&busy, &logFrames, &checkpointed); err != nil {
-			checkpointErr = classify("checkpoint SQLite WAL", err)
-		} else if busy != 0 {
+		checkpoint, err := database.CheckpointWAL(ctx, true)
+		if err != nil {
+			checkpointErr = err
+		} else if checkpoint.Busy {
 			checkpointErr = fmt.Errorf(
 				"checkpoint SQLite WAL: %w (%d log frames, %d checkpointed)",
 				ErrBusy,
-				logFrames,
-				checkpointed,
+				checkpoint.LogFrames,
+				checkpoint.CheckpointedFrames,
 			)
 		}
 		database.closeErr = errors.Join(checkpointErr, classify("close SQLite", database.sql.Close()))
