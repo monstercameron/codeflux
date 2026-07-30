@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-034
+Date: 2026-07-30
+Type: Cancellable SQLite transaction boundary
+Request-or-TODO: M03-044, M03-055, M03-059, and M03-060
+Outcome: Added the storage-owned immediate-write transaction runner, complete
+  typed repository error vocabulary, atomic rollback, and context-bounded lock
+  waiting with connection-policy restoration
+Affected-behavior: Multi-table operations now commit as one unit or retain no
+  partial state; a short caller deadline bounds SQLite writer contention even
+  when the configured busy timeout is longer
+Compatibility-or-migration: No schema change
+Verification: Real-SQLite tests prove successful commit, halfway rollback,
+  100 ms blocked-writer cancellation, busy-timeout restoration, and typed error
+  matching; full repository suites pass
+Dev-Log: DL-20260730-035
+
 Change-ID: CL-20260730-033
 Date: 2026-07-30
 Type: Initial operational SQLite schema

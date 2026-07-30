@@ -727,7 +727,7 @@ Initial-schema evidence:
 
 ## Repository Layer
 
-- [ ] `M03-044 BLOCKER` Define a transaction runner with context cancellation.
+- [x] `M03-044 BLOCKER` Define a transaction runner with context cancellation.
 - [ ] `M03-045` Define repository interfaces around domain operations, not generic CRUD.
 - [ ] `M03-046` Implement project and repository persistence.
 - [ ] `M03-047` Implement thread creation and cursor pagination.
@@ -738,12 +738,24 @@ Initial-schema evidence:
 - [ ] `M03-052` Implement budget reservation and actual-cost posting.
 - [ ] `M03-053` Implement checkpoint persistence.
 - [ ] `M03-054` Implement validation and evidence persistence.
-- [ ] `M03-055` Return typed not-found, conflict, stale-revision, busy, corruption, and constraint errors.
+- [x] `M03-055` Return typed not-found, conflict, stale-revision, busy, corruption, and constraint errors.
 - [ ] `M03-056 TEST` Test every repository against a temporary real SQLite database.
 - [ ] `M03-057 TEST` Test concurrent event append ordering.
 - [ ] `M03-058 TEST` Test idempotent retries of message, approval, and state-transition writes.
-- [ ] `M03-059 TEST` Test rollback after a failure halfway through a multi-table operation.
-- [ ] `M03-060 TEST` Test cancellation of a blocked database call.
+- [x] `M03-059 TEST` Test rollback after a failure halfway through a multi-table operation.
+- [x] `M03-060 TEST` Test cancellation of a blocked database call.
+
+Transaction-runner evidence:
+
+- One immediate-write runner owns commit/rollback behavior and exposes no
+  generic SQL surface to application packages.
+- Typed not-found, conflict, stale-revision, busy, corruption, and constraint
+  classifications remain matchable without exposing raw database details.
+- A real-SQLite multi-table write injected with a halfway failure retains
+  neither row.
+- A contending writer with a 100 ms context deadline returns within the
+  deadline rather than waiting for the five-second SQLite busy timeout, and the
+  connection's configured timeout is restored afterward.
 
 ## Diagnostics and Maintenance
 

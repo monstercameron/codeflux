@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -27,6 +28,12 @@ var (
 	ErrMigrationChecksum = errors.New("database migration checksum mismatch")
 	// ErrDiskSpace means backup and migration safety space is unavailable.
 	ErrDiskSpace = errors.New("insufficient disk space for database migration")
+	// ErrNotFound means the requested durable identity does not exist.
+	ErrNotFound = errors.New("database entity not found")
+	// ErrConflict means an idempotency or uniqueness claim disagrees.
+	ErrConflict = errors.New("database write conflict")
+	// ErrStaleRevision means optimistic concurrency rejected an old revision.
+	ErrStaleRevision = errors.New("database entity revision is stale")
 )
 
 // Error adds a stable storage classification and bounded operation name.
@@ -52,11 +59,18 @@ func classify(operation string, err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
 	kind := classifyKind(err)
 	if kind == nil {
 		return fmt.Errorf("%s: %w", operation, err)
 	}
 	return &Error{Kind: kind, Operation: operation, Cause: err}
+}
+
+func typedError(kind error, operation string, cause error) error {
+	return &Error{Kind: kind, Operation: operation, Cause: cause}
 }
 
 func classifyKind(err error) error {

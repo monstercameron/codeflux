@@ -93,3 +93,16 @@ forecasts, usage records, redacted output chunks, and diff summaries. New facts
 append new rows. Deletion is deliberately not trigger-blocked here because the
 later explicit deletion lifecycle must be able to satisfy user erasure without
 manual database mutation.
+
+## Transaction runner
+
+Storage mutations use one immediate-write transaction runner. Application code
+receives an operation-bearing transaction value, not raw SQL. The runner rolls
+back on every callback error and commits only after the whole operation
+succeeds.
+
+When a context deadline is shorter than the configured SQLite busy timeout, the
+runner temporarily bounds that connection's busy timeout to the remaining
+deadline. It restores the configured value before releasing the connection.
+This is required because the SQLite busy handler itself does not observe Go
+context cancellation while waiting for a writer.

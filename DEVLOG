@@ -24,6 +24,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-035
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-034
+Request-or-TODO: M03-044, M03-055, M03-059, and M03-060
+Goal: Give every repository operation one cancellable atomic write boundary and
+  stable failure classifications before implementing domain repositories
+Assumptions: SQLite immediate write intent is the correct place to surface
+  contention; application code must not receive a generic SQL transaction;
+  commit success remains success even if cancellation races afterward
+Decisions: Keep SQL access private on the storage Transaction type; roll back
+  every callback failure; classify not-found, conflict, stale revision, busy,
+  corruption, and constraints; temporarily lower a connection's busy timeout
+  when the context deadline is shorter and restore it before pool reuse
+Files-or-schemas: internal/storage transaction runner, typed errors and
+  real-database tests, docs/storage.md, TODOS.md, CHANGELOG, DEVLOG; no schema
+  change
+Validation: The initial-schema commit passes local generation, migration,
+  integrity, and repository suites. Transaction tests commit one successful
+  row, remove both sides of an injected multi-table failure, cancel a writer
+  blocked behind a five-second busy policy in about 100 ms, verify policy
+  restoration, and match every typed error. Full repository test-all, lint,
+  generation, migration, and artifact checks pass.
+Failures-or-discarded-approaches: The initial database/sql BeginTx approach
+  ignored the Go deadline while the SQLite busy handler waited five seconds.
+  Replaced it with a dedicated connection whose busy timeout is bounded to the
+  remaining context only for that operation, then restored.
+Known-limitations: Domain repository methods are the only intended consumers
+  and are introduced next; direct SQL remains private to storage
+Next-safe-step: Define operation-oriented repository interfaces and implement
+  project, repository, thread, message, task/event, approval, budget,
+  checkpoint, validation, and evidence persistence on this runner
+
 Dev-Log: DL-20260730-034
 Date: 2026-07-30
 Status: Complete
