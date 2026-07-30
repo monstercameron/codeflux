@@ -24,6 +24,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-032
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-031
+Request-or-TODO: M03-001 through M03-011
+Goal: Establish the portable, durable, bounded SQLite lifecycle on which all
+  migration and repository work depends
+Assumptions: The local task journal values committed durability above marginal
+  write speed; WAL still has one writer; four pooled connections are a bounded
+  starting point for concurrent local reads
+Decisions: Pin the CGO-free modernc driver; choose OS-native application-data
+  paths; pre-create restrictive directories and files; configure all
+  connection-local pragmas in the DSN; use FULL synchronous durability and
+  immediate write intent; classify SQLite failures without leaking paths
+Files-or-schemas: go.mod, go.sum, docs/storage.md, internal/storage database
+  lifecycle and real-database tests, TODOS.md, CHANGELOG, DEVLOG; no schema
+  change
+Validation: Real-SQLite tests verify Windows-safe URI construction, WAL,
+  foreign keys, FULL synchronous mode, configured and observed busy timeout,
+  one real read/write transaction rolled back after probing, constraint
+  enforcement, pool bounds, file permissions, corrupt content, unreadable
+  classification, and idempotent checkpointed close. Full repository test-all,
+  lint, generation, and artifact checks pass.
+Failures-or-discarded-approaches: The first Windows test caught `file://C:/`
+  being parsed as a URI authority; fixed it to a drive-safe `file:///C:/`
+  path. Replaced host-native cross-OS path simulation with explicit Windows and
+  POSIX path semantics. Rejected CGO and synchronous NORMAL for the declared
+  build matrix and durability contract.
+Known-limitations: Native Windows ACL hardening belongs to the installer and
+  credential milestone; schema migration coordination begins at M03-012
+Next-safe-step: Implement embedded forward migrations, schema and migration
+  history, exclusive version coordination, backup, disk-space validation,
+  downgrade refusal, failure preservation, and restoration tests
+
 Dev-Log: DL-20260730-031
 Date: 2026-07-30
 Status: Complete

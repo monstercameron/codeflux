@@ -1,0 +1,57 @@
+# Codeflux SQLite Storage Decisions
+
+This document records the concrete storage choices that implement the authority
+and recovery rules in [the Codeflux plan](plan.md#23-storage).
+
+## Driver
+
+Codeflux uses `modernc.org/sqlite` v1.55.0 through `database/sql`.
+
+- The driver is a CGO-free port of SQLite. Builds do not require a C compiler,
+  a platform SQLite library, or the SQLite CLI.
+- Its supported platform matrix includes the declared Windows ARM64 and AMD64,
+  macOS ARM64, and Linux AMD64 CI targets.
+- Codeflux pins the driver and its transitive `modernc.org/libc` dependency
+  through `go.mod` and `go.sum`; dependency upgrades are reviewed together.
+
+Primary references:
+
+- <https://pkg.go.dev/modernc.org/sqlite>
+- <https://gitlab.com/cznic/sqlite>
+
+## Location and permissions
+
+The default database is `codeflux.sqlite3` in the operating-system application
+data directory:
+
+- Windows: `%LOCALAPPDATA%\Codeflux`
+- macOS: `~/Library/Application Support/Codeflux`
+- Linux: `$XDG_DATA_HOME/codeflux`, or `~/.local/share/codeflux`
+
+The directory is created with mode `0700` and the database with mode `0600`
+where the operating system enforces POSIX permission bits. Windows access
+control remains the responsibility of the user-local application-data
+directory until the credential and installer milestone adds native ACL work.
+
+## Connection and durability policy
+
+Every connection enables foreign keys, WAL journaling, a bounded busy timeout,
+`synchronous=FULL`, and disabled double-quoted string compatibility.
+
+`FULL` is intentional: Codeflux considers committed task events and authority
+decisions durable state. SQLite documents `FULL` in WAL mode as durable across
+application, operating-system, and power failures. A future performance change
+requires durability evidence and a plan amendment; it is not a user speed
+preset.
+
+The default pool permits four open and four idle connections. SQLite still has
+one writer, while WAL permits bounded concurrent readers. Mutating transaction
+runners acquire write intent immediately so contention fails or waits at the
+transaction boundary rather than after application reads.
+
+Primary references:
+
+- <https://www.sqlite.org/pragma.html#pragma_foreign_keys>
+- <https://www.sqlite.org/pragma.html#pragma_synchronous>
+- <https://www.sqlite.org/wal.html>
+- <https://www.sqlite.org/lang_transaction.html>

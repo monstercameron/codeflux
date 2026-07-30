@@ -632,18 +632,31 @@ Milestone output: a migrated, backed-up, integrity-checked SQLite database plus 
 
 ## Database Lifecycle
 
-- [ ] `M03-001 BLOCKER DATA` Select the Go SQLite driver and document CGO or pure-Go implications.
-- [ ] `M03-002 BLOCKER DATA` Define the default database location per operating system.
-- [ ] `M03-003 DATA` Create the application-data directory with restrictive permissions.
-- [ ] `M03-004 DATA` Open SQLite with foreign keys enabled.
-- [ ] `M03-005 DATA` Enable WAL mode.
-- [ ] `M03-006 DATA` Set and test a busy timeout.
-- [ ] `M03-007 DATA` Choose and document synchronous durability settings.
-- [ ] `M03-008 DATA` Configure a bounded connection pool appropriate for SQLite.
-- [ ] `M03-009 DATA` Add a health check that verifies reads, writes, foreign keys, and journal mode.
-- [ ] `M03-010 DATA` Add graceful close behavior.
-- [ ] `M03-011 DATA` Add corruption and unreadable-file error classification.
+- [x] `M03-001 BLOCKER DATA` Select the Go SQLite driver and document CGO or pure-Go implications.
+- [x] `M03-002 BLOCKER DATA` Define the default database location per operating system.
+- [x] `M03-003 DATA` Create the application-data directory with restrictive permissions.
+- [x] `M03-004 DATA` Open SQLite with foreign keys enabled.
+- [x] `M03-005 DATA` Enable WAL mode.
+- [x] `M03-006 DATA` Set and test a busy timeout.
+- [x] `M03-007 DATA` Choose and document synchronous durability settings.
+- [x] `M03-008 DATA` Configure a bounded connection pool appropriate for SQLite.
+- [x] `M03-009 DATA` Add a health check that verifies reads, writes, foreign keys, and journal mode.
+- [x] `M03-010 DATA` Add graceful close behavior.
+- [x] `M03-011 DATA` Add corruption and unreadable-file error classification.
 - [ ] `M03-012 DATA` Prevent two incompatible Codeflux versions from concurrently migrating the same database.
+
+Database-lifecycle evidence:
+
+- `modernc.org/sqlite` v1.55.0 provides the pinned CGO-free driver across all
+  declared CI platforms, including Windows ARM64.
+- Default Windows, macOS, and Linux application-data locations and restrictive
+  directory/file permissions are explicit and tested.
+- Every pooled connection requests foreign keys, WAL, a bounded busy timeout,
+  `synchronous=FULL`, disabled double-quoted string fallback, and immediate
+  write intent. The pool is capped at four connections by default.
+- Real-SQLite tests verify read/write health, foreign-key rejection, policy
+  pragmas, actual lock-wait timeout bounds, corrupt content classification, and
+  idempotent WAL-checkpointed close.
 
 ## Migration System
 

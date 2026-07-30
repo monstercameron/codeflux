@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-031
+Date: 2026-07-30
+Type: SQLite database lifecycle
+Request-or-TODO: M03-001 through M03-011
+Outcome: Added the pinned CGO-free SQLite driver, OS application-data paths,
+  restrictive file creation, durable connection policy, health checks, typed
+  database failures, and checkpointed close
+Affected-behavior: Codeflux can now open a bounded real-SQLite pool with WAL,
+  foreign keys, FULL durability, and measured busy waits on every supported OS
+Compatibility-or-migration: Adds modernc.org/sqlite v1.55.0 and its pinned
+  transitive dependencies; no application schema exists yet
+Verification: Real-SQLite tests cover policy pragmas, reads, writes, foreign
+  keys, contention timeout, corruption, permissions, pool bounds, and repeated
+  close; full repository suites pass
+Dev-Log: DL-20260730-032
+
 Change-ID: CL-20260730-030
 Date: 2026-07-30
 Type: Exact policy, budget, and assurance domain values
