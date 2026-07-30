@@ -30,6 +30,25 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-047
+Date: 2026-07-30
+Type: Authenticated product gRPC boundary
+Request-or-TODO: M07-051 through M07-060
+Outcome: Added unary/stream validation and authentication interceptors, stable
+  safe error details, request correlation and credential-free logging,
+  unchanged deadline propagation, and bounded graceful shutdown
+Affected-behavior: Product RPCs now reject malformed or unauthenticated input
+  before delegation and return stable user-safe failures without exposing raw
+  internal errors; all 37 methods and the generated-client journey run through
+  an authenticated in-process boundary
+Compatibility-or-migration: Additive internal transport behavior only; no
+  protobuf or database schema change
+Verification: In-process all-method and generated-client tests plus malformed,
+  unauthorized, bridge-attestation, stale, duplicate, deadline, correlation,
+  logging, rich-status, graph-bound, and shutdown tests pass with repository
+  lint
+Dev-Log: DL-20260730-048
+
 Change-ID: CL-20260730-046
 Date: 2026-07-30
 Type: Versioned product gRPC contracts

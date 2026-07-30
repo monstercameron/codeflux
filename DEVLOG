@@ -24,6 +24,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-048
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-047
+Request-or-TODO: M07-051 through M07-060
+Goal: Put one testable security, validation, observability, cancellation, and
+  safe-failure boundary around every generated product RPC
+Assumptions: The production grpc.Server remains in-process behind the M06
+  bridge; browser cookie authentication occurs before upgrade and its
+  server-generated request ID may be trusted only when explicitly configured;
+  native callers carry the local session token as metadata
+Decisions: Use constant-time token comparison, protobuf-reflection validation,
+  typed application errors with ApiErrorDetail, payload-free structured logs,
+  validated/generated correlation IDs, and a graceful-stop deadline fallback.
+  Keep business policy out of interceptors and handlers.
+Files-or-schemas: Product boundary implementation and in-process tests plus
+  M07 evidence/ledgers; no protobuf or SQLite change
+Validation: Every one of 37 methods passed through Bufconn authentication and
+  validation, and generated clients completed the synthetic workspace,
+  thread/message, task, graph, review/acceptance, and session-stream journey.
+  Malformed controls, identity/bounds, unauthorized sessions, stale revisions,
+  duplicates, deadlines, safe details, bridge attestation, correlation/log
+  shape, and graceful shutdown have focused passing tests. Repository lint
+  passes.
+Failures-or-discarded-approaches: Treating same-origin as authentication was
+  rejected. Forwarding the cookie into gRPC metadata was unavailable and would
+  duplicate secret exposure; instead the app-owned upgrade validates the
+  cookie and the private in-process gRPC boundary may explicitly trust only the
+  bridge-generated request attestation. Dynamic protobuf test messages first
+  exposed an unsafe concrete type assertion; validation now reads reflection
+  values and supports generated and dynamic clients equally.
+Known-limitations: The in-process fake proves the transport journey but does
+  not yet supply application-domain semantics; the function catalog and
+  chronological deterministic flow model begin at M07-061.
+Next-safe-step: Add the machine-reviewable method/application catalog and prove
+  every authority, revision, transaction, event, external-effect,
+  cancellation, and typed-error contract.
+
 Dev-Log: DL-20260730-047
 Date: 2026-07-30
 Status: Complete

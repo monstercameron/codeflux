@@ -1263,16 +1263,35 @@ M07 contract evidence:
   streaming boundary, and absence of SQLite/SQL/raw credential fields. Buf
   STANDARD lint, FILE compatibility against `HEAD`, generation, and
   `generate-check` pass.
-- [ ] `M07-051` Implement request validation interceptors.
-- [ ] `M07-052` Implement session authentication interceptors.
-- [ ] `M07-053` Implement safe error mapping.
-- [ ] `M07-054` Implement request correlation and structured logging.
-- [ ] `M07-055` Implement deadline propagation.
-- [ ] `M07-056` Implement graceful server shutdown.
-- [ ] `M07-057 TEST` Add in-process API tests for every method.
-- [ ] `M07-058 TEST` Add malformed-request tests.
-- [ ] `M07-059 TEST` Add stale-revision and duplicate-idempotency tests.
-- [ ] `M07-060 TEST` Add unauthorized-session tests.
+- [x] `M07-051` Implement request validation interceptors.
+- [x] `M07-052` Implement session authentication interceptors.
+- [x] `M07-053` Implement safe error mapping.
+- [x] `M07-054` Implement request correlation and structured logging.
+- [x] `M07-055` Implement deadline propagation.
+- [x] `M07-056` Implement graceful server shutdown.
+- [x] `M07-057 TEST` Add in-process API tests for every method.
+- [x] `M07-058 TEST` Add malformed-request tests.
+- [x] `M07-059 TEST` Add stale-revision and duplicate-idempotency tests.
+- [x] `M07-060 TEST` Add unauthorized-session tests.
+
+M07 transport-boundary evidence:
+
+- Unary and streaming interceptors authenticate either a constant-time native
+  session token or an explicitly trusted request ID forwarded only by an
+  already cookie-authenticated in-process bridge. They validate stable IDs,
+  mutation controls, bounded strings/lists/pages/graphs, exact money, and
+  normalized time values before delegation.
+- Internal errors map to safe gRPC status/details for every declared stable
+  error class. Diagnostic logs contain only method, validated/generated
+  correlation ID, status code, and duration; session material and request
+  payloads are structurally absent.
+- Context deadlines reach handlers unchanged. Graceful shutdown drains first
+  and force-stops only when its context expires.
+- A Bufconn server exercised all 37 methods through protobuf descriptors and a
+  generated-client synthetic journey. Focused tests reject missing/wrong
+  sessions, missing mutation control, malformed idempotency, stale revision,
+  duplicate result, invalid bounds, cancellation/deadline failures, and prove
+  safe error details, bridge attestation, correlation, and logs.
 
 ## Backend Function and Flow Coverage
 
