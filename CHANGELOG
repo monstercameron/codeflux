@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-026
+Date: 2026-07-30
+Type: Milestone gate evidence
+Request-or-TODO: M01-G04
+Outcome: Closed the hosted-CI platform gate with a successful public matrix run
+Affected-behavior: M02 domain work is dependency-authorized after the
+  gate-evidence commit itself passes the same required CI matrix
+Compatibility-or-migration: No runtime or schema impact
+Verification: GitHub Actions run 30519967041 passed Windows 11 ARM64 quality
+  and build, Windows Server 2025 AMD64, macOS 15 ARM64, Ubuntu 24.04 AMD64, and
+  Ubuntu race jobs at commit c8b3f2f2e3cb00a402bb9fb9205c48cda673c246
+Dev-Log: DL-20260730-027
+
 Change-ID: CL-20260730-025
 Date: 2026-07-30
 Type: CI portability fix

@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-027
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-026
+Request-or-TODO: M01-G04
+Goal: Replace local cross-build confidence with actual hosted execution on
+  every declared prototype platform
+Assumptions: A successful matrix bound to the pushed commit is the acceptance
+  authority for this milestone gate
+Decisions: Record the public run URL and full commit identity; require the
+  evidence-only follow-up commit to pass CI before starting M02
+Files-or-schemas: TODOS.md, CHANGELOG, DEVLOG; no schema change
+Validation: GitHub Actions run 30519967041 completed successfully for Windows
+  11 ARM64 quality and build, Windows Server 2025 AMD64 build, macOS 15 ARM64
+  build, Ubuntu 24.04 AMD64 build, and Ubuntu 24.04 AMD64 race tests at commit
+  c8b3f2f2e3cb00a402bb9fb9205c48cda673c246
+Failures-or-discarded-approaches: The first public run exposed and preserved a
+  Windows cross-volume temp-root failure; CL-20260730-025 fixed the general
+  path-classification defect before the successful clean rerun
+Known-limitations: Browser E2E remains intentionally unavailable until M16 and
+  is not part of the M01 platform gate
+Next-safe-step: Commit and push this evidence, require its complete hosted
+  matrix to pass, then begin M02-001 from the cited plan sections
+
 Dev-Log: DL-20260730-026
 Date: 2026-07-30
 Status: Complete

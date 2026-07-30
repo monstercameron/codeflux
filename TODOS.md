@@ -496,7 +496,7 @@ Developer-safety evidence:
 - [x] `M01-G01 GATE` A fresh clone builds with one documented command.
 - [x] `M01-G02 GATE` A fresh clone runs the fast tests with one documented command.
 - [x] `M01-G03 GATE` Regeneration is deterministic and produces no unexplained diff.
-- [ ] `M01-G04 GATE` CI passes on every declared prototype platform.
+- [x] `M01-G04 GATE` CI passes on every declared prototype platform.
 - [x] `M01-G05 GATE` Root `AGENTS.md` and `CLAUDE.md` pass instruction-presence, reference, and link checks without duplicating their authoritative rules.
 - [x] `M01-G06 GATE` Atom-comment schema, lint rules, and fixtures prevent undocumented or structurally incomplete atoms from entering the reusable catalog.
 - [x] `M01-G07 GATE` Atom names remain standalone-descriptive, semantically scoped, non-misleading, and deterministically represented for graph and retrieval use.
@@ -509,7 +509,7 @@ Gate evidence:
 - Bootstrap selected Go 1.26.5 and installed all pinned tools inside the clone's ignored `.artifacts/tools`.
 - Instruction, atom documentation, atom naming, root safety, package direction, generated path, cleanup, and artifact policy checks all ran through clean-clone lint.
 - Cross-builds succeeded for Windows ARM64, Windows AMD64, macOS ARM64, and Linux AMD64 without creating repository output.
-- `M01-G04` remains open: `.github/workflows/ci.yml` passes actionlint and names every declared hosted runner, but this repository has no Git remote, so no actual hosted workflow run exists to verify.
+- Public hosted CI run `30519967041` passed at commit `c8b3f2f2e3cb00a402bb9fb9205c48cda673c246`: Windows 11 ARM64 quality and build, Windows Server 2025 AMD64 build, macOS 15 ARM64 build, Ubuntu 24.04 AMD64 build, and Ubuntu 24.04 AMD64 race jobs all completed successfully.
 
 ---
 
