@@ -87,6 +87,30 @@ func TestCheckNoTrackedBrowserSourceRejectsAlternateFrontendStacks(t *testing.T)
 	}
 }
 
+func TestCheckTaskStateOwnership(t *testing.T) {
+	root := t.TempDir()
+	canonical := filepath.Join("internal", "domain", "states.go")
+	writeTestFile(
+		t,
+		filepath.Join(root, canonical),
+		"package domain\n\ntype TaskState string\n",
+	)
+	if err := checkTaskStateOwnership(root, []string{canonical}); err != nil {
+		t.Fatalf("canonical ownership: %v", err)
+	}
+
+	transport := filepath.Join("internal", "transport", "states.go")
+	writeTestFile(
+		t,
+		filepath.Join(root, transport),
+		"package transport\n\ntype TaskState string\n",
+	)
+	err := checkTaskStateOwnership(root, []string{canonical, transport})
+	if err == nil || !strings.Contains(err.Error(), "exactly one definition") {
+		t.Fatalf("alternative task state error = %v", err)
+	}
+}
+
 func TestCompareDirectoryTrees(t *testing.T) {
 	expected := filepath.Join(t.TempDir(), "expected")
 	actual := filepath.Join(t.TempDir(), "actual")

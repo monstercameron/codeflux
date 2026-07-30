@@ -585,24 +585,38 @@ State-machine evidence:
 
 ## Policy, Budget, and Assurance Types
 
-- [ ] `M02-022` Define correctness/speed/cost policy presets.
-- [ ] `M02-023` Define reasoning-effort levels without coupling them to one provider's names.
-- [ ] `M02-024` Define model capability metadata.
-- [ ] `M02-025` Define monetary values using exact integer minor units or decimal arithmetic.
-- [ ] `M02-026` Define token usage by input, cached input, output, and provider-specific categories.
-- [ ] `M02-027` Define a task budget with warning and hard-stop thresholds.
-- [ ] `M02-028` Define P50/P90 forecast ranges for latency, tokens, and cost.
-- [ ] `M02-029` Define risk levels: routine, elevated, and protected.
-- [ ] `M02-030` Define assurance levels: fully evaluated, model verified, contract checked, runtime only, and invalidated.
-- [ ] `M02-031` Define validation result severity independent of log severity.
-- [ ] `M02-032` Define typed reasons for pause, failure, cancellation, rollback, and invalidation.
-- [ ] `M02-033` Add deterministic serialization tests for all policy-bearing types.
+- [x] `M02-022` Define correctness/speed/cost policy presets.
+- [x] `M02-023` Define reasoning-effort levels without coupling them to one provider's names.
+- [x] `M02-024` Define model capability metadata.
+- [x] `M02-025` Define monetary values using exact integer minor units or decimal arithmetic.
+- [x] `M02-026` Define token usage by input, cached input, output, and provider-specific categories.
+- [x] `M02-027` Define a task budget with warning and hard-stop thresholds.
+- [x] `M02-028` Define P50/P90 forecast ranges for latency, tokens, and cost.
+- [x] `M02-029` Define risk levels: routine, elevated, and protected.
+- [x] `M02-030` Define assurance levels: fully evaluated, model verified, contract checked, runtime only, and invalidated.
+- [x] `M02-031` Define validation result severity independent of log severity.
+- [x] `M02-032` Define typed reasons for pause, failure, cancellation, rollback, and invalidation.
+- [x] `M02-033` Add deterministic serialization tests for all policy-bearing types.
+
+Policy and assurance evidence:
+
+- User-facing correctness, balanced, fast, and economical presets preserve
+  correctness as a policy floor while provider-neutral effort values remain
+  independent of vendor terminology.
+- Money and forecasts use integer minor units and exact integer counts. Unknown
+  usage and forecast dimensions are explicit and cannot be serialized as
+  known-zero values.
+- Budgets carry warning and hard-stop thresholds for cost, tokens, wall clock,
+  provider calls, repair rounds, and tool executions.
+- Deterministic JSON coverage enumerates every policy-bearing type and every
+  declared enum/reason value. An AST guard rejects binary floating-point types
+  from the policy source.
 
 ## Gate
 
-- [ ] `M02-G01 GATE` No transport, database, or UI package owns an alternative task-state definition.
-- [ ] `M02-G02 GATE` Invalid transitions fail with typed, user-presentable errors.
-- [ ] `M02-G03 GATE` Cost arithmetic has no binary floating-point dependency.
+- [x] `M02-G01 GATE` No transport, database, or UI package owns an alternative task-state definition.
+- [x] `M02-G02 GATE` Invalid transitions fail with typed, user-presentable errors.
+- [x] `M02-G03 GATE` Cost arithmetic has no binary floating-point dependency.
 
 ---
 

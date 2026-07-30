@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-030
+Date: 2026-07-30
+Type: Exact policy, budget, and assurance domain values
+Request-or-TODO: M02-022 through M02-033 and M02-G01 through M02-G03
+Outcome: Added provider-neutral execution policy, exact money and token usage,
+  budgets, forecasts, risk, assurance, validation severity, and typed reasons
+Affected-behavior: Unknown usage and forecasts remain distinct from known zero;
+  invalid domain values fail with typed errors; lint enforces one canonical
+  task-state owner
+Compatibility-or-migration: Establishes initial value contracts; no persisted
+  schema exists
+Verification: Exhaustive deterministic JSON coverage, exact arithmetic tests,
+  budget and forecast validation, task-state ownership lint, float-type AST
+  guard, and the full repository suites pass
+Dev-Log: DL-20260730-031
+
 Change-ID: CL-20260730-029
 Date: 2026-07-30
 Type: Domain lifecycle state machines

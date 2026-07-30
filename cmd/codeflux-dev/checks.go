@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -45,6 +48,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 		return err
 	}
 	if err := checkNoTrackedBrowserSource(tracked); err != nil {
+		return err
+	}
+	if err := checkTaskStateOwnership(root, tracked); err != nil {
 		return err
 	}
 	if err := checkInstructionFiles(root, tracked); err != nil {
@@ -232,6 +238,37 @@ func checkNoTrackedBrowserSource(tracked []string) error {
 				filepath.ToSlash(relative),
 			)
 		}
+	}
+	return nil
+}
+
+func checkTaskStateOwnership(root string, tracked []string) error {
+	const canonicalPath = "internal/domain/states.go"
+	definitions := make([]string, 0, 1)
+	files := token.NewFileSet()
+	for _, relative := range tracked {
+		if strings.ToLower(filepath.Ext(relative)) != ".go" {
+			continue
+		}
+		sourcePath := filepath.Join(root, relative)
+		file, err := parser.ParseFile(files, sourcePath, nil, 0)
+		if err != nil {
+			return fmt.Errorf("parse %s for task-state ownership: %w", filepath.ToSlash(relative), err)
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			spec, ok := node.(*ast.TypeSpec)
+			if ok && spec.Name.Name == "TaskState" {
+				definitions = append(definitions, filepath.ToSlash(relative))
+			}
+			return true
+		})
+	}
+	if len(definitions) != 1 || definitions[0] != canonicalPath {
+		return fmt.Errorf(
+			"TaskState must have exactly one definition in %s; found %s",
+			canonicalPath,
+			strings.Join(definitions, ", "),
+		)
 	}
 	return nil
 }

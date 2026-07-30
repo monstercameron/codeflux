@@ -24,6 +24,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-031
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-030
+Request-or-TODO: M02-022 through M02-033 and M02-G01 through M02-G03
+Goal: Finish the pure domain value layer with honest unknowns, exact cost
+  arithmetic, provider-neutral policy, and mechanically enforced ownership
+Assumptions: Correctness is a fixed floor; fast, balanced, and economical
+  presets vary latency and escalation posture without lowering that floor;
+  currency values use canonical three-letter codes and integer minor units
+Decisions: Represent unknown usage and each forecast dimension with explicit
+  known flags; keep provider-specific usage categories without losing the
+  common categories; make invalid values typed; scan the Go AST in repository
+  lint so only internal/domain/states.go can define TaskState
+Files-or-schemas: internal/domain policy values and tests, codeflux-dev
+  repository checks and tests, TODOS.md, CHANGELOG, DEVLOG; no schema change
+Validation: Public CI run 30521094501 passed the preceding lifecycle commit.
+  Domain and repository-check tests cover exact addition and overflow,
+  currency mismatch, unknown versus zero, token categories, budget and
+  percentile ordering, enum separation, model metadata, deterministic JSON,
+  task-state ownership, and absence of float32/float64 in policy source. Full
+  repository test-all, lint, generation, and artifact checks pass.
+Failures-or-discarded-approaches: Corrected an initial vet formatting mismatch
+  in the AST test; rejected floating-point prices, implicit unknown-as-zero,
+  provider-branded reasoning values, and a documentation-only ownership gate
+Known-limitations: Pricing snapshots and budget reservations are persistence
+  work in later milestones; forecasts are value contracts, not a router yet
+Next-safe-step: Begin M03 with the SQLite driver decision, connection policy,
+  pragmas, migration authority, and real-database verification required by the
+  plan
+
 Dev-Log: DL-20260730-030
 Date: 2026-07-30
 Status: Complete
