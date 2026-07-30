@@ -24,6 +24,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-037
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-036
+Request-or-TODO: M03-049 through M03-054 and M03-056 through M03-058
+Goal: Complete the M03 domain repository surface with atomic replay facts,
+  explicit authority, exact budget accounting, and evidence lineage
+Assumptions: Task transitions always emit one deterministic event; idempotent
+  retries reuse identity and content; event order is per task; callers release
+  a declared reservation amount when posting actual cost
+Decisions: Bind transition update and event insert in one immediate transaction;
+  allocate max sequence under the single-writer lock; compare retry identity,
+  content, and lineage; use optimistic revisions for approvals and budgets;
+  prevent integer overflow before SQL; validate run/task and
+  validation/task relationships before commit
+Files-or-schemas: internal/storage task, approval/budget, checkpoint,
+  validation/evidence repositories, contracts and real-database tests,
+  docs/storage.md, TODOS.md, CHANGELOG, DEVLOG; no schema change
+Validation: Task creation and typed read pass, one draft-to-forecasting
+  transition returns the same task/event on retry and rejects changed or stale
+  claims. Twenty concurrent event appends produce exactly sequences 1 through
+  20. Approval creation retries exactly and resolution advances one revision.
+  Budget reserve/post produces reserved 100, actual 250, tokens 10 and rejects
+  stale and over-cap changes. Checkpoint retry, validation, and evidence
+  persistence pass. The complete storage suite passes locally.
+Failures-or-discarded-approaches: Replaced collapsed optional-run query errors
+  with a shared lineage verifier that distinguishes missing constraint,
+  database failure, and cross-task mismatch. Local `go test -race` is
+  unavailable on Windows ARM64; the declared Ubuntu hosted race job remains the
+  required race verification.
+Known-limitations: Diagnostics, maintenance, process-termination recovery gate,
+  replay projection, and deletion/retention operations remain in M03
+Next-safe-step: Implement doctor database checks, explicit backup and integrity
+  operations, shutdown checkpointing, retention and deletion semantics, size
+  and version diagnostics, then exercise the M03 forced-termination and replay
+  gates
+
 Dev-Log: DL-20260730-036
 Date: 2026-07-30
 Status: Complete

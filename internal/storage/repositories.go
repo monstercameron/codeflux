@@ -152,6 +152,248 @@ type AppendMessage struct {
 	IdempotencyKey string
 }
 
+// Task is one durable task aggregate.
+type Task struct {
+	ID                domain.TaskID
+	ThreadID          domain.ThreadID
+	RepositoryID      domain.RepositoryID
+	RequestMessageID  *domain.MessageID
+	State             domain.TaskState
+	PolicyPreset      domain.PolicyPreset
+	ReasoningEffort   domain.ReasoningEffort
+	RiskLevel         domain.RiskLevel
+	RequiredAssurance domain.AssuranceLevel
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Revision          uint64
+}
+
+// TaskEvent is one immutable ordered task fact.
+type TaskEvent struct {
+	ID             domain.EventID
+	TaskID         domain.TaskID
+	RunID          *domain.RunID
+	Sequence       uint64
+	EventType      string
+	PayloadJSON    string
+	IdempotencyKey string
+	CreatedAt      time.Time
+}
+
+// CreateTask declares one initial draft task.
+type CreateTask struct {
+	ID                domain.TaskID
+	ThreadID          domain.ThreadID
+	RepositoryID      domain.RepositoryID
+	RequestMessageID  *domain.MessageID
+	PolicyPreset      domain.PolicyPreset
+	ReasoningEffort   domain.ReasoningEffort
+	RiskLevel         domain.RiskLevel
+	RequiredAssurance domain.AssuranceLevel
+	IdempotencyKey    string
+}
+
+// TransitionTask declares one optimistic state change and its atomic event.
+type TransitionTask struct {
+	EventID          domain.EventID
+	TaskID           domain.TaskID
+	RunID            *domain.RunID
+	ExpectedRevision uint64
+	From             domain.TaskState
+	To               domain.TaskState
+	Approval         domain.ApprovalRequestState
+	IdempotencyKey   string
+}
+
+// TransitionedTask returns the aggregate and correctness-bearing event.
+type TransitionedTask struct {
+	Task  Task
+	Event TaskEvent
+}
+
+// AppendTaskEvent declares one immutable event independent of a state change.
+type AppendTaskEvent struct {
+	ID             domain.EventID
+	TaskID         domain.TaskID
+	RunID          *domain.RunID
+	EventType      string
+	PayloadJSON    string
+	IdempotencyKey string
+}
+
+// TaskOperations groups task aggregate and event-journal operations.
+type TaskOperations interface {
+	CreateTask(context.Context, CreateTask) (Task, error)
+	GetTask(context.Context, domain.TaskID) (Task, error)
+	TransitionTask(context.Context, TransitionTask) (TransitionedTask, error)
+	AppendTaskEvent(context.Context, AppendTaskEvent) (TaskEvent, error)
+}
+
+// Approval is one durable authority request.
+type Approval struct {
+	ID               domain.ApprovalID
+	TaskID           domain.TaskID
+	RunID            *domain.RunID
+	State            domain.ApprovalRequestState
+	Scope            string
+	RequestReason    string
+	ResolutionReason *string
+	IdempotencyKey   string
+	RequestedAt      time.Time
+	DecidedAt        *time.Time
+	ExpiresAt        *time.Time
+	Revision         uint64
+}
+
+// CreateApproval declares one idempotent authority request.
+type CreateApproval struct {
+	ID             domain.ApprovalID
+	TaskID         domain.TaskID
+	RunID          *domain.RunID
+	Scope          string
+	RequestReason  string
+	IdempotencyKey string
+	ExpiresAt      *time.Time
+}
+
+// ResolveApproval declares one optimistic authority decision.
+type ResolveApproval struct {
+	ID               domain.ApprovalID
+	ExpectedRevision uint64
+	To               domain.ApprovalRequestState
+	ResolutionReason string
+}
+
+// BudgetAccount is the durable exact accounting state for one task budget.
+type BudgetAccount struct {
+	Budget       domain.TaskBudget
+	TaskID       domain.TaskID
+	ReservedCost domain.Money
+	ActualCost   domain.Money
+	ActualTokens domain.TokenCount
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Revision     uint64
+}
+
+// CreateBudget declares one exact task budget.
+type CreateBudget struct {
+	TaskID domain.TaskID
+	Budget domain.TaskBudget
+}
+
+// ReserveBudget declares one optimistic exact-cost reservation.
+type ReserveBudget struct {
+	ID               domain.BudgetID
+	ExpectedRevision uint64
+	Amount           domain.Money
+}
+
+// PostActualCost declares one exact posting and reservation release.
+type PostActualCost struct {
+	ID                   domain.BudgetID
+	ExpectedRevision     uint64
+	Actual               domain.Money
+	ReleaseReservedMinor int64
+	Tokens               domain.TokenCount
+}
+
+// ApprovalBudgetOperations groups authority and exact budget operations.
+type ApprovalBudgetOperations interface {
+	CreateApproval(context.Context, CreateApproval) (Approval, error)
+	ResolveApproval(context.Context, ResolveApproval) (Approval, error)
+	CreateBudget(context.Context, CreateBudget) (BudgetAccount, error)
+	ReserveBudget(context.Context, ReserveBudget) (BudgetAccount, error)
+	PostActualCost(context.Context, PostActualCost) (BudgetAccount, error)
+}
+
+// Checkpoint is one repository-bound recovery point.
+type Checkpoint struct {
+	ID                 domain.CheckpointID
+	TaskID             domain.TaskID
+	RunID              *domain.RunID
+	State              domain.CheckpointState
+	RepositoryRevision string
+	WorktreeDiffHash   string
+	EventSequence      uint64
+	IdempotencyKey     string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Revision           uint64
+}
+
+// CreateCheckpoint declares one idempotent recovery point.
+type CreateCheckpoint struct {
+	ID                 domain.CheckpointID
+	TaskID             domain.TaskID
+	RunID              *domain.RunID
+	State              domain.CheckpointState
+	RepositoryRevision string
+	WorktreeDiffHash   string
+	EventSequence      uint64
+	IdempotencyKey     string
+}
+
+// Validation is one durable validation aggregate.
+type Validation struct {
+	ID              domain.ValidationID
+	TaskID          domain.TaskID
+	RunID           *domain.RunID
+	ArtifactID      *domain.ArtifactID
+	State           domain.ValidationState
+	Severity        domain.ValidationSeverity
+	ProfileName     string
+	SummaryRedacted *string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Revision        uint64
+}
+
+// CreateValidation declares one validation record.
+type CreateValidation struct {
+	ID              domain.ValidationID
+	TaskID          domain.TaskID
+	RunID           *domain.RunID
+	ArtifactID      *domain.ArtifactID
+	State           domain.ValidationState
+	Severity        domain.ValidationSeverity
+	ProfileName     string
+	SummaryRedacted *string
+}
+
+// Evidence is one revision-bound correctness artifact.
+type Evidence struct {
+	ID              domain.EvidenceID
+	ValidationID    domain.ValidationID
+	TaskID          domain.TaskID
+	ArtifactID      *domain.ArtifactID
+	AssuranceLevel  domain.AssuranceLevel
+	EvidenceType    string
+	ContentHash     string
+	SummaryRedacted string
+	CreatedAt       time.Time
+	Revision        uint64
+}
+
+// CreateEvidence declares one immutable evidence row.
+type CreateEvidence struct {
+	ID              domain.EvidenceID
+	ValidationID    domain.ValidationID
+	TaskID          domain.TaskID
+	ArtifactID      *domain.ArtifactID
+	AssuranceLevel  domain.AssuranceLevel
+	EvidenceType    string
+	ContentHash     string
+	SummaryRedacted string
+}
+
+// RecoveryEvidenceOperations groups checkpoint, validation, and evidence writes.
+type RecoveryEvidenceOperations interface {
+	CreateCheckpoint(context.Context, CreateCheckpoint) (Checkpoint, error)
+	CreateValidation(context.Context, CreateValidation) (Validation, error)
+	CreateEvidence(context.Context, CreateEvidence) (Evidence, error)
+}
+
 func validateBounded(label, value string, maximum int) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -173,6 +415,9 @@ func (repositories *Repositories) timestamp() (time.Time, int64) {
 }
 
 var (
-	_ ProjectOperations      = (*Repositories)(nil)
-	_ ConversationOperations = (*Repositories)(nil)
+	_ ProjectOperations          = (*Repositories)(nil)
+	_ ConversationOperations     = (*Repositories)(nil)
+	_ TaskOperations             = (*Repositories)(nil)
+	_ ApprovalBudgetOperations   = (*Repositories)(nil)
+	_ RecoveryEvidenceOperations = (*Repositories)(nil)
 )

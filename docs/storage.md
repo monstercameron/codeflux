@@ -119,3 +119,14 @@ that its repository belongs to its project. Thread pages use an exclusive
 allocates its per-thread sequence and checks its idempotency claim in the same
 immediate transaction; an identical retry returns the original row and a
 changed retry fails with a typed conflict.
+
+Task transitions compare the expected state and revision, update the task, and
+append the next event sequence in one transaction. The transition's
+idempotency key belongs to both the event identity and deterministic transition
+payload. A retry returns the committed task/event pair; a changed claim fails.
+
+Approval requests and checkpoints use the same compare-on-retry rule. Approval
+resolution and budget changes use optimistic revisions. Budget reservations and
+actual postings operate only on integer minor units, verify currency, prevent
+integer overflow, and reject any result above the hard cap. Validation and
+evidence writes verify their task/run or task/validation lineage before commit.

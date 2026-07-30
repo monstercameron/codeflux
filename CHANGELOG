@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-036
+Date: 2026-07-30
+Type: Task, authority, budget, and evidence repositories
+Request-or-TODO: M03-049 through M03-054 and M03-056 through M03-058
+Outcome: Added atomic task transitions and event allocation, approval
+  resolution, exact budget accounting, checkpoints, validations, and evidence
+  with operation-oriented contracts and typed lineage
+Affected-behavior: State and event facts commit together; concurrent events
+  receive gapless unique sequences; retries are content-bound; budget posts
+  cannot exceed currency, revision, integer, reservation, or hard-cap rules
+Compatibility-or-migration: No schema change
+Verification: Every repository runs against temporary real SQLite; focused
+  tests cover idempotency, stale revisions, exact accounting, lineage, and 20
+  concurrent appends; full repository suites pass
+Dev-Log: DL-20260730-037
+
 Change-ID: CL-20260730-035
 Date: 2026-07-30
 Type: Core identity and conversation repositories

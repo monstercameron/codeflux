@@ -732,16 +732,16 @@ Initial-schema evidence:
 - [x] `M03-046` Implement project and repository persistence.
 - [x] `M03-047` Implement thread creation and cursor pagination.
 - [x] `M03-048` Implement message append with idempotency.
-- [ ] `M03-049` Implement task creation and transition persistence.
-- [ ] `M03-050` Implement atomic event append and sequence allocation.
-- [ ] `M03-051` Implement approval creation and resolution.
-- [ ] `M03-052` Implement budget reservation and actual-cost posting.
-- [ ] `M03-053` Implement checkpoint persistence.
-- [ ] `M03-054` Implement validation and evidence persistence.
+- [x] `M03-049` Implement task creation and transition persistence.
+- [x] `M03-050` Implement atomic event append and sequence allocation.
+- [x] `M03-051` Implement approval creation and resolution.
+- [x] `M03-052` Implement budget reservation and actual-cost posting.
+- [x] `M03-053` Implement checkpoint persistence.
+- [x] `M03-054` Implement validation and evidence persistence.
 - [x] `M03-055` Return typed not-found, conflict, stale-revision, busy, corruption, and constraint errors.
-- [ ] `M03-056 TEST` Test every repository against a temporary real SQLite database.
-- [ ] `M03-057 TEST` Test concurrent event append ordering.
-- [ ] `M03-058 TEST` Test idempotent retries of message, approval, and state-transition writes.
+- [x] `M03-056 TEST` Test every repository against a temporary real SQLite database.
+- [x] `M03-057 TEST` Test concurrent event append ordering.
+- [x] `M03-058 TEST` Test idempotent retries of message, approval, and state-transition writes.
 - [x] `M03-059 TEST` Test rollback after a failure halfway through a multi-table operation.
 - [x] `M03-060 TEST` Test cancellation of a blocked database call.
 
@@ -756,6 +756,14 @@ Transaction-runner evidence:
 - A contending writer with a 100 ms context deadline returns within the
   deadline rather than waiting for the five-second SQLite busy timeout, and the
   connection's configured timeout is restored afterward.
+- Task state and its correctness-bearing event commit atomically under one
+  expected revision. Twenty concurrent event appends receive each integer
+  sequence exactly once.
+- Identical task, message, approval, checkpoint, and transition retries return
+  the original fact; changed claims conflict.
+- Exact budget reservation and actual posting reject stale revisions, currency
+  mismatch, overflow, excess release, and hard-cap excess. Checkpoints,
+  validations, and evidence verify typed lineage in real SQLite.
 
 ## Diagnostics and Maintenance
 
