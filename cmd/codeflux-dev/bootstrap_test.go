@@ -9,7 +9,7 @@ import (
 
 func TestVerifyGeneratorPins(t *testing.T) {
 	root := t.TempDir()
-	writeTestFile(t, filepath.Join(root, "buf.gen.yaml"), "remote: buf.build/protocolbuffers/go:v1.36.11\n")
+	writeTestFile(t, filepath.Join(root, "buf.gen.yaml"), `local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go"]`+"\n")
 	writeTestFile(t, filepath.Join(root, "cmd", "codeflux-dev", "main.go"), `const tool = "`+pinnedBufModule+`"`)
 	if err := verifyGeneratorPins(root); err != nil {
 		t.Fatalf("valid pins: %v", err)

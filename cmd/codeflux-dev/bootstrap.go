@@ -190,8 +190,11 @@ func verifyGeneratorPins(repository string) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Contains(bufConfig, []byte("buf.build/protocolbuffers/go:v1.36.11")) {
-		return fmt.Errorf("buf.gen.yaml lacks protoc-gen-go v1.36.11")
+	if !bytes.Contains(
+		bufConfig,
+		[]byte(`["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go"]`),
+	) {
+		return fmt.Errorf("buf.gen.yaml lacks the module-pinned protoc-gen-go invocation")
 	}
 	mainSource, err := os.ReadFile(filepath.Join(repository, "cmd", "codeflux-dev", "main.go"))
 	if err != nil {

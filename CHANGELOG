@@ -30,6 +30,23 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-043
+Date: 2026-07-30
+Type: Unified session-event contract
+Request-or-TODO: M05-001 through M05-015
+Outcome: Added stable session identity plus domain and protobuf SessionEvent
+  envelopes with every initial versioned typed payload, safe-field validation,
+  stable error codes, and delivery/correctness classification
+Affected-behavior: Session facts now have one canonical shape and cannot pass
+  validation with mismatched payloads, invalid identities/states/values, or an
+  unsupported payload version
+Compatibility-or-migration: Adds protobuf session messages and identity enum
+  value 22; generation now uses the module-pinned local Go plugin invocation
+  instead of the rate-limited remote registry
+Verification: Event/domain/transport tests, deterministic generation, isolated
+  generation-check, and the complete repository suite pass
+Dev-Log: DL-20260730-044
+
 Change-ID: CL-20260730-042
 Date: 2026-07-30
 Type: Redaction pipeline and credential gates

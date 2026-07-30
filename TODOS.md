@@ -302,11 +302,10 @@ Quality-command evidence:
 - `test-coverage` writes `.artifacts/coverage/unit.out`; coverage is diagnostic and has no raw-percentage gate.
 - [x] `M01-033` Add protobuf generation through a pinned tool version.
 
-Protobuf generation evidence: Buf 1.72.0 compiles
-`api/proto/codeflux/v1/system.proto` and invokes the pinned
-`buf.build/protocolbuffers/go:v1.36.11` plugin; a second generation produced
-the identical SHA-256
-`E9E6331D9AD000D782C80EB91663B2CA2DA670D2FB09FBBEC4DAEC639FEE5280`.
+Protobuf generation evidence: Buf 1.72.0 compiles the `api/proto` module and
+invokes `google.golang.org/protobuf/cmd/protoc-gen-go` from the module-pinned
+v1.36.11 dependency. Generation and isolated generation-check pass without a
+remote-plugin registry request.
 - [x] `M01-034` Add migration embedding through `go:embed`.
 - [x] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
 
@@ -954,21 +953,35 @@ Milestone output: one typed, durable, monotonic event stream that joins replay t
 
 ## Event Envelope
 
-- [ ] `M05-001 BLOCKER` Define the `SessionEvent` protobuf and domain type.
-- [ ] `M05-002 BLOCKER` Include sequence, session/thread/task IDs, timestamp, kind, revision, causation ID, correlation ID, and typed payload.
-- [ ] `M05-003` Define message-delta and message-final payloads.
-- [ ] `M05-004` Define plan-created and plan-changed payloads.
-- [ ] `M05-005` Define tool-started, tool-progress, and tool-completed payloads.
-- [ ] `M05-006` Define approval-requested and approval-resolved payloads.
-- [ ] `M05-007` Define task-state-changed payloads.
-- [ ] `M05-008` Define forecast, usage, cost, and budget payloads.
-- [ ] `M05-009` Define validation-updated payloads.
-- [ ] `M05-010` Define graph-snapshot and graph-patch payloads.
-- [ ] `M05-011` Define checkpoint-created and recovery-required payloads.
-- [ ] `M05-012` Define user-presentable error payloads with stable error codes.
-- [ ] `M05-013` Version event payloads for forward-compatible replay.
-- [ ] `M05-014` Define which event fields are safe for UI delivery.
-- [ ] `M05-015` Define which event types are immutable and correctness-bearing.
+- [x] `M05-001 BLOCKER` Define the `SessionEvent` protobuf and domain type.
+- [x] `M05-002 BLOCKER` Include sequence, session/thread/task IDs, timestamp, kind, revision, causation ID, correlation ID, and typed payload.
+- [x] `M05-003` Define message-delta and message-final payloads.
+- [x] `M05-004` Define plan-created and plan-changed payloads.
+- [x] `M05-005` Define tool-started, tool-progress, and tool-completed payloads.
+- [x] `M05-006` Define approval-requested and approval-resolved payloads.
+- [x] `M05-007` Define task-state-changed payloads.
+- [x] `M05-008` Define forecast, usage, cost, and budget payloads.
+- [x] `M05-009` Define validation-updated payloads.
+- [x] `M05-010` Define graph-snapshot and graph-patch payloads.
+- [x] `M05-011` Define checkpoint-created and recovery-required payloads.
+- [x] `M05-012` Define user-presentable error payloads with stable error codes.
+- [x] `M05-013` Version event payloads for forward-compatible replay.
+- [x] `M05-014` Define which event fields are safe for UI delivery.
+- [x] `M05-015` Define which event types are immutable and correctness-bearing.
+
+Session-event-contract evidence:
+
+- `session.proto` defines one versioned oneof envelope with monotonic sequence,
+  session/thread/task identity, UTC microsecond timestamp, entity revision,
+  causation and correlation identities, kind, and all initial typed payloads.
+- Domain validation requires canonical identities, exactly one kind-matched
+  payload, payload version 1, exact money/token values, valid state machines,
+  and only redacted user-presentable text fields.
+- Message delta and tool progress are explicitly ephemeral/coalescible. Task
+  transitions, approvals, budgets, validations, graph revisions, checkpoints,
+  recovery, and errors are immutable correctness-bearing material events.
+- The new stable session identity round-trips through domain, SQL/text/JSON
+  identity machinery, and the protobuf identity envelope.
 
 ## Append and Publish
 

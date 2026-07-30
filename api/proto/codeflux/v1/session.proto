@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+import "codeflux/v1/identity.proto";
+
+enum SessionEventKind {
+  SESSION_EVENT_KIND_UNSPECIFIED = 0;
+  SESSION_EVENT_KIND_MESSAGE_DELTA = 1;
+  SESSION_EVENT_KIND_MESSAGE_FINAL = 2;
+  SESSION_EVENT_KIND_PLAN_CREATED = 3;
+  SESSION_EVENT_KIND_PLAN_CHANGED = 4;
+  SESSION_EVENT_KIND_TOOL_STARTED = 5;
+  SESSION_EVENT_KIND_TOOL_PROGRESS = 6;
+  SESSION_EVENT_KIND_TOOL_COMPLETED = 7;
+  SESSION_EVENT_KIND_APPROVAL_REQUESTED = 8;
+  SESSION_EVENT_KIND_APPROVAL_RESOLVED = 9;
+  SESSION_EVENT_KIND_TASK_STATE_CHANGED = 10;
+  SESSION_EVENT_KIND_FORECAST_UPDATED = 11;
+  SESSION_EVENT_KIND_USAGE_UPDATED = 12;
+  SESSION_EVENT_KIND_COST_UPDATED = 13;
+  SESSION_EVENT_KIND_BUDGET_UPDATED = 14;
+  SESSION_EVENT_KIND_VALIDATION_UPDATED = 15;
+  SESSION_EVENT_KIND_GRAPH_SNAPSHOT = 16;
+  SESSION_EVENT_KIND_GRAPH_PATCH = 17;
+  SESSION_EVENT_KIND_CHECKPOINT_CREATED = 18;
+  SESSION_EVENT_KIND_RECOVERY_REQUIRED = 19;
+  SESSION_EVENT_KIND_ERROR = 20;
+}
+
+message SessionEvent {
+  uint64 sequence = 1;
+  StableIdentity session_id = 2;
+  StableIdentity thread_id = 3;
+  StableIdentity task_id = 4;
+  int64 timestamp_unix_micros = 5;
+  SessionEventKind kind = 6;
+  uint64 revision = 7;
+  StableIdentity causation_id = 8;
+  StableIdentity correlation_id = 9;
+  uint32 payload_version = 10;
+  oneof payload {
+    MessageDeltaEvent message_delta = 20;
+    MessageFinalEvent message_final = 21;
+    PlanEvent plan = 22;
+    ToolEvent tool = 23;
+    ApprovalEvent approval = 24;
+    TaskStateChangedEvent task_state_changed = 25;
+    ForecastEvent forecast = 26;
+    UsageEvent usage = 27;
+    CostEvent cost = 28;
+    BudgetEvent budget = 29;
+    ValidationEvent validation = 30;
+    GraphEvent graph = 31;
+    CheckpointEvent checkpoint = 32;
+    RecoveryRequiredEvent recovery_required = 33;
+    UserErrorEvent error = 34;
+  }
+}
+
+message MessageDeltaEvent {
+  StableIdentity message_id = 1;
+  string redacted_delta = 2;
+}
+
+message MessageFinalEvent {
+  StableIdentity message_id = 1;
+  string role = 2;
+  string redacted_body = 3;
+}
+
+message PlanEvent {
+  uint64 plan_revision = 1;
+  string redacted_summary = 2;
+}
+
+message ToolEvent {
+  string execution_id = 1;
+  string command_name = 2;
+  string state = 3;
+  string redacted_summary = 4;
+}
+
+message ApprovalEvent {
+  StableIdentity approval_id = 1;
+  string state = 2;
+  string scope = 3;
+  string redacted_reason = 4;
+}
+
+message TaskStateChangedEvent {
+  string from = 1;
+  string to = 2;
+  string approval_state = 3;
+}
+
+message ForecastEvent {
+  bool cost_known = 1;
+  int64 cost_p50_minor = 2;
+  int64 cost_p90_minor = 3;
+  string currency = 4;
+  bool tokens_known = 5;
+  uint64 tokens_p50 = 6;
+  uint64 tokens_p90 = 7;
+  bool latency_known = 8;
+  int64 latency_p50_ms = 9;
+  int64 latency_p90_ms = 10;
+}
+
+message UsageEvent {
+  bool known = 1;
+  uint64 input_tokens = 2;
+  uint64 cached_input_tokens = 3;
+  uint64 output_tokens = 4;
+  uint64 reasoning_tokens = 5;
+}
+
+message CostEvent {
+  bool known = 1;
+  int64 minor_units = 2;
+  string currency = 3;
+}
+
+message BudgetEvent {
+  int64 hard_limit_minor = 1;
+  int64 reserved_minor = 2;
+  int64 actual_minor = 3;
+  string currency = 4;
+}
+
+message ValidationEvent {
+  StableIdentity validation_id = 1;
+  string state = 2;
+  string redacted_summary = 3;
+}
+
+message GraphEvent {
+  StableIdentity graph_revision_id = 1;
+  bytes encoded_change = 2;
+}
+
+message CheckpointEvent {
+  StableIdentity checkpoint_id = 1;
+  uint64 task_revision = 2;
+}
+
+message RecoveryRequiredEvent {
+  StableIdentity checkpoint_id = 1;
+  string redacted_reason = 2;
+}
+
+message UserErrorEvent {
+  string code = 1;
+  string redacted_message = 2;
+  bool retryable = 3;
+}

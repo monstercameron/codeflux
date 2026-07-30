@@ -83,6 +83,16 @@ func WorkspaceIDFromProto(value *codefluxv1.StableIdentity) (domain.WorkspaceID,
 	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE, domain.ParseWorkspaceID)
 }
 
+// SessionIDToProto converts a session identity to its protobuf envelope.
+func SessionIDToProto(value domain.SessionID) (*codefluxv1.StableIdentity, error) {
+	return identityToProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION)
+}
+
+// SessionIDFromProto validates and converts a protobuf session identity.
+func SessionIDFromProto(value *codefluxv1.StableIdentity) (domain.SessionID, error) {
+	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION, domain.ParseSessionID)
+}
+
 // ThreadIDToProto converts a thread identity to its protobuf envelope.
 func ThreadIDToProto(value domain.ThreadID) (*codefluxv1.StableIdentity, error) {
 	return identityToProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD)

@@ -3,4 +3,25 @@
 
 package events
 
-var Registry = []KindDescriptor{}
+var Registry = []KindDescriptor{
+	{Name: "session.approval.requested"},
+	{Name: "session.approval.resolved"},
+	{Name: "session.budget.updated"},
+	{Name: "session.checkpoint.created"},
+	{Name: "session.cost.updated"},
+	{Name: "session.error"},
+	{Name: "session.forecast.updated"},
+	{Name: "session.graph.patch"},
+	{Name: "session.graph.snapshot"},
+	{Name: "session.message.delta"},
+	{Name: "session.message.final"},
+	{Name: "session.plan.changed"},
+	{Name: "session.plan.created"},
+	{Name: "session.recovery.required"},
+	{Name: "session.task.state.changed"},
+	{Name: "session.tool.completed"},
+	{Name: "session.tool.progress"},
+	{Name: "session.tool.started"},
+	{Name: "session.usage.updated"},
+	{Name: "session.validation.updated"},
+}

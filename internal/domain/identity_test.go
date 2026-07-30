@@ -28,6 +28,7 @@ func TestEveryIdentityTypeParsesItsCanonicalPrefix(t *testing.T) {
 		{name: "project", prefix: "prj", parse: wrapIDParser(ParseProjectID)},
 		{name: "repository", prefix: "repo", parse: wrapIDParser(ParseRepositoryID)},
 		{name: "workspace", prefix: "wsp", parse: wrapIDParser(ParseWorkspaceID)},
+		{name: "session", prefix: "ses", parse: wrapIDParser(ParseSessionID)},
 		{name: "thread", prefix: "thr", parse: wrapIDParser(ParseThreadID)},
 		{name: "message", prefix: "msg", parse: wrapIDParser(ParseMessageID)},
 		{name: "task", prefix: "tsk", parse: wrapIDParser(ParseTaskID)},

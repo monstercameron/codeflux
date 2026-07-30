@@ -3660,12 +3660,16 @@ Use one ordered session stream for chat, graph, task state, validation, and cost
 ```text
 SessionEvent
     sequence
+    session_id
     thread_id
     task_id
     timestamp
     kind
     revision
-    payload
+    causation_id
+    correlation_id
+    payload_version
+    typed payload
 ```
 
 Initial event kinds are:
@@ -3673,15 +3677,23 @@ Initial event kinds are:
 ```text
 message_delta
 message_final
+plan_created
 plan_changed
 tool_started
+tool_progress
 tool_completed
 approval_requested
+approval_resolved
 task_state_changed
+forecast_updated
+usage_updated
 cost_updated
+budget_updated
 validation_updated
+graph_snapshot
 graph_patch
 checkpoint_created
+recovery_required
 error
 ```
 
@@ -5821,9 +5833,10 @@ Staticcheck:
 
 No global `protoc`, Buf, Node, npm, Make, Bash, PowerShell module, SQLite CLI,
 or C compiler is required for the current build and fast-test path. Protobuf
-generation invokes Buf 1.72.0 through a version-qualified Go command and uses
-the pinned `buf.build/protocolbuffers/go:v1.36.11` plugin. Its first run is an
-explicitly network-capable bootstrap/generation action; ordinary builds and
+generation invokes Buf 1.72.0 through a version-qualified Go command and runs
+`google.golang.org/protobuf/cmd/protoc-gen-go` from the module-pinned v1.36.11
+dependency. Its first run is an explicitly network-capable
+bootstrap/generation action; ordinary builds and
 tests compile the committed generated source without network access.
 
 The implemented commands are:

@@ -47,6 +47,7 @@ const (
 	StableIdentityKind_STABLE_IDENTITY_KIND_MODEL_REQUEST  StableIdentityKind = 19
 	StableIdentityKind_STABLE_IDENTITY_KIND_PROVIDER       StableIdentityKind = 20
 	StableIdentityKind_STABLE_IDENTITY_KIND_BUDGET         StableIdentityKind = 21
+	StableIdentityKind_STABLE_IDENTITY_KIND_SESSION        StableIdentityKind = 22
 )
 
 // Enum value maps for StableIdentityKind.
@@ -74,6 +75,7 @@ var (
 		19: "STABLE_IDENTITY_KIND_MODEL_REQUEST",
 		20: "STABLE_IDENTITY_KIND_PROVIDER",
 		21: "STABLE_IDENTITY_KIND_BUDGET",
+		22: "STABLE_IDENTITY_KIND_SESSION",
 	}
 	StableIdentityKind_value = map[string]int32{
 		"STABLE_IDENTITY_KIND_UNSPECIFIED":    0,
@@ -98,6 +100,7 @@ var (
 		"STABLE_IDENTITY_KIND_MODEL_REQUEST":  19,
 		"STABLE_IDENTITY_KIND_PROVIDER":       20,
 		"STABLE_IDENTITY_KIND_BUDGET":         21,
+		"STABLE_IDENTITY_KIND_SESSION":        22,
 	}
 )
 
@@ -189,7 +192,7 @@ const file_codeflux_v1_identity_proto_rawDesc = "" +
 	"\x1acodeflux/v1/identity.proto\x12\vcodeflux.v1\"[\n" +
 	"\x0eStableIdentity\x123\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1f.codeflux.v1.StableIdentityKindR\x04kind\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value*\x8a\x06\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value*\xac\x06\n" +
 	"\x12StableIdentityKind\x12$\n" +
 	" STABLE_IDENTITY_KIND_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cSTABLE_IDENTITY_KIND_PROJECT\x10\x01\x12#\n" +
@@ -213,7 +216,8 @@ const file_codeflux_v1_identity_proto_rawDesc = "" +
 	"\x19STABLE_IDENTITY_KIND_ATOM\x10\x12\x12&\n" +
 	"\"STABLE_IDENTITY_KIND_MODEL_REQUEST\x10\x13\x12!\n" +
 	"\x1dSTABLE_IDENTITY_KIND_PROVIDER\x10\x14\x12\x1f\n" +
-	"\x1bSTABLE_IDENTITY_KIND_BUDGET\x10\x15B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
+	"\x1bSTABLE_IDENTITY_KIND_BUDGET\x10\x15\x12 \n" +
+	"\x1cSTABLE_IDENTITY_KIND_SESSION\x10\x16B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
 
 var (
 	file_codeflux_v1_identity_proto_rawDescOnce sync.Once

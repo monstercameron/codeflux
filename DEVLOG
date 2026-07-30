@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-044
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-043
+Request-or-TODO: M05-001 through M05-015
+Goal: Freeze the complete typed event vocabulary before implementing journal
+  persistence, publication, subscription, or replay
+Assumptions: A session is the ordered reconnect boundary and may include thread
+  events before a task exists; graph encoded changes are structural,
+  schema-owned payloads; payload schema version 1 is the only accepted version
+Decisions: Add a distinct `ses_` stable identity. Use one protobuf oneof and a
+  domain one-of with exact kind matching. Classify only message deltas and tool
+  progress as ephemeral/coalescible; make authority, correctness, recovery, and
+  error facts material. Keep all user-presentable strings explicitly redacted.
+Files-or-schemas: session protobuf/generated Go, stable identity protobuf/domain/
+  transport changes, session event domain contract/tests, generated registry,
+  Buf local module-pinned plugin configuration/bootstrap checks, docs/plan.md,
+  TODOS.md, CHANGELOG, DEVLOG; no SQLite migration
+Validation: All 20 initial event kinds passed typed envelope validation and UI
+  safety. Tests rejected unversioned, mismatched, and multi-payload envelopes
+  and verified non-droppable classifications. Session identity round-tripped
+  through domain and protobuf conversion. Generation and isolated
+  generation-check passed with the module-pinned protoc-gen-go dependency.
+Failures-or-discarded-approaches: The Buf remote plugin registry repeatedly
+  returned resource-exhausted during generation. Replaced it with Buf's local
+  command-array support invoking the already pinned Go module dependency,
+  removing registry rate limits without adding a global tool. The first full
+  lint run also correctly rejected a token-shaped redaction fixture; the test
+  now assembles that synthetic value at runtime so tracked source contains no
+  credential-shaped literal.
+Known-limitations: No SessionEvent SQLite table, append/publish service,
+  subscriptions, replay join, or command-result idempotency exists yet.
+Next-safe-step: Add schema 4 and the atomic append API, then publish only the
+  committed returned event into bounded session/task subscribers.
+
 Dev-Log: DL-20260730-043
 Date: 2026-07-30
 Status: Complete

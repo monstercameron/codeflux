@@ -28,6 +28,7 @@ enum StableIdentityKind {
   STABLE_IDENTITY_KIND_MODEL_REQUEST = 19;
   STABLE_IDENTITY_KIND_PROVIDER = 20;
   STABLE_IDENTITY_KIND_BUDGET = 21;
+  STABLE_IDENTITY_KIND_SESSION = 22;
 }
 
 // StableIdentity carries one canonical typed identity across protobuf

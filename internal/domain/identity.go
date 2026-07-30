@@ -275,6 +275,26 @@ func NewWorkspaceID() (WorkspaceID, error) {
 	return WorkspaceID{value}, err
 }
 
+type sessionIDKind struct{}
+
+func (sessionIDKind) prefix() string { return "ses" }
+func (sessionIDKind) label() string  { return "session" }
+
+// SessionID identifies one ordered reconnectable event stream.
+type SessionID struct{ typedID[sessionIDKind] }
+
+// ParseSessionID parses a canonical session identity.
+func ParseSessionID(raw string) (SessionID, error) {
+	value, err := parseTypedID[sessionIDKind](raw)
+	return SessionID{value}, err
+}
+
+// NewSessionID generates a locally unique, time-sortable session identity.
+func NewSessionID() (SessionID, error) {
+	value, err := newTypedID[sessionIDKind]()
+	return SessionID{value}, err
+}
+
 type threadIDKind struct{}
 
 func (threadIDKind) prefix() string { return "thr" }

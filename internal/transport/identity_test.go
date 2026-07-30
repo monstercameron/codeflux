@@ -24,6 +24,7 @@ func TestEveryIdentityTypeProtobufRoundTrips(t *testing.T) {
 		makeIdentityProtoCase("project", "prj", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_PROJECT, domain.ParseProjectID, ProjectIDToProto, ProjectIDFromProto),
 		makeIdentityProtoCase("repository", "repo", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY, domain.ParseRepositoryID, RepositoryIDToProto, RepositoryIDFromProto),
 		makeIdentityProtoCase("workspace", "wsp", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE, domain.ParseWorkspaceID, WorkspaceIDToProto, WorkspaceIDFromProto),
+		makeIdentityProtoCase("session", "ses", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION, domain.ParseSessionID, SessionIDToProto, SessionIDFromProto),
 		makeIdentityProtoCase("thread", "thr", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD, domain.ParseThreadID, ThreadIDToProto, ThreadIDFromProto),
 		makeIdentityProtoCase("message", "msg", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MESSAGE, domain.ParseMessageID, MessageIDToProto, MessageIDFromProto),
 		makeIdentityProtoCase("task", "tsk", codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_TASK, domain.ParseTaskID, TaskIDToProto, TaskIDFromProto),

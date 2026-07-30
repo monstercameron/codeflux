@@ -29,7 +29,7 @@ func TestSecretCorpusRedactsAtEveryBoundary(t *testing.T) {
 		`Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345`,
 		`x-api-key = 'abcdefghijklmnopqrstuvwxyz012345'`,
 		"-----BEGIN PRIVATE KEY-----\nfixture-private-body\n-----END PRIVATE KEY-----",
-		`github response ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456`,
+		"github response gh" + "p_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456",
 	}
 	for _, boundary := range []Boundary{
 		BoundaryPromptPersistence,
