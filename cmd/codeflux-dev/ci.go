@@ -20,18 +20,27 @@ type ciFailureArtifact struct {
 	Architecture  string `json:"architecture"`
 }
 
-func runCIFailureArtifact(ctx context.Context, stderr io.Writer) int {
+func runCIFailureArtifact(
+	ctx context.Context,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev ci-failure-artifact: %v\n", err)
 		return exitFailure
+	}
+	outputDir, err := resolveCommandRoot(root, "test-failures", invocation.Root)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev ci-failure-artifact: root: %v\n", err)
+		return exitUsage
 	}
 	commit, err := gitOutput(ctx, root, "rev-parse", "HEAD")
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev ci-failure-artifact: %v\n", err)
 		return exitFailure
 	}
-	if err := writeCIFailureArtifact(root, ciFailureArtifact{
+	if err := writeCIFailureArtifact(outputDir, ciFailureArtifact{
 		SchemaVersion: ciFailureArtifactSchemaVersion,
 		Commit:        commit,
 		GoVersion:     runtime.Version(),
@@ -44,8 +53,7 @@ func runCIFailureArtifact(ctx context.Context, stderr io.Writer) int {
 	return exitSuccess
 }
 
-func writeCIFailureArtifact(root string, artifact ciFailureArtifact) error {
-	outputDir := filepath.Join(root, ".artifacts", "test-failures")
+func writeCIFailureArtifact(outputDir string, artifact ciFailureArtifact) error {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("create failure artifact directory: %w", err)
 	}

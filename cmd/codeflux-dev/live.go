@@ -20,6 +20,9 @@ type liveGateResult struct {
 }
 
 func runLiveGate(stdout, stderr io.Writer, invocation commandInvocation) int {
+	if code := validateCommandRoot("run-live", invocation, stderr); code != exitSuccess {
+		return code
+	}
 	if invocation.Provider == "" || invocation.CredentialRef == "" || invocation.Database == "" {
 		fmt.Fprintln(stderr, "codeflux-dev run-live: --provider, --credential-ref, and --database are all required")
 		return exitUsage

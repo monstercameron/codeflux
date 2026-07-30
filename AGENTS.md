@@ -206,6 +206,70 @@ These rules apply when executing the final §28 ReserveFlow dogfood trial and Mi
 - For every mutating application function, define authority, idempotency, expected revision, transaction boundary, durable events, external effects, cancellation, and typed failures.
 - Persist external-effect intent before execution when replay or ambiguity matters, then persist the attributable outcome.
 
+## Implemented Development Commands
+
+Run repository development operations through the cross-platform Go helper:
+
+```text
+go run ./cmd/codeflux-dev help
+go run ./cmd/codeflux-dev <command> --help
+```
+
+The current executable commands are:
+
+```text
+go run ./cmd/codeflux-dev bootstrap
+go run ./cmd/codeflux-dev build
+go run ./cmd/codeflux-dev generate
+go run ./cmd/codeflux-dev generate-check
+go run ./cmd/codeflux-dev migration-check
+go run ./cmd/codeflux-dev lint
+go run ./cmd/codeflux-dev test-fast
+go run ./cmd/codeflux-dev test-integration
+go run ./cmd/codeflux-dev test-security
+go run ./cmd/codeflux-dev test-all
+go run ./cmd/codeflux-dev test-coverage
+go run ./cmd/codeflux-dev test-race
+go run ./cmd/codeflux-dev run --once
+go run ./cmd/codeflux-dev benchmark atom-names
+go run ./cmd/codeflux-dev benchmark generation
+go run ./cmd/codeflux-dev artifact-check
+```
+
+Use `bootstrap` before lint or generation on a fresh clone. It selects the
+patched Go toolchain and installs pinned repository tools beneath `.artifacts`.
+`generate` is the sole normal writer for generated source. `migration-check`
+validates ordering, embedding, and checksums; it does not apply an application
+schema before M03. `benchmark` retains measured output beneath
+`.artifacts/bench`. `test-race` is unavailable on Windows ARM64 and runs in the
+declared Ubuntu AMD64 CI job. Commands labeled `skeleton` or `gated` by help
+return exit 3 until their owning milestone implements the subsystem.
+
+Every command accepts `--root`. A repository-local root must be a child of
+`.artifacts`; an explicit external root is never selected or deleted
+implicitly. Use `--json` only when command help declares machine-readable
+output.
+
+### Atomic Inner Loop
+
+For each non-trivial change:
+
+1. identify the governing `docs/plan.md` section and first dependency-safe
+   `TODOS.md` ID;
+2. inspect the scoped source, tests, generated inputs, migrations, and Git
+   state;
+3. start or update the matching `DEVLOG` entry and state material assumptions;
+4. run the narrowest relevant test or reproduction;
+5. implement the smallest sufficient source, test, migration, or generated
+   change;
+6. rerun the targeted check, then the broader command required by the task;
+7. run `generate-check`, `lint`, and `artifact-check` when their boundaries are
+   affected;
+8. inspect the final diff and Git status, update completion evidence, and mark
+   no TODO complete until its verification passes;
+9. when a commit is authorized, stage explicit paths, add the matching
+   `CHANGELOG` entry, commit with both ledger trailers, and inspect the result.
+
 ## Atom Naming Style
 
 Atom names must preserve domain context when displayed without surrounding source. A somewhat long, precise name is preferred over a short generic name that forces a human or retrieval system to reopen the implementation.

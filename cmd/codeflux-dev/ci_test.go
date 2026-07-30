@@ -10,6 +10,7 @@ import (
 func TestWriteCIFailureArtifactUsesOnlyAllowListedFields(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "must-not-appear")
 	root := t.TempDir()
+	outputDir := filepath.Join(root, ".artifacts", "test-failures")
 	artifact := ciFailureArtifact{
 		SchemaVersion: ciFailureArtifactSchemaVersion,
 		Commit:        "0123456789abcdef",
@@ -18,7 +19,7 @@ func TestWriteCIFailureArtifactUsesOnlyAllowListedFields(t *testing.T) {
 		Architecture:  "test-arch",
 	}
 
-	if err := writeCIFailureArtifact(root, artifact); err != nil {
+	if err := writeCIFailureArtifact(outputDir, artifact); err != nil {
 		t.Fatalf("writeCIFailureArtifact() error = %v", err)
 	}
 

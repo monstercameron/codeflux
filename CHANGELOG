@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-020
+Date: 2026-07-30
+Type: Developer safety and artifact confinement
+Request-or-TODO: M01-063, M01-064, M01-090 through M01-094, M01-097
+  through M01-104
+Outcome: Enforced roots, import direction, generated paths, Markdown policy,
+  artifact ignore/escape/cleanup, always-run CI scans, real migration checks,
+  real M01 benchmarks, and the documented atomic inner loop
+Affected-behavior: Unsafe repository output fails before writing and CI detects
+  disposable escape after each command, including failed commands
+Compatibility-or-migration: Adds artifact-check and migration-check commands
+  plus named M01 benchmark output; no runtime migration
+Verification: Root/dependency/artifact/cleanup tests, real commands, actionlint,
+  lint, test-all, artifact scan, and staged whitespace checks
+Dev-Log: DL-20260730-021
+
 Change-ID: CL-20260730-019
 Date: 2026-07-30
 Type: Development command orchestration

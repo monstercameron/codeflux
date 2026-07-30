@@ -50,6 +50,12 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkAtomDeclarations(root, tracked); err != nil {
 		return err
 	}
+	if err := checkPackageDependencies(root, tracked); err != nil {
+		return err
+	}
+	if err := checkArtifactPolicy(ctx, root, tracked); err != nil {
+		return err
+	}
 	return nil
 }
 

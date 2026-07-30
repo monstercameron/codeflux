@@ -381,8 +381,8 @@ Evidence:
 - [x] `M01-060 TEST` Add a documentation check that requires root `AGENTS.md` and `CLAUDE.md`.
 - [x] `M01-061 TEST` Add a documentation check that `CLAUDE.md` still points to `AGENTS.md`, `docs/plan.md`, and `TODOS.md`.
 - [x] `M01-062 TEST` Add a link check for repository-relative instruction links and the pinned external Karpathy-inspired reference.
-- [ ] `M01-063 DOC` Add real build, test, generation, migration, and benchmark commands to `AGENTS.md` only after those commands exist.
-- [ ] `M01-064 DOC` Review agent instructions at each prototype milestone gate and remove rules that have become false, redundant, or unhelpful.
+- [x] `M01-063 DOC` Add real build, test, generation, migration, and benchmark commands to `AGENTS.md` only after those commands exist.
+- [x] `M01-064 DOC` Review agent instructions at each prototype milestone gate and remove rules that have become false, redundant, or unhelpful.
 - [x] `M01-065 TEST` Add an instruction smoke scenario in which a coding agent must identify the relevant plan section and TODO ID before changing a fixture.
 - [x] `M01-066 DOC` Define the required structured Go atom-comment style in `AGENTS.md`. Output: versioned field template covering selection, semantics, contracts, effects, failures, retry, reconciliation, security, dependencies, examples, verification, and retrieval concepts. Verify: the template starts with the Go identifier and distinguishes descriptive comments from correctness authority.
 - [x] `M01-067 TEST` Add a repository check that every Go atom declaration has a schema-versioned Codeflux atom doc comment.
@@ -427,21 +427,21 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [x] `M01-087` Implement `lint` orchestration for format, vet, selected linters, documentation links, protobuf compatibility, migrations, atom names, and atom comments.
 - [x] `M01-088` Implement `seed`, `replay`, `inspect-db`, `benchmark`, and `doctor` command skeletons with honest unavailable messages until their subsystems exist.
 - [x] `M01-089` Define deterministic, interactive-fake, live-provider, and fault-injection development profiles.
-- [ ] `M01-090` Ensure each development command accepts an explicit temporary/application root and never defaults destructive work to the repository root.
-- [ ] `M01-091` Ensure each command supports `--help`, stable non-zero failure codes, and the exact failing sub-step.
-- [ ] `M01-092` Add a package-dependency check that enforces inward domain dependencies and prevents storage/provider/transport code from owning frontend or domain policy.
-- [ ] `M01-093` Add a generated-file check that rejects hand edits and generation outside declared paths.
-- [ ] `M01-094 DOC` Document the atomic inner loop from plan/TODO selection through targeted test, implementation, broader verification, diff inspection, and completion evidence.
+- [x] `M01-090` Ensure each development command accepts an explicit temporary/application root and never defaults destructive work to the repository root.
+- [x] `M01-091` Ensure each command supports `--help`, stable non-zero failure codes, and the exact failing sub-step.
+- [x] `M01-092` Add a package-dependency check that enforces inward domain dependencies and prevents storage/provider/transport code from owning frontend or domain policy.
+- [x] `M01-093` Add a generated-file check that rejects hand edits and generation outside declared paths.
+- [x] `M01-094 DOC` Document the atomic inner loop from plan/TODO selection through targeted test, implementation, broader verification, diff inspection, and completion evidence.
 - [ ] `M01-095 TEST` Run bootstrap, generate-check, lint, and fast tests from a clean clone using only documented commands.
 - [x] `M01-096 DOC` Define in `AGENTS.md` that agents may not create any new Markdown file without an explicit user request naming that file.
-- [ ] `M01-097 TEST` Add an instruction check that fails if the Markdown-creation rule is removed or weakened.
-- [ ] `M01-098 BLOCKER` Configure every development command to place repository-local disposable output beneath `.artifacts/`.
-- [ ] `M01-099 TEST` Verify build, test, race, coverage, browser, benchmark, package, diagnostic, replay, and failure-preservation commands create no repository-local artifact outside `.artifacts/`.
-- [ ] `M01-100 TEST` Verify a command rejects an explicit repository-local artifact destination outside `.artifacts/` before writing.
-- [ ] `M01-101 TEST` Verify cleanup resolves and validates a child of `.artifacts/` and cannot delete the repository root, source directories, or an external path.
-- [ ] `M01-102 TEST` Verify `.artifacts/` and every descendant remain ignored, cannot enter a normal commit, and need no tracked placeholder.
-- [ ] `M01-103` Configure CI artifact uploads to select redacted files from `.artifacts/` without creating another staging root.
-- [ ] `M01-104 TEST` Scan the worktree after every CI command and fail on known disposable build/test artifact types outside `.artifacts/`.
+- [x] `M01-097 TEST` Add an instruction check that fails if the Markdown-creation rule is removed or weakened.
+- [x] `M01-098 BLOCKER` Configure every development command to place repository-local disposable output beneath `.artifacts/`.
+- [x] `M01-099 TEST` Verify build, test, race, coverage, browser, benchmark, package, diagnostic, replay, and failure-preservation commands create no repository-local artifact outside `.artifacts/`.
+- [x] `M01-100 TEST` Verify a command rejects an explicit repository-local artifact destination outside `.artifacts/` before writing.
+- [x] `M01-101 TEST` Verify cleanup resolves and validates a child of `.artifacts/` and cannot delete the repository root, source directories, or an external path.
+- [x] `M01-102 TEST` Verify `.artifacts/` and every descendant remain ignored, cannot enter a normal commit, and need no tracked placeholder.
+- [x] `M01-103` Configure CI artifact uploads to select redacted files from `.artifacts/` without creating another staging root.
+- [x] `M01-104 TEST` Scan the worktree after every CI command and fail on known disposable build/test artifact types outside `.artifacts/`.
 
 Developer-command registry evidence:
 
@@ -477,7 +477,17 @@ Command-orchestration evidence:
 - Current-scope integration and security commands run real Go suites; browser returns a versioned unavailable result until M16; race retains the platform-specific failure and Ubuntu CI route.
 - `test-all` ran lint, isolated generation, fast, integration, and security sub-steps in order and named the precise sub-step on failure.
 - Lint now covers gofmt, repository instructions/links, migration ordering, atom comments/names, generated paths, provider-token scanning, Buf lint, Buf breaking against committed `HEAD`, Go vet, and Staticcheck 2026.1.
-- Seed, replay, inspect-db, benchmark, and doctor skeletons all return stable exit 3 with text or versioned JSON rather than fabricated subsystem results.
+- Seed, replay, inspect-db, and doctor skeletons return stable exit 3 with text or versioned JSON rather than fabricated subsystem results; benchmark is now a real M01 microbenchmark runner.
+
+Developer-safety evidence:
+
+- Every registry command supports `--help` and `--root`; a table test sends an unsafe repository-local root to every command and proves exit 2 occurs before the path is created.
+- Output-producing build, coverage, generation-check, benchmark, failure-capture, and deterministic-run commands honored explicit safe roots; cleanup removed only resolved `.artifacts` children.
+- The package check parses production Go imports and rejects outward domain imports, frontend imports from adapters, and concrete sibling-adapter coupling.
+- Generated headers and suffixes are limited to declared paths, while isolated regeneration rejects byte-level hand edits.
+- The Markdown rule negative test, ignored-artifact and forced-add tests, disposable-extension escape test, and cleanup boundary tests pass.
+- CI invokes `artifact-check` with `always()` after every build/test/generation/race command and uploads only `.artifacts/test-failures/context.json` on failure.
+- Real migration validation and atom-name/generation benchmarks now back the commands documented in `AGENTS.md`; the milestone instruction review updated stale “planned helper” wording.
 
 ## Gate
 

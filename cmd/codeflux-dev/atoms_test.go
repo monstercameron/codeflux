@@ -154,3 +154,20 @@ func TestValidateAtomSourceRejectsOrphanMarker(t *testing.T) {
 		t.Fatalf("orphan marker error = %v", err)
 	}
 }
+
+func BenchmarkSplitGoIdentifier(b *testing.B) {
+	for b.Loop() {
+		splitGoIdentifier("ValidateTaskBudgetBeforeModelRequest")
+	}
+}
+
+func BenchmarkRenderMigrationCatalog(b *testing.B) {
+	descriptors := []migrationDescriptor{{
+		Number: 0,
+		Name:   "000000_bootstrap.sql",
+		SHA256: strings.Repeat("a", 64),
+	}}
+	for b.Loop() {
+		renderMigrationCatalog(descriptors)
+	}
+}

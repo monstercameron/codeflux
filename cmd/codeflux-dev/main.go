@@ -81,26 +81,39 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		fmt.Fprintf(stderr, "codeflux-dev %s: live-provider options are only valid for run-live\n", spec.Name)
 		return exitUsage
 	}
+	if len(invocation.Positional) > maximumPositionals(spec.Name) {
+		fmt.Fprintf(stderr, "codeflux-dev %s: unexpected positional arguments %q\n", spec.Name, invocation.Positional)
+		return exitUsage
+	}
 
 	switch spec.Name {
+	case "artifact-check":
+		return runArtifactCheck(ctx, stdout, stderr, invocation)
+	case "benchmark":
+		return runBenchmark(ctx, stdout, stderr, invocation)
 	case "bootstrap":
 		return runBootstrap(ctx, stdout, stderr, invocation)
 	case "build":
-		return runBuild(ctx, stdout, stderr)
+		return runBuild(ctx, stdout, stderr, invocation)
 	case "generate":
 		return runGenerate(ctx, stdout, stderr, invocation)
 	case "generate-check":
 		return runGenerateCheck(ctx, stdout, stderr, invocation)
 	case "ci-failure-artifact":
-		return runCIFailureArtifact(ctx, stderr)
+		return runCIFailureArtifact(ctx, stderr, invocation)
 	case "test-fast":
+		if code := validateCommandRoot(spec.Name, invocation, stderr); code != exitSuccess {
+			return code
+		}
 		return runGo(ctx, stdout, stderr, "test", "./...")
 	case "test-race":
-		return runRace(ctx, stdout, stderr)
+		return runRace(ctx, stdout, stderr, invocation)
 	case "test-coverage":
-		return runCoverage(ctx, stdout, stderr)
+		return runCoverage(ctx, stdout, stderr, invocation)
 	case "lint":
-		return runLint(ctx, stdout, stderr)
+		return runLint(ctx, stdout, stderr, invocation)
+	case "migration-check":
+		return runMigrationCheck(ctx, stdout, stderr, invocation)
 	case "run":
 		return runDeterministicProfile(ctx, stdout, stderr, invocation)
 	case "run-live":
@@ -112,7 +125,19 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	case "test-security":
 		return runSecurityTests(ctx, stdout, stderr, invocation)
 	default:
+		if code := validateCommandRoot(spec.Name, invocation, stderr); code != exitSuccess {
+			return code
+		}
 		return runUnavailable(stderr, spec, invocation)
+	}
+}
+
+func maximumPositionals(command string) int {
+	switch command {
+	case "benchmark", "inspect-db", "replay", "seed":
+		return 1
+	default:
+		return 0
 	}
 }
 
@@ -165,12 +190,31 @@ func runGenerateCheck(
 		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
 		return exitFailure
 	}
-	staging, err := createArtifactTemp(root, "generate-check-")
+	var staging string
+	cleanup := true
+	if invocation.Root == "" {
+		staging, err = createArtifactTemp(root, "generate-check-")
+	} else {
+		stagingRoot, rootErr := resolveCommandRoot(root, "tmp", invocation.Root)
+		if rootErr != nil {
+			fmt.Fprintf(stderr, "codeflux-dev generate-check: root: %v\n", rootErr)
+			return exitUsage
+		}
+		if rootErr = os.MkdirAll(stagingRoot, 0o755); rootErr != nil {
+			fmt.Fprintf(stderr, "codeflux-dev generate-check: create staging root: %v\n", rootErr)
+			return exitFailure
+		}
+		staging, err = os.MkdirTemp(stagingRoot, "generate-check-")
+		cleanup = isRepositoryArtifactChild(root, staging)
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev generate-check: %v\n", err)
 		return exitFailure
 	}
 	defer func() {
+		if !cleanup {
+			return
+		}
 		if removeErr := removeArtifactChild(root, staging); removeErr != nil {
 			fmt.Fprintf(stderr, "codeflux-dev generate-check: cleanup: %v\n", removeErr)
 		}
@@ -239,14 +283,23 @@ func runPinnedBuf(
 	return runCommandIn(ctx, root, stdout, stderr, "go", commandArgs...)
 }
 
-func runBuild(ctx context.Context, stdout, stderr io.Writer) int {
+func runBuild(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev build: %v\n", err)
 		return exitFailure
 	}
 
-	binDir := filepath.Join(root, ".artifacts", "bin")
+	binDir, err := resolveCommandRoot(root, "bin", invocation.Root)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev build: root: %v\n", err)
+		return exitUsage
+	}
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev build: create artifact directory: %v\n", err)
 		return exitFailure
@@ -328,7 +381,15 @@ func gitOutput(ctx context.Context, root string, args ...string) (string, error)
 	return value, nil
 }
 
-func runRace(ctx context.Context, stdout, stderr io.Writer) int {
+func runRace(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
+	if code := validateCommandRoot("test-race", invocation, stderr); code != exitSuccess {
+		return code
+	}
 	if runtime.GOOS == "windows" && runtime.GOARCH == "arm64" {
 		fmt.Fprintln(stderr, "codeflux-dev test-race: unsupported on windows/arm64; run the declared Linux amd64 CI race job")
 		return exitFailure
@@ -336,13 +397,22 @@ func runRace(ctx context.Context, stdout, stderr io.Writer) int {
 	return runGo(ctx, stdout, stderr, "test", "-race", "./...")
 }
 
-func runCoverage(ctx context.Context, stdout, stderr io.Writer) int {
+func runCoverage(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev test-coverage: %v\n", err)
 		return exitFailure
 	}
-	coverageDir := filepath.Join(root, ".artifacts", "coverage")
+	coverageDir, err := resolveCommandRoot(root, "coverage", invocation.Root)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev test-coverage: root: %v\n", err)
+		return exitUsage
+	}
 	if err := os.MkdirAll(coverageDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev test-coverage: create artifact directory: %v\n", err)
 		return exitFailure
@@ -358,11 +428,20 @@ func runCoverage(ctx context.Context, stdout, stderr io.Writer) int {
 	)
 }
 
-func runLint(ctx context.Context, stdout, stderr io.Writer) int {
+func runLint(
+	ctx context.Context,
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+) int {
 	root, err := repositoryRoot()
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev lint: %v\n", err)
 		return exitFailure
+	}
+	if _, err := resolveCommandRoot(root, "lint", invocation.Root); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev lint: root: %v\n", err)
+		return exitUsage
 	}
 	unformatted, err := unformattedGoFiles(root)
 	if err != nil {

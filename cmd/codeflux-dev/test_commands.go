@@ -44,7 +44,7 @@ func runAllTests(
 		name string
 		run  func() int
 	}{
-		{name: "lint", run: func() int { return runLint(ctx, stdout, stderr) }},
+		{name: "lint", run: func() int { return runLint(ctx, stdout, stderr, invocation) }},
 		{name: "generate-check", run: func() int {
 			return runGenerateCheck(ctx, stdout, stderr, invocation)
 		}},

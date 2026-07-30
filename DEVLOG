@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-021
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-020
+Request-or-TODO: M01-063, M01-064, M01-090 through M01-094, M01-097
+  through M01-104
+Goal: Close the developer-experience safety boundary for command roots, package
+  direction, generated paths, artifact confinement, CI scans, and truthful docs
+Assumptions: Explicit external output roots may be used but are never selected
+  or deleted implicitly; repository-local roots must be .artifacts children
+Decisions: Parse imports directly; classify only untracked disposable outputs
+  as escapes; add always-run CI scans; implement real M01 microbenchmarks and
+  migration validation before documenting them; keep package/browser skeletons
+Files-or-schemas: codeflux-dev boundaries, benchmarks, roots, CI, AGENTS.md,
+  docs/plan.md, and tests; no runtime schema
+Validation: Root matrix, dependency, artifact ignore/escape, cleanup, benchmark,
+  migration, actionlint, staged lint, test-all, fast tests, artifact-check, and
+  whitespace checks passed
+Failures-or-discarded-approaches: Initial combined patch for benchmark registry
+  missed shifted context and made no changes; reapplied as smaller exact patches
+Known-limitations: Package and browser remain honest future skeletons; actual
+  multi-platform hosted CI execution still requires a GitHub remote
+Next-safe-step: Complete staged review and commit, then validate documented
+  bootstrap/build/test/generation/run commands from a clean local clone.
+
 Dev-Log: DL-20260730-020
 Date: 2026-07-30
 Status: Complete

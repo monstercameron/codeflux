@@ -5764,6 +5764,11 @@ go run ./cmd/codeflux-dev test-coverage
 go run ./cmd/codeflux-dev test-race
 go run ./cmd/codeflux-dev generate
 go run ./cmd/codeflux-dev generate-check
+go run ./cmd/codeflux-dev migration-check
+go run ./cmd/codeflux-dev run --once
+go run ./cmd/codeflux-dev benchmark atom-names
+go run ./cmd/codeflux-dev benchmark generation
+go run ./cmd/codeflux-dev artifact-check
 ```
 
 To change protobuf output:
@@ -5783,7 +5788,7 @@ when it becomes real. (`M01-045`, `M01-046`)
 
 ## Development Helper
 
-The planned cross-platform entry point is:
+The implemented cross-platform entry point is:
 
 ```text
 go run ./cmd/codeflux-dev <command>
@@ -5791,17 +5796,25 @@ go run ./cmd/codeflux-dev <command>
 
 It avoids requiring Make, Bash, PowerShell, Node package scripts, or a globally installed task runner for the basic loop.
 
-Planned commands are:
+Registry commands are listed below. `codeflux-dev help` is authoritative for
+whether each command is implemented, gated, or an honest unavailable skeleton
+at the current milestone:
 
 ```text
 bootstrap
-    verify Go/Git/tool versions and install pinned local generators
+    verify Go/Git/tool versions and install pinned local generators under .artifacts
+
+build
+    compile packages and command binaries beneath .artifacts
 
 generate
     generate protobuf, transport bindings, migrations catalog, and frontend assets
 
 generate-check
     regenerate in a temporary area and fail on committed drift
+
+migration-check
+    validate migration ordering, embedding, and generated checksums
 
 run
     start isolated development SQLite, fake provider, coordinator, and frontend
@@ -5840,7 +5853,14 @@ inspect-db
     print a safe structured summary, never credentials or raw sensitive content
 
 benchmark
-    run named startup, repository, event, frontend, graph, and vector benchmarks
+    run current named microbenchmarks beneath .artifacts/bench; later milestones
+    add startup, repository, event, frontend, graph, and vector benchmarks
+
+artifact-check
+    reject repository-local disposable output outside .artifacts
+
+package
+    build release packages when the M23 packaging subsystem exists
 
 doctor
     run the same environment checks as the packaged product

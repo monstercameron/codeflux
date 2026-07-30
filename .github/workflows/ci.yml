@@ -37,12 +37,24 @@ jobs:
         run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
       - name: Check formatting, vet, lint, migrations, and secrets
         run: go run ./cmd/codeflux-dev lint
+      - name: Check artifact boundary after lint
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Check deterministic generation
         run: go run ./cmd/codeflux-dev generate-check
+      - name: Check artifact boundary after generation
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Run unit tests with coverage
         run: go run ./cmd/codeflux-dev test-coverage
+      - name: Check artifact boundary after tests
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Build
         run: go run ./cmd/codeflux-dev build
+      - name: Check artifact boundary after build
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Create allow-listed failure metadata
         if: failure()
         run: go run ./cmd/codeflux-dev ci-failure-artifact
@@ -84,8 +96,14 @@ jobs:
           cache-dependency-path: go.sum
       - name: Run fast tests
         run: go run ./cmd/codeflux-dev test-fast
+      - name: Check artifact boundary after tests
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Build
         run: go run ./cmd/codeflux-dev build
+      - name: Check artifact boundary after build
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Create allow-listed failure metadata
         if: failure()
         run: go run ./cmd/codeflux-dev ci-failure-artifact
@@ -115,6 +133,9 @@ jobs:
           cache-dependency-path: go.sum
       - name: Run race tests
         run: go run ./cmd/codeflux-dev test-race
+      - name: Check artifact boundary after race tests
+        if: always()
+        run: go run ./cmd/codeflux-dev artifact-check
       - name: Create allow-listed failure metadata
         if: failure()
         run: go run ./cmd/codeflux-dev ci-failure-artifact

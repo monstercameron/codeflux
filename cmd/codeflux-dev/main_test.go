@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -106,7 +107,7 @@ func TestUnavailableCommandHasStableExitAndJSON(t *testing.T) {
 }
 
 func TestCurrentSkeletonCommandsAreHonestlyUnavailable(t *testing.T) {
-	for _, command := range []string{"benchmark", "doctor", "inspect-db", "replay", "seed", "test-browser"} {
+	for _, command := range []string{"doctor", "inspect-db", "package", "replay", "seed", "test-browser"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
@@ -176,6 +177,50 @@ func TestResolveCommandRootRejectsRepositoryAndLocalEscape(t *testing.T) {
 	explicit := filepath.Join(root, ".artifacts", "custom")
 	if got, err := resolveCommandRoot(root, "build", explicit); err != nil || got != explicit {
 		t.Fatalf("explicit artifact child = %q, %v", got, err)
+	}
+}
+
+func TestEveryCommandRejectsRepositoryLocalRootOutsideArtifactsBeforeWriting(t *testing.T) {
+	repository, err := repositoryRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unsafeName := fmt.Sprintf(".codeflux-synthetic-unsafe-%d", os.Getpid())
+	unsafePath := filepath.Join(repository, unsafeName)
+	if _, err := os.Stat(unsafePath); !os.IsNotExist(err) {
+		t.Fatalf("unsafe-path fixture unexpectedly exists: %v", err)
+	}
+	for _, spec := range developmentCommandRegistry() {
+		t.Run(spec.Name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run(context.Background(), &stdout, &stderr, []string{
+				spec.Name,
+				"--root",
+				unsafeName,
+			})
+			if code != exitUsage {
+				t.Fatalf("exit = %d, want %d; stdout=%q stderr=%q", code, exitUsage, stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), "child of .artifacts") {
+				t.Fatalf("root error = %q", stderr.String())
+			}
+			if _, err := os.Stat(unsafePath); !os.IsNotExist(err) {
+				t.Fatalf("unsafe path was written: %v", err)
+			}
+		})
+	}
+}
+
+func TestImplementedCommandRejectsUnexpectedPositionalArgument(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), &stdout, &stderr, []string{"build", "unexpected"})
+	if code != exitUsage {
+		t.Fatalf("exit = %d, want %d", code, exitUsage)
+	}
+	if !strings.Contains(stderr.String(), "unexpected positional arguments") {
+		t.Fatalf("argument error = %q", stderr.String())
 	}
 }
 
