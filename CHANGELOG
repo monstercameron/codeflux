@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-027
+Date: 2026-07-30
+Type: Domain identity primitives
+Request-or-TODO: M02-001 through M02-004 and M02-006
+Outcome: Added distinct type-prefixed UUIDv7 identities for every declared
+  project, execution, graph, evidence, provider, and budget entity
+Affected-behavior: Domain boundaries now reject empty, malformed, wrong-kind,
+  non-v7, or non-canonical identities with typed errors
+Compatibility-or-migration: Establishes the initial canonical identity text
+  format; no persisted schema exists yet
+Verification: Domain tests cover all identity kinds, invalid formats, boundary
+  rejection, local generation, chronological sorting, and Go type isolation;
+  full repository test and lint suites pass
+Dev-Log: DL-20260730-028
+
 Change-ID: CL-20260730-026
 Date: 2026-07-30
 Type: Milestone gate evidence

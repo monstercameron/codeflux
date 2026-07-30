@@ -24,6 +24,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-028
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-027
+Request-or-TODO: M02-001 through M02-004 and M02-006
+Goal: Establish transport-independent stable identities before storage,
+  services, or UI can invent interchangeable strings
+Assumptions: Type-prefixed lowercase UUIDv7 provides sufficient local
+  uniqueness and chronological sortability without adding a dependency
+Decisions: Use a private generic typed core with a distinct kind marker for
+  each exported struct; enforce canonical RFC 9562 version and variant bits;
+  return typed boundary errors; leave exhaustive protobuf conversion to
+  M02-005
+Files-or-schemas: internal/domain identities and tests, TODOS.md, CHANGELOG,
+  DEVLOG; no persistence schema
+Validation: Final M01 gate commit passed public CI run 30520206636 across all
+  declared jobs. Domain tests cover all 21 prefixes, invalid format classes,
+  JSON/SQL zero rejection, generated UUID parsing, chronological order, and
+  non-assignability/non-convertibility; repository test-all and lint pass.
+Failures-or-discarded-approaches: Rejected plain string aliases because they
+  admit accidental interchange, random UUIDv4 because it is not time-sortable,
+  and a third-party identity dependency because the standard library is
+  sufficient
+Known-limitations: M02-005 remains open until JSON, SQL, and generated-protobuf
+  conversions are exercised for every identity kind
+Next-safe-step: Add one generated protobuf identity envelope and exhaustive
+  adapter round-trip tests without importing transport types into domain
+
 Dev-Log: DL-20260730-027
 Date: 2026-07-30
 Status: Complete

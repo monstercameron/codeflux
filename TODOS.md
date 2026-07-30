@@ -525,12 +525,27 @@ Milestone output: transport-independent identity, lifecycle, policy, budget, ris
 
 ## Stable Identity Types
 
-- [ ] `M02-001 BLOCKER` Define distinct typed IDs for project, repository, workspace, thread, message, task, run, event, checkpoint, approval, graph, graph revision, node, edge, validation, evidence, artifact, atom, model request, provider, and budget.
-- [ ] `M02-002` Choose a sortable identifier format suitable for local generation.
-- [ ] `M02-003` Implement ID parsing and validation.
-- [ ] `M02-004` Reject empty or malformed IDs at domain boundaries.
+- [x] `M02-001 BLOCKER` Define distinct typed IDs for project, repository, workspace, thread, message, task, run, event, checkpoint, approval, graph, graph revision, node, edge, validation, evidence, artifact, atom, model request, provider, and budget.
+- [x] `M02-002` Choose a sortable identifier format suitable for local generation.
+- [x] `M02-003` Implement ID parsing and validation.
+- [x] `M02-004` Reject empty or malformed IDs at domain boundaries.
 - [ ] `M02-005` Add JSON, SQL, and protobuf conversion tests for every ID type.
-- [ ] `M02-006` Ensure different ID types cannot be accidentally interchanged in Go.
+- [x] `M02-006` Ensure different ID types cannot be accidentally interchanged in Go.
+
+Identity evidence:
+
+- Every identity is a distinct non-assignable and non-convertible Go struct
+  backed by a private typed core and a unique short kind prefix.
+- The canonical payload is lowercase RFC 9562 UUIDv7. Its 48-bit Unix
+  millisecond prefix sorts chronologically and its cryptographic entropy
+  supports dependency-free local generation.
+- Parsers reject empty values, wrong kind prefixes, non-canonical hexadecimal,
+  misplaced separators, non-v7 UUIDs, and invalid variants with typed
+  `IDParseError` values that unwrap to `ErrInvalidID`.
+- JSON text and SQL scan/value boundaries reject null, empty, malformed, or
+  wrong-representation input instead of admitting an invalid zero identity.
+- M02-005 remains open until every identity kind has exhaustive JSON, SQL, and
+  generated-protobuf round-trip coverage.
 
 ## Task and Run States
 
