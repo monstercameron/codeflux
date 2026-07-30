@@ -24,6 +24,52 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-055
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-054
+Request-or-TODO: M09-001 through M09-050 and M09-G01 through M09-G03
+Goal: Make every supported source mutation isolated, conflict-aware,
+  inspectable, reversible, and attributable to an exact task/base revision
+Assumptions: M09 owns filesystem/Git mechanics and narrow persistence ports;
+  M10 will apply the complete command authority policy, and M15 will extend
+  checkpoint contents and crash classification without weakening these gates
+Decisions: Place task worktrees under a typed repository/task convention
+  outside the source repository and record exact base/expected HEAD in SQLite.
+  Use cryptographic branch suffixes, fixed argument arrays, disabled hooks,
+  optimistic binding revisions, strict no-symlink path resolution, exact
+  existence/hash preconditions, rollback-on-event failure, and explicit
+  approval for broad deletes. Build rename/binary-capable diffs with a copied
+  disposable Git index so review never stages the user's real index. Pin
+  checkpoint commits under private refs and require reviewed diff identity plus
+  explicit author/mode for acceptance.
+Files-or-schemas: Gitwork runner, worktree, file/edit, task-event, diff,
+  checkpoint, acceptance implementations and real-Git tests; worktree binding
+  and checkpoint storage operations/tests; migration 000006 and generated
+  schema/build metadata; M09 evidence and ledgers
+Validation: Focused Gitwork/storage tests and vet, migration-check,
+  generate-check, lint, security tests, and test-all pass. Tests cover dirty
+  primary repositories, branch collisions, cleanup after persistence failure,
+  restart/missing/moved/external-commit detection, traversal and symlink
+  escapes, UTF-8/binary/mode/newline handling, create/update/rename/delete,
+  concurrent hashes, delete approval, transactional event rollback, exact
+  diff classifications/attribution, real-index preservation, multi-checkpoint
+  rollback, stale acceptance, all acceptance modes, author identity, and
+  repository-hook suppression.
+Failures-or-discarded-approaches: Raw XML-like worktree sidecars, shared source
+  edits, shell command strings, automatic destructive cleanup, overwriting
+  stale hashes, staging the user's actual Git index for review, deleting task
+  branches on abandonment, and silently inventing commit authors were rejected.
+  Ordinary Git diff omitted unstaged rename targets; an isolated copied index
+  corrected rename/empty/binary review without mutating user state.
+Known-limitations: The MVP provides mediated path confinement rather than a
+  perfect OS sandbox. Symlink tests run where the OS grants link creation.
+  M10 still owns general command policy, and M15 owns richer checkpoint schema
+  and forced-termination recovery classification.
+Next-safe-step: Implement M10 typed tools, executable permission policy,
+  controlled subprocesses, approvals, cancellation, redacted output, and
+  adversarial command-boundary gates.
+
 Dev-Log: DL-20260730-054
 Date: 2026-07-30
 Status: Complete

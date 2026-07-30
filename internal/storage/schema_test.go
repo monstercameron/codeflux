@@ -152,6 +152,7 @@ func TestInitialSchemaHasRequiredQueryIndexes(t *testing.T) {
 	database := openMigratedSchema(t)
 	expected := []string{
 		"worktree_bindings_active",
+		"worktree_bindings_by_task",
 		"threads_for_pagination",
 		"messages_for_pagination",
 		"tasks_active",

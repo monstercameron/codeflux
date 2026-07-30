@@ -144,6 +144,65 @@ type ContextManifestOperations interface {
 	GetContextManifest(context.Context, string) (ContextManifest, error)
 }
 
+// WorktreeBindingState is the durable task-worktree lifecycle.
+type WorktreeBindingState string
+
+const (
+	WorktreeBindingActive           WorktreeBindingState = "active"
+	WorktreeBindingReleased         WorktreeBindingState = "released"
+	WorktreeBindingRecoveryRequired WorktreeBindingState = "recovery-required"
+)
+
+// WorktreeBinding binds one task to one isolated Git branch and path.
+type WorktreeBinding struct {
+	WorkspaceID  domain.WorkspaceID
+	TaskID       domain.TaskID
+	RepositoryID domain.RepositoryID
+	BaseRevision string
+	HeadRevision string
+	BranchName   string
+	WorktreePath string
+	State        WorktreeBindingState
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Revision     uint64
+}
+
+// CreateWorktreeBinding atomically records one complete active binding.
+type CreateWorktreeBinding struct {
+	WorkspaceID  domain.WorkspaceID
+	TaskID       domain.TaskID
+	RepositoryID domain.RepositoryID
+	BaseRevision string
+	HeadRevision string
+	BranchName   string
+	WorktreePath string
+}
+
+// AdvanceWorktreeBinding declares an optimistic Codeflux-owned HEAD update.
+type AdvanceWorktreeBinding struct {
+	TaskID           domain.TaskID
+	ExpectedRevision uint64
+	ExpectedHead     string
+	HeadRevision     string
+}
+
+// TransitionWorktreeBinding declares an optimistic lifecycle transition.
+type TransitionWorktreeBinding struct {
+	TaskID           domain.TaskID
+	ExpectedRevision uint64
+	From             WorktreeBindingState
+	To               WorktreeBindingState
+}
+
+// WorktreeBindingOperations groups durable task-worktree binding operations.
+type WorktreeBindingOperations interface {
+	CreateWorktreeBinding(context.Context, CreateWorktreeBinding) (WorktreeBinding, error)
+	GetWorktreeBinding(context.Context, domain.TaskID) (WorktreeBinding, error)
+	AdvanceWorktreeBinding(context.Context, AdvanceWorktreeBinding) (WorktreeBinding, error)
+	TransitionWorktreeBinding(context.Context, TransitionWorktreeBinding) (WorktreeBinding, error)
+}
+
 // SettingsScope identifies one persisted non-secret configuration layer.
 type SettingsScope string
 
@@ -614,6 +673,7 @@ type CreateEvidence struct {
 // RecoveryEvidenceOperations groups checkpoint, validation, and evidence writes.
 type RecoveryEvidenceOperations interface {
 	CreateCheckpoint(context.Context, CreateCheckpoint) (Checkpoint, error)
+	GetCheckpoint(context.Context, domain.CheckpointID) (Checkpoint, error)
 	CreateValidation(context.Context, CreateValidation) (Validation, error)
 	CreateEvidence(context.Context, CreateEvidence) (Evidence, error)
 }
@@ -646,4 +706,5 @@ var (
 	_ ApprovalBudgetOperations   = (*Repositories)(nil)
 	_ RecoveryEvidenceOperations = (*Repositories)(nil)
 	_ ContextManifestOperations  = (*Repositories)(nil)
+	_ WorktreeBindingOperations  = (*Repositories)(nil)
 )

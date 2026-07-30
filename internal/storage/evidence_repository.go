@@ -101,6 +101,24 @@ func (repositories *Repositories) CreateCheckpoint(
 	return checkpoint, err
 }
 
+func (repositories *Repositories) GetCheckpoint(
+	ctx context.Context,
+	id domain.CheckpointID,
+) (Checkpoint, error) {
+	if id.IsZero() {
+		return Checkpoint{}, errors.New("checkpoint ID must not be empty")
+	}
+	return scanCheckpoint(repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT id, task_id, run_id, state, repository_revision,
+		        worktree_diff_hash, event_sequence, idempotency_key,
+		        created_at_unix_micros, updated_at_unix_micros, revision
+		 FROM checkpoints
+		 WHERE id = ?`,
+		id,
+	), "get checkpoint")
+}
+
 func (repositories *Repositories) CreateValidation(
 	ctx context.Context,
 	input CreateValidation,
@@ -287,6 +305,47 @@ func findCheckpointByIdempotency(
 	checkpoint.CreatedAt = repositoryTime(createdMicros)
 	checkpoint.UpdatedAt = repositoryTime(updatedMicros)
 	return checkpoint, true, nil
+}
+
+func scanCheckpoint(
+	row rowScanner,
+	operation string,
+) (Checkpoint, error) {
+	var (
+		checkpoint    Checkpoint
+		runRaw        sql.NullString
+		createdMicros int64
+		updatedMicros int64
+	)
+	err := row.Scan(
+		&checkpoint.ID,
+		&checkpoint.TaskID,
+		&runRaw,
+		&checkpoint.State,
+		&checkpoint.RepositoryRevision,
+		&checkpoint.WorktreeDiffHash,
+		&checkpoint.EventSequence,
+		&checkpoint.IdempotencyKey,
+		&createdMicros,
+		&updatedMicros,
+		&checkpoint.Revision,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Checkpoint{}, typedError(ErrNotFound, operation, err)
+	}
+	if err != nil {
+		return Checkpoint{}, classify(operation, err)
+	}
+	if runRaw.Valid {
+		id, err := domain.ParseRunID(runRaw.String)
+		if err != nil {
+			return Checkpoint{}, classify(operation, err)
+		}
+		checkpoint.RunID = &id
+	}
+	checkpoint.CreatedAt = repositoryTime(createdMicros)
+	checkpoint.UpdatedAt = repositoryTime(updatedMicros)
+	return checkpoint, nil
 }
 
 func nullableArtifactID(id *domain.ArtifactID) any {

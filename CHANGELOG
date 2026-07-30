@@ -30,6 +30,27 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-054
+Date: 2026-07-30
+Type: Isolated Git editing and acceptance
+Request-or-TODO: M09-001 through M09-050 and M09-G01 through M09-G03
+Outcome: Added durable task-worktree bindings, collision-safe isolated
+  worktrees, confined expected-hash edits, exact review diffs, checkpoint
+  rollback, and commit/patch/both acceptance modes
+Affected-behavior: Agent-supported mutations cannot resolve outside an active
+  task worktree or silently overwrite changed content; dirty primary worktrees
+  remain untouched until explicit patch acceptance, and every accepted result
+  stays bound to its task, base revision, reviewed diff, branch, and author
+Compatibility-or-migration: Adds migration 000006 with task and expected-HEAD
+  bindings plus a unique task-worktree index; generated schema version advances
+  from 5 to 6 with additive Go APIs only
+Verification: Gitwork/storage tests and vet, deterministic generation and
+  migration checks, lint, security tests, and the complete local test matrix
+  pass. Real repositories cover lifecycle/restart, collisions, dirty-primary
+  preservation, traversal/symlink attacks, all edit types, stale hashes,
+  alternate-index diffs, checkpoints, rollback, acceptance, and cleanup.
+Dev-Log: DL-20260730-055
+
 Change-ID: CL-20260730-053
 Date: 2026-07-30
 Type: Deterministic context selection and persistence

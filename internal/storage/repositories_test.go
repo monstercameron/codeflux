@@ -422,6 +422,13 @@ func TestCheckpointValidationAndEvidencePersistAgainstTask(t *testing.T) {
 	if checkpoint.ID != retried.ID || checkpoint.CreatedAt != retried.CreatedAt {
 		t.Fatalf("idempotent checkpoints = %#v, %#v", checkpoint, retried)
 	}
+	loadedCheckpoint, err := repositories.GetCheckpoint(ctx, checkpoint.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedCheckpoint != checkpoint {
+		t.Fatalf("loaded checkpoint = %#v, want %#v", loadedCheckpoint, checkpoint)
+	}
 	validation, err := repositories.CreateValidation(ctx, CreateValidation{
 		ID:          testValidationID(t, 408),
 		TaskID:      task.ID,

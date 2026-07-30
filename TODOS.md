@@ -1534,71 +1534,135 @@ Milestone output: isolated task worktrees, conflict-aware file mutations, tracea
 
 ## Worktree Lifecycle
 
-- [ ] `M09-001 BLOCKER` Define the worktree naming and storage convention.
-- [ ] `M09-002` Generate collision-resistant task branch names.
-- [ ] `M09-003` Record base repository, base revision, task branch, and worktree path atomically.
-- [ ] `M09-004` Create a dedicated Git worktree for a task.
-- [ ] `M09-005` Refuse to reuse an active worktree owned by another task.
-- [ ] `M09-006` Verify the new worktree starts at the expected base revision.
-- [ ] `M09-007` Handle repositories with dirty primary worktrees without modifying those changes.
-- [ ] `M09-008` Handle branch-name collisions.
-- [ ] `M09-009` Handle worktree creation failure with cleanup.
-- [ ] `M09-010` Detect manual deletion or movement of a task worktree.
-- [ ] `M09-011` Detect external commits in the task worktree.
-- [ ] `M09-012` Detect concurrent user edits during agent execution.
-- [ ] `M09-013` Pause before overwriting a file changed since it was read.
-- [ ] `M09-014` Preserve task worktrees after failure until the user chooses cleanup.
+- [x] `M09-001 BLOCKER` Define the worktree naming and storage convention.
+- [x] `M09-002` Generate collision-resistant task branch names.
+- [x] `M09-003` Record base repository, base revision, task branch, and worktree path atomically.
+- [x] `M09-004` Create a dedicated Git worktree for a task.
+- [x] `M09-005` Refuse to reuse an active worktree owned by another task.
+- [x] `M09-006` Verify the new worktree starts at the expected base revision.
+- [x] `M09-007` Handle repositories with dirty primary worktrees without modifying those changes.
+- [x] `M09-008` Handle branch-name collisions.
+- [x] `M09-009` Handle worktree creation failure with cleanup.
+- [x] `M09-010` Detect manual deletion or movement of a task worktree.
+- [x] `M09-011` Detect external commits in the task worktree.
+- [x] `M09-012` Detect concurrent user edits during agent execution.
+- [x] `M09-013` Pause before overwriting a file changed since it was read.
+- [x] `M09-014` Preserve task worktrees after failure until the user chooses cleanup.
+
+Worktree-lifecycle evidence:
+
+- The configured external root uses
+  `<root>/<repository-id>/<task-id>`, rejects root/repository overlap, and
+  receives collision-resistant `codeflux/task/...` branches from
+  cryptographic entropy. SQLite records workspace, task, repository, exact
+  base/expected HEAD, branch, path, state, and revision in one transaction.
+- Creation verifies the full base commit and resulting HEAD, never resets or
+  stages the primary worktree, reports primary dirtiness, retries branch
+  collisions, and removes only its newly created worktree/branch if creation
+  or persistence fails.
+- Verification detects missing/moved worktrees, branch replacement, external
+  commits, and uncommitted changes after restart. Failures preserve the task
+  worktree; abandonment releases it without deleting either path or branch,
+  and explicit cleanup removes only the validated released path.
 
 ## Safe File Operations
 
-- [ ] `M09-015 BLOCKER SECURITY` Resolve every edit path relative to the task worktree.
-- [ ] `M09-016 SECURITY` Reject path traversal outside the task worktree.
-- [ ] `M09-017 SECURITY` Decide and test symlink handling.
-- [ ] `M09-018 SECURITY` Prevent writes through symlinks to external locations.
-- [ ] `M09-019` Preserve file permissions where practical.
-- [ ] `M09-020` Preserve newline style unless the formatter intentionally changes it.
-- [ ] `M09-021` Preserve UTF-8 and reject unsupported binary edits.
-- [ ] `M09-022` Apply edits with expected-content or expected-hash preconditions.
-- [ ] `M09-023` Return a typed conflict when expected content changed.
-- [ ] `M09-024` Support create, update, rename, and delete as explicit operations.
-- [ ] `M09-025` Require higher-risk approval for large or broad deletes.
-- [ ] `M09-026` Record a redacted edit summary as an event.
+- [x] `M09-015 BLOCKER SECURITY` Resolve every edit path relative to the task worktree.
+- [x] `M09-016 SECURITY` Reject path traversal outside the task worktree.
+- [x] `M09-017 SECURITY` Decide and test symlink handling.
+- [x] `M09-018 SECURITY` Prevent writes through symlinks to external locations.
+- [x] `M09-019` Preserve file permissions where practical.
+- [x] `M09-020` Preserve newline style unless the formatter intentionally changes it.
+- [x] `M09-021` Preserve UTF-8 and reject unsupported binary edits.
+- [x] `M09-022` Apply edits with expected-content or expected-hash preconditions.
+- [x] `M09-023` Return a typed conflict when expected content changed.
+- [x] `M09-024` Support create, update, rename, and delete as explicit operations.
+- [x] `M09-025` Require higher-risk approval for large or broad deletes.
+- [x] `M09-026` Record a redacted edit summary as an event.
+
+Safe-edit evidence:
+
+- Slash-normalized relative paths must be clean, remain under the exact active
+  worktree, have existing directory parents, and contain no symlinked component
+  or resolved indirection. Absolute, drive-qualified, alternate-separator, and
+  traversal paths fail before filesystem mutation.
+- Bounded regular UTF-8 files carry existence/content-hash preconditions.
+  Create, update, rename, and delete recheck snapshots before mutation; stale
+  content returns a typed conflict without overwriting the user's edit.
+  Updates preserve mode and CRLF/LF style unless explicitly formatter-owned.
+- Binary edits are rejected. Large or broad deletes require an explicit
+  higher-risk grant. Batches reject repeated paths, restore every touched file
+  on mutation/event failure, and append only counts plus a batch digest—not
+  repository content or paths—to the durable ordered task event journal.
 
 ## Diff and Acceptance
 
-- [ ] `M09-027 BLOCKER` Produce repository-relative unified diffs.
-- [ ] `M09-028` Produce per-file added/deleted line counts.
-- [ ] `M09-029` Classify generated, dependency, test, configuration, and source changes.
-- [ ] `M09-030` Detect binary changes.
-- [ ] `M09-031` Detect suspiciously broad formatting churn.
-- [ ] `M09-032` Detect changes outside the approved plan scope.
-- [ ] `M09-033` Summarize diff intent without substituting summary for source review.
-- [ ] `M09-034` Link changed lines to related task events and validation.
-- [ ] `M09-035` Implement user acceptance of the worktree result.
-- [ ] `M09-036` Decide whether acceptance creates a commit, applies a patch, or offers both.
-- [ ] `M09-037` Preserve original author attribution rules.
-- [ ] `M09-038` Implement user-requested repair without losing the previous checkpoint.
-- [ ] `M09-039` Implement rollback to the last valid checkpoint.
-- [ ] `M09-040` Implement task abandonment without deleting the branch by default.
-- [ ] `M09-041` Implement explicit cleanup of abandoned worktrees.
+- [x] `M09-027 BLOCKER` Produce repository-relative unified diffs.
+- [x] `M09-028` Produce per-file added/deleted line counts.
+- [x] `M09-029` Classify generated, dependency, test, configuration, and source changes.
+- [x] `M09-030` Detect binary changes.
+- [x] `M09-031` Detect suspiciously broad formatting churn.
+- [x] `M09-032` Detect changes outside the approved plan scope.
+- [x] `M09-033` Summarize diff intent without substituting summary for source review.
+- [x] `M09-034` Link changed lines to related task events and validation.
+- [x] `M09-035` Implement user acceptance of the worktree result.
+- [x] `M09-036` Decide whether acceptance creates a commit, applies a patch, or offers both.
+- [x] `M09-037` Preserve original author attribution rules.
+- [x] `M09-038` Implement user-requested repair without losing the previous checkpoint.
+- [x] `M09-039` Implement rollback to the last valid checkpoint.
+- [x] `M09-040` Implement task abandonment without deleting the branch by default.
+- [x] `M09-041` Implement explicit cleanup of abandoned worktrees.
+
+Diff, checkpoint, and acceptance evidence:
+
+- Git produces binary-capable repository-relative unified diffs, rename-aware
+  per-file line counts, exact diff identities, source/test/config/generated/
+  dependency classes, binary and broad-churn flags, plan-scope warnings, and
+  caller-supplied task-event/validation attribution. Untracked paths enter only
+  a disposable alternate index, leaving the user's actual index unchanged.
+- The concise summary ends with an explicit direction to review the unified
+  source diff. Acceptance is revision/diff-identity checked and offers branch
+  commit, primary patch, or both. Patch mode verifies the primary HEAD and
+  applies only after `git apply --check`; commit modes require and preserve the
+  explicit user author instead of inventing attribution.
+- Checkpoints commit task changes without repository hooks, advance the
+  optimistic expected HEAD, pin private checkpoint refs, and persist exact
+  task/base/diff/event lineage. Repairs add new changes without removing older
+  refs. Explicit rollback verifies the durable ref and requires discard
+  authority before resetting the task branch and removing post-checkpoint
+  untracked files.
 
 ## Tests
 
-- [ ] `M09-042 TEST` Test worktree creation and cleanup in a temporary repository.
-- [ ] `M09-043 TEST` Test dirty primary worktree preservation.
-- [ ] `M09-044 TEST` Test concurrent user edit detection.
-- [ ] `M09-045 TEST` Test symlink escape attempts.
-- [ ] `M09-046 TEST` Test path traversal attempts.
-- [ ] `M09-047 TEST` Test expected-hash conflicts.
-- [ ] `M09-048 TEST` Test rename and delete diffs.
-- [ ] `M09-049 TEST` Test rollback after several edit batches.
-- [ ] `M09-050 TEST` Test coordinator restart with an intact task worktree.
+- [x] `M09-042 TEST` Test worktree creation and cleanup in a temporary repository.
+- [x] `M09-043 TEST` Test dirty primary worktree preservation.
+- [x] `M09-044 TEST` Test concurrent user edit detection.
+- [x] `M09-045 TEST` Test symlink escape attempts.
+- [x] `M09-046 TEST` Test path traversal attempts.
+- [x] `M09-047 TEST` Test expected-hash conflicts.
+- [x] `M09-048 TEST` Test rename and delete diffs.
+- [x] `M09-049 TEST` Test rollback after several edit batches.
+- [x] `M09-050 TEST` Test coordinator restart with an intact task worktree.
+
+M09 test evidence:
+
+- Real temporary repositories exercise creation, collision retry, failed-create
+  cleanup, dirty-primary preservation, restart verification, deletion,
+  movement, external commits, abandonment, and explicit cleanup.
+- Safe-edit tests cover traversal, cross-platform absolute syntax, file and
+  parent symlinks where the OS permits them, stale hashes, user edits, binary
+  rejection, mode/newline preservation, all mutation types, approval-required
+  deletion, durable-event rollback, and rename/delete/binary/churn diffs.
+- Acceptance tests cover stale review refusal, patch-only preservation of
+  unrelated primary changes, commit-only author attribution, and combined
+  commit/apply. Multi-batch checkpoint tests restore an earlier revision while
+  preserving later checkpoint lineage and pending edits on persistence failure.
 
 ## Gate
 
-- [ ] `M09-G01 GATE` No agent edit can reach outside the task worktree through supported file operations.
-- [ ] `M09-G02 GATE` User changes made after agent read are not silently overwritten.
-- [ ] `M09-G03 GATE` Every accepted patch can be traced to a base revision and task.
+- [x] `M09-G01 GATE` No agent edit can reach outside the task worktree through supported file operations.
+- [x] `M09-G02 GATE` User changes made after agent read are not silently overwritten.
+- [x] `M09-G03 GATE` Every accepted patch can be traced to a base revision and task.
 
 ---
 
