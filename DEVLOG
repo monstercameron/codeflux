@@ -24,6 +24,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-030
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-029
+Request-or-TODO: M02-007 through M02-021
+Goal: Make lifecycle ownership and permitted transitions explicit before
+  persistence, workers, transport, or UI can invent incompatible states
+Assumptions: Retryable task failure remains recoverable, while a failed run is
+  terminal for that run identity; completed tasks may move only to explicit
+  rolled-back state
+Decisions: Keep each machine a distinct string type; centralize only generic
+  table validation; return typed errors; require a granted approval state on
+  task and command authority boundaries; model unknown command outcome as
+  recoverable reconciliation without allowing silent re-execution
+Files-or-schemas: internal/domain state machines and tests, TODOS.md,
+  CHANGELOG, DEVLOG; no schema change
+Validation: Identity commits passed public CI runs 30520606086 and
+  30520817287. Domain tests cover every allowed edge, negative cases for all
+  eight machines, unknown values, terminal task protection, recoverable
+  classification, and all non-granted authority outcomes. Full repository
+  test-all, lint, and artifact checks pass.
+Failures-or-discarded-approaches: Rejected one shared state enum because task,
+  run, and command lifecycles have different ownership and terminal semantics;
+  rejected a boolean authority bypass because approval state must be explicit
+Known-limitations: Persistence revision checks and approval-ledger binding
+  arrive in their later milestones; these validators are pure domain policy
+Next-safe-step: Define policy, exact money, usage, budget, forecast, risk,
+  assurance, validation-severity, and typed-reason values in M02-022 onward
+
 Dev-Log: DL-20260730-029
 Date: 2026-07-30
 Status: Complete

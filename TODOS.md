@@ -552,21 +552,36 @@ Identity evidence:
 
 ## Task and Run States
 
-- [ ] `M02-007 BLOCKER` Define task states: draft, forecasting, awaiting-plan-approval, ready, running, paused, awaiting-authority, validating, awaiting-review, completed, failed, cancelled, rolled-back, and recovery-required.
-- [ ] `M02-008 BLOCKER` Define permitted task-state transitions.
-- [ ] `M02-009` Define terminal and recoverable task states.
-- [ ] `M02-010` Define run states separately from task states.
-- [ ] `M02-011` Define command-execution states separately from run states.
-- [ ] `M02-012` Define approval-request states.
-- [ ] `M02-013` Define checkpoint states.
-- [ ] `M02-014` Define validation states.
-- [ ] `M02-015` Define graph-revision states.
-- [ ] `M02-016` Define change-acceptance states.
-- [ ] `M02-017` Add pure transition validators for each state machine.
-- [ ] `M02-018 TEST` Test every allowed state transition.
-- [ ] `M02-019 TEST` Test representative forbidden transitions.
-- [ ] `M02-020 TEST` Property-test that terminal states cannot silently return to running.
-- [ ] `M02-021 TEST` Property-test that approval is required before an awaiting-authority action begins.
+- [x] `M02-007 BLOCKER` Define task states: draft, forecasting, awaiting-plan-approval, ready, running, paused, awaiting-authority, validating, awaiting-review, completed, failed, cancelled, rolled-back, and recovery-required.
+- [x] `M02-008 BLOCKER` Define permitted task-state transitions.
+- [x] `M02-009` Define terminal and recoverable task states.
+- [x] `M02-010` Define run states separately from task states.
+- [x] `M02-011` Define command-execution states separately from run states.
+- [x] `M02-012` Define approval-request states.
+- [x] `M02-013` Define checkpoint states.
+- [x] `M02-014` Define validation states.
+- [x] `M02-015` Define graph-revision states.
+- [x] `M02-016` Define change-acceptance states.
+- [x] `M02-017` Add pure transition validators for each state machine.
+- [x] `M02-018 TEST` Test every allowed state transition.
+- [x] `M02-019 TEST` Test representative forbidden transitions.
+- [x] `M02-020 TEST` Property-test that terminal states cannot silently return to running.
+- [x] `M02-021 TEST` Property-test that approval is required before an awaiting-authority action begins.
+
+State-machine evidence:
+
+- Task, run, command execution, approval request, checkpoint, validation, graph
+  revision, and change acceptance use distinct string types and transition
+  tables in the pure domain package.
+- `TransitionError` provides stable `ErrUnknownState`,
+  `ErrInvalidTransition`, and `ErrApprovalRequired` classifications plus a
+  bounded user-presentable message.
+- Exhaustive table tests execute every declared allowed edge; independent
+  negative cases cover each machine and require typed errors.
+- Terminal task states cannot transition directly to running. Both task resume
+  from `awaiting-authority` and command authorization require an explicitly
+  granted approval state; pending, denied, expired, cancelled, and absent
+  approvals fail.
 
 ## Policy, Budget, and Assurance Types
 

@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-029
+Date: 2026-07-30
+Type: Domain lifecycle state machines
+Request-or-TODO: M02-007 through M02-021
+Outcome: Added separate task, run, command, approval, checkpoint, validation,
+  graph-revision, and change-acceptance state machines with pure validators
+Affected-behavior: Impossible and unauthorized transitions now fail with typed
+  user-presentable errors before storage or transport exists
+Compatibility-or-migration: Establishes initial lifecycle contracts; no
+  persisted schema exists
+Verification: Tests execute every allowed transition, representative forbidden
+  transitions for all machines, every terminal-task-to-running case, and all
+  non-granted approval variants; full repository suites pass
+Dev-Log: DL-20260730-030
+
 Change-ID: CL-20260730-028
 Date: 2026-07-30
 Type: Identity boundary adapters
