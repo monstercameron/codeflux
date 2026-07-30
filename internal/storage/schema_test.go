@@ -37,6 +37,10 @@ func TestInitialOperationalSchemaContainsEveryRequiredTable(t *testing.T) {
 		"diff_summaries",
 		"validations",
 		"evidence",
+		"sessions",
+		"session_events",
+		"session_snapshots",
+		"session_commands",
 	}
 	for _, table := range expected {
 		var count int
@@ -151,6 +155,9 @@ func TestInitialSchemaHasRequiredQueryIndexes(t *testing.T) {
 		"task_events_for_replay",
 		"approvals_pending",
 		"model_requests_for_cost",
+		"session_events_by_thread",
+		"session_events_by_task",
+		"session_snapshots_latest",
 	}
 	for _, index := range expected {
 		var count int

@@ -30,6 +30,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-044
+Date: 2026-07-30
+Type: Durable session journal and reconnect stream
+Request-or-TODO: M05-016 through M05-038 and M05-G01 through M05-G03
+Outcome: Added schema 4, atomic monotonic session-event append, post-commit
+  publication, bounded replay/live subscriptions, snapshots, strict task
+  reduction, and transactional UI-command idempotency
+Affected-behavior: Sessions now reconnect without event gaps or duplicates;
+  ephemeral progress is coalesced under pressure while material facts force an
+  explicit replayable disconnect, and duplicate commands return one stored
+  result without repeating effects
+Compatibility-or-migration: Forward migration 4 adds sessions, immutable
+  session events and snapshots, and immutable command-result records; schema
+  version advances from 3 to 4
+Verification: Event and storage tests cover transaction rollback, concurrent
+  sequence allocation, replay/live races, every reconnect boundary, slow
+  subscribers, cancellation, restart, interleaved event types, snapshot
+  reduction, duplicate commands, and randomized sequence properties
+Dev-Log: DL-20260730-045
+
 Change-ID: CL-20260730-043
 Date: 2026-07-30
 Type: Unified session-event contract

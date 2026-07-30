@@ -24,6 +24,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-045
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-044
+Request-or-TODO: M05-016 through M05-038 and M05-G01 through M05-G03
+Goal: Complete the durable ordered session stream, exact reconnect behavior,
+  and command idempotency required before the framework/transport spike
+Assumptions: One reconnectable session belongs to one thread; SQLite remains
+  the full durable history even when an individual live subscriber is too slow;
+  schema version 1 snapshots and payloads are the only accepted versions
+Decisions: Allocate sequence by advancing the session row inside the event
+  transaction. Serialize publication against the replay boundary. Coalesce
+  only message deltas and same-execution tool progress, preserving arrival
+  order; disconnect rather than silently lose material facts. Store immutable
+  snapshots and command results, and reduce task state with strict sequence,
+  revision, and from-state checks.
+Files-or-schemas: Session event JSON codec, event hub/subscription/metrics,
+  snapshot/reducer, schema 4, session journal/replay/command repositories,
+  storage decision record, milestone evidence, generated migration/build
+  metadata, and focused concurrency/restart/property tests
+Validation: Focused event and storage suites pass. They prove rollback-safe
+  allocation, 64-way concurrent contiguous sequences, serialized replay/live
+  join, post-commit observation, bounded pressure behavior, cancellation
+  cleanup, every reconnect boundary, interleaved facts, restart snapshots, and
+  one effect across 16 concurrent command retries.
+Failures-or-discarded-approaches: Windows ARM64 cannot execute Go's race
+  instrumentation, so local `go test -race` was rejected by the toolchain;
+  the repository's Ubuntu race job remains the authoritative race gate. Queue
+  replacement was changed from in-place overwrite to remove-and-append so a
+  newer coalesced event cannot appear before an older material event.
+Known-limitations: Browser transport and GoWebComponents do not exist yet;
+  snapshot construction is explicit and durable compaction scheduling belongs
+  to later lifecycle work.
+Next-safe-step: Execute the M06 GoWebComponents v5 and typed transport spike,
+  record measured compatibility/security/rendering results, and select the
+  retained browser transport before implementing product UI.
+
 Dev-Log: DL-20260730-044
 Date: 2026-07-30
 Status: Complete

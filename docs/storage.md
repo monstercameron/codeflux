@@ -173,6 +173,40 @@ must pass full integrity and foreign-key checks, preserve the first transition,
 discard both halves of the interrupted transition, and replay to the same state
 and revision as the aggregate.
 
+## Unified session journal
+
+Migration `000004_session_event_journal.sql` adds one durable stream per thread,
+immutable typed event rows, immutable reconnect snapshots, and immutable
+idempotent command results. Sequence allocation updates the owning session and
+inserts its event inside the same immediate SQLite transaction as the represented
+state mutation. A failed insert or caller error rolls both changes back.
+
+Publication is a post-commit operation. The storage boundary returns the
+committed event and only then invokes the in-process hub. A publication failure
+cannot undo durability; reconnect replay recovers the event. The hub holds its
+publication boundary while it reads the committed sequence and ordered replay,
+so concurrent live publication cannot cross the replay/live join. An event at
+or below the established boundary is not delivered twice.
+
+Subscriber queues have a fixed bound. Message deltas and verbose tool progress
+may replace an older event for the same message or execution, while their full
+history remains in SQLite. Material events first displace queued ephemeral
+progress. If a queue contains only material events, the subscriber is closed
+with a slow-subscriber error and must reconnect from its last consumed sequence;
+task transitions, approvals, budgets, validations, checkpoints, graph changes,
+final messages, and errors are never silently discarded.
+
+Snapshots are immutable bases through a committed sequence. Requests older than
+the compacted boundary receive the latest snapshot plus subsequent events. The
+task reducer requires contiguous stream sequences, contiguous entity revisions,
+and matching task transition states. A stale or ahead client revision is an
+explicit error rather than an implicit overwrite.
+
+Every UI mutation uses the session command ledger. The idempotency key, canonical
+request hash, stable JSON result, final event sequence, and command effects share
+one transaction. Identical retries return the original result; a changed request
+under the same key conflicts; invalid results roll back all event effects.
+
 ## Settings revisions
 
 Migration `000002_settings_revisions.sql` adds immutable non-secret settings

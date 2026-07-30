@@ -985,38 +985,55 @@ Session-event-contract evidence:
 
 ## Append and Publish
 
-- [ ] `M05-016 BLOCKER DATA` Implement atomic event persistence and sequence allocation.
-- [ ] `M05-017 BLOCKER` Publish an event only after its transaction commits.
-- [ ] `M05-018` Implement in-process subscriptions by thread or task.
-- [ ] `M05-019` Implement bounded subscriber buffers.
-- [ ] `M05-020` Define backpressure behavior for token deltas.
-- [ ] `M05-021` Define backpressure behavior for verbose tool progress.
-- [ ] `M05-022` Prohibit dropping task transitions, approvals, budgets, validations, checkpoints, graph revisions, or errors.
-- [ ] `M05-023` Coalesce superseded ephemeral progress events without changing durable history.
-- [ ] `M05-024` Close subscriptions cleanly on cancellation.
-- [ ] `M05-025` Remove disconnected subscribers without leaking goroutines.
-- [ ] `M05-026` Add per-session and global subscriber metrics.
+- [x] `M05-016 BLOCKER DATA` Implement atomic event persistence and sequence allocation.
+- [x] `M05-017 BLOCKER` Publish an event only after its transaction commits.
+- [x] `M05-018` Implement in-process subscriptions by thread or task.
+- [x] `M05-019` Implement bounded subscriber buffers.
+- [x] `M05-020` Define backpressure behavior for token deltas.
+- [x] `M05-021` Define backpressure behavior for verbose tool progress.
+- [x] `M05-022` Prohibit dropping task transitions, approvals, budgets, validations, checkpoints, graph revisions, or errors.
+- [x] `M05-023` Coalesce superseded ephemeral progress events without changing durable history.
+- [x] `M05-024` Close subscriptions cleanly on cancellation.
+- [x] `M05-025` Remove disconnected subscribers without leaking goroutines.
+- [x] `M05-026` Add per-session and global subscriber metrics.
 
 ## Replay
 
-- [ ] `M05-027 BLOCKER` Implement replay from `after_sequence`.
-- [ ] `M05-028` Return a snapshot plus subsequent events when replaying an old or compacted range.
-- [ ] `M05-029` Detect a client's stale entity revision.
-- [ ] `M05-030` Ensure replay and live delivery join without a gap or duplicate.
-- [ ] `M05-031` Make all UI command requests idempotent.
-- [ ] `M05-032` Persist command idempotency keys and final results.
-- [ ] `M05-033 TEST` Test reconnect at every boundary around a committed event.
-- [ ] `M05-034 TEST` Test duplicate command delivery.
-- [ ] `M05-035 TEST` Test slow subscribers and forced disconnects.
-- [ ] `M05-036 TEST` Test a stream with interleaved chat, graph, approval, and cost events.
-- [ ] `M05-037 TEST` Test replay after coordinator restart.
-- [ ] `M05-038 TEST` Property-test strictly increasing per-session sequence numbers.
+- [x] `M05-027 BLOCKER` Implement replay from `after_sequence`.
+- [x] `M05-028` Return a snapshot plus subsequent events when replaying an old or compacted range.
+- [x] `M05-029` Detect a client's stale entity revision.
+- [x] `M05-030` Ensure replay and live delivery join without a gap or duplicate.
+- [x] `M05-031` Make all UI command requests idempotent.
+- [x] `M05-032` Persist command idempotency keys and final results.
+- [x] `M05-033 TEST` Test reconnect at every boundary around a committed event.
+- [x] `M05-034 TEST` Test duplicate command delivery.
+- [x] `M05-035 TEST` Test slow subscribers and forced disconnects.
+- [x] `M05-036 TEST` Test a stream with interleaved chat, graph, approval, and cost events.
+- [x] `M05-037 TEST` Test replay after coordinator restart.
+- [x] `M05-038 TEST` Property-test strictly increasing per-session sequence numbers.
 
 ## Gate
 
-- [ ] `M05-G01 GATE` A subscriber can disconnect, miss events, reconnect, and reconstruct the exact current task state.
-- [ ] `M05-G02 GATE` Duplicate commands do not duplicate messages, actions, approvals, or costs.
-- [ ] `M05-G03 GATE` Event persistence and publication ordering is documented and covered by concurrency tests.
+- [x] `M05-G01 GATE` A subscriber can disconnect, miss events, reconnect, and reconstruct the exact current task state.
+- [x] `M05-G02 GATE` Duplicate commands do not duplicate messages, actions, approvals, or costs.
+- [x] `M05-G03 GATE` Event persistence and publication ordering is documented and covered by concurrency tests.
+
+Session-journal evidence:
+
+- Schema 4 allocates a strictly increasing per-session sequence on the session
+  row and inserts the immutable event in the same immediate SQLite transaction.
+  The public persist-and-publish operation reaches the hub only after commit.
+- The in-process hub establishes a committed replay boundary while publication
+  is serialized, then joins bounded live delivery without gaps or duplicates.
+  It coalesces only message deltas and tool progress; a queue containing only
+  material events is disconnected with an explicit replay-required error.
+- Immutable snapshots provide compacted reconnect bases. The task reducer
+  rejects sequence, state, and entity-revision gaps. UI command keys, request
+  hashes, results, and final sequences commit atomically with command effects.
+- Tests cover rollback, concurrent sequence allocation, every reconnect
+  boundary, duplicate and conflicting commands, slow subscribers,
+  cancellation cleanup, interleaved chat/graph/approval/cost facts, restart
+  replay, and randomized contiguous-sequence properties.
 
 ---
 

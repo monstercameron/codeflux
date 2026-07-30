@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/events"
 )
 
 // Project is one durable project aggregate.
@@ -177,6 +178,76 @@ type ConversationOperations interface {
 	CreateThread(context.Context, CreateThread) (Thread, error)
 	ListThreads(context.Context, ListThreads) (ThreadPage, error)
 	AppendMessage(context.Context, AppendMessage) (Message, error)
+}
+
+// Session is one durable, thread-scoped ordered event stream.
+type Session struct {
+	ID                       domain.SessionID
+	ThreadID                 domain.ThreadID
+	CurrentSequence          uint64
+	CompactedThroughSequence uint64
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+}
+
+// CreateSession declares the sole reconnectable stream for one thread.
+type CreateSession struct {
+	ID       domain.SessionID
+	ThreadID domain.ThreadID
+}
+
+// ReplaySessionEvents declares a bounded exclusive replay query.
+type ReplaySessionEvents struct {
+	SessionID     domain.SessionID
+	AfterSequence uint64
+	Limit         int
+}
+
+// SessionReplay is the reconnect response for one requested sequence.
+type SessionReplay struct {
+	Snapshot *events.SessionSnapshot
+	Events   []events.SessionEvent
+	Boundary uint64
+}
+
+// SessionCommand identifies one idempotent UI mutation.
+type SessionCommand struct {
+	SessionID      domain.SessionID
+	IdempotencyKey string
+	RequestSHA256  string
+}
+
+// SessionCommandResult is the immutable result returned to every retry.
+type SessionCommandResult struct {
+	SessionID      domain.SessionID
+	IdempotencyKey string
+	RequestSHA256  string
+	ResultJSON     string
+	FinalSequence  uint64
+	CreatedAt      time.Time
+	Replayed       bool
+}
+
+// SessionCommandOperation performs the command effect in the command ledger's
+// transaction and returns stable JSON plus its final event sequence.
+type SessionCommandOperation func(*Transaction) (resultJSON string, finalSequence uint64, err error)
+
+// SessionEventOperations groups durable append and replay operations.
+type SessionEventOperations interface {
+	CreateSession(context.Context, CreateSession) (Session, error)
+	AppendSessionEvent(context.Context, *Transaction, events.NewSessionEvent) (events.SessionEvent, error)
+	PersistSessionEvent(context.Context, events.NewSessionEvent) (events.SessionEvent, error)
+	PersistAndPublishSessionEvent(context.Context, events.NewSessionEvent, CommittedEventPublisher) (events.SessionEvent, error)
+	ReplaySessionEvents(context.Context, ReplaySessionEvents) ([]events.SessionEvent, error)
+	StoreSessionSnapshot(context.Context, events.SessionSnapshot) error
+	ReplaySession(context.Context, ReplaySessionEvents) (SessionReplay, error)
+	ExecuteSessionCommand(context.Context, SessionCommand, SessionCommandOperation) (SessionCommandResult, error)
+	CurrentSessionSequence(context.Context, domain.SessionID) (uint64, error)
+}
+
+// CommittedEventPublisher accepts only events returned after commit.
+type CommittedEventPublisher interface {
+	PublishCommitted(events.SessionEvent) error
 }
 
 // CreateProject declares one idempotency-independent project creation.
@@ -503,6 +574,7 @@ func (repositories *Repositories) timestamp() (time.Time, int64) {
 var (
 	_ ProjectOperations          = (*Repositories)(nil)
 	_ ConversationOperations     = (*Repositories)(nil)
+	_ SessionEventOperations     = (*Repositories)(nil)
 	_ TaskOperations             = (*Repositories)(nil)
 	_ ApprovalBudgetOperations   = (*Repositories)(nil)
 	_ RecoveryEvidenceOperations = (*Repositories)(nil)

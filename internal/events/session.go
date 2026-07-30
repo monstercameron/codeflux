@@ -1,8 +1,11 @@
 package events
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -82,11 +85,25 @@ const (
 
 // SessionEvent is one ordered, versioned, UI-safe session fact.
 type SessionEvent struct {
-	Sequence       uint64
+	Sequence       uint64           `json:"sequence"`
+	SessionID      domain.SessionID `json:"session_id"`
+	ThreadID       domain.ThreadID  `json:"thread_id"`
+	TaskID         *domain.TaskID   `json:"task_id,omitempty"`
+	Timestamp      time.Time        `json:"timestamp"`
+	Kind           Kind             `json:"kind"`
+	Revision       uint64           `json:"revision"`
+	CausationID    *domain.EventID  `json:"causation_id,omitempty"`
+	CorrelationID  *domain.EventID  `json:"correlation_id,omitempty"`
+	PayloadVersion uint32           `json:"payload_version"`
+	Payload        Payload          `json:"payload"`
+}
+
+// NewSessionEvent is an unsequenced event supplied to the durable journal.
+// The journal assigns Sequence and Timestamp inside the caller's transaction.
+type NewSessionEvent struct {
 	SessionID      domain.SessionID
 	ThreadID       domain.ThreadID
 	TaskID         *domain.TaskID
-	Timestamp      time.Time
 	Kind           Kind
 	Revision       uint64
 	CausationID    *domain.EventID
@@ -97,97 +114,97 @@ type SessionEvent struct {
 
 // Payload is a typed one-of. Exactly the field selected by Kind must be set.
 type Payload struct {
-	MessageDelta     *MessageDelta
-	MessageFinal     *MessageFinal
-	Plan             *Plan
-	Tool             *Tool
-	Approval         *Approval
-	TaskStateChanged *TaskStateChanged
-	Forecast         *Forecast
-	Usage            *Usage
-	Cost             *Cost
-	Budget           *Budget
-	Validation       *Validation
-	Graph            *Graph
-	Checkpoint       *Checkpoint
-	RecoveryRequired *RecoveryRequired
-	Error            *UserError
+	MessageDelta     *MessageDelta     `json:"message_delta,omitempty"`
+	MessageFinal     *MessageFinal     `json:"message_final,omitempty"`
+	Plan             *Plan             `json:"plan,omitempty"`
+	Tool             *Tool             `json:"tool,omitempty"`
+	Approval         *Approval         `json:"approval,omitempty"`
+	TaskStateChanged *TaskStateChanged `json:"task_state_changed,omitempty"`
+	Forecast         *Forecast         `json:"forecast,omitempty"`
+	Usage            *Usage            `json:"usage,omitempty"`
+	Cost             *Cost             `json:"cost,omitempty"`
+	Budget           *Budget           `json:"budget,omitempty"`
+	Validation       *Validation       `json:"validation,omitempty"`
+	Graph            *Graph            `json:"graph,omitempty"`
+	Checkpoint       *Checkpoint       `json:"checkpoint,omitempty"`
+	RecoveryRequired *RecoveryRequired `json:"recovery_required,omitempty"`
+	Error            *UserError        `json:"error,omitempty"`
 }
 
 type MessageDelta struct {
-	MessageID     domain.MessageID
-	RedactedDelta string
+	MessageID     domain.MessageID `json:"message_id"`
+	RedactedDelta string           `json:"redacted_delta"`
 }
 
 type MessageFinal struct {
-	MessageID    domain.MessageID
-	Role         string
-	RedactedBody string
+	MessageID    domain.MessageID `json:"message_id"`
+	Role         string           `json:"role"`
+	RedactedBody string           `json:"redacted_body"`
 }
 
 type Plan struct {
-	Revision        uint64
-	RedactedSummary string
+	Revision        uint64 `json:"revision"`
+	RedactedSummary string `json:"redacted_summary"`
 }
 
 type Tool struct {
-	ExecutionID     string
-	CommandName     string
-	State           string
-	RedactedSummary string
+	ExecutionID     string `json:"execution_id"`
+	CommandName     string `json:"command_name"`
+	State           string `json:"state"`
+	RedactedSummary string `json:"redacted_summary"`
 }
 
 type Approval struct {
-	ApprovalID     domain.ApprovalID
-	State          domain.ApprovalRequestState
-	Scope          string
-	RedactedReason string
+	ApprovalID     domain.ApprovalID           `json:"approval_id"`
+	State          domain.ApprovalRequestState `json:"state"`
+	Scope          string                      `json:"scope"`
+	RedactedReason string                      `json:"redacted_reason"`
 }
 
 type TaskStateChanged struct {
-	From     domain.TaskState
-	To       domain.TaskState
-	Approval domain.ApprovalRequestState
+	From     domain.TaskState            `json:"from"`
+	To       domain.TaskState            `json:"to"`
+	Approval domain.ApprovalRequestState `json:"approval"`
 }
 
 type Forecast struct {
-	Range domain.ForecastRange
+	Range domain.ForecastRange `json:"range"`
 }
 
 type Usage struct {
-	Tokens domain.TokenUsage
+	Tokens domain.TokenUsage `json:"tokens"`
 }
 
 type Cost struct {
-	Known bool
-	Value domain.Money
+	Known bool         `json:"known"`
+	Value domain.Money `json:"value"`
 }
 
 type Budget struct {
-	HardLimit domain.Money
-	Reserved  domain.Money
-	Actual    domain.Money
+	HardLimit domain.Money `json:"hard_limit"`
+	Reserved  domain.Money `json:"reserved"`
+	Actual    domain.Money `json:"actual"`
 }
 
 type Validation struct {
-	ValidationID    domain.ValidationID
-	State           domain.ValidationState
-	RedactedSummary string
+	ValidationID    domain.ValidationID    `json:"validation_id"`
+	State           domain.ValidationState `json:"state"`
+	RedactedSummary string                 `json:"redacted_summary"`
 }
 
 type Graph struct {
-	RevisionID    domain.GraphRevisionID
-	EncodedChange []byte
+	RevisionID    domain.GraphRevisionID `json:"revision_id"`
+	EncodedChange []byte                 `json:"encoded_change"`
 }
 
 type Checkpoint struct {
-	CheckpointID domain.CheckpointID
-	TaskRevision uint64
+	CheckpointID domain.CheckpointID `json:"checkpoint_id"`
+	TaskRevision uint64              `json:"task_revision"`
 }
 
 type RecoveryRequired struct {
-	CheckpointID   *domain.CheckpointID
-	RedactedReason string
+	CheckpointID   *domain.CheckpointID `json:"checkpoint_id,omitempty"`
+	RedactedReason string               `json:"redacted_reason"`
 }
 
 // ErrorCode is a stable user-presentable failure classification.
@@ -205,9 +222,92 @@ const (
 )
 
 type UserError struct {
-	Code            ErrorCode
-	RedactedMessage string
-	Retryable       bool
+	Code            ErrorCode `json:"code"`
+	RedactedMessage string    `json:"redacted_message"`
+	Retryable       bool      `json:"retryable"`
+}
+
+// Build assigns journal-owned envelope facts and validates the resulting event.
+func (event NewSessionEvent) Build(sequence uint64, timestamp time.Time) (SessionEvent, error) {
+	built := SessionEvent{
+		Sequence:       sequence,
+		SessionID:      event.SessionID,
+		ThreadID:       event.ThreadID,
+		TaskID:         event.TaskID,
+		Timestamp:      timestamp,
+		Kind:           event.Kind,
+		Revision:       event.Revision,
+		CausationID:    event.CausationID,
+		CorrelationID:  event.CorrelationID,
+		PayloadVersion: event.PayloadVersion,
+		Payload:        event.Payload,
+	}
+	if err := built.Validate(); err != nil {
+		return SessionEvent{}, err
+	}
+	return built, nil
+}
+
+// MarshalPayload returns the stable JSON form persisted by the local journal.
+func MarshalPayload(payload Payload) ([]byte, error) {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal session payload: %w", err)
+	}
+	return encoded, nil
+}
+
+// UnmarshalPayload decodes one strict, kind-matched journal payload.
+func UnmarshalPayload(kind Kind, encoded []byte) (Payload, error) {
+	var payload Payload
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
+		return Payload{}, fmt.Errorf("unmarshal session payload: %w", err)
+	}
+	if err := ensureJSONEnd(decoder); err != nil {
+		return Payload{}, err
+	}
+	probe := SessionEvent{
+		Sequence:       1,
+		SessionID:      mustProbeSessionID(),
+		ThreadID:       mustProbeThreadID(),
+		Timestamp:      time.Unix(0, 0).UTC(),
+		Kind:           kind,
+		PayloadVersion: 1,
+		Payload:        payload,
+	}
+	if err := probe.Validate(); err != nil {
+		return Payload{}, fmt.Errorf("validate decoded session payload: %w", err)
+	}
+	return payload, nil
+}
+
+func ensureJSONEnd(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("unmarshal session payload: trailing JSON value")
+		}
+		return fmt.Errorf("unmarshal session payload: %w", err)
+	}
+	return nil
+}
+
+func mustProbeSessionID() domain.SessionID {
+	value, err := domain.ParseSessionID("ses_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+func mustProbeThreadID() domain.ThreadID {
+	value, err := domain.ParseThreadID("thr_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	return value
 }
 
 // Validate rejects incomplete, mismatched, private, or unversioned envelopes.
