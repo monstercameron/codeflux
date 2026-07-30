@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-055
+Date: 2026-07-30
+Type: Cross-platform worktree path correction
+Request-or-TODO: M09-G01 through M09-G03 follow-up from public CI
+Outcome: Canonicalized the task-worktree root at service startup and compared
+  canonical paths with platform-aware relative identity
+Affected-behavior: Worktrees beneath aliased Windows temporary paths and the
+  macOS /var-to-/private path alias remain confined and verifiable instead of
+  being falsely reported as moved or unsafe
+Compatibility-or-migration: No schema or API change
+Verification: Focused Gitwork suite and lint pass locally; the originating
+  failure remains captured in public CI run 30536861293 for regression evidence
+Dev-Log: DL-20260730-056
+
 Change-ID: CL-20260730-054
 Date: 2026-07-30
 Type: Isolated Git editing and acceptance

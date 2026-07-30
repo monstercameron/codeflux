@@ -67,7 +67,7 @@ func ResolveTaskPath(
 		return ResolvedTaskPath{}, fmt.Errorf("resolve task worktree: %w", err)
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil || filepath.Clean(resolvedRoot) != filepath.Clean(root) {
+	if err != nil || !samePath(resolvedRoot, root) {
 		return ResolvedTaskPath{}, ErrUnsafeTaskPath
 	}
 	absolute := filepath.Join(root, filepath.FromSlash(cleaned))
@@ -92,7 +92,7 @@ func ResolveTaskPath(
 			return ResolvedTaskPath{}, ErrUnsafeTaskPath
 		}
 		resolved, resolveErr := filepath.EvalSymlinks(current)
-		if resolveErr != nil || filepath.Clean(resolved) != filepath.Clean(current) ||
+		if resolveErr != nil || !samePath(resolved, current) ||
 			!pathWithin(root, resolved) {
 			return ResolvedTaskPath{}, ErrUnsafeTaskPath
 		}

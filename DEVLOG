@@ -24,6 +24,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-056
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-055
+Request-or-TODO: M09-G01 through M09-G03 public-CI regression
+Goal: Preserve strict worktree confinement without rejecting valid
+  platform-level path aliases
+Assumptions: Windows temporary directories may use 8.3 aliases and macOS
+  exposes /var through /private; canonical identity must be established before
+  deriving and persisting task paths
+Decisions: Create and canonicalize the dedicated external worktree root at
+  service construction, derive every task path from that canonical root, and
+  compare already-resolved paths through filepath.Rel identity. Continue to
+  reject actual symlink/reparse escapes and root overlap.
+Files-or-schemas: Gitwork service root initialization, task path verification,
+  and safe-file path identity checks
+Validation: The focused Gitwork suite and lint pass on the local Windows host.
+  Public CI run 30536861293 records the prior failures on Windows AMD64/ARM64
+  and macOS ARM64 while Ubuntu and race jobs passed.
+Failures-or-discarded-approaches: Direct string equality between a stored path
+  and EvalSymlinks output treated operating-system aliases as movement.
+  Weakening symlink validation was rejected; canonicalizing before derivation
+  retains the confinement invariant.
+Known-limitations: Cross-platform confirmation requires the next public CI
+  matrix after this commit is pushed.
+Next-safe-step: Push and require Windows, macOS, Ubuntu, and race jobs to pass,
+  then accept the pending M10 authority milestone.
+
 Dev-Log: DL-20260730-055
 Date: 2026-07-30
 Status: Complete

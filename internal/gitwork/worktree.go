@@ -90,8 +90,15 @@ func NewService(
 		filepath.Dir(absolute) == absolute {
 		return nil, errors.New("worktree root must be a clean absolute non-root path")
 	}
+	if err := os.MkdirAll(absolute, 0o700); err != nil {
+		return nil, fmt.Errorf("create worktree root: %w", err)
+	}
+	canonicalRoot, err := canonicalDirectory(absolute)
+	if err != nil {
+		return nil, fmt.Errorf("canonicalize worktree root: %w", err)
+	}
 	return &Service{
-		root: absolute, bindings: bindings, runner: runner, random: randomSource,
+		root: canonicalRoot, bindings: bindings, runner: runner, random: randomSource,
 	}, nil
 }
 
@@ -311,7 +318,7 @@ func (service *Service) VerifyTaskWorktree(
 	}
 	report.PathPresent = true
 	canonical, err := canonicalDirectory(binding.WorktreePath)
-	if err != nil || canonical != binding.WorktreePath ||
+	if err != nil || !samePath(canonical, binding.WorktreePath) ||
 		!pathWithin(service.root, canonical) {
 		report.RecoveryNeeded = true
 		return report, ErrWorktreeMoved
@@ -322,7 +329,7 @@ func (service *Service) VerifyTaskWorktree(
 		return report, ErrWorktreeMoved
 	}
 	root, err = canonicalDirectory(root)
-	if err != nil || root != canonical {
+	if err != nil || !samePath(root, canonical) {
 		report.RecoveryNeeded = true
 		return report, ErrWorktreeMoved
 	}
@@ -459,6 +466,11 @@ func pathWithin(root, candidate string) bool {
 	relative, err := filepath.Rel(root, candidate)
 	return err == nil && relative != ".." &&
 		!strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func samePath(left, right string) bool {
+	relative, err := filepath.Rel(filepath.Clean(left), filepath.Clean(right))
+	return err == nil && relative == "."
 }
 
 func validateObjectID(value string) error {
