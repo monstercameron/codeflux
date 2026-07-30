@@ -112,8 +112,12 @@ func TestSubscriptionCancelAndReconnectAfterSequence(t *testing.T) {
 			t.Fatalf("resumed sequence = %d, want %d", event.GetSequence(), want)
 		}
 	}
+	if _, err = resumed.Recv(); !errors.Is(err, io.EOF) {
+		t.Fatalf("resumed terminal receive = %v, want EOF", err)
+	}
 	waitFor(t, time.Second, func() bool {
-		return service.Metrics().CancelledStreams == 1
+		metrics := service.Metrics()
+		return metrics.CancelledStreams == 1 && metrics.ActiveStreams == 0
 	})
 }
 

@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-049
+Date: 2026-07-30
+Type: Cross-platform transport security and teardown correction
+Request-or-TODO: M06-018, M06-019, M06-024, and M06-G02
+Outcome: Made editor-path validation independent of the host path convention
+  and completed resumed streams before tunnel teardown
+Affected-behavior: Unix and macOS now reject Windows drive-qualified or
+  backslash editor targets, and the Linux race suite no longer closes the
+  pinned WebSocket tunnel while its gRPC writer is flushing a resumed stream
+Compatibility-or-migration: Internal retained-spike correction only; no product
+  protobuf or database schema change
+Verification: Focused transport-spike tests and repository lint pass locally;
+  Linux AMD64 race and macOS/Linux fast-test confirmation run in public CI
+Dev-Log: DL-20260730-050
+
 Change-ID: CL-20260730-048
 Date: 2026-07-30
 Type: Backend application contract and deterministic flow gate

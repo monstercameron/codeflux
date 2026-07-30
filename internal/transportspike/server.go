@@ -71,9 +71,10 @@ func (service *Service) CheckEditorCapability(
 	path := strings.TrimSpace(request.GetRelativePath())
 	clean := filepath.Clean(path)
 	if path == "" ||
+		strings.Contains(path, `\`) ||
+		(len(path) >= 2 && path[1] == ':') ||
 		filepath.IsAbs(path) ||
 		strings.HasPrefix(path, "/") ||
-		strings.HasPrefix(path, `\`) ||
 		clean == "." ||
 		clean == ".." ||
 		strings.HasPrefix(clean, ".."+string(filepath.Separator)) {

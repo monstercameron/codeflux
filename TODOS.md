@@ -1129,6 +1129,10 @@ Milestone 06 decision and evidence:
   oversized-count, and payloads above 4 MiB. The final measured tunnel run
   transferred 575,700 bytes for 369,873 serialized protobuf bytes: 205,827
   bytes of framing and a 1.556 transport/serialization ratio.
+- Cross-platform CI correction: editor targets reject both slash conventions
+  and drive-qualified paths on every host, and cancellation/reconnect tests
+  consume the resumed stream terminator before closing the tunnel so the pinned
+  bridge is not torn down during an outstanding write.
 - Browser proof on Windows 11 ARM64: the visible client completed sequence
   10,000 after refresh and, during a live coordinator restart, held sequence
   6,657 while disconnected before resuming to 10,000 with no duplicate or

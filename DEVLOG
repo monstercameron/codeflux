@@ -24,6 +24,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-050
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-049
+Request-or-TODO: M06-018, M06-019, M06-024, and M06-G02
+Goal: Repair the two cross-platform failures reported by the authoritative
+  public CI matrix before proceeding with M08
+Assumptions: GoGRPCBridge v1.1.1 remains the pinned decision; its client
+  connection is safe to close after the resumed RPC has delivered its terminal
+  status and the service reports no active streams
+Decisions: Reject backslashes and drive-qualified paths lexically rather than
+  delegating all absolute-path recognition to host-specific filepath rules.
+  Receive the resumed stream EOF and wait for service quiescence before test
+  teardown instead of replacing or patching the selected bridge.
+Files-or-schemas: Retained transport-spike validation and reconnect test plus
+  M06 evidence and ledgers; no schema change
+Validation: The focused transport-spike package and full repository lint pass
+  on Windows ARM64. Public CI supplies the required Linux AMD64 race and
+  macOS/Linux host-path checks.
+Failures-or-discarded-approaches: Windows-only local testing had accepted the
+  false assumption that filepath.IsAbs recognizes Windows drive paths on Unix.
+  The reconnect test also stopped after the final payload rather than receiving
+  EOF, allowing deferred connection close to race the pinned bridge's writer.
+  A bridge fork was rejected because orderly RPC completion removes the
+  teardown race without expanding transport surface.
+Known-limitations: Local Windows ARM64 still cannot execute the Go race
+  detector; the correction is not considered fully confirmed until public CI
+  passes.
+Next-safe-step: Push the focused correction, verify the public matrix, then
+  resume the uncommitted M08 repository-discovery slice.
+
 Dev-Log: DL-20260730-049
 Date: 2026-07-30
 Status: Complete
