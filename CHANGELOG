@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-010
+Date: 2026-07-30
+Type: Developer documentation
+Request-or-TODO: M01-045, M01-046
+Outcome: Documented current native prerequisites and the executable protobuf
+  regeneration workflow without inventing a WASM command
+Affected-behavior: Contributors can distinguish offline build/test commands
+  from the first network-capable pinned generation action
+Compatibility-or-migration: Documentation only
+Verification: Copied generation-check, lint, and fast-test commands passed;
+  plan trace check passed
+Dev-Log: DL-20260730-011
+
 Change-ID: CL-20260730-009
 Date: 2026-07-30
 Type: Executable identity and diagnostics

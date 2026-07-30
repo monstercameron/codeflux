@@ -5730,6 +5730,57 @@ This layout is a target, not evidence that packages already exist. Empty directo
 
 The `.artifacts/` directory is never tracked and has no placeholder. Build commands create only the children they need, such as `bin`, `wasm`, `coverage`, `package`, `bench`, `test-failures`, `db`, and `tmp`. Reviewed generated source remains in its declared source directory and is not treated as disposable output.
 
+### Implemented Bootstrap Prerequisites
+
+The current M01 repository commands require:
+
+```text
+Go:
+    minimum language version 1.26.0
+    latest security-patched Go 1.26 release required by bootstrap and CI
+
+Git:
+    required for source identity, tracked-file checks, hooks, and later worktrees
+
+Staticcheck:
+    exact supported version 2026.1
+    required only by the lint command
+```
+
+No global `protoc`, Buf, Node, npm, Make, Bash, PowerShell module, SQLite CLI,
+or C compiler is required for the current build and fast-test path. Protobuf
+generation invokes Buf 1.72.0 through a version-qualified Go command and uses
+the pinned `buf.build/protocolbuffers/go:v1.36.11` plugin. Its first run is an
+explicitly network-capable bootstrap/generation action; ordinary builds and
+tests compile the committed generated source without network access.
+
+The implemented commands are:
+
+```text
+go run ./cmd/codeflux-dev build
+go run ./cmd/codeflux-dev test-fast
+go run ./cmd/codeflux-dev lint
+go run ./cmd/codeflux-dev test-coverage
+go run ./cmd/codeflux-dev test-race
+go run ./cmd/codeflux-dev generate
+go run ./cmd/codeflux-dev generate-check
+```
+
+To change protobuf output:
+
+1. edit source beneath `api/proto/`;
+2. run `go run ./cmd/codeflux-dev generate`;
+3. inspect the generated `api/gen/` diff and its generated-file header;
+4. run `go run ./cmd/codeflux-dev generate-check`;
+5. run `go run ./cmd/codeflux-dev lint` and `test-fast`.
+
+`generate-check` writes regeneration output beneath a validated
+`.artifacts/tmp` child, compares exact file sets and bytes, and removes only
+that child. The current frontend package embeds reviewed source assets directly.
+No WASM generator exists yet, so these instructions do not claim a WASM
+regeneration command; the v5 frontend spike must add and document that workflow
+when it becomes real. (`M01-045`, `M01-046`)
+
 ## Development Helper
 
 The planned cross-platform entry point is:

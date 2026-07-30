@@ -24,6 +24,26 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-011
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-010
+Request-or-TODO: M01-045, M01-046
+Goal: Document only the native prerequisites and regeneration commands that
+  are executable at the current repository milestone
+Assumptions: The existing docs/plan.md is the authorized documentation
+  destination; no root README may be created
+Decisions: Separate required host tools from network-fetched pinned generators;
+  state explicitly that WASM generation does not exist yet
+Files-or-schemas: docs/plan.md, DEVLOG; no schema
+Validation: The documented generate-check, lint, and fast-test commands passed;
+  the executable plan trace check passed; repository-relative paths resolve
+Failures-or-discarded-approaches: None
+Known-limitations: Full bootstrap and WASM instructions wait for their actual
+  implementation tasks
+Next-safe-step: Commit documentation, then add primary-host and declared-platform
+  CI in M01-047 through M01-054.
+
 Dev-Log: DL-20260730-010
 Date: 2026-07-30
 Status: Complete

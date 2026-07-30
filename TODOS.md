@@ -333,8 +333,13 @@ Version/doctor evidence: the development build links deterministic Git commit
 and commit-date metadata, reports all six required fields, and returns exit 3
 from `doctor` while explicitly naming storage, credential-store, and browser
 transport as unavailable rather than healthy.
-- [ ] `M01-045 DOC` Document required native dependencies, if any.
-- [ ] `M01-046 DOC` Document how to regenerate protobuf and WASM assets.
+- [x] `M01-045 DOC` Document required native dependencies, if any.
+- [x] `M01-046 DOC` Document how to regenerate protobuf and WASM assets.
+
+Documentation evidence: `docs/plan.md` lists the real Go, Git, and Staticcheck
+requirements; identifies pinned network-fetched protobuf tooling; gives the
+copy/paste generate/check/lint/test sequence; and explicitly states that no
+WASM generator exists yet.
 
 ## Continuous Integration
 
