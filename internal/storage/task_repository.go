@@ -272,6 +272,39 @@ func (repositories *Repositories) TransitionTask(
 				errors.New("task state or revision changed"),
 			)
 		}
+		if input.From == domain.TaskStateReady &&
+			input.To == domain.TaskStateRunning {
+			if input.RunID == nil {
+				return typedError(
+					ErrExecutionPreflightIncomplete,
+					"transition task",
+					errors.New("initial task start requires a preflight-bound run"),
+				)
+			}
+			var bound int
+			if err := transaction.sql.QueryRowContext(
+				ctx,
+				`SELECT count(*)
+				 FROM run_execution_bindings AS binding
+				 JOIN task_execution_preflights AS preflight
+				   ON preflight.task_id = binding.task_id
+				  AND preflight.revision = binding.preflight_revision
+				 WHERE binding.run_id = ? AND binding.task_id = ?
+				   AND preflight.expected_task_revision = ?`,
+				*input.RunID,
+				input.TaskID,
+				input.ExpectedRevision,
+			).Scan(&bound); err != nil {
+				return classify("verify task start preflight", err)
+			}
+			if bound != 1 {
+				return typedError(
+					ErrExecutionPreflightIncomplete,
+					"transition task",
+					errors.New("initial task start lacks an exact preflight binding"),
+				)
+			}
+		}
 		result, err := transaction.sql.ExecContext(
 			ctx,
 			`UPDATE tasks

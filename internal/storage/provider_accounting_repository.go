@@ -619,7 +619,8 @@ func (repositories *Repositories) TransitionProviderLogicalRequest(
 		var started any
 		if current.StartedAt != nil {
 			started = current.StartedAt.UnixMicro()
-		} else if input.To == ProviderLogicalRequestInFlight {
+		} else if input.To == ProviderLogicalRequestInFlight ||
+			providerLogicalTerminal(input.To) {
 			started = micros
 		}
 		var completed any

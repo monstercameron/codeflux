@@ -1998,66 +1998,98 @@ Milestone output: a versioned fixed baseline, transparent P50/P90 heuristic, exa
 
 ## Fixed Baseline Policy
 
-- [ ] `M13-001 BLOCKER` Choose the fixed baseline provider, model, and effort level.
-- [ ] `M13-002` Define fixed policy behavior for planning, execution, repair, and review.
-- [ ] `M13-003` Define maximum planning and repair rounds.
-- [ ] `M13-004` Define maximum tool calls per round.
-- [ ] `M13-005` Define maximum context budget.
-- [ ] `M13-006` Define default task monetary and token budgets.
-- [ ] `M13-007` Version the fixed policy.
-- [ ] `M13-008` Persist the exact policy with every task and run.
-- [ ] `M13-009` Make policy selection deterministic for identical inputs.
-- [ ] `M13-010` Expose manual model/effort override as an explicit recorded choice.
+- [x] `M13-001 BLOCKER` Choose the fixed baseline provider, model, and effort level.
+- [x] `M13-002` Define fixed policy behavior for planning, execution, repair, and review.
+- [x] `M13-003` Define maximum planning and repair rounds.
+- [x] `M13-004` Define maximum tool calls per round.
+- [x] `M13-005` Define maximum context budget.
+- [x] `M13-006` Define default task monetary and token budgets.
+- [x] `M13-007` Version the fixed policy.
+- [x] `M13-008` Persist the exact policy with every task and run.
+- [x] `M13-009` Make policy selection deterministic for identical inputs.
+- [x] `M13-010` Expose manual model/effort override as an explicit recorded choice.
 
 ## Initial Forecast
 
-- [ ] `M13-011 BLOCKER` Define a transparent heuristic forecast based on task class, repository size, likely files, validation commands, and fixed model.
-- [ ] `M13-012` Produce P50/P90 latency estimates.
-- [ ] `M13-013` Produce P50/P90 token estimates.
-- [ ] `M13-014` Produce P50/P90 cost estimates.
-- [ ] `M13-015` Produce uncertainty reasons.
-- [ ] `M13-016` Distinguish unknown price from zero cost.
-- [ ] `M13-017` Record forecast features and algorithm version.
-- [ ] `M13-018` Present the forecast before execution begins.
-- [ ] `M13-019` Allow the user to adjust budget before approval.
-- [ ] `M13-020` Compare forecast with actual results after completion.
-- [ ] `M13-021` Do not present forecasts as promises.
+- [x] `M13-011 BLOCKER` Define a transparent heuristic forecast based on task class, repository size, likely files, validation commands, and fixed model.
+- [x] `M13-012` Produce P50/P90 latency estimates.
+- [x] `M13-013` Produce P50/P90 token estimates.
+- [x] `M13-014` Produce P50/P90 cost estimates.
+- [x] `M13-015` Produce uncertainty reasons.
+- [x] `M13-016` Distinguish unknown price from zero cost.
+- [x] `M13-017` Record forecast features and algorithm version.
+- [x] `M13-018` Present the forecast before execution begins.
+- [x] `M13-019` Allow the user to adjust budget before approval.
+- [x] `M13-020` Compare forecast with actual results after completion.
+- [x] `M13-021` Do not present forecasts as promises.
 
 ## Budget Ledger
 
-- [ ] `M13-022 BLOCKER DATA` Implement atomic budget creation.
-- [ ] `M13-023 DATA` Implement pre-request estimated-cost reservation.
-- [ ] `M13-024 DATA` Reconcile reservation with actual usage after the request.
-- [ ] `M13-025 DATA` Track model, tool, and optional infrastructure cost categories.
-- [ ] `M13-026` Define warning thresholds.
-- [ ] `M13-027` Emit budget-warning events.
-- [ ] `M13-028` Block new model requests at the hard cap.
-- [ ] `M13-029` Allow the current request to finish if stopping it would waste already billed work, while preventing subsequent actions.
-- [ ] `M13-030` Require explicit approval to raise a hard budget.
-- [ ] `M13-031` Record who or what changed the budget.
-- [ ] `M13-032` Make cancellation and budget exhaustion distinguishable.
-- [ ] `M13-033` Show forecast, reserved, actual, and remaining amounts.
-- [ ] `M13-034` Handle concurrent cost postings without overspending.
+- [x] `M13-022 BLOCKER DATA` Implement atomic budget creation.
+- [x] `M13-023 DATA` Implement pre-request estimated-cost reservation.
+- [x] `M13-024 DATA` Reconcile reservation with actual usage after the request.
+- [x] `M13-025 DATA` Track model, tool, and optional infrastructure cost categories.
+- [x] `M13-026` Define warning thresholds.
+- [x] `M13-027` Emit budget-warning events.
+- [x] `M13-028` Block new model requests at the hard cap.
+- [x] `M13-029` Allow the current request to finish if stopping it would waste already billed work, while preventing subsequent actions.
+- [x] `M13-030` Require explicit approval to raise a hard budget.
+- [x] `M13-031` Record who or what changed the budget.
+- [x] `M13-032` Make cancellation and budget exhaustion distinguishable.
+- [x] `M13-033` Show forecast, reserved, actual, and remaining amounts.
+- [x] `M13-034` Handle concurrent cost postings without overspending.
 
 ## Shadow Forecasting Preparation
 
-- [ ] `M13-035` Record task features needed for later effort forecasting.
-- [ ] `M13-036` Record counterfactual eligibility without choosing a dynamic model.
-- [ ] `M13-037` Record actual outcome, latency, usage, cost, repairs, and human interventions.
-- [ ] `M13-038` Define a later calibration report schema.
-- [ ] `M13-039 DEFER` Do not change model or effort from learned forecasts in the prototype.
+- [x] `M13-035` Record task features needed for later effort forecasting.
+- [x] `M13-036` Record counterfactual eligibility without choosing a dynamic model.
+- [x] `M13-037` Record actual outcome, latency, usage, cost, repairs, and human interventions.
+- [x] `M13-038` Define a later calibration report schema.
+- [x] `M13-039 DEFER` Do not change model or effort from learned forecasts in the prototype.
 
 ## Tests and Gate
 
-- [ ] `M13-040 TEST` Test exact cost arithmetic.
-- [ ] `M13-041 TEST` Test concurrent reservation races.
-- [ ] `M13-042 TEST` Test missing pricing.
-- [ ] `M13-043 TEST` Test warning and hard-cap boundaries.
-- [ ] `M13-044 TEST` Test explicit budget increase.
-- [ ] `M13-045 TEST` Test that retries consume budget.
-- [ ] `M13-G01 GATE` A task cannot start without an inspectable policy, forecast, and budget.
-- [ ] `M13-G02 GATE` No combination of concurrent requests can exceed the approved hard cap beyond a documented in-flight bound.
-- [ ] `M13-G03 GATE` The fixed policy is reproducible and creates usable baseline telemetry.
+- [x] `M13-040 TEST` Test exact cost arithmetic.
+- [x] `M13-041 TEST` Test concurrent reservation races.
+- [x] `M13-042 TEST` Test missing pricing.
+- [x] `M13-043 TEST` Test warning and hard-cap boundaries.
+- [x] `M13-044 TEST` Test explicit budget increase.
+- [x] `M13-045 TEST` Test that retries consume budget.
+- [x] `M13-G01 GATE` A task cannot start without an inspectable policy, forecast, and budget.
+- [x] `M13-G02 GATE` No combination of concurrent requests can exceed the approved hard cap beyond a documented in-flight bound.
+- [x] `M13-G03 GATE` The fixed policy is reproducible and creates usable baseline telemetry.
+
+M13 test evidence:
+
+- `fixed-baseline-v2` freezes the OpenAI Responses adapter, `gpt-5.6-sol`,
+  maximum reasoning, phase limits, context/tool ceilings, and default budget;
+  the exact provider revision creates a reproducible stratum and explicit
+  manual overrides retain actor, authority, and reason.
+- The transparent forecast records its algorithm, normalized task/repository
+  features, immutable bindings, P50/P90 latency, tokens, tools, exact or
+  explicitly unknown cost, uncertainty reasons, and the mandatory
+  estimate-not-promise notice. Mutated or overflowed forecasts are rejected.
+- SQLite migrations 000010 through 000013 add exact rational limits,
+  reservations, postings, warning/hard-cap events, immutable snapshots,
+  reconciliation intents, preapproval adjustments, execution preflights, run
+  bindings, outcome comparisons, and physical provider-call reconciliation.
+- Concurrent exact and legacy reservations share one revision authority;
+  complete retry envelopes reserve cost, tokens, and call slots before request
+  activation, while settlement reconciles slots to actual physical attempts.
+  In-flight billed work settles even at the cap and blocks subsequent work.
+- Task start rejects missing or stale policy, forecast, limit, budget snapshot,
+  unknown accounting, reconciliation, and generic ready-to-running bypasses.
+  The current presentation combines immutable policy/forecast with exact or
+  unknown reserved, actual, and remaining cost and token state.
+- The production live path is planned request, budget reservation, activation,
+  then provider I/O. Unknown price, cross-task budget, or insufficient hard cap
+  yields zero provider stream calls; hard-cap exhaustion is durably paused and
+  attributed rather than confused with cancellation.
+- Focused arithmetic, missing-price, warning, hard-cap, explicit-increase,
+  retry, reconciliation, preflight, presentation, and terminal-outcome tests
+  pass. Lint, generation, migration, fast, integration, security, and the
+  complete local `test-all` gate pass; the final adversarial audit accepts the
+  integrated milestone.
 
 ---
 

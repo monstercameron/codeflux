@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,9 @@ import (
 	"codeflux.dev/codeflux/internal/buildinfo"
 	"codeflux.dev/codeflux/internal/coordinator"
 	"codeflux.dev/codeflux/internal/credentials"
+	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/forecast"
+	"codeflux.dev/codeflux/internal/policy"
 	"codeflux.dev/codeflux/internal/providers"
 	"codeflux.dev/codeflux/internal/providers/anthropic"
 	"codeflux.dev/codeflux/internal/providers/openai"
@@ -52,6 +56,8 @@ type liveProviderFactory func(
 type liveRuntime struct {
 	credentialStore credentials.Store
 	providerFactory liveProviderFactory
+	pricing         *storage.LiveProviderSmokePricing
+	budgetFactory   func() (domain.TaskBudget, error)
 	now             func() time.Time
 }
 
@@ -59,6 +65,7 @@ func defaultLiveRuntime() liveRuntime {
 	return liveRuntime{
 		credentialStore: credentials.NewPlatformStore(),
 		providerFactory: newLiveProvider,
+		budgetFactory:   newLiveTaskBudget,
 		now:             time.Now,
 	}
 }
@@ -143,8 +150,14 @@ func runLiveGateWithRuntime(
 	if runtime.now == nil {
 		runtime.now = time.Now
 	}
+	if runtime.budgetFactory == nil {
+		runtime.budgetFactory = newLiveTaskBudget
+	}
 
-	const warning = "LIVE PROVIDER REQUEST CAN INCUR REAL COST; pricing is unknown and will never be displayed as zero"
+	warning := "LIVE PROVIDER REQUEST CAN INCUR REAL COST; pricing is unknown and will never be displayed as zero"
+	if runtime.pricing != nil {
+		warning = "LIVE PROVIDER REQUEST CAN INCUR REAL COST; the immutable price snapshot and hard budget will be enforced"
+	}
 	result := liveGateResult{
 		SchemaVersion: 1,
 		Status:        "unavailable",
@@ -236,10 +249,60 @@ func runLiveGateWithRuntime(
 	}
 	adapterName, adapterVersion, providerVersion, endpoint :=
 		liveProviderConfiguration(invocation.Provider)
+	identity := providers.ProviderIdentity{
+		Adapter: adapterName, AdapterVersion: adapterVersion,
+		Provider: invocation.Provider, ProviderVersion: providerVersion,
+	}
+	modelIdentity := providers.ModelIdentity{
+		Provider: identity, Model: invocation.Model,
+		Revision: invocation.ModelRevision,
+	}
 	gitIdentity, err := liveRepositoryGitIdentity(ctx, repository)
 	if err != nil {
 		result.Status = "failed"
 		result.Reason = "identify live-provider repository"
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	taskBudget, err := runtime.budgetFactory()
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "create fixed live-provider budget"
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	selectedPolicy, err := policy.Select(policy.SelectionInput{
+		BaselineModelRevision: invocation.ModelRevision,
+		Override: &policy.ManualOverride{
+			Model: modelIdentity, Reasoning: domain.ReasoningEffortMaximum,
+			Actor:              "codeflux-dev",
+			AuthorityReference: "run-live explicit provider and model selection",
+			Reason:             "attributable live-provider diagnostic",
+		},
+	})
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "select fixed live-provider execution policy"
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	effortForecast, err := forecast.Generate(forecast.Input{
+		RepositoryRevision:       gitIdentity,
+		TaskFingerprint:          requestHash,
+		TaskClass:                forecast.TaskClassSmallChange,
+		Policy:                   selectedPolicy,
+		ToolConfigurationVersion: "live-smoke-tools-v1",
+		ValidationProfileVersion: "live-smoke-runtime-v1",
+	})
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "generate live-provider effort forecast"
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	eligibility, err := forecast.NewCounterfactualEligibility(
+		false,
+		[]string{"live-provider-diagnostic"},
+	)
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "build live-provider shadow eligibility"
 		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
 	}
 	fixture, err := repositories.PrepareLiveProviderSmokeRequest(
@@ -254,7 +317,9 @@ func runLiveGateWithRuntime(
 			CapabilitiesJSON:          string(capabilitiesJSON),
 			OpaqueCredentialReference: invocation.CredentialRef,
 			ModelIdentifier:           invocation.Model, ModelVersion: invocation.ModelRevision,
-			RequestSHA256: requestHash, Pricing: nil,
+			RequestSHA256: requestHash, Pricing: runtime.pricing,
+			Policy: selectedPolicy, Forecast: effortForecast,
+			Eligibility: eligibility, Budget: taskBudget,
 		},
 	)
 	if err != nil {
@@ -274,38 +339,12 @@ func runLiveGateWithRuntime(
 		}
 		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
 	}
-	identity := providers.ProviderIdentity{
-		Adapter: adapterName, AdapterVersion: adapterVersion,
-		Provider: invocation.Provider, ProviderVersion: providerVersion,
-	}
-	modelIdentity := providers.ModelIdentity{
-		Provider: identity, Model: invocation.Model,
-		Revision: invocation.ModelRevision,
-	}
 	adapter, err := runtime.providerFactory(
 		credentialSource, fixture, modelIdentity, capabilities,
 	)
 	if err != nil {
 		result.Status = "failed"
 		result.Reason = "initialize explicit live-provider adapter"
-		if abortErr := abortLiveProviderBeforeIO(repositories, fixture); abortErr != nil {
-			result.Reason += "; durable pre-I/O abort also failed"
-		}
-		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
-	}
-	execution, err := coordinator.NewProviderExecutionService(
-		adapter,
-		repositories,
-		providers.RetryPolicy{
-			MaximumAttempts:       2,
-			InitialDelay:          500 * time.Millisecond,
-			MaximumBackoff:        2 * time.Second,
-			MaximumCumulativeWait: 3 * time.Second,
-		},
-	)
-	if err != nil {
-		result.Status = "failed"
-		result.Reason = "initialize live-provider execution"
 		if abortErr := abortLiveProviderBeforeIO(repositories, fixture); abortErr != nil {
 			result.Reason += "; durable pre-I/O abort also failed"
 		}
@@ -340,19 +379,58 @@ func runLiveGateWithRuntime(
 		Idempotency:   idempotency,
 		Deadline:      runtime.now().Add(liveRequestTimeout),
 	}
+	priceSnapshot, err := liveProviderPriceSnapshot(
+		fixture.Pricing,
+		modelIdentity,
+		taskBudget.HardStopCost.Currency,
+	)
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "build immutable live-provider price snapshot"
+		if abortErr := abortLiveProviderBeforeIO(repositories, fixture); abortErr != nil {
+			result.Reason += "; durable pre-I/O abort also failed"
+		}
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	budgetedExecution, err := coordinator.NewBudgetedProviderExecutionService(
+		adapter,
+		repositories,
+		providers.RetryPolicy{
+			MaximumAttempts:       2,
+			InitialDelay:          500 * time.Millisecond,
+			MaximumBackoff:        2 * time.Second,
+			MaximumCumulativeWait: 3 * time.Second,
+		},
+	)
+	if err != nil {
+		result.Status = "failed"
+		result.Reason = "initialize budgeted live-provider execution"
+		if abortErr := abortLiveProviderBeforeIO(repositories, fixture); abortErr != nil {
+			result.Reason += "; durable pre-I/O abort also failed"
+		}
+		return finishLiveGate(stdout, stderr, invocation, result, exitFailure)
+	}
+	approvedUsage := providers.Usage{
+		Known: true, Source: providers.UsageSourceEstimated,
+		InputTokens: 32, OutputTokens: 64,
+	}
 	started := runtime.now()
-	executionResult, err := execution.Execute(
+	budgetedResult, err := budgetedExecution.Execute(
 		ctx,
-		coordinator.ExecuteProviderRequest{
-			Request: request,
-			PriceSnapshot: &providers.PriceSnapshot{
-				ID: fixture.Pricing.ID, Model: modelIdentity,
-				EffectiveAt: fixture.Pricing.EffectiveAt,
-				CapturedAt:  fixture.Pricing.CreatedAt,
-				Source:      "unknown",
+		coordinator.ExecuteBudgetedProviderRequest{
+			BudgetID:                taskBudget.ID,
+			TaskID:                  fixture.TaskID,
+			RunID:                   fixture.RunID,
+			PreflightRevision:       fixture.Preflight.Revision,
+			ExpectedBudgetRevision:  fixture.Budget.Revision,
+			ApprovedUsagePerAttempt: approvedUsage,
+			Provider: coordinator.ExecuteProviderRequest{
+				Request: request, EstimatedUsage: approvedUsage,
+				PriceSnapshot: priceSnapshot,
 			},
 		},
 	)
+	executionResult := budgetedResult.Provider
 	finalizeContext, finalizeCancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
 		10*time.Second,
@@ -362,13 +440,22 @@ func runLiveGateWithRuntime(
 		fixture.Request.ID,
 	)
 	if attributionErr == nil {
-		if attribution.Request.State == storage.ProviderLogicalRequestInFlight &&
+		if (attribution.Request.State == storage.ProviderLogicalRequestPlanned ||
+			attribution.Request.State == storage.ProviderLogicalRequestInFlight) &&
 			attribution.Accounting.AttemptCount == 0 {
+			blockReason := storage.LiveProviderPreIOAborted
+			switch {
+			case errors.Is(err, coordinator.ErrProviderBudgetPriceUnknown):
+				blockReason = storage.LiveProviderPreIOPriceUnknown
+			case errors.Is(err, storage.ErrBudgetExhausted):
+				blockReason = storage.LiveProviderPreIOBudgetExhausted
+			}
 			_, attributionErr = repositories.AbortLiveProviderSmokeRequestBeforeIO(
 				finalizeContext,
 				storage.AbortLiveProviderSmokeRequestBeforeIO{
 					RequestID:        fixture.Request.ID,
 					ExpectedRevision: attribution.Request.Revision,
+					Reason:           blockReason,
 				},
 			)
 		} else {
@@ -609,8 +696,115 @@ func liveRepositoryGitIdentity(ctx context.Context, repository string) (string, 
 	return filepath.Abs(common)
 }
 
+func newLiveTaskBudget() (domain.TaskBudget, error) {
+	budgetID, err := domain.NewBudgetID()
+	if err != nil {
+		return domain.TaskBudget{}, err
+	}
+	usd := domain.CurrencyCode("USD")
+	return domain.TaskBudget{
+		ID:                    budgetID,
+		WarningCost:           domain.Money{Currency: usd, MinorUnits: 50},
+		HardStopCost:          domain.Money{Currency: usd, MinorUnits: 100},
+		WarningTokens:         96,
+		HardStopTokens:        192,
+		WarningWallClock:      domain.Milliseconds((30 * time.Second).Milliseconds()),
+		HardStopWallClock:     domain.Milliseconds(liveRequestTimeout.Milliseconds()),
+		MaximumProviderCalls:  2,
+		MaximumRepairRounds:   0,
+		MaximumToolExecutions: 0,
+	}, nil
+}
+
+func liveProviderPriceSnapshot(
+	revision storage.ProviderPricingRevision,
+	model providers.ModelIdentity,
+	fallbackCurrency domain.CurrencyCode,
+) (*providers.PriceSnapshot, error) {
+	snapshot := &providers.PriceSnapshot{
+		ID: revision.ID, Model: model,
+		EffectiveAt: revision.EffectiveAt,
+		CapturedAt:  revision.CreatedAt,
+		Source:      "explicitly-unknown",
+		Price: providers.TokenPrice{
+			Input:            providers.UnknownAmount(string(fallbackCurrency)),
+			CachedInput:      providers.UnknownAmount(string(fallbackCurrency)),
+			CacheWrite:       providers.UnknownAmount(string(fallbackCurrency)),
+			Output:           providers.UnknownAmount(string(fallbackCurrency)),
+			Reasoning:        providers.UnknownAmount(string(fallbackCurrency)),
+			ProviderSpecific: map[string]providers.ExactAmount{},
+		},
+	}
+	if !revision.PricingKnown {
+		return snapshot, nil
+	}
+	if revision.Currency == nil || revision.SourceRedacted == nil {
+		return nil, errors.New("known provider pricing lacks currency or source")
+	}
+	snapshot.Source = *revision.SourceRedacted
+	currency := string(*revision.Currency)
+	for _, component := range revision.Components {
+		price, err := liveProviderComponentPrice(currency, component)
+		if err != nil {
+			return nil, err
+		}
+		switch component.UsageKind {
+		case "input":
+			snapshot.Price.Input = price
+		case "cached-input":
+			snapshot.Price.CachedInput = price
+		case "cache-write":
+			snapshot.Price.CacheWrite = price
+		case "output":
+			snapshot.Price.Output = price
+		case "reasoning":
+			snapshot.Price.Reasoning = price
+		case "provider-specific":
+			if component.ProviderSpecificKind == nil {
+				return nil, errors.New("provider-specific price lacks category")
+			}
+			snapshot.Price.ProviderSpecific[*component.ProviderSpecificKind] = price
+		default:
+			return nil, errors.New("provider price has unsupported usage category")
+		}
+	}
+	return snapshot, nil
+}
+
+func liveProviderComponentPrice(
+	currency string,
+	component storage.ProviderPriceComponent,
+) (providers.ExactAmount, error) {
+	numerator := new(big.Int).Mul(
+		big.NewInt(component.MinorNumerator),
+		big.NewInt(1_000_000),
+	)
+	denominator := big.NewInt(component.TokenDenominator)
+	common := new(big.Int).GCD(nil, nil, numerator, denominator)
+	if common.Sign() == 0 {
+		common.SetInt64(1)
+	}
+	numerator.Quo(numerator, common)
+	denominator.Quo(denominator, common)
+	if !numerator.IsInt64() || !denominator.IsInt64() {
+		return providers.ExactAmount{},
+			errors.New("provider price exceeds runtime exact integer range")
+	}
+	return providers.NewExactAmount(
+		currency,
+		numerator.Int64(),
+		denominator.Int64(),
+	)
+}
+
 func safeLiveFailureReason(err error) string {
 	switch {
+	case errors.Is(err, coordinator.ErrProviderBudgetPriceUnknown):
+		return "live-provider request blocked before I/O because pricing is unknown"
+	case errors.Is(err, storage.ErrBudgetExhausted):
+		return "live-provider request blocked before I/O by the hard budget"
+	case errors.Is(err, storage.ErrBudgetReconciliationPending):
+		return "live-provider usage was preserved for durable budget reconciliation"
 	case errors.Is(err, providers.ErrAuthentication):
 		return "provider rejected the configured credential"
 	case errors.Is(err, providers.ErrRateLimited):

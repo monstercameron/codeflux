@@ -14,4 +14,8 @@ var Catalog = []Descriptor{
 	{Number: 7, Name: "000007_tool_authority_and_commands.sql", SHA256: "2818b8b2aca5750dd76781b48edb9251ffb8d01f18c413e9731bb28a49fd377d"},
 	{Number: 8, Name: "000008_worker_lifecycle.sql", SHA256: "c31caad6873e92338efc41ec2c6572b4d067a1b961abc051370f41acb5e95352"},
 	{Number: 9, Name: "000009_provider_accounting.sql", SHA256: "7bb4e933d89784c070445ff8d6ec9730fb61ed49a42543c51333b9135ab9c404"},
+	{Number: 10, Name: "000010_budget_ledger.sql", SHA256: "59ae538ea617c6f3a834b43632ba7efcb74cdf424c7258f2244a6811a030a6b6"},
+	{Number: 11, Name: "000011_execution_preflight.sql", SHA256: "a510387c17234387c146afc8b09b53dfe7c4192f8a19a62aec85c4c04dac2e21"},
+	{Number: 12, Name: "000012_preflight_budget_adjustments.sql", SHA256: "41e2233e67515413726b3e7e0b3bd9223ec9d2ea2848bea8f571fda26cb6d7b2"},
+	{Number: 13, Name: "000013_provider_call_slot_reconciliation.sql", SHA256: "3b002da47edce72258223241cba0fd18e2507c7397ff309f1ec30345a470516e"},
 }

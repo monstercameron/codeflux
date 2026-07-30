@@ -24,6 +24,51 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-062
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-061
+Request-or-TODO: M13-001 through M13-045 and M13-G01 through M13-G03
+Goal: Make the prototype's fixed execution policy, forecast, and hard budget
+  inspectable, reproducible, and enforceable before provider I/O
+Assumptions: The plan's frozen baseline is OpenAI GPT-5.6 Sol at maximum
+  reasoning; a provider revision creates a distinct evidence stratum; forecasts
+  are advisory estimates; missing price or usage is unknown; external billed
+  work may finish but cannot authorize subsequent work past the hard cap
+Decisions: Freeze a versioned provider/model/effort and phase policy; retain
+  transparent normalized forecast features and P50/P90 ranges; persist exact
+  policy, forecast, budget snapshot, preflight, run binding, adjustment, and
+  outcome evidence; share one optimistic budget revision across legacy and
+  exact APIs; reserve the complete retry envelope before activating a planned
+  provider request; reconcile reserved call slots to physical attempts; make
+  the raw provider executor package-private; pause durably on pre-I/O budget
+  exhaustion; keep learned routing advisory-only
+Files-or-schemas: Migrations 000010 through 000013; policy and forecast
+  packages; exact budget, preapproval adjustment, and execution-preflight
+  repositories; coordinator preflight and budgeted-provider services; live
+  provider lifecycle; generated schema metadata; milestone evidence
+Validation: Deterministic baseline and drift tests, overflow-safe forecast
+  validation, exact rational arithmetic, mixed-API concurrency, warning and
+  hard boundaries, exact approval scope, settlement churn, reconciliation,
+  retry-slot accounting, stale/missing preflight, dynamic presentation,
+  terminal telemetry, cross-task rejection, and zero-I/O live budget tests
+  pass. Generation, migration, lint, integration, security, complete local
+  test-all, diff, and independent adversarial gates pass.
+Failures-or-discarded-approaches: Early implementations accepted arbitrary
+  baseline models, exposed an unbudgeted executor, started a live task before
+  preflight, let two ledger APIs overspend together, bound raises too broadly,
+  could abandon settlement after revision churn, ignored token-only overruns,
+  counted retry maxima as actual calls, and presented stale budget values.
+  Each defect now has a durable invariant and regression. Caller-controlled
+  overage, unknown-price zero substitution, and adaptive model selection were
+  rejected.
+Known-limitations: Browser E2E begins with the M16 GWC harness. The real
+  billable provider smoke remains explicit and must have immutable known
+  pricing and sufficient budget. Public CI supplies cross-platform and Ubuntu
+  race evidence after push.
+Next-safe-step: Push M13, require public CI to pass, then implement M14's
+  bounded requirement-plan-approve-edit-test-repair-review agent loop.
+
 Dev-Log: DL-20260730-061
 Date: 2026-07-30
 Status: Complete

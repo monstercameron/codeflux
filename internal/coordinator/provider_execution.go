@@ -68,21 +68,66 @@ type ProviderExecutionResult struct {
 	Accounting storage.ProviderRequestAccountingSummary
 }
 
-// ProviderExecutionService owns the complete provider request lifecycle. It
-// never changes provider or model identity; recovery choices remain explicit.
-type ProviderExecutionService struct {
+// providerExecutionService owns the complete provider request lifecycle. It is
+// deliberately package-private: production callers must enter through the
+// budgeted service so no provider I/O capability can escape reservation.
+type providerExecutionService struct {
 	provider providers.ModelProvider
 	store    providerExecutionStore
 	retries  *providers.RetryExecutor
 	redactor providerAttemptRedactor
 }
 
-func NewProviderExecutionService(
+// MaximumPhysicalAttempts returns the exact retry bound enforced by Execute.
+// Budget orchestration reserves this complete bound before provider I/O.
+func (service *providerExecutionService) maximumPhysicalAttempts() int {
+	if service == nil || service.retries == nil {
+		return 0
+	}
+	return service.retries.MaximumAttempts()
+}
+
+func (service *providerExecutionService) getProviderLogicalRequest(
+	ctx context.Context,
+	requestID domain.ModelRequestID,
+) (storage.ProviderLogicalRequest, error) {
+	if service == nil || service.store == nil {
+		return storage.ProviderLogicalRequest{},
+			errors.New("provider execution service is unavailable")
+	}
+	return service.store.GetProviderLogicalRequest(ctx, requestID)
+}
+
+func (service *providerExecutionService) activateProviderLogicalRequest(
+	ctx context.Context,
+	logical storage.ProviderLogicalRequest,
+) (storage.ProviderLogicalRequest, error) {
+	if service == nil || service.store == nil {
+		return storage.ProviderLogicalRequest{},
+			errors.New("provider execution service is unavailable")
+	}
+	if logical.State != storage.ProviderLogicalRequestPlanned {
+		return storage.ProviderLogicalRequest{},
+			errors.New("provider logical request is not planned")
+	}
+	return service.store.TransitionProviderLogicalRequest(
+		ctx,
+		storage.TransitionProviderLogicalRequest{
+			ID:               logical.ID,
+			ExpectedRevision: logical.Revision,
+			From:             storage.ProviderLogicalRequestPlanned,
+			To:               storage.ProviderLogicalRequestInFlight,
+			AccountingStatus: storage.ProviderAccountingUnknown,
+		},
+	)
+}
+
+func newProviderExecutionService(
 	provider providers.ModelProvider,
 	store providerExecutionStore,
 	policy providers.RetryPolicy,
 	redactors ...providerAttemptRedactor,
-) (*ProviderExecutionService, error) {
+) (*providerExecutionService, error) {
 	if provider == nil || store == nil {
 		return nil, errors.New("provider execution dependencies are required")
 	}
@@ -113,7 +158,7 @@ func NewProviderExecutionService(
 	if err != nil {
 		return nil, err
 	}
-	return &ProviderExecutionService{
+	return &providerExecutionService{
 		provider: provider,
 		store:    store,
 		retries:  retries,
@@ -121,7 +166,7 @@ func NewProviderExecutionService(
 	}, nil
 }
 
-func (service *ProviderExecutionService) Execute(
+func (service *providerExecutionService) execute(
 	ctx context.Context,
 	input ExecuteProviderRequest,
 ) (ProviderExecutionResult, error) {
@@ -203,7 +248,7 @@ func (service *ProviderExecutionService) Execute(
 	return result, nil
 }
 
-func (service *ProviderExecutionService) executeAttempt(
+func (service *providerExecutionService) executeAttempt(
 	ctx context.Context,
 	attempt providers.PhysicalAttempt,
 	input ExecuteProviderRequest,
@@ -394,7 +439,7 @@ func (service *ProviderExecutionService) executeAttempt(
 	return final, outcome(nil)
 }
 
-func (service *ProviderExecutionService) cancelProviderRequest(
+func (service *providerExecutionService) cancelProviderRequest(
 	requestID domain.ModelRequestID,
 ) {
 	cancelContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -402,7 +447,7 @@ func (service *ProviderExecutionService) cancelProviderRequest(
 	_ = service.provider.Cancel(cancelContext, requestID)
 }
 
-func (service *ProviderExecutionService) sanitizeProviderEvent(
+func (service *providerExecutionService) sanitizeProviderEvent(
 	event *providers.StreamEvent,
 ) error {
 	if event == nil || service.redactor == nil {
@@ -454,7 +499,7 @@ func (service *ProviderExecutionService) sanitizeProviderEvent(
 	return nil
 }
 
-func (service *ProviderExecutionService) appendProviderEvidence(
+func (service *providerExecutionService) appendProviderEvidence(
 	ctx context.Context,
 	attempt providers.PhysicalAttempt,
 	sequence uint64,
@@ -479,7 +524,7 @@ func (service *ProviderExecutionService) appendProviderEvidence(
 	return err
 }
 
-func (service *ProviderExecutionService) appendAttemptAccounting(
+func (service *providerExecutionService) appendAttemptAccounting(
 	ctx context.Context,
 	attempt providers.PhysicalAttempt,
 	input ExecuteProviderRequest,
@@ -562,7 +607,7 @@ func (service *ProviderExecutionService) appendAttemptAccounting(
 	return err
 }
 
-func (service *ProviderExecutionService) transitionLogicalRequest(
+func (service *providerExecutionService) transitionLogicalRequest(
 	ctx context.Context,
 	logical storage.ProviderLogicalRequest,
 	target storage.ProviderLogicalRequestState,

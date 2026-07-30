@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/forecast"
+	"codeflux.dev/codeflux/internal/policy"
 	"codeflux.dev/codeflux/internal/providers"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -47,7 +49,7 @@ func TestProviderExecutionPersistsTerminalAttributionAndUnknownPrice(t *testing.
 			},
 		}},
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -56,7 +58,7 @@ func TestProviderExecutionPersistsTerminalAttributionAndUnknownPrice(t *testing.
 		t.Fatal(err)
 	}
 	request := providerExecutionRequest(smoke, identity)
-	result, err := service.Execute(
+	result, err := service.execute(
 		ctx,
 		ExecuteProviderRequest{
 			Request: request,
@@ -117,7 +119,7 @@ func TestProviderExecutionCancellationPreventsAdditionalToolCalls(t *testing.T) 
 			},
 		}},
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -128,7 +130,7 @@ func TestProviderExecutionCancellationPreventsAdditionalToolCalls(t *testing.T) 
 	ctx, cancel := context.WithCancel(context.Background())
 	var calls int
 	var delivered int
-	_, err = service.Execute(
+	_, err = service.execute(
 		ctx,
 		ExecuteProviderRequest{
 			Request: providerExecutionRequest(smoke, identity),
@@ -185,7 +187,7 @@ func TestProviderExecutionRequiresUnknownPriceSnapshotBeforeIO(t *testing.T) {
 		identity: identity.Provider,
 		stream:   &executionStream{},
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -193,7 +195,7 @@ func TestProviderExecutionRequiresUnknownPriceSnapshotBeforeIO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.Execute(
+	_, err = service.execute(
 		context.Background(),
 		ExecuteProviderRequest{
 			Request: providerExecutionRequest(smoke, identity),
@@ -234,7 +236,7 @@ func TestProviderExecutionCancelInterruptsProviderThatNeedsExplicitCancel(
 		stream:   blocked,
 		cancel:   blocked.release,
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -245,7 +247,7 @@ func TestProviderExecutionCancelInterruptsProviderThatNeedsExplicitCancel(
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		_, executeErr := service.Execute(
+		_, executeErr := service.execute(
 			ctx,
 			ExecuteProviderRequest{
 				Request: providerExecutionRequest(smoke, identity),
@@ -301,7 +303,7 @@ func TestProviderExecutionRejectsMalformedFinalBeforePublicationAndAccountsAttem
 			},
 		}}},
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -310,7 +312,7 @@ func TestProviderExecutionRejectsMalformedFinalBeforePublicationAndAccountsAttem
 		t.Fatal(err)
 	}
 	var published int
-	_, err = service.Execute(
+	_, err = service.execute(
 		context.Background(),
 		ExecuteProviderRequest{
 			Request: providerExecutionRequest(smoke, identity),
@@ -375,7 +377,7 @@ func TestProviderExecutionRedactsMetadataBeforeUIDeliveryAndResult(t *testing.T)
 			},
 		}},
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		repositories,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -384,7 +386,7 @@ func TestProviderExecutionRedactsMetadataBeforeUIDeliveryAndResult(t *testing.T)
 		t.Fatal(err)
 	}
 	var delivered []string
-	result, err := service.Execute(
+	result, err := service.execute(
 		context.Background(),
 		ExecuteProviderRequest{
 			Request: providerExecutionRequest(smoke, identity),
@@ -479,7 +481,7 @@ func TestProviderExecutionFallsBackToUnknownAccountingAfterOneShotWriteFailure(
 		Repositories: repositories,
 		failures:     1,
 	}
-	service, err := NewProviderExecutionService(
+	service, err := newProviderExecutionService(
 		provider,
 		store,
 		providers.RetryPolicy{MaximumAttempts: 1},
@@ -487,7 +489,7 @@ func TestProviderExecutionFallsBackToUnknownAccountingAfterOneShotWriteFailure(
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.Execute(
+	_, err = service.execute(
 		context.Background(),
 		ExecuteProviderRequest{
 			Request: providerExecutionRequest(smoke, identity),
@@ -631,6 +633,50 @@ func providerExecutionFixture(
 		revision        = "fixture-revision"
 		requestHash     = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	)
+	identity := providers.ModelIdentity{
+		Provider: providers.ProviderIdentity{
+			Adapter: adapter, AdapterVersion: adapterVersion,
+			Provider: providerName, ProviderVersion: providerVersion,
+		},
+		Model: model, Revision: revision,
+	}
+	selected, err := policy.Select(policy.SelectionInput{
+		BaselineModelRevision: revision,
+		Override: &policy.ManualOverride{
+			Model: identity, Reasoning: domain.ReasoningEffortMaximum,
+			Actor: "test", AuthorityReference: "provider-execution-fixture",
+			Reason: "test fixture",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := forecast.Generate(forecast.Input{
+		RepositoryRevision:       "provider-execution-git",
+		TaskFingerprint:          requestHash,
+		TaskClass:                forecast.TaskClassSmallChange,
+		Policy:                   selected,
+		ToolConfigurationVersion: "provider-execution-tools-v1",
+		ValidationProfileVersion: "provider-execution-validation-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eligibility, err := forecast.NewCounterfactualEligibility(
+		false,
+		[]string{"test-fixture"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	budgetID, err := domain.NewBudgetID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err := selected.BudgetDefaults.Materialize(budgetID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	smoke, err := repositories.PrepareLiveProviderSmokeRequest(
 		ctx,
 		storage.PrepareLiveProviderSmokeRequest{
@@ -648,17 +694,26 @@ func providerExecutionFixture(
 			ModelIdentifier:           model,
 			ModelVersion:              revision,
 			RequestSHA256:             requestHash,
+			Policy:                    selected,
+			Forecast:                  value,
+			Eligibility:               eligibility,
+			Budget:                    budget,
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	identity := providers.ModelIdentity{
-		Provider: providers.ProviderIdentity{
-			Adapter: adapter, AdapterVersion: adapterVersion,
-			Provider: providerName, ProviderVersion: providerVersion,
+	smoke.Request, err = repositories.TransitionProviderLogicalRequest(
+		ctx,
+		storage.TransitionProviderLogicalRequest{
+			ID: smoke.Request.ID, ExpectedRevision: smoke.Request.Revision,
+			From:             storage.ProviderLogicalRequestPlanned,
+			To:               storage.ProviderLogicalRequestInFlight,
+			AccountingStatus: storage.ProviderAccountingUnknown,
 		},
-		Model: model, Revision: revision,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 	return repositories, smoke, identity
 }

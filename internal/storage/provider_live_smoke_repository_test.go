@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/forecast"
+	"codeflux.dev/codeflux/internal/policy"
+	"codeflux.dev/codeflux/internal/providers"
 )
 
 func TestPrepareLiveProviderSmokeRequestIsAtomicIdempotentAndSecretFree(t *testing.T) {
@@ -29,7 +32,7 @@ func TestPrepareLiveProviderSmokeRequestIsAtomicIdempotentAndSecretFree(t *testi
 		first.Request.ID != retried.Request.ID {
 		t.Fatalf("live smoke retry created different identities:\nfirst=%#v\nretry=%#v", first, retried)
 	}
-	if first.Request.State != ProviderLogicalRequestInFlight ||
+	if first.Request.State != ProviderLogicalRequestPlanned ||
 		first.Request.ProviderVersion != input.ProviderVersion ||
 		first.Request.ModelIdentifier != input.ModelIdentifier ||
 		first.Request.ModelVersion != input.ModelVersion ||
@@ -96,6 +99,7 @@ func TestLiveProviderSmokeAttributionReportsAttemptUsageLatencyAndFinalStatus(t 
 	if err != nil {
 		t.Fatal(err)
 	}
+	activateLiveProviderSmokeRequest(t, ctx, repositories, &smoke)
 	attempt, err := repositories.CreateProviderRequestAttempt(
 		ctx,
 		CreateProviderRequestAttempt{
@@ -293,7 +297,7 @@ func TestAbortLiveProviderSmokeRequestBeforeIOIsIdempotentAndRejectsPreparedAtte
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Request.State != ProviderLogicalRequestFailed ||
+	if report.Request.State != ProviderLogicalRequestCancelled ||
 		report.Request.AccountingStatus != ProviderAccountingUnknown ||
 		retried.Request.ID != report.Request.ID {
 		t.Fatalf("aborted live smoke report = %#v, retry = %#v", report, retried)
@@ -309,7 +313,7 @@ func TestAbortLiveProviderSmokeRequestBeforeIOIsIdempotentAndRejectsPreparedAtte
 	).Scan(&runState); err != nil {
 		t.Fatal(err)
 	}
-	if taskState != "failed" || runState != "failed" {
+	if taskState != "cancelled" || runState != "cancelled" {
 		t.Fatalf("aborted live smoke task=%q run=%q", taskState, runState)
 	}
 
@@ -319,6 +323,7 @@ func TestAbortLiveProviderSmokeRequestBeforeIOIsIdempotentAndRejectsPreparedAtte
 	if err != nil {
 		t.Fatal(err)
 	}
+	activateLiveProviderSmokeRequest(t, ctx, repositories, &second)
 	if _, err := repositories.CreateProviderRequestAttempt(
 		ctx,
 		CreateProviderRequestAttempt{
@@ -339,6 +344,54 @@ func TestAbortLiveProviderSmokeRequestBeforeIOIsIdempotentAndRejectsPreparedAtte
 	}
 }
 
+func TestAbortLiveProviderSmokeRequestPersistsBudgetExhaustedState(
+	t *testing.T,
+) {
+	ctx := context.Background()
+	repositories := openTestRepositories(t)
+	input := liveProviderSmokeInputFixture(t)
+	input.IdempotencyKey = "budget-exhausted-live-smoke"
+	smoke, err := repositories.PrepareLiveProviderSmokeRequest(ctx, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := repositories.AbortLiveProviderSmokeRequestBeforeIO(
+		ctx,
+		AbortLiveProviderSmokeRequestBeforeIO{
+			RequestID: smoke.Request.ID, ExpectedRevision: smoke.Request.Revision,
+			Reason: LiveProviderPreIOBudgetExhausted,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var taskState, runState, pauseReason, eventType string
+	if err := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT task.state, run.state, task.pause_reason, event.event_type
+		 FROM tasks AS task
+		 JOIN runs AS run ON run.task_id = task.id
+		 JOIN task_events AS event ON event.task_id = task.id
+		 WHERE task.id = ? AND event.idempotency_key = ?`,
+		smoke.TaskID,
+		"live-smoke-final-"+smoke.Request.ID.String(),
+	).Scan(&taskState, &runState, &pauseReason, &eventType); err != nil {
+		t.Fatal(err)
+	}
+	if report.Request.State != ProviderLogicalRequestCancelled ||
+		taskState != "paused" || runState != "paused" ||
+		pauseReason != "budget-exhausted" || eventType != "budget.exhausted" {
+		t.Fatalf(
+			"budget block request=%q task=%q run=%q pause=%q event=%q",
+			report.Request.State,
+			taskState,
+			runState,
+			pauseReason,
+			eventType,
+		)
+	}
+}
+
 func TestFinalizeLiveProviderSmokeRequestPausesAfterRetryExhaustion(
 	t *testing.T,
 ) {
@@ -350,6 +403,7 @@ func TestFinalizeLiveProviderSmokeRequestPausesAfterRetryExhaustion(
 	if err != nil {
 		t.Fatal(err)
 	}
+	activateLiveProviderSmokeRequest(t, ctx, repositories, &smoke)
 	attempt, err := repositories.CreateProviderRequestAttempt(
 		ctx,
 		CreateProviderRequestAttempt{
@@ -466,6 +520,7 @@ func TestFinalizeLiveProviderSmokeRequestAllowsCancellationBeforeFirstAttempt(t 
 	if err != nil {
 		t.Fatal(err)
 	}
+	activateLiveProviderSmokeRequest(t, ctx, repositories, &smoke)
 	cancelled, err := repositories.TransitionProviderLogicalRequest(
 		ctx,
 		TransitionProviderLogicalRequest{
@@ -509,8 +564,74 @@ func TestFinalizeLiveProviderSmokeRequestAllowsCancellationBeforeFirstAttempt(t 
 	}
 }
 
+func activateLiveProviderSmokeRequest(
+	t *testing.T,
+	ctx context.Context,
+	repositories *Repositories,
+	smoke *LiveProviderSmokeRequest,
+) {
+	t.Helper()
+	request, err := repositories.TransitionProviderLogicalRequest(
+		ctx,
+		TransitionProviderLogicalRequest{
+			ID: smoke.Request.ID, ExpectedRevision: smoke.Request.Revision,
+			From:             ProviderLogicalRequestPlanned,
+			To:               ProviderLogicalRequestInFlight,
+			AccountingStatus: ProviderAccountingUnknown,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	smoke.Request = request
+}
+
 func liveProviderSmokeInputFixture(t *testing.T) PrepareLiveProviderSmokeRequest {
 	t.Helper()
+	model := providers.ModelIdentity{
+		Provider: providers.ProviderIdentity{
+			Adapter: "openai-responses", AdapterVersion: "adapter-v1",
+			Provider: "openai", ProviderVersion: "responses-api-v1",
+		},
+		Model: "fixture-model", Revision: "fixture-model-v1",
+	}
+	selected, err := policy.Select(policy.SelectionInput{
+		BaselineModelRevision: model.Revision,
+		Override: &policy.ManualOverride{
+			Model: model, Reasoning: domain.ReasoningEffortMaximum,
+			Actor: "test", AuthorityReference: "storage-live-smoke-fixture",
+			Reason: "test fixture",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := forecast.Generate(forecast.Input{
+		RepositoryRevision:       "git-live-smoke-fixture",
+		TaskFingerprint:          hashFixture("9"),
+		TaskClass:                forecast.TaskClassSmallChange,
+		Policy:                   selected,
+		ToolConfigurationVersion: "fixture-tools-v1",
+		ValidationProfileVersion: "fixture-validation-v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eligibility, err := forecast.NewCounterfactualEligibility(
+		false,
+		[]string{"test-fixture"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	budgetID, err := domain.NewBudgetID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err := selected.BudgetDefaults.Materialize(budgetID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return PrepareLiveProviderSmokeRequest{
 		IdempotencyKey:        "explicit-live-smoke-fixture",
 		RepositoryPath:        filepath.Join(t.TempDir(), "repository"),
@@ -523,5 +644,7 @@ func liveProviderSmokeInputFixture(t *testing.T) PrepareLiveProviderSmokeRequest
 		OpaqueCredentialReference: "os://openai/live-smoke",
 		ModelIdentifier:           "fixture-model", ModelVersion: "fixture-model-v1",
 		RequestSHA256: hashFixture("9"),
+		Policy:        selected, Forecast: value, Eligibility: eligibility,
+		Budget: budget,
 	}
 }

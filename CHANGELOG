@@ -30,6 +30,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-061
+Date: 2026-07-30
+Type: Fixed routing, forecasting, and exact budget enforcement
+Request-or-TODO: M13-001 through M13-045 and M13-G01 through M13-G03
+Outcome: Added the frozen GPT-5.6 Sol maximum-effort policy, transparent
+  P50/P90 forecasts, exact rational budget reservations and settlements,
+  durable execution preflights, attributable budget adjustments, and terminal
+  forecast-versus-actual telemetry
+Affected-behavior: Tasks cannot start without current inspectable policy,
+  forecast, and budget evidence. Provider requests reserve the full retry
+  envelope before activation, reconcile physical attempts and actual usage,
+  block cross-task or over-cap work before I/O, retain unknown accounting, and
+  expose exact or unknown reserved, actual, and remaining amounts.
+Compatibility-or-migration: Adds migrations 000010 through 000013 for the
+  budget ledger, execution preflights, preapproval adjustments, and actual
+  provider-call reconciliation; schema version advances from 9 to 13.
+Verification: Fixed-policy, forecast, exact arithmetic, concurrent race,
+  retry, reconciliation, preflight, live zero-I/O hard-cap, migration,
+  generation, integration, security, and complete local test-all gates pass.
+  The final independent adversarial audit accepts every M13 TODO and gate.
+Dev-Log: DL-20260730-062
+
 Change-ID: CL-20260730-060
 Date: 2026-07-30
 Type: Provider abstraction and exact accounting

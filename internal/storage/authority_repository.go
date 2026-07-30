@@ -259,6 +259,45 @@ func (repositories *Repositories) ReserveBudget(
 		if current.Budget.WarningCost.Currency != input.Amount.Currency {
 			return typedError(ErrConstraint, "reserve budget", errors.New("currency mismatch"))
 		}
+		exactSnapshot, err := computeBudgetSnapshot(
+			ctx, transaction.sql, input.ID,
+		)
+		if err != nil {
+			return err
+		}
+		if exactSnapshot.CostAccountingUnknown ||
+			exactSnapshot.TokenAccountingUnknown {
+			return typedError(
+				ErrBudgetAccountingUnknown, "reserve budget",
+				errors.New("prior settled usage is unknown"),
+			)
+		}
+		if exactSnapshot.HardCapReached {
+			return typedError(
+				ErrBudgetExhausted, "reserve budget",
+				errors.New("task hard cap is already reached"),
+			)
+		}
+		legacyReservation := ExactMinorCost{
+			Numerator: input.Amount.MinorUnits, Denominator: 1,
+			Currency: input.Amount.Currency,
+		}
+		exposure, err := addExactCosts(
+			exactSnapshot.ReservedCost, exactSnapshot.ChargedCost,
+		)
+		if err != nil {
+			return err
+		}
+		exposure, err = addExactCosts(exposure, legacyReservation)
+		if err != nil {
+			return err
+		}
+		if compareExactCosts(exposure, exactSnapshot.HardCost) > 0 {
+			return typedError(
+				ErrConstraint, "reserve budget",
+				errors.New("hard cost cap exceeded"),
+			)
+		}
 		if input.Amount.MinorUnits >
 			current.Budget.HardStopCost.MinorUnits-
 				current.ReservedCost.MinorUnits-

@@ -184,6 +184,7 @@ func TestRunLiveGateExecutesOneAttributedContentFreeSmoke(t *testing.T) {
 		},
 		liveRuntime{
 			credentialStore: store,
+			pricing:         liveKnownPricing(time.Now()),
 			providerFactory: func(
 				_ *coordinator.ProviderCredentialSource,
 				fixture storage.LiveProviderSmokeRequest,
@@ -255,7 +256,7 @@ func TestRunLiveGateExecutesOneAttributedContentFreeSmoke(t *testing.T) {
 	}
 	if result.Status != "succeeded" ||
 		result.UsageStatus != "provider-reported" ||
-		result.CostStatus != "unknown" ||
+		result.CostStatus != "known" ||
 		result.Attempts != 1 {
 		t.Fatalf("run-live result = %#v", result)
 	}
@@ -296,13 +297,107 @@ func TestRunLiveGateExecutesOneAttributedContentFreeSmoke(t *testing.T) {
 	}
 	if attribution.Request.State != storage.ProviderLogicalRequestSucceeded ||
 		attribution.Request.ModelVersion != "fixture-revision" ||
-		attribution.Pricing == nil || attribution.Pricing.PricingKnown ||
+		attribution.Pricing == nil || !attribution.Pricing.PricingKnown ||
 		len(attribution.Attempts) != 1 ||
 		attribution.Attempts[0].Attempt.ProviderRequestIDRedacted == nil ||
 		*attribution.Attempts[0].Attempt.ProviderRequestIDRedacted !=
 			"provider-response-fixture" ||
 		attribution.Attempts[0].Attempt.SafeMetadataJSON == nil {
 		t.Fatalf("run-live attribution = %#v", attribution)
+	}
+}
+
+func TestRunLiveGateBudgetBlocksUnknownAndInsufficientCostBeforeStream(
+	t *testing.T,
+) {
+	tests := []struct {
+		name       string
+		pricing    *storage.LiveProviderSmokePricing
+		budget     func() (domain.TaskBudget, error)
+		wantReason string
+		wantPaused bool
+	}{
+		{
+			name:       "unknown pricing",
+			wantReason: "pricing is unknown",
+		},
+		{
+			name:    "insufficient hard cap",
+			pricing: liveExpensivePricing(time.Now()),
+			budget: func() (domain.TaskBudget, error) {
+				budget, err := newLiveTaskBudget()
+				budget.WarningCost.MinorUnits = 1
+				budget.HardStopCost.MinorUnits = 1
+				return budget, err
+			},
+			wantReason: "hard budget",
+			wantPaused: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			streamCalls := 0
+			var fixture storage.LiveProviderSmokeRequest
+			databasePath := filepath.Join(t.TempDir(), "live.sqlite")
+			runtime := liveRuntime{
+				credentialStore: liveTestCredentialStore{
+					secret: []byte("test-secret-never-print"),
+				},
+				pricing:       test.pricing,
+				budgetFactory: test.budget,
+				providerFactory: func(
+					_ *coordinator.ProviderCredentialSource,
+					prepared storage.LiveProviderSmokeRequest,
+					model providers.ModelIdentity,
+					_ providers.ModelCapabilities,
+				) (providers.ModelProvider, error) {
+					fixture = prepared
+					return &liveTestProvider{
+						identity:    model.Provider,
+						streamCalls: &streamCalls,
+					}, nil
+				},
+				now: time.Now,
+			}
+			code := runLiveGateWithRuntime(
+				context.Background(),
+				&stdout,
+				&stderr,
+				commandInvocation{
+					JSON: true, Provider: "openai",
+					Model: "fixture-model", ModelRevision: "fixture-revision",
+					CredentialRef: "os://openai/live-test",
+					Database:      databasePath,
+				},
+				runtime,
+			)
+			if code != exitFailure {
+				t.Fatalf(
+					"run-live exit = %d, stdout=%q stderr=%q",
+					code, stdout.String(), stderr.String(),
+				)
+			}
+			if streamCalls != 0 {
+				t.Fatalf("provider Stream calls = %d, want zero", streamCalls)
+			}
+			var result liveGateResult
+			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if result.Attempts != 0 ||
+				!strings.Contains(result.Reason, test.wantReason) {
+				t.Fatalf("run-live result = %#v", result)
+			}
+			if test.wantPaused {
+				assertLiveBudgetExhaustedPersistence(
+					t,
+					databasePath,
+					fixture,
+				)
+			}
+		})
 	}
 }
 
@@ -348,8 +443,9 @@ func (liveTestCredentialStore) Delete(
 }
 
 type liveTestProvider struct {
-	identity providers.ProviderIdentity
-	events   []providers.StreamEvent
+	identity    providers.ProviderIdentity
+	events      []providers.StreamEvent
+	streamCalls *int
 }
 
 func (provider *liveTestProvider) ProviderIdentity() providers.ProviderIdentity {
@@ -373,7 +469,87 @@ func (provider *liveTestProvider) Stream(
 	context.Context,
 	providers.ModelRequest,
 ) (providers.ModelStream, error) {
+	if provider.streamCalls != nil {
+		(*provider.streamCalls)++
+	}
 	return &liveTestStream{events: provider.events}, nil
+}
+
+func liveKnownPricing(now time.Time) *storage.LiveProviderSmokePricing {
+	return &storage.LiveProviderSmokePricing{
+		Currency:       domain.CurrencyCode("USD"),
+		SourceRedacted: "test immutable pricing",
+		EffectiveAt:    now.UTC(),
+		Components: []storage.ProviderPriceComponent{
+			{
+				UsageKind: "input", MinorNumerator: 1,
+				TokenDenominator: 1_000_000,
+			},
+			{
+				UsageKind: "output", MinorNumerator: 1,
+				TokenDenominator: 1_000_000,
+			},
+		},
+	}
+}
+
+func liveExpensivePricing(now time.Time) *storage.LiveProviderSmokePricing {
+	pricing := liveKnownPricing(now)
+	for index := range pricing.Components {
+		pricing.Components[index].TokenDenominator = 1
+	}
+	return pricing
+}
+
+func assertLiveBudgetExhaustedPersistence(
+	t *testing.T,
+	path string,
+	fixture storage.LiveProviderSmokeRequest,
+) {
+	t.Helper()
+	if fixture.TaskID.IsZero() || fixture.Request.ID.IsZero() {
+		t.Fatal("budget-exhausted live fixture was not persisted")
+	}
+	ctx := context.Background()
+	database, err := storage.Open(ctx, storage.OpenOptions{Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		closeContext, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+		if err := database.Close(closeContext); err != nil {
+			t.Errorf("close budget-exhausted live database: %v", err)
+		}
+	})
+	repositories, err := storage.NewRepositories(database, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err := repositories.GetTask(ctx, fixture.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attribution, err := repositories.GetProviderRequestAttribution(
+		ctx,
+		fixture.Request.ID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.State != domain.TaskStatePaused ||
+		attribution.Request.State != storage.ProviderLogicalRequestCancelled ||
+		attribution.Accounting.AttemptCount != 0 {
+		t.Fatalf(
+			"budget-exhausted persistence task=%q request=%q attempts=%d",
+			task.State,
+			attribution.Request.State,
+			attribution.Accounting.AttemptCount,
+		)
+	}
 }
 
 func (*liveTestProvider) Cancel(

@@ -60,6 +60,7 @@ type Application struct {
 	credentials credentials.Store
 	providers   ProviderDependencies
 	workspace   WorkspaceDependencies
+	preflight   *TaskPreflightService
 	events      *events.Hub
 	transport   *transport.Boundary
 	scheduler   *DurableScheduler
@@ -153,6 +154,10 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	taskPreflight, err := NewTaskPreflightService(repositories)
+	if err != nil {
+		return nil, err
+	}
 	credentialStore := credentials.NewPlatformStore()
 	providerDependencies, err := newProviderDependencies(
 		credentialStore, repositories,
@@ -190,8 +195,9 @@ func StartApplication(
 	application := &Application{
 		lock: instanceLock, database: database, repos: repositories,
 		credentials: credentialStore, providers: providerDependencies,
-		workspace: workspaceDependencies, scheduler: scheduler,
-		listener: listener, workers: options.Workers,
+		workspace: workspaceDependencies, preflight: taskPreflight,
+		scheduler: scheduler,
+		listener:  listener, workers: options.Workers,
 		secret:    base64.RawURLEncoding.EncodeToString(secretBytes),
 		serveDone: make(chan error, 1),
 		heartbeat: options.HeartbeatTimeout, now: options.Now,
@@ -300,6 +306,12 @@ func (application *Application) ProviderDependencies() ProviderDependencies {
 
 func (application *Application) WorkspaceDependencies() WorkspaceDependencies {
 	return application.workspace
+}
+
+// TaskPreflightService exposes the fixed-policy preparation, start, and
+// terminal outcome lifecycle to product handlers.
+func (application *Application) TaskPreflightService() *TaskPreflightService {
+	return application.preflight
 }
 
 func (application *Application) TransportBoundary() *transport.Boundary {

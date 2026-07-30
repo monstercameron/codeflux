@@ -130,6 +130,16 @@ type RetryExecutor struct {
 	recorder AttemptRecorder
 }
 
+// MaximumAttempts returns the normalized physical-attempt limit enforced by
+// Execute. Coordinators use this value when reserving the complete retry bound
+// before any provider I/O begins.
+func (executor *RetryExecutor) MaximumAttempts() int {
+	if executor == nil {
+		return 0
+	}
+	return executor.policy.MaximumAttempts
+}
+
 // NewRetryExecutor validates a retry policy and requires an attempt recorder so
 // no physical request can escape attribution.
 func NewRetryExecutor(

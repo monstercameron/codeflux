@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/forecast"
+	"codeflux.dev/codeflux/internal/policy"
 )
 
 type LiveProviderSmokePricing struct {
@@ -39,6 +42,10 @@ type PrepareLiveProviderSmokeRequest struct {
 	ModelVersion              string
 	RequestSHA256             string
 	Pricing                   *LiveProviderSmokePricing
+	Policy                    policy.Snapshot
+	Forecast                  forecast.Forecast
+	Eligibility               forecast.CounterfactualEligibility
+	Budget                    domain.TaskBudget
 }
 
 type LiveProviderSmokeRequest struct {
@@ -50,6 +57,8 @@ type LiveProviderSmokeRequest struct {
 	ProviderID    domain.ProviderID
 	Configuration ProviderConfigurationRevision
 	Pricing       ProviderPricingRevision
+	Preflight     ExecutionPreflight
+	Budget        BudgetSnapshot
 	Request       ProviderLogicalRequest
 }
 
@@ -76,7 +85,18 @@ type FinalizeLiveProviderSmokeRequest struct {
 type AbortLiveProviderSmokeRequestBeforeIO struct {
 	RequestID        domain.ModelRequestID
 	ExpectedRevision uint64
+	Reason           LiveProviderPreIOBlockReason
 }
+
+// LiveProviderPreIOBlockReason preserves why provider I/O was denied instead
+// of collapsing a budget decision into a generic provider failure.
+type LiveProviderPreIOBlockReason string
+
+const (
+	LiveProviderPreIOAborted         LiveProviderPreIOBlockReason = "aborted"
+	LiveProviderPreIOPriceUnknown    LiveProviderPreIOBlockReason = "price-unknown"
+	LiveProviderPreIOBudgetExhausted LiveProviderPreIOBlockReason = "budget-exhausted"
+)
 
 type LiveProviderSmokeOperations interface {
 	PrepareLiveProviderSmokeRequest(
@@ -176,7 +196,7 @@ func (repositories *Repositories) PrepareLiveProviderSmokeRequest(
 				idempotency_key, created_at_unix_micros,
 				updated_at_unix_micros
 			) VALUES (
-				?, ?, ?, 'running', 'correctness', 'standard', 'routine',
+				?, ?, ?, 'ready', 'correctness', 'standard', 'routine',
 				'runtime-only', ?, ?, ?
 			)`,
 			ids.TaskID, ids.ThreadID, repositoryID, taskKey, micros, micros,
@@ -192,6 +212,18 @@ func (repositories *Repositories) PrepareLiveProviderSmokeRequest(
 		); err != nil {
 			return repositoryWriteError("bind live smoke task settings", err)
 		}
+		preflight, err := persistLiveSmokeExecutionPreflight(
+			ctx,
+			transaction,
+			ids.TaskID,
+			input,
+			idempotencyHash,
+			now,
+			micros,
+		)
+		if err != nil {
+			return err
+		}
 		if _, err := transaction.sql.ExecContext(
 			ctx,
 			`INSERT INTO runs (
@@ -201,6 +233,30 @@ func (repositories *Repositories) PrepareLiveProviderSmokeRequest(
 			ids.RunID, ids.TaskID, taskKey, micros, micros,
 		); err != nil {
 			return repositoryWriteError("create live smoke run", err)
+		}
+		if _, err := transaction.sql.ExecContext(
+			ctx,
+			`INSERT INTO run_execution_bindings (
+				run_id, task_id, preflight_revision, policy_revision,
+				forecast_revision, budget_id, budget_limit_revision,
+				budget_snapshot_revision, created_at_unix_micros
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			ids.RunID, ids.TaskID, preflight.Revision,
+			preflight.PolicyRevision, preflight.ForecastRevision,
+			preflight.BudgetID, preflight.BudgetLimitRevision,
+			preflight.BudgetSnapshotRevision, micros,
+		); err != nil {
+			return repositoryWriteError("bind live smoke run preflight", err)
+		}
+		if _, err := transaction.sql.ExecContext(
+			ctx,
+			`UPDATE tasks
+			 SET state = 'running', revision = 1,
+			     updated_at_unix_micros = ?
+			 WHERE id = ? AND state = 'ready' AND revision = 0`,
+			micros, ids.TaskID,
+		); err != nil {
+			return repositoryWriteError("start prepared live smoke task", err)
 		}
 		if _, err := transaction.sql.ExecContext(
 			ctx,
@@ -227,14 +283,14 @@ func (repositories *Repositories) PrepareLiveProviderSmokeRequest(
 				started_at_unix_micros, created_at_unix_micros,
 				updated_at_unix_micros
 			) VALUES (
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in-flight', ?, ?,
-				'unknown', ?, ?, ?
+				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?,
+				'unknown', NULL, ?, ?
 			)`,
 			ids.RequestID, ids.TaskID, ids.RunID, providerID,
 			configuration.ID, configuration.AdapterName,
 			configuration.AdapterVersion, configuration.ProviderVersion,
 			input.ModelIdentifier, input.ModelVersion, pricing.ID,
-			input.RequestSHA256, requestKey, micros, micros, micros,
+			input.RequestSHA256, requestKey, micros, micros,
 		); err != nil {
 			return repositoryWriteError("create live smoke logical request", err)
 		}
@@ -267,6 +323,145 @@ func (repositories *Repositories) PrepareLiveProviderSmokeRequest(
 		return LiveProviderSmokeRequest{}, err
 	}
 	return repositories.loadLiveProviderSmokeRequest(ctx, fixture)
+}
+
+func persistLiveSmokeExecutionPreflight(
+	ctx context.Context,
+	transaction *Transaction,
+	taskID domain.TaskID,
+	input PrepareLiveProviderSmokeRequest,
+	idempotencyHash string,
+	now time.Time,
+	micros int64,
+) (ExecutionPreflight, error) {
+	policyJSON, err := input.Policy.CanonicalJSON()
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	policyDigest, err := input.Policy.Digest()
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	if _, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO execution_policy_revisions (
+			task_id, revision, policy_version, selection_source,
+			canonical_json, content_sha256, idempotency_key,
+			created_at_unix_micros
+		) VALUES (?, 1, ?, ?, ?, ?, ?, ?)`,
+		taskID, input.Policy.Version, input.Policy.Source,
+		string(policyJSON), policyDigest,
+		"live-smoke-policy-"+idempotencyHash[:32], micros,
+	); err != nil {
+		return ExecutionPreflight{},
+			repositoryWriteError("record live smoke policy", err)
+	}
+	forecastJSON, err := json.Marshal(input.Forecast)
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	featuresJSON, err := json.Marshal(input.Forecast.Features)
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	eligibilityJSON, err := json.Marshal(input.Eligibility)
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	if _, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO effort_forecast_revisions (
+			task_id, revision, policy_revision, algorithm_version,
+			canonical_json, content_sha256, features_json,
+			features_sha256, counterfactual_eligible, eligibility_json,
+			idempotency_key, created_at_unix_micros
+		) VALUES (?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		taskID, input.Forecast.AlgorithmVersion,
+		string(forecastJSON), hashJSON(string(forecastJSON)),
+		string(featuresJSON), hashJSON(string(featuresJSON)),
+		input.Eligibility.Eligible, string(eligibilityJSON),
+		"live-smoke-forecast-"+idempotencyHash[:32], micros,
+	); err != nil {
+		return ExecutionPreflight{},
+			repositoryWriteError("record live smoke forecast", err)
+	}
+	if _, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO budgets (
+			id, task_id, currency, warning_cost_minor, hard_stop_cost_minor,
+			warning_tokens, hard_stop_tokens, warning_wall_clock_millis,
+			hard_stop_wall_clock_millis, maximum_provider_calls,
+			maximum_repair_rounds, maximum_tool_executions,
+			reserved_cost_minor, actual_cost_minor, actual_tokens,
+			created_at_unix_micros, updated_at_unix_micros, revision
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, 0)`,
+		input.Budget.ID, taskID, input.Budget.WarningCost.Currency,
+		input.Budget.WarningCost.MinorUnits,
+		input.Budget.HardStopCost.MinorUnits,
+		input.Budget.WarningTokens, input.Budget.HardStopTokens,
+		input.Budget.WarningWallClock, input.Budget.HardStopWallClock,
+		input.Budget.MaximumProviderCalls,
+		input.Budget.MaximumRepairRounds,
+		input.Budget.MaximumToolExecutions,
+		micros, micros,
+	); err != nil {
+		return ExecutionPreflight{},
+			repositoryWriteError("create live smoke budget", err)
+	}
+	initialBudget, err := computeBudgetSnapshot(
+		ctx,
+		transaction.sql,
+		input.Budget.ID,
+	)
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	preflightInput := PrepareTaskExecution{
+		TaskID: taskID, ExpectedTaskRevision: 0,
+		PolicyRevision: 1, ForecastRevision: 1,
+		BudgetID:            input.Budget.ID,
+		BudgetLimitRevision: initialBudget.LimitRevision,
+		IdempotencyKey:      "live-smoke-preflight-" + idempotencyHash[:32],
+	}
+	presentation, budgetSnapshotRevision, err :=
+		buildCurrentPreflightPresentation(
+			ctx,
+			transaction.sql,
+			preflightInput,
+		)
+	if err != nil {
+		return ExecutionPreflight{}, err
+	}
+	preflight := ExecutionPreflight{
+		TaskID: taskID, Revision: 1, ExpectedTaskRevision: 0,
+		PolicyRevision: 1, ForecastRevision: 1,
+		BudgetID:               input.Budget.ID,
+		BudgetLimitRevision:    initialBudget.LimitRevision,
+		BudgetSnapshotRevision: budgetSnapshotRevision,
+		PresentationJSON:       presentation,
+		ContentSHA256:          hashJSON(presentation),
+		IdempotencyKey:         preflightInput.IdempotencyKey,
+		CreatedAt:              now,
+	}
+	if _, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO task_execution_preflights (
+			task_id, revision, expected_task_revision, policy_revision,
+			forecast_revision, budget_id, budget_limit_revision,
+			budget_snapshot_revision, presentation_json, content_sha256,
+			idempotency_key, created_at_unix_micros
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		preflight.TaskID, preflight.Revision,
+		preflight.ExpectedTaskRevision, preflight.PolicyRevision,
+		preflight.ForecastRevision, preflight.BudgetID,
+		preflight.BudgetLimitRevision, preflight.BudgetSnapshotRevision,
+		preflight.PresentationJSON, preflight.ContentSHA256,
+		preflight.IdempotencyKey, micros,
+	); err != nil {
+		return ExecutionPreflight{},
+			repositoryWriteError("prepare live smoke execution", err)
+	}
+	return preflight, nil
 }
 
 func (repositories *Repositories) GetProviderRequestAttribution(
@@ -369,7 +564,12 @@ func (repositories *Repositories) FinalizeLiveProviderSmokeRequest(
 	ctx context.Context,
 	input FinalizeLiveProviderSmokeRequest,
 ) (ProviderRequestAttribution, error) {
-	return repositories.finalizeLiveProviderSmokeRequest(ctx, input, false)
+	return repositories.finalizeLiveProviderSmokeRequest(
+		ctx,
+		input,
+		false,
+		LiveProviderPreIOAborted,
+	)
 }
 
 func (repositories *Repositories) AbortLiveProviderSmokeRequestBeforeIO(
@@ -379,14 +579,30 @@ func (repositories *Repositories) AbortLiveProviderSmokeRequestBeforeIO(
 	if input.RequestID.IsZero() {
 		return ProviderRequestAttribution{}, errors.New("live smoke request ID is required")
 	}
+	reason := input.Reason
+	if reason == "" {
+		reason = LiveProviderPreIOAborted
+	}
+	if !slices.Contains(
+		[]LiveProviderPreIOBlockReason{
+			LiveProviderPreIOAborted,
+			LiveProviderPreIOPriceUnknown,
+			LiveProviderPreIOBudgetExhausted,
+		},
+		reason,
+	) {
+		return ProviderRequestAttribution{},
+			errors.New("live smoke pre-I/O block reason is invalid")
+	}
 	return repositories.finalizeLiveProviderSmokeRequest(
 		ctx,
 		FinalizeLiveProviderSmokeRequest{
 			RequestID: input.RequestID, ExpectedRevision: input.ExpectedRevision,
-			To:               ProviderLogicalRequestFailed,
+			To:               ProviderLogicalRequestCancelled,
 			AccountingStatus: ProviderAccountingUnknown,
 		},
 		true,
+		reason,
 	)
 }
 
@@ -394,6 +610,7 @@ func (repositories *Repositories) finalizeLiveProviderSmokeRequest(
 	ctx context.Context,
 	input FinalizeLiveProviderSmokeRequest,
 	beforeExternalIO bool,
+	preIOReason LiveProviderPreIOBlockReason,
 ) (ProviderRequestAttribution, error) {
 	if input.RequestID.IsZero() ||
 		!slices.Contains(
@@ -431,7 +648,10 @@ func (repositories *Repositories) finalizeLiveProviderSmokeRequest(
 		if err != nil {
 			return err
 		}
-		logicalNeedsTransition := request.State == ProviderLogicalRequestInFlight
+		logicalNeedsTransition :=
+			request.State == ProviderLogicalRequestInFlight ||
+				beforeExternalIO &&
+					request.State == ProviderLogicalRequestPlanned
 		if logicalNeedsTransition && request.Revision != input.ExpectedRevision {
 			return typedError(
 				ErrStaleRevision, "finalize live provider smoke request",
@@ -557,15 +777,32 @@ func (repositories *Repositories) finalizeLiveProviderSmokeRequest(
 			)
 		}
 		taskState, runState := liveSmokeTerminalStates(input.To)
+		eventType := "provider.live-smoke." + string(input.To)
+		failureReason := "live provider smoke request did not complete successfully"
+		if beforeExternalIO {
+			switch preIOReason {
+			case LiveProviderPreIOPriceUnknown:
+				taskState, runState = "failed", "failed"
+				eventType = "provider.price-unknown"
+				failureReason = "provider price is unknown; external I/O was blocked"
+			case LiveProviderPreIOBudgetExhausted:
+				taskState, runState = "paused", "paused"
+				eventType = "budget.exhausted"
+				failureReason = ""
+			}
+		}
 		_, micros := repositories.timestamp()
 		if logicalNeedsTransition {
 			if _, err := transaction.sql.ExecContext(
 				ctx,
 				`UPDATE provider_logical_requests SET state = ?,
 					accounting_status = ?, completed_at_unix_micros = ?,
+					started_at_unix_micros =
+					    coalesce(started_at_unix_micros, ?),
 					updated_at_unix_micros = ?, revision = revision + 1
-				 WHERE id = ? AND revision = ? AND state = 'in-flight'`,
-				input.To, input.AccountingStatus, micros, micros,
+				 WHERE id = ? AND revision = ?
+				   AND state IN ('planned', 'in-flight')`,
+				input.To, input.AccountingStatus, micros, micros, micros,
 				input.RequestID, input.ExpectedRevision,
 			); err != nil {
 				return repositoryWriteError("finalize live smoke logical request", err)
@@ -621,14 +858,18 @@ func (repositories *Repositories) finalizeLiveProviderSmokeRequest(
 			ctx,
 			`UPDATE tasks SET state = ?,
 				failure_reason = CASE WHEN ? IN ('failed', 'recovery-required')
-				    THEN 'live provider smoke request did not complete successfully'
+				    THEN ?
 				    ELSE failure_reason END,
+				pause_reason = CASE WHEN ? = 'paused'
+				    THEN 'budget-exhausted'
+				    ELSE pause_reason END,
 				cancellation_reason = CASE WHEN ? = 'cancelled'
 				    THEN 'live provider smoke request was cancelled'
 				    ELSE cancellation_reason END,
 				updated_at_unix_micros = ?, revision = revision + 1
 			 WHERE id = ? AND state = 'running'`,
-			taskState, taskState, taskState, micros, fixture.TaskID,
+			taskState, taskState, failureReason, taskState,
+			taskState, micros, fixture.TaskID,
 		)
 		if err != nil {
 			return repositoryWriteError("finalize live smoke task", err)
@@ -655,7 +896,7 @@ func (repositories *Repositories) finalizeLiveProviderSmokeRequest(
 				idempotency_key, created_at_unix_micros
 			) VALUES (?, ?, ?, ?, ?, '{"diagnostic":"live-provider-smoke"}', ?, ?)`,
 			eventID, fixture.TaskID, fixture.RunID, sequence,
-			"provider.live-smoke."+string(input.To),
+			eventType,
 			"live-smoke-final-"+input.RequestID.String(), micros,
 		); err != nil {
 			return repositoryWriteError("record live smoke completion", err)
@@ -1000,11 +1241,24 @@ func (repositories *Repositories) loadLiveProviderSmokeRequest(
 	if err != nil {
 		return LiveProviderSmokeRequest{}, err
 	}
+	preflight, err := repositories.GetTaskExecutionPreflight(
+		ctx,
+		fixture.TaskID,
+		1,
+	)
+	if err != nil {
+		return LiveProviderSmokeRequest{}, err
+	}
+	budget, err := repositories.GetBudgetSnapshot(ctx, fixture.TaskID)
+	if err != nil {
+		return LiveProviderSmokeRequest{}, err
+	}
 	return LiveProviderSmokeRequest{
 		ProjectID: fixture.ProjectID, RepositoryID: fixture.RepositoryID,
 		ThreadID: fixture.ThreadID, TaskID: fixture.TaskID, RunID: fixture.RunID,
 		ProviderID: fixture.ProviderID, Configuration: configuration,
-		Pricing: pricing, Request: request,
+		Pricing: pricing, Preflight: preflight, Budget: budget,
+		Request: request,
 	}, nil
 }
 
@@ -1186,6 +1440,19 @@ func validateLiveProviderSmokeInput(input PrepareLiveProviderSmokeRequest) error
 	if !validSHA256(input.RequestSHA256) {
 		return errors.New("live smoke request hash is invalid")
 	}
+	if err := input.Policy.Validate(); err != nil {
+		return fmt.Errorf("live smoke execution policy: %w", err)
+	}
+	if err := input.Forecast.Validate(input.Policy); err != nil {
+		return fmt.Errorf("live smoke effort forecast: %w", err)
+	}
+	if !input.Eligibility.AdvisoryOnly ||
+		(!input.Eligibility.Eligible && len(input.Eligibility.Reasons) == 0) {
+		return errors.New("live smoke counterfactual eligibility is invalid")
+	}
+	if err := input.Budget.Validate(); err != nil {
+		return fmt.Errorf("live smoke task budget: %w", err)
+	}
 	if input.Pricing != nil {
 		if input.Pricing.EffectiveAt.IsZero() {
 			return errors.New("live smoke pricing effective time is required")
@@ -1223,6 +1490,17 @@ func liveProviderSmokeInputHash(input PrepareLiveProviderSmokeRequest) string {
 		input.OpaqueCredentialReference, input.ModelIdentifier,
 		input.ModelVersion, input.RequestSHA256,
 	}
+	policyJSON, _ := input.Policy.CanonicalJSON()
+	forecastJSON, _ := json.Marshal(input.Forecast)
+	eligibilityJSON, _ := json.Marshal(input.Eligibility)
+	budgetJSON, _ := json.Marshal(input.Budget)
+	fields = append(
+		fields,
+		string(policyJSON),
+		string(forecastJSON),
+		string(eligibilityJSON),
+		string(budgetJSON),
+	)
 	if input.Pricing == nil {
 		fields = append(fields, "pricing:unknown")
 	} else {
