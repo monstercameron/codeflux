@@ -17,6 +17,16 @@ var (
 	ErrUnreadable = errors.New("database unreadable")
 	// ErrConstraint means a durable database constraint rejected a write.
 	ErrConstraint = errors.New("database constraint")
+	// ErrMigrationLocked means another process owns schema migration authority.
+	ErrMigrationLocked = errors.New("database migration locked")
+	// ErrMigrationFailed means a prior or current migration failed safely.
+	ErrMigrationFailed = errors.New("database migration failed")
+	// ErrSchemaNewer means the database requires a newer Codeflux binary.
+	ErrSchemaNewer = errors.New("database schema newer than binary")
+	// ErrMigrationChecksum means immutable migration history does not match.
+	ErrMigrationChecksum = errors.New("database migration checksum mismatch")
+	// ErrDiskSpace means backup and migration safety space is unavailable.
+	ErrDiskSpace = errors.New("insufficient disk space for database migration")
 )
 
 // Error adds a stable storage classification and bounded operation name.

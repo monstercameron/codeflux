@@ -643,7 +643,7 @@ Milestone output: a migrated, backed-up, integrity-checked SQLite database plus 
 - [x] `M03-009 DATA` Add a health check that verifies reads, writes, foreign keys, and journal mode.
 - [x] `M03-010 DATA` Add graceful close behavior.
 - [x] `M03-011 DATA` Add corruption and unreadable-file error classification.
-- [ ] `M03-012 DATA` Prevent two incompatible Codeflux versions from concurrently migrating the same database.
+- [x] `M03-012 DATA` Prevent two incompatible Codeflux versions from concurrently migrating the same database.
 
 Database-lifecycle evidence:
 
@@ -660,19 +660,34 @@ Database-lifecycle evidence:
 
 ## Migration System
 
-- [ ] `M03-013 BLOCKER DATA` Define monotonically ordered forward migrations.
-- [ ] `M03-014 DATA` Create a schema-version table.
-- [ ] `M03-015 DATA` Record migration checksum, application version, start time, completion time, and result.
-- [ ] `M03-016 DATA` Embed migrations in the binary.
-- [ ] `M03-017 DATA` Apply migrations transactionally when SQLite permits.
-- [ ] `M03-018 DATA` Back up the database before a schema-changing migration.
-- [ ] `M03-019 DATA` Validate available disk space before backup and migration.
-- [ ] `M03-020 DATA` Refuse startup when the database schema is newer than the binary supports.
-- [ ] `M03-021 DATA` Preserve a failed migration error without repeatedly mutating the database.
-- [ ] `M03-022 TEST` Test migration from an empty database.
-- [ ] `M03-023 TEST` Test migration across every committed schema version.
-- [ ] `M03-024 TEST` Test restart after an interrupted migration.
-- [ ] `M03-025 TEST` Test backup restoration.
+- [x] `M03-013 BLOCKER DATA` Define monotonically ordered forward migrations.
+- [x] `M03-014 DATA` Create a schema-version table.
+- [x] `M03-015 DATA` Record migration checksum, application version, start time, completion time, and result.
+- [x] `M03-016 DATA` Embed migrations in the binary.
+- [x] `M03-017 DATA` Apply migrations transactionally when SQLite permits.
+- [x] `M03-018 DATA` Back up the database before a schema-changing migration.
+- [x] `M03-019 DATA` Validate available disk space before backup and migration.
+- [x] `M03-020 DATA` Refuse startup when the database schema is newer than the binary supports.
+- [x] `M03-021 DATA` Preserve a failed migration error without repeatedly mutating the database.
+- [x] `M03-022 TEST` Test migration from an empty database.
+- [x] `M03-023 TEST` Test migration across every committed schema version.
+- [x] `M03-024 TEST` Test restart after an interrupted migration.
+- [x] `M03-025 TEST` Test backup restoration.
+
+Migration-system evidence:
+
+- An OS-backed per-database lock provides cross-process migration authority and
+  releases automatically on process termination.
+- Embedded catalog entries are contiguous and their generated SHA-256 values
+  are rechecked against embedded SQL before use and against applied history.
+- Migration-control tables retain schema version and complete attempt history.
+  Each migration, version advance, and success record commits atomically.
+- Disk-space validation precedes a restrictive SQLite Online Backup snapshot.
+  Newer schemas, checksum drift, and stable prior failures refuse mutation.
+- Real-SQLite tests cover empty migration, upgrade from every committed schema
+  version, lock contention, insufficient space, downgrade refusal, checksum
+  mismatch, transactional failure restoration, interrupted-start restoration,
+  stable retry refusal, and direct backup restoration.
 
 ## Initial Operational Schema
 

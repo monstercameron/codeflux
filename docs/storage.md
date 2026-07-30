@@ -55,3 +55,27 @@ Primary references:
 - <https://www.sqlite.org/pragma.html#pragma_synchronous>
 - <https://www.sqlite.org/wal.html>
 - <https://www.sqlite.org/lang_transaction.html>
+
+## Migration and recovery policy
+
+Migrations are immutable, embedded, checksum-bound, and monotonically numbered.
+The database records the application version, checksum, start, completion,
+result, failure text, and recovery snapshot for every attempt.
+
+Before pending migrations run, Codeflux:
+
+1. acquires an OS-backed cross-process lock beside the database;
+2. refuses schemas newer than the binary or histories whose checksums differ;
+3. verifies free space for two database sizes plus a fixed safety reserve;
+4. creates a restrictive snapshot with SQLite's Online Backup API; and
+5. executes each migration and version/history update in one transaction.
+
+A failed migration is rolled back, the snapshot is restored, and one stable
+failure record is written. Later startups report that record without retrying
+or changing the database. If a process stops after recording a migration start,
+the next startup restores the recorded snapshot, marks the attempt failed, and
+also refuses an automatic retry.
+
+Primary reference:
+
+- <https://www.sqlite.org/backup.html>

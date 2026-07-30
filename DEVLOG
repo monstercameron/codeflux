@@ -24,6 +24,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-033
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-032
+Request-or-TODO: M03-012 through M03-025
+Goal: Make schema change deterministic, exclusive, recoverable, and auditable
+  before the operational tables are introduced
+Assumptions: Migration infrastructure tables may be bootstrapped before the
+  first application migration; one recovery snapshot covers one ordered startup
+  migration batch; interrupted and failed attempts require explicit review
+  rather than automatic repeated mutation
+Decisions: Use a cross-platform OS file lock beside the database; verify
+  embedded and applied SHA-256 checksums; require two database sizes plus a
+  fixed 16 MiB free-space reserve; use SQLite Online Backup/Restore; record
+  start before execution and update schema version plus success in one SQL
+  transaction; restore then record one stable failure on error or interruption
+Files-or-schemas: go.mod, go.sum, docs/storage.md, migrations source loader,
+  internal/storage backup, disk-space, migration engine and real-database tests,
+  TODOS.md, CHANGELOG, DEVLOG; adds migration-control schema at runtime
+Validation: The preceding M02 policy commit passed public CI run 30521523866.
+  Tests migrate empty databases and dynamically upgrade from every committed
+  schema version; verify exclusive lock timeout, disk-space refusal, newer
+  schema refusal, source checksum mismatch, online backup restoration,
+  transaction rollback, pre-attempt snapshot restoration, interrupted-start
+  recovery, and unchanged failure count on repeated startup. Full repository
+  test-all, lint, generation, migration, and artifact checks pass.
+Failures-or-discarded-approaches: Rejected a durable lock row alone because a
+  crashed process would leave ambiguous authority; the OS lock releases on
+  process death while durable history records interrupted intent. Rejected raw
+  file copying in favor of SQLite's consistency-aware Online Backup API.
+Known-limitations: Version 0 remains the only committed application migration;
+  the initial operational schema is the next append-only migration
+Next-safe-step: Add the normalized operational tables, ownership and lineage
+  constraints, idempotency and sequence uniqueness, query indexes, numeric and
+  state checks, and immutability enforcement required by M03-026 through
+  M03-043
+
 Dev-Log: DL-20260730-032
 Date: 2026-07-30
 Status: Complete

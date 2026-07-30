@@ -7,3 +7,9 @@ type Descriptor struct {
 	Name   string
 	SHA256 string
 }
+
+// Source binds one generated descriptor to its immutable embedded SQL.
+type Source struct {
+	Descriptor Descriptor
+	SQL        string
+}

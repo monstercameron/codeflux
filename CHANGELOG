@@ -30,6 +30,23 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-032
+Date: 2026-07-30
+Type: Transactional SQLite migration and recovery
+Request-or-TODO: M03-012 through M03-025
+Outcome: Added cross-process migration authority, embedded source verification,
+  schema/history control, disk-space gating, online backup/restore, transactional
+  application, downgrade refusal, and stable failure recovery
+Affected-behavior: Pending schemas migrate only after a recovery snapshot;
+  incompatible concurrent binaries, newer schemas, checksum drift, and failed
+  attempts refuse unsafe or repeated mutation
+Compatibility-or-migration: Adds github.com/gofrs/flock v0.13.0; initializes
+  migration-control tables and applies embedded migration version 0
+Verification: Real-SQLite tests cover every committed start version, backup and
+  restore, contention, disk exhaustion, downgrade, checksum mismatch, failure,
+  interruption, and stable refusal; full repository suites pass
+Dev-Log: DL-20260730-033
+
 Change-ID: CL-20260730-031
 Date: 2026-07-30
 Type: SQLite database lifecycle
