@@ -24,6 +24,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-003
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-002
+Request-or-TODO: M01-001 through M01-006
+Goal: Establish the smallest buildable repository identity and text policy
+Assumptions: No Git remote establishes a canonical import path, so
+  codeflux.dev/codeflux is used as a reversible product-owned vanity path
+Decisions: Set minimum language semantics to Go 1.26.0; require bootstrap and
+  CI to select the latest patched 1.26 toolchain; choose Apache-2.0; retain the
+  explicitly required absence of a root README
+Files-or-schemas: go.mod, LICENSE, .gitattributes, .gitignore, TODOS.md,
+  CHANGELOG, DEVLOG; no runtime schema
+Validation: `go env GOMOD` resolved the root go.mod; `go mod edit -json`
+  reported module codeflux.dev/codeflux and Go 1.26.0; `git check-attr`
+  confirmed LF text, CRLF batch files, and binary image treatment;
+  `git check-ignore` confirmed .artifacts descendants are ignored; root
+  README.md is absent; `git diff --check` passed
+Failures-or-discarded-approaches: Rejected pinning the installed Go 1.26.3
+  patch because official release history identifies Go 1.26.5 as the current
+  security-patched release; rejected inventing a GitHub owner without a remote
+Known-limitations: The current host runs Go 1.26.3. M01 bootstrap must report
+  the outdated patch and CI must use the latest 1.26 patch. No package exists
+  until M01-007.
+Next-safe-step: Verify and commit the repository identity, then implement the
+  dependency-directed package skeleton in M01-007 through M01-025.
+
 Dev-Log: DL-20260730-002
 Date: 2026-07-30
 Status: Complete

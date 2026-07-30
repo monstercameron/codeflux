@@ -240,12 +240,20 @@ Milestone output: a clean Go workspace that builds, generates, tests, reports it
 
 ## Repository Structure
 
-- [ ] `M01-001 BLOCKER` Initialize the Go module with the chosen module path.
-- [ ] `M01-002 BLOCKER` Pin the minimum supported Go version.
-- [ ] `M01-003` Check whether the user has explicitly requested a root `README.md`; create only that file if explicitly authorized, otherwise record that its intentional absence does not block the milestone.
-- [ ] `M01-004` Add a root `LICENSE` after choosing the project license.
+- [x] `M01-001 BLOCKER` Initialize the Go module with the chosen module path.
+- [x] `M01-002 BLOCKER` Pin the minimum supported Go version.
+- [x] `M01-003` Check whether the user has explicitly requested a root `README.md`; create only that file if explicitly authorized, otherwise record that its intentional absence does not block the milestone.
+- [x] `M01-004` Add a root `LICENSE` after choosing the project license.
 - [x] `M01-005` Add a root `.gitignore` rule for `.artifacts/`, the sole repository-local root for binaries, WASM output, packages, coverage, profiles, benchmarks, test-failure captures, temporary development databases, disposable logs, generated comparison trees, and staging files.
-- [ ] `M01-006` Add `.gitattributes` rules for consistent text normalization.
+- [x] `M01-006` Add `.gitattributes` rules for consistent text normalization.
+
+Repository bootstrap evidence:
+
+- Module path: `codeflux.dev/codeflux`.
+- Minimum language version: Go 1.26.0; CI/tool bootstrap must use the current patched Go 1.26 release rather than silently accepting an older security patch.
+- Root `README.md`: intentionally absent because the user did not explicitly request that file; this does not block M01.
+- License: Apache License 2.0.
+- Text normalization: LF by default, CRLF only for Windows batch command files, and common binary assets marked binary.
 - [ ] `M01-007` Create `cmd/codeflux` for the user-facing executable.
 - [ ] `M01-008` Create `internal/coordinator` for coordinator application logic.
 - [ ] `M01-009` Create `internal/worker` for task-worker logic.

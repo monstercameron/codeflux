@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-002
+Date: 2026-07-30
+Type: Repository bootstrap
+Request-or-TODO: M01-001 through M01-006
+Outcome: Initialized the Codeflux Go module, minimum language version, Apache
+  2.0 license, ignore policy, and deterministic text/binary normalization
+Affected-behavior: Go tooling resolves the repository as
+  codeflux.dev/codeflux with Go 1.26 language semantics
+Compatibility-or-migration: Initial module identity; future module-path changes
+  require an explicit compatibility decision
+Verification: `go env GOMOD` and `go mod edit -json` resolve the root module;
+  Git attribute and ignored-artifact checks pass; no root README was created
+  without explicit authorization
+Dev-Log: DL-20260730-003
+
 Change-ID: CL-20260730-001
 Date: 2026-07-30
 Type: Product contract, evaluation fixture, and documentation check

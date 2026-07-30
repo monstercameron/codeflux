@@ -1,0 +1,3 @@
+# Sole repository-local root for disposable build, test, package, benchmark,
+# profile, diagnostic, temporary database, log, and staging output.
+/.artifacts/
