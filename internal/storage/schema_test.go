@@ -47,6 +47,9 @@ func TestInitialOperationalSchemaContainsEveryRequiredTable(t *testing.T) {
 		"run_tool_schemas",
 		"permission_grant_uses",
 		"custom_commands",
+		"worker_leases",
+		"worker_reports",
+		"task_queue_entries",
 	}
 	for _, table := range expected {
 		var count int
@@ -166,6 +169,11 @@ func TestInitialSchemaHasRequiredQueryIndexes(t *testing.T) {
 		"session_events_by_task",
 		"session_snapshots_latest",
 		"permission_decisions_by_task_action",
+		"worker_leases_one_active_run",
+		"worker_leases_heartbeat",
+		"worker_reports_by_run",
+		"task_queue_one_live_entry",
+		"task_queue_dispatch_order",
 	}
 	for _, index := range expected {
 		var count int

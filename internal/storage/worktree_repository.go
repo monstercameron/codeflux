@@ -9,6 +9,11 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 )
 
+type WorktreeRecoveryCandidate struct {
+	Binding WorktreeBinding
+	Reason  string
+}
+
 func (repositories *Repositories) CreateWorktreeBinding(
 	ctx context.Context,
 	input CreateWorktreeBinding,
@@ -87,6 +92,123 @@ func (repositories *Repositories) GetWorktreeBinding(
 		 WHERE task_id = ?`,
 		taskID,
 	), "get worktree binding")
+}
+
+func (repositories *Repositories) ListActiveWorktreeBindings(
+	ctx context.Context,
+	limit int,
+) ([]WorktreeBinding, error) {
+	if limit < 1 || limit > 1000 {
+		return nil, errors.New("worktree page limit is outside supported bounds")
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		`SELECT workspace_id, task_id, repository_id, base_revision,
+		        head_revision, branch_name, worktree_path, state,
+		        created_at_unix_micros, updated_at_unix_micros, revision
+		 FROM worktree_bindings WHERE state = 'active'
+		 ORDER BY created_at_unix_micros, task_id LIMIT ?`,
+		limit+1,
+	)
+	if err != nil {
+		return nil, classify("list active worktree bindings", err)
+	}
+	defer rows.Close()
+	var bindings []WorktreeBinding
+	for rows.Next() {
+		binding, err := scanWorktreeBinding(rows, "scan active worktree binding")
+		if err != nil {
+			return nil, err
+		}
+		bindings = append(bindings, binding)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("iterate active worktree bindings", err)
+	}
+	if len(bindings) > limit {
+		return nil, errors.New("active worktree binding count exceeds startup recovery bound")
+	}
+	return bindings, nil
+}
+
+func (repositories *Repositories) MarkWorktreeRecoveryRequired(
+	ctx context.Context,
+	taskID domain.TaskID,
+	expectedRevision uint64,
+	reason string,
+) (WorktreeBinding, error) {
+	if taskID.IsZero() {
+		return WorktreeBinding{}, errors.New("task ID must not be empty")
+	}
+	if err := validateBounded("worktree recovery reason", reason, 2048); err != nil {
+		return WorktreeBinding{}, err
+	}
+	_, micros := repositories.timestamp()
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		result, err := transaction.sql.ExecContext(
+			ctx,
+			`UPDATE worktree_bindings
+			 SET state = 'recovery-required',
+			     updated_at_unix_micros = ?, revision = revision + 1
+			 WHERE task_id = ? AND state = 'active' AND revision = ?`,
+			micros, taskID, expectedRevision,
+		)
+		if err != nil {
+			return repositoryWriteError("mark worktree recovery required", err)
+		}
+		if err := requireOneAffected(result, "mark worktree recovery required"); err != nil {
+			return err
+		}
+		result, err = transaction.sql.ExecContext(
+			ctx,
+			`UPDATE workspaces
+			 SET state = 'recovery-required',
+			     updated_at_unix_micros = ?, revision = revision + 1
+			 WHERE id = (
+			     SELECT workspace_id FROM worktree_bindings WHERE task_id = ?
+			)`,
+			micros, taskID,
+		)
+		if err != nil {
+			return repositoryWriteError("mark workspace recovery required", err)
+		}
+		if err := requireOneAffected(result, "mark workspace recovery required"); err != nil {
+			return err
+		}
+		result, err = transaction.sql.ExecContext(
+			ctx,
+			`UPDATE tasks
+			 SET state = 'recovery-required', invalidation_reason = ?,
+			     updated_at_unix_micros = ?, revision = revision + 1
+			 WHERE id = ? AND state NOT IN (
+			     'completed','failed','cancelled','rolled-back'
+			)`,
+			reason, micros, taskID,
+		)
+		if err != nil {
+			return repositoryWriteError("mark task worktree recovery required", err)
+		}
+		if err := requireOneAffected(result, "mark task worktree recovery required"); err != nil {
+			return err
+		}
+		if _, err := transaction.sql.ExecContext(
+			ctx,
+			`UPDATE runs
+			 SET state = 'recovery-required',
+			     updated_at_unix_micros = ?, revision = revision + 1
+			 WHERE task_id = ? AND state NOT IN (
+			     'completed','failed','cancelled','recovery-required'
+			 )`,
+			micros, taskID,
+		); err != nil {
+			return repositoryWriteError("mark task runs recovery required", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return WorktreeBinding{}, err
+	}
+	return repositories.GetWorktreeBinding(ctx, taskID)
 }
 
 func (repositories *Repositories) AdvanceWorktreeBinding(

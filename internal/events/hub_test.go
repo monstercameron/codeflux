@@ -41,6 +41,45 @@ func TestHubJoinsReplayAndLiveWithoutGapOrDuplicate(t *testing.T) {
 	}
 }
 
+func TestHubCloseDisconnectsStreamsAndRejectsNewDelivery(t *testing.T) {
+	ids := newEventTestIDs(t)
+	journal := &memoryJournal{}
+	hub, err := NewHub(journal, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subscription, err := hub.Subscribe(
+		context.Background(),
+		SubscriptionQuery{SessionID: ids.session},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hub.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := subscription.Next(context.Background()); !errors.Is(err, ErrHubClosed) {
+		t.Fatalf("closed subscription error = %v", err)
+	}
+	if _, err := hub.Subscribe(
+		context.Background(),
+		SubscriptionQuery{SessionID: ids.session},
+	); !errors.Is(err, ErrHubClosed) {
+		t.Fatalf("subscribe after close = %v", err)
+	}
+	if err := hub.PublishCommitted(
+		hubMessageFinal(t, ids, 1, "late"),
+	); !errors.Is(err, ErrHubClosed) {
+		t.Fatalf("publish after close = %v", err)
+	}
+	if metrics := hub.GlobalMetrics(); metrics.Active != 0 {
+		t.Fatalf("closed hub metrics = %#v", metrics)
+	}
+	if err := hub.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestHubSerializesPublicationAcrossReplayBoundary(t *testing.T) {
 	ids := newEventTestIDs(t)
 	first := hubMessageFinal(t, ids, 1, "first")

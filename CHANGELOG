@@ -30,6 +30,30 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-058
+Date: 2026-07-30
+Type: Coordinator and worker lifecycle
+Request-or-TODO: M11-001 through M11-048 and M11-G01 through M11-G03
+Outcome: Added single-instance coordinator startup, authenticated one-worker-
+  per-task execution, durable ownership and queueing, heartbeat recovery,
+  process isolation controls, and ordered graceful shutdown
+Affected-behavior: The coordinator migrates before serving on literal
+  loopback, restores uncertain state as recovery-required, dispatches within
+  separate worker and provider limits, persists process/report diagnostics,
+  compensates failed starts durably, and prevents duplicate active owners.
+  Workers receive credential-free pipe startup, execute only in the exact
+  task worktree, continue control heartbeats while paused, and terminate as a
+  platform process tree.
+Compatibility-or-migration: Adds migration 000008 for worker leases, ordered
+  reports, and the durable task queue; schema version advances from 7 to 8.
+  Default isolation is explicitly mediated workspace confinement rather than
+  a perfect sandbox.
+Verification: Migration, artifact, generation, lint, security, integration,
+  focused crash/concurrency/recovery suites, deterministic loopback startup,
+  and the complete local test-all gate pass. Public CI supplies cross-platform
+  process and Ubuntu race coverage for the committed state.
+Dev-Log: DL-20260730-059
+
 Change-ID: CL-20260730-057
 Date: 2026-07-30
 Type: Coordinator-worker protocol foundation

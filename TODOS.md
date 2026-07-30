@@ -1786,20 +1786,20 @@ Milestone output: authenticated one-worker-per-task subprocess execution with ow
 
 ## Coordinator
 
-- [ ] `M11-001 BLOCKER` Implement coordinator startup and dependency wiring.
-- [ ] `M11-002` Acquire a local single-instance lock or define multi-instance behavior.
-- [ ] `M11-003` Open and migrate SQLite before accepting tasks.
-- [ ] `M11-004` Initialize credential, provider, workspace, event, and transport services.
-- [ ] `M11-005` Bind the frontend server to loopback.
-- [ ] `M11-006` Generate a per-launch browser session secret.
-- [ ] `M11-007` Restore incomplete task metadata at startup.
-- [ ] `M11-008` Detect orphaned worker processes.
-- [ ] `M11-009` Detect missing or divergent worktrees.
-- [ ] `M11-010` Present recovery-required state instead of auto-resuming uncertain work.
-- [ ] `M11-011` Implement graceful shutdown ordering.
-- [ ] `M11-012` Stop accepting new mutations before draining streams.
-- [ ] `M11-013` Ask active workers to checkpoint and stop.
-- [ ] `M11-014` Flush committed events and checkpoint WAL.
+- [x] `M11-001 BLOCKER` Implement coordinator startup and dependency wiring.
+- [x] `M11-002` Acquire a local single-instance lock or define multi-instance behavior.
+- [x] `M11-003` Open and migrate SQLite before accepting tasks.
+- [x] `M11-004` Initialize credential, provider, workspace, event, and transport services.
+- [x] `M11-005` Bind the frontend server to loopback.
+- [x] `M11-006` Generate a per-launch browser session secret.
+- [x] `M11-007` Restore incomplete task metadata at startup.
+- [x] `M11-008` Detect orphaned worker processes.
+- [x] `M11-009` Detect missing or divergent worktrees.
+- [x] `M11-010` Present recovery-required state instead of auto-resuming uncertain work.
+- [x] `M11-011` Implement graceful shutdown ordering.
+- [x] `M11-012` Stop accepting new mutations before draining streams.
+- [x] `M11-013` Ask active workers to checkpoint and stop.
+- [x] `M11-014` Flush committed events and checkpoint WAL.
 
 ## Worker Protocol
 
@@ -1808,50 +1808,69 @@ Milestone output: authenticated one-worker-per-task subprocess execution with ow
 - [x] `M11-017` Pass task ID, run ID, worktree path, policy revision, tool schema, and coordinator endpoint.
 - [x] `M11-018` Authenticate the worker to the coordinator.
 - [x] `M11-019` Reject protocol-version mismatch.
-- [ ] `M11-020` Implement worker heartbeat.
-- [ ] `M11-021` Implement coordinator-issued pause, resume, cancel, and checkpoint requests.
-- [ ] `M11-022` Implement worker status and tool-event reporting.
-- [ ] `M11-023` Bound reconnect attempts.
-- [ ] `M11-024` Mark the task recovery-required after heartbeat expiry.
-- [ ] `M11-025` Prevent two workers from owning the same active run.
-- [ ] `M11-026` Persist worker process metadata for diagnostics.
+- [x] `M11-020` Implement worker heartbeat.
+- [x] `M11-021` Implement coordinator-issued pause, resume, cancel, and checkpoint requests.
+- [x] `M11-022` Implement worker status and tool-event reporting.
+- [x] `M11-023` Bound reconnect attempts.
+- [x] `M11-024` Mark the task recovery-required after heartbeat expiry.
+- [x] `M11-025` Prevent two workers from owning the same active run.
+- [x] `M11-026` Persist worker process metadata for diagnostics.
 
 ## Process Isolation
 
-- [ ] `M11-027 SECURITY` Launch one subprocess worker per active task.
-- [ ] `M11-028 SECURITY` Set the worker working directory to the task worktree.
-- [ ] `M11-029 SECURITY` Provide the minimum required environment.
-- [ ] `M11-030 SECURITY` Keep credential-store handles in the coordinator.
-- [ ] `M11-031 SECURITY` Keep SQLite writes behind coordinator repositories unless a carefully reviewed writer boundary is required.
-- [ ] `M11-032 SECURITY` Apply platform-appropriate process-group management.
-- [ ] `M11-033 SECURITY` Support an optional user-provided container command for stronger isolation.
-- [ ] `M11-034` Clearly label the default isolation as mediated workspace confinement, not a perfect sandbox.
+- [x] `M11-027 SECURITY` Launch one subprocess worker per active task.
+- [x] `M11-028 SECURITY` Set the worker working directory to the task worktree.
+- [x] `M11-029 SECURITY` Provide the minimum required environment.
+- [x] `M11-030 SECURITY` Keep credential-store handles in the coordinator.
+- [x] `M11-031 SECURITY` Keep SQLite writes behind coordinator repositories unless a carefully reviewed writer boundary is required.
+- [x] `M11-032 SECURITY` Apply platform-appropriate process-group management.
+- [x] `M11-033 SECURITY` Support an optional user-provided container command for stronger isolation.
+- [x] `M11-034` Clearly label the default isolation as mediated workspace confinement, not a perfect sandbox.
 
 ## Concurrency
 
-- [ ] `M11-035` Define the active-task concurrency limit.
-- [ ] `M11-036` Queue excess tasks with visible position and reason.
-- [ ] `M11-037` Prevent starvation of paused or approval-blocked tasks.
-- [ ] `M11-038` Define provider concurrency limits separately from worker limits.
-- [ ] `M11-039` Define database write-contention handling.
-- [ ] `M11-040` Define shutdown behavior for queued tasks.
+- [x] `M11-035` Define the active-task concurrency limit.
+- [x] `M11-036` Queue excess tasks with visible position and reason.
+- [x] `M11-037` Prevent starvation of paused or approval-blocked tasks.
+- [x] `M11-038` Define provider concurrency limits separately from worker limits.
+- [x] `M11-039` Define database write-contention handling.
+- [x] `M11-040` Define shutdown behavior for queued tasks.
 
 ## Tests
 
-- [ ] `M11-041 TEST` Test normal worker startup and exit.
-- [ ] `M11-042 TEST` Test worker crash.
-- [ ] `M11-043 TEST` Test coordinator crash.
-- [ ] `M11-044 TEST` Test heartbeat loss.
-- [ ] `M11-045 TEST` Test duplicate worker ownership.
-- [ ] `M11-046 TEST` Test protocol-version mismatch.
-- [ ] `M11-047 TEST` Test graceful shutdown with running, paused, and queued tasks.
-- [ ] `M11-048 TEST` Test worker environment for credential absence.
+- [x] `M11-041 TEST` Test normal worker startup and exit.
+- [x] `M11-042 TEST` Test worker crash.
+- [x] `M11-043 TEST` Test coordinator crash.
+- [x] `M11-044 TEST` Test heartbeat loss.
+- [x] `M11-045 TEST` Test duplicate worker ownership.
+- [x] `M11-046 TEST` Test protocol-version mismatch.
+- [x] `M11-047 TEST` Test graceful shutdown with running, paused, and queued tasks.
+- [x] `M11-048 TEST` Test worker environment for credential absence.
+
+M11 test evidence:
+
+- Application tests cover lock-before-migration startup, dependency ownership,
+  literal-loopback serving, per-launch browser secrets, orphan and invalid
+  worktree classification, mutation shutdown ordering, worker checkpoint and
+  process-tree stop, event closure, WAL checkpointing, and database closure.
+- Real SQLite tests cover unique active leases, immutable process identity,
+  ordered heartbeat and redacted report persistence, atomic expiry recovery,
+  durable queue dispatch and cancellation, failed-start compensation after
+  caller cancellation, bounded startup recovery, and worktree-linked recovery.
+- Worker tests cover credential-free pipe startup, exact worktree execution,
+  strict version and session authentication, bounded payloads and reconnects,
+  heartbeat/control operation while paused, status and tool reports, minimum
+  environments, optional container wrapping, and platform process-tree stops.
+- Crash and concurrency tests kill representative workers and a coordinator,
+  preserve an unrelated worktree sentinel, restore explicit recovery-required
+  state, verify SQLite integrity, and reject duplicate database and in-memory
+  ownership. Combined shutdown tests cover running, paused, and queued work.
 
 ## Gate
 
-- [ ] `M11-G01 GATE` Killing a worker cannot corrupt coordinator state or another task worktree.
-- [ ] `M11-G02 GATE` Killing the coordinator leaves enough durable state for a safe recovery choice.
-- [ ] `M11-G03 GATE` No task runs with two active worker owners.
+- [x] `M11-G01 GATE` Killing a worker cannot corrupt coordinator state or another task worktree.
+- [x] `M11-G02 GATE` Killing the coordinator leaves enough durable state for a safe recovery choice.
+- [x] `M11-G03 GATE` No task runs with two active worker owners.
 
 ---
 

@@ -16,6 +16,8 @@ var (
 	// ErrSnapshotRequired means the requested replay exceeds the bounded live
 	// queue and must be satisfied by a snapshot before joining the stream.
 	ErrSnapshotRequired = errors.New("session snapshot is required")
+	// ErrHubClosed means coordinator shutdown ended live delivery.
+	ErrHubClosed = errors.New("session event hub is closed")
 )
 
 // Journal is the committed durable history required to join replay to live
@@ -57,6 +59,7 @@ type Hub struct {
 	subscribers map[uint64]*Subscription
 	global      Metrics
 	bySession   map[domain.SessionID]Metrics
+	closed      bool
 }
 
 // NewHub creates a hub with one fixed per-subscriber queue bound.
@@ -99,6 +102,9 @@ func (hub *Hub) Subscribe(
 
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.closed {
+		return nil, ErrHubClosed
+	}
 	boundary, err := hub.journal.CommittedSequence(ctx, query.SessionID)
 	if err != nil {
 		return nil, err
@@ -168,6 +174,9 @@ func (hub *Hub) PublishCommitted(event SessionEvent) error {
 	}
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.closed {
+		return ErrHubClosed
+	}
 	hub.global.Published++
 	sessionMetrics := hub.bySession[event.SessionID]
 	sessionMetrics.Published++
@@ -199,6 +208,31 @@ func (hub *Hub) PublishCommitted(event SessionEvent) error {
 		subscription.mu.Unlock()
 	}
 	hub.bySession[event.SessionID] = sessionMetrics
+	return nil
+}
+
+// Close drains no new events, disconnects every subscriber, and prevents new
+// subscriptions or publication. Durable committed events remain replayable
+// from SQLite after restart.
+func (hub *Hub) Close() error {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if hub.closed {
+		return nil
+	}
+	hub.closed = true
+	for id, subscription := range hub.subscribers {
+		subscription.mu.Lock()
+		subscription.closeLocked(ErrHubClosed)
+		subscription.mu.Unlock()
+		delete(hub.subscribers, id)
+		sessionMetrics := hub.bySession[subscription.query.SessionID]
+		if sessionMetrics.Active > 0 {
+			sessionMetrics.Active--
+		}
+		hub.bySession[subscription.query.SessionID] = sessionMetrics
+	}
+	hub.global.Active = 0
 	return nil
 }
 

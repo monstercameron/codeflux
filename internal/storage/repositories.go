@@ -199,8 +199,10 @@ type TransitionWorktreeBinding struct {
 type WorktreeBindingOperations interface {
 	CreateWorktreeBinding(context.Context, CreateWorktreeBinding) (WorktreeBinding, error)
 	GetWorktreeBinding(context.Context, domain.TaskID) (WorktreeBinding, error)
+	ListActiveWorktreeBindings(context.Context, int) ([]WorktreeBinding, error)
 	AdvanceWorktreeBinding(context.Context, AdvanceWorktreeBinding) (WorktreeBinding, error)
 	TransitionWorktreeBinding(context.Context, TransitionWorktreeBinding) (WorktreeBinding, error)
+	MarkWorktreeRecoveryRequired(context.Context, domain.TaskID, uint64, string) (WorktreeBinding, error)
 }
 
 // SettingsScope identifies one persisted non-secret configuration layer.

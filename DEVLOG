@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-059
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-058
+Request-or-TODO: M11-001 through M11-048 and M11-G01 through M11-G03
+Goal: Complete the coordinator and one-worker-per-task lifecycle with durable
+  ownership, bounded concurrency, explicit recovery, and graceful shutdown
+Assumptions: SQLite remains the only authoritative runtime store; the
+  coordinator is single-instance per database; a coordinator restart cannot
+  safely reattach to an old in-memory worker session; default process
+  isolation is mediated workspace confinement rather than a perfect sandbox
+Decisions: Use a file lock before migration and serving; bind only to literal
+  loopback; generate per-launch browser and worker session secrets; persist
+  lease ownership, process metadata, ordered heartbeats/reports, and the task
+  queue; send worker startup only over an anonymous pipe; keep credentials out
+  of worker startup and environment; classify expired/orphaned workers and
+  invalid worktrees as recovery-required; separate worker and provider
+  concurrency; bound reconnect, control queues, payloads, checkpoint grace,
+  and forced process-tree termination
+Files-or-schemas: Migration 000008; coordinator application,
+  scheduler, supervisor, recovery, and gateway; worker protocol, client,
+  process launcher, and platform process-tree controls; storage worker and
+  queue repositories; focused crash, recovery, isolation, and shutdown tests
+Validation: Focused worker, coordinator, storage, scheduler, and cancellation
+  compensation suites pass. Migration, artifact, generation, lint, security,
+  integration, and full local test-all gates pass. The deterministic
+  development profile starts and self-checks on literal loopback. Public CI
+  supplies the declared Ubuntu race and cross-platform process evidence.
+Failures-or-discarded-approaches: A shell working-directory field was ignored,
+  so repository commands now explicitly select the repository. Editing an
+  uncommitted migration correctly triggered the generated-checksum guard.
+  A failed worker launch initially reused its cancelled caller context for
+  durable compensation; recovery now owns a separate bounded context.
+  Unbounded shutdown waits, redirect-following authenticated clients, raw
+  credentials, automatic uncertain recovery, and in-memory-only task queues
+  were rejected.
+Known-limitations: Default worker confinement is mediated rather than a
+  perfect sandbox. Provider adapters remain M12 work, and the full GWC
+  journey/browser harness remains gated on M16.
+Next-safe-step: Verify the committed M11 state in public cross-platform and
+  race CI, then implement M12 provider normalization and durable accounting.
+
 Dev-Log: DL-20260730-058
 Date: 2026-07-30
 Status: Complete

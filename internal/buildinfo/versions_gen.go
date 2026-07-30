@@ -3,5 +3,5 @@
 
 package buildinfo
 
-const generatedSchemaVersion uint32 = 7
+const generatedSchemaVersion uint32 = 8
 const generatedFrontendVersion = "assets-e3b0c44298fc"

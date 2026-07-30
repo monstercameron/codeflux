@@ -2,7 +2,9 @@ package worker
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -13,6 +15,12 @@ import (
 )
 
 const ProtocolVersion = 1
+
+const (
+	maxStartupBytes       = 64 << 10
+	maxControlReasonBytes = 2 << 10
+	maxReportSummaryBytes = 8 << 10
+)
 
 // StartupParameters are the complete credential-free worker bootstrap contract.
 type StartupParameters struct {
@@ -43,7 +51,8 @@ func (parameters StartupParameters) Validate() error {
 	}
 	endpoint, err := url.Parse(parameters.CoordinatorEndpoint)
 	if err != nil || endpoint.Scheme != "http" || endpoint.Host == "" ||
-		endpoint.Path != "" || endpoint.RawQuery != "" {
+		endpoint.User != nil || endpoint.Path != "" || endpoint.RawPath != "" ||
+		endpoint.RawQuery != "" || endpoint.ForceQuery || endpoint.Fragment != "" {
 		return errors.New("worker coordinator endpoint is invalid")
 	}
 	host, _, err := net.SplitHostPort(endpoint.Host)
@@ -53,6 +62,14 @@ func (parameters StartupParameters) Validate() error {
 	if len(parameters.SessionToken) < 32 || len(parameters.SessionToken) > 255 ||
 		strings.TrimSpace(parameters.SessionToken) != parameters.SessionToken {
 		return errors.New("worker session token is invalid")
+	}
+	for _, character := range parameters.SessionToken {
+		if !((character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '-' || character == '_') {
+			return errors.New("worker session token is invalid")
+		}
 	}
 	if len(parameters.ContainerCommand) > 64 {
 		return errors.New("worker container command exceeds bounds")
@@ -103,6 +120,7 @@ type Message struct {
 type Heartbeat struct {
 	WorkerPID      int
 	LeaseID        string
+	State          StatusKind
 	ObservedAt     time.Time
 	LastCheckpoint string
 }
@@ -145,7 +163,89 @@ func (message Message) Validate(expectedToken string) error {
 	if payloads != 1 {
 		return errors.New("worker message must contain exactly one payload")
 	}
+	switch {
+	case message.Heartbeat != nil:
+		return message.Heartbeat.validate()
+	case message.Control != nil:
+		return message.Control.Validate()
+	case message.Status != nil:
+		return message.Status.validate()
+	case message.ToolEvent != nil:
+		return message.ToolEvent.validate()
+	}
 	return nil
+}
+
+func (heartbeat Heartbeat) validate() error {
+	if heartbeat.WorkerPID < 1 || heartbeat.ObservedAt.IsZero() ||
+		!validHeartbeatStatus(heartbeat.State) ||
+		!validOptionalIdentifier(heartbeat.LeaseID) ||
+		!validOptionalIdentifier(heartbeat.LastCheckpoint) {
+		return errors.New("worker heartbeat is invalid")
+	}
+	return nil
+}
+
+// Validate checks a coordinator control before a worker acts on it.
+func (control Control) Validate() error {
+	switch control.Kind {
+	case ControlPause, ControlResume, ControlCancel, ControlCheckpoint,
+		ControlShutdown:
+	default:
+		return errors.New("worker control kind is invalid")
+	}
+	if len(control.Reason) > maxControlReasonBytes ||
+		strings.ContainsRune(control.Reason, 0) {
+		return errors.New("worker control reason is invalid")
+	}
+	return nil
+}
+
+func (status Status) validate() error {
+	if !validStatus(status.Kind) || status.OccurredAt.IsZero() ||
+		len(status.Summary) > maxReportSummaryBytes ||
+		strings.ContainsRune(status.Summary, 0) {
+		return errors.New("worker status report is invalid")
+	}
+	return nil
+}
+
+func (event ToolEvent) validate() error {
+	if !validRequiredIdentifier(event.RequestID) ||
+		!validRequiredIdentifier(event.State) ||
+		len(event.Summary) > maxReportSummaryBytes ||
+		strings.ContainsRune(event.Summary, 0) {
+		return errors.New("worker tool report is invalid")
+	}
+	return nil
+}
+
+func validHeartbeatStatus(status StatusKind) bool {
+	switch status {
+	case StatusStarting, StatusRunning, StatusPaused, StatusStopping:
+		return true
+	default:
+		return false
+	}
+}
+
+func validStatus(status StatusKind) bool {
+	switch status {
+	case StatusStarting, StatusRunning, StatusPaused, StatusCheckpointed,
+		StatusStopping, StatusExited, StatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func validRequiredIdentifier(value string) bool {
+	return value != "" && len(value) <= 255 &&
+		strings.TrimSpace(value) == value && !strings.ContainsRune(value, 0)
+}
+
+func validOptionalIdentifier(value string) bool {
+	return value == "" || validRequiredIdentifier(value)
 }
 
 func AuthenticateSession(expected, presented string) bool {
@@ -180,4 +280,24 @@ func (policy ReconnectPolicy) Delay(attempt int) time.Duration {
 		delay = min(delay*2, policy.MaximumDelay)
 	}
 	return delay
+}
+
+func decodeSingleJSON(reader io.Reader, maximum int64, target any) error {
+	limited := &io.LimitedReader{R: reader, N: maximum + 1}
+	decoder := json.NewDecoder(limited)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("JSON contains trailing data")
+		}
+		return err
+	}
+	if limited.N == 0 {
+		return errors.New("JSON exceeds size limit")
+	}
+	return nil
 }
