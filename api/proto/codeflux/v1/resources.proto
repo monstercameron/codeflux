@@ -1,0 +1,148 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+import "codeflux/v1/conventions.proto";
+import "codeflux/v1/identity.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+message WorkspaceView {
+  StableIdentity workspace_id = 1;
+  StableIdentity repository_id = 2;
+  SafePath root = 3;
+  GitStateView git = 4;
+  uint64 revision = 5;
+  repeated RedactedText warnings = 6;
+  google.protobuf.Timestamp observed_at = 7;
+}
+
+message RepositorySummary {
+  StableIdentity repository_id = 1;
+  RedactedText display_name = 2;
+  SafePath root = 3;
+  GitStateView git = 4;
+  uint64 revision = 5;
+}
+
+message ThreadView {
+  StableIdentity thread_id = 1;
+  StableIdentity workspace_id = 2;
+  RedactedText title = 3;
+  bool archived = 4;
+  uint64 revision = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message MessageView {
+  StableIdentity message_id = 1;
+  StableIdentity thread_id = 2;
+  string role = 3;
+  RedactedText body = 4;
+  repeated SafePath attachments = 5;
+  uint64 revision = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message TaskView {
+  StableIdentity task_id = 1;
+  StableIdentity thread_id = 2;
+  StableIdentity session_id = 3;
+  string state = 4;
+  uint64 revision = 5;
+  uint64 plan_revision = 6;
+  RedactedText summary = 7;
+  Money actual_cost = 8;
+  Money hard_budget = 9;
+  TokenAmount actual_tokens = 10;
+  google.protobuf.Duration elapsed = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message BudgetView {
+  StableIdentity budget_id = 1;
+  StableIdentity task_id = 2;
+  Money hard_limit = 3;
+  Money reserved = 4;
+  Money actual = 5;
+  uint64 revision = 6;
+}
+
+message GraphNodeView {
+  StableIdentity node_id = 1;
+  string kind = 2;
+  string state = 3;
+  RedactedText label = 4;
+  SafePath source_path = 5;
+  uint32 source_line = 6;
+  uint32 rank = 7;
+}
+
+message GraphEdgeView {
+  StableIdentity edge_id = 1;
+  StableIdentity from_node_id = 2;
+  StableIdentity to_node_id = 3;
+  string kind = 4;
+}
+
+message GraphSliceView {
+  StableIdentity graph_id = 1;
+  StableIdentity graph_revision_id = 2;
+  StableIdentity task_id = 3;
+  uint64 revision = 4;
+  repeated GraphNodeView nodes = 5;
+  repeated GraphEdgeView edges = 6;
+  string continuation_cursor = 7;
+  bool truncated = 8;
+}
+
+message DiffSummaryView {
+  StableIdentity task_id = 1;
+  string diff_identity = 2;
+  uint64 task_revision = 3;
+  uint32 changed_files = 4;
+  uint64 added_lines = 5;
+  uint64 deleted_lines = 6;
+  RedactedText summary = 7;
+}
+
+message ValidationItemView {
+  StableIdentity validation_id = 1;
+  string state = 2;
+  string guarantee_level = 3;
+  RedactedText summary = 4;
+}
+
+message ValidationReportView {
+  StableIdentity task_id = 1;
+  string diff_identity = 2;
+  uint64 revision = 3;
+  repeated ValidationItemView items = 4;
+  RedactedText summary = 5;
+}
+
+message ModelView {
+  StableIdentity provider_id = 1;
+  string model_id = 2;
+  RedactedText display_name = 3;
+  bool available = 4;
+  google.protobuf.Duration default_timeout = 5;
+}
+
+message PolicyView {
+  string preset = 1;
+  string reasoning_effort = 2;
+  string risk = 3;
+  string required_assurance = 4;
+  uint64 revision = 5;
+}
+
+message ProviderView {
+  StableIdentity provider_id = 1;
+  RedactedText display_name = 2;
+  string credential_reference = 3;
+  bool configured = 4;
+  uint64 revision = 5;
+}

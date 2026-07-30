@@ -24,6 +24,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-047
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-046
+Request-or-TODO: M07-001 through M07-050
+Goal: Freeze the complete production transport vocabulary before interceptor,
+  handler, application-catalog, or chronological-flow implementation
+Assumptions: The selected M06 WebSocket bridge uses ordinary generated Go gRPC
+  bindings in WASM; M07 contracts describe domain views and commands rather
+  than database rows or future subsystem implementations
+Decisions: Keep one versioned Go/protobuf package, seven logical services, and
+  one server stream. Use a shared mutation control for idempotency and optional
+  optimistic revision, opaque cursor pagination, exact minor-unit money,
+  explicit redacted text, standard protobuf time values, caller-bounded graph
+  slices, safe relative editor paths, and provider credential references only.
+Files-or-schemas: Conventions, resources, and product API protobuf files;
+  generated message/gRPC bindings; descriptor boundary tests; M07 completion
+  and evidence ledger entries; no database schema
+Validation: All 37 methods and generated client constructors are present;
+  every mutation has standard control; only SubscribeSession streams; product
+  fields expose no SQLite, SQL, raw credential, password, or API-key value.
+  Buf lint/breaking, generation/check, generated compilation, and repository
+  lint pass.
+Failures-or-discarded-approaches: Reusing storage-shaped or generic CRUD
+  messages was rejected. Raw provider credentials were excluded in favor of
+  opaque credential references. Multiple chat/graph/cost streams were rejected
+  in favor of the existing ordered SessionEvent envelope.
+Known-limitations: Contracts are generated and validated but production
+  interceptors, thin handlers, application delegation, error mapping, and
+  deterministic fake flows begin at M07-051.
+Next-safe-step: Implement the authenticated validation/error/logging server
+  boundary and prove every method through in-process generated clients.
+
 Dev-Log: DL-20260730-046
 Date: 2026-07-30
 Status: Complete

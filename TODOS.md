@@ -1174,74 +1174,95 @@ Milestone output: generated, versioned server/client contracts plus a complete a
 
 ## API Conventions
 
-- [ ] `M07-001 BLOCKER` Define protobuf package, Go package, and versioning conventions.
-- [ ] `M07-002` Define a standard error detail with stable code, safe message, retryability, and relevant entity ID.
-- [ ] `M07-003` Define cursor pagination.
-- [ ] `M07-004` Define idempotency-key fields for mutating requests.
-- [ ] `M07-005` Define expected-revision fields for optimistic concurrency.
-- [ ] `M07-006` Define timestamp and duration conventions.
-- [ ] `M07-007` Define exact monetary and token value messages.
-- [ ] `M07-008` Define redacted-output conventions.
-- [ ] `M07-009` Reserve protobuf fields instead of reusing removed numbers.
-- [ ] `M07-010` Add API compatibility checks.
+- [x] `M07-001 BLOCKER` Define protobuf package, Go package, and versioning conventions.
+- [x] `M07-002` Define a standard error detail with stable code, safe message, retryability, and relevant entity ID.
+- [x] `M07-003` Define cursor pagination.
+- [x] `M07-004` Define idempotency-key fields for mutating requests.
+- [x] `M07-005` Define expected-revision fields for optimistic concurrency.
+- [x] `M07-006` Define timestamp and duration conventions.
+- [x] `M07-007` Define exact monetary and token value messages.
+- [x] `M07-008` Define redacted-output conventions.
+- [x] `M07-009` Reserve protobuf fields instead of reusing removed numbers.
+- [x] `M07-010` Add API compatibility checks.
 
 ## Workspace Service
 
-- [ ] `M07-011` Define `OpenWorkspace`.
-- [ ] `M07-012` Define `GetWorkspaceState`.
-- [ ] `M07-013` Define `ListRepositories`.
-- [ ] `M07-014` Define `InspectRepository`.
-- [ ] `M07-015` Define safe path and Git-state responses.
+- [x] `M07-011` Define `OpenWorkspace`.
+- [x] `M07-012` Define `GetWorkspaceState`.
+- [x] `M07-013` Define `ListRepositories`.
+- [x] `M07-014` Define `InspectRepository`.
+- [x] `M07-015` Define safe path and Git-state responses.
 
 ## Thread Service
 
-- [ ] `M07-016` Define `CreateThread`.
-- [ ] `M07-017` Define `ListThreads`.
-- [ ] `M07-018` Define `GetThreadPage`.
-- [ ] `M07-019` Define `SendMessage`.
-- [ ] `M07-020` Define `RenameThread`.
-- [ ] `M07-021` Define `ArchiveThread`.
+- [x] `M07-016` Define `CreateThread`.
+- [x] `M07-017` Define `ListThreads`.
+- [x] `M07-018` Define `GetThreadPage`.
+- [x] `M07-019` Define `SendMessage`.
+- [x] `M07-020` Define `RenameThread`.
+- [x] `M07-021` Define `ArchiveThread`.
 
 ## Task Service
 
-- [ ] `M07-022` Define `CreateTask` or task creation semantics through `SendMessage`.
-- [ ] `M07-023` Define `GetTask`.
-- [ ] `M07-024` Define `StartTask`.
-- [ ] `M07-025` Define `PauseTask`.
-- [ ] `M07-026` Define `ResumeTask`.
-- [ ] `M07-027` Define `CancelTask`.
-- [ ] `M07-028` Define `ApproveAction`.
-- [ ] `M07-029` Define `SetBudget`.
-- [ ] `M07-030` Define `RequestRepair`.
-- [ ] `M07-031` Define `RollbackTask`.
+- [x] `M07-022` Define `CreateTask` or task creation semantics through `SendMessage`.
+- [x] `M07-023` Define `GetTask`.
+- [x] `M07-024` Define `StartTask`.
+- [x] `M07-025` Define `PauseTask`.
+- [x] `M07-026` Define `ResumeTask`.
+- [x] `M07-027` Define `CancelTask`.
+- [x] `M07-028` Define `ApproveAction`.
+- [x] `M07-029` Define `SetBudget`.
+- [x] `M07-030` Define `RequestRepair`.
+- [x] `M07-031` Define `RollbackTask`.
 
 ## Graph Service
 
-- [ ] `M07-032` Define `GetGraphSlice`.
-- [ ] `M07-033` Define `ExpandGraph`.
-- [ ] `M07-034` Define `GetNode`.
-- [ ] `M07-035` Define `ExplainNode`.
-- [ ] `M07-036` Define `CompareGraphRevisions`.
-- [ ] `M07-037` Define bounded node/edge counts and continuation behavior.
+- [x] `M07-032` Define `GetGraphSlice`.
+- [x] `M07-033` Define `ExpandGraph`.
+- [x] `M07-034` Define `GetNode`.
+- [x] `M07-035` Define `ExplainNode`.
+- [x] `M07-036` Define `CompareGraphRevisions`.
+- [x] `M07-037` Define bounded node/edge counts and continuation behavior.
 
 ## Review and Settings Services
 
-- [ ] `M07-038` Define `GetDiffSummary`.
-- [ ] `M07-039` Define `GetValidationReport`.
-- [ ] `M07-040` Define `AcceptChange`.
-- [ ] `M07-041` Define `RejectChange`.
-- [ ] `M07-042` Define `OpenInEditor`.
-- [ ] `M07-043` Define `GetModels`.
-- [ ] `M07-044` Define `GetPolicy`.
-- [ ] `M07-045` Define `SetPolicy`.
-- [ ] `M07-046` Define `SetBudgetDefaults`.
-- [ ] `M07-047` Define `ConfigureProvider`.
-- [ ] `M07-048` Define `TestProvider`.
-- [ ] `M07-049` Define `SubscribeSession`.
+- [x] `M07-038` Define `GetDiffSummary`.
+- [x] `M07-039` Define `GetValidationReport`.
+- [x] `M07-040` Define `AcceptChange`.
+- [x] `M07-041` Define `RejectChange`.
+- [x] `M07-042` Define `OpenInEditor`.
+- [x] `M07-043` Define `GetModels`.
+- [x] `M07-044` Define `GetPolicy`.
+- [x] `M07-045` Define `SetPolicy`.
+- [x] `M07-046` Define `SetBudgetDefaults`.
+- [x] `M07-047` Define `ConfigureProvider`.
+- [x] `M07-048` Define `TestProvider`.
+- [x] `M07-049` Define `SubscribeSession`.
 
 ## Implementation
 
-- [ ] `M07-050 BLOCKER` Generate Go server and v5 client bindings.
+- [x] `M07-050 BLOCKER` Generate Go server and v5 client bindings.
+
+M07 contract evidence:
+
+- `codeflux.v1` and `codeflux.dev/codeflux/api/gen/codeflux/v1` carry the
+  breaking API major. Additive changes remain in v1; incompatible changes use
+  a new package, and removed names/numbers are reserved permanently.
+- Seven logical services expose 37 domain methods. Mutations carry one
+  `MutationControl` with an idempotency key and optional expected revision.
+  Pagination cursors are opaque, graph reads are caller-bounded with explicit
+  continuation, and `SessionService.SubscribeSession` is the sole product
+  server stream.
+- Standard error details expose stable codes, redacted safe messages,
+  retryability, and a typed entity identity. Money is exact minor-unit decimal
+  arithmetic, tokens are unsigned counts, times use normalized protobuf UTC
+  timestamps/nonnegative durations, and provider configuration accepts only an
+  opaque credential reference.
+- Generated Go/gRPC bindings compile for native server and Go/WASM bridge
+  clients. Descriptor tests freeze every method, mutation-control field,
+  streaming boundary, and absence of SQLite/SQL/raw credential fields. Buf
+  STANDARD lint, FILE compatibility against `HEAD`, generation, and
+  `generate-check` pass.
 - [ ] `M07-051` Implement request validation interceptors.
 - [ ] `M07-052` Implement session authentication interceptors.
 - [ ] `M07-053` Implement safe error mapping.

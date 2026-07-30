@@ -30,6 +30,24 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-046
+Date: 2026-07-30
+Type: Versioned product gRPC contracts
+Request-or-TODO: M07-001 through M07-050
+Outcome: Added the complete v1 domain-oriented product API, shared error,
+  mutation, pagination, exact-value, time, redaction, path, and resource
+  conventions, plus generated Go server and browser-compatible client bindings
+Affected-behavior: Seven logical services now expose 37 typed methods for the
+  synthetic user journey with one resumable session stream, retry-safe mutation
+  controls, bounded graph reads, opaque cursors, and credential references only
+Compatibility-or-migration: Additive protobuf v1 surface only; no SQLite
+  migration or implemented production handler behavior
+Verification: Buf STANDARD lint and FILE breaking comparison, deterministic
+  generation/check, generated package compilation, repository lint, and
+  descriptor tests for method, mutation, streaming, and safe-field contracts
+  pass
+Dev-Log: DL-20260730-047
+
 Change-ID: CL-20260730-045
 Date: 2026-07-30
 Type: GoWebComponents browser transport and rendering decision

@@ -1,0 +1,449 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+import "codeflux/v1/conventions.proto";
+import "codeflux/v1/identity.proto";
+import "codeflux/v1/resources.proto";
+import "codeflux/v1/session.proto";
+
+service WorkspaceService {
+  rpc OpenWorkspace(OpenWorkspaceRequest) returns (OpenWorkspaceResponse);
+  rpc GetWorkspaceState(GetWorkspaceStateRequest) returns (GetWorkspaceStateResponse);
+  rpc ListRepositories(ListRepositoriesRequest) returns (ListRepositoriesResponse);
+  rpc InspectRepository(InspectRepositoryRequest) returns (InspectRepositoryResponse);
+}
+
+message OpenWorkspaceRequest {
+  MutationControl control = 1;
+  string selected_path = 2;
+}
+
+message OpenWorkspaceResponse {
+  WorkspaceView workspace = 1;
+}
+
+message GetWorkspaceStateRequest {
+  StableIdentity workspace_id = 1;
+}
+
+message GetWorkspaceStateResponse {
+  WorkspaceView workspace = 1;
+}
+
+message ListRepositoriesRequest {
+  PageRequest page = 1;
+}
+
+message ListRepositoriesResponse {
+  repeated RepositorySummary repositories = 1;
+  PageInfo page = 2;
+}
+
+message InspectRepositoryRequest {
+  StableIdentity repository_id = 1;
+}
+
+message InspectRepositoryResponse {
+  RepositorySummary repository = 1;
+  repeated RedactedText warnings = 2;
+}
+
+service ThreadService {
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThreadPage(GetThreadPageRequest) returns (GetThreadPageResponse);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc RenameThread(RenameThreadRequest) returns (RenameThreadResponse);
+  rpc ArchiveThread(ArchiveThreadRequest) returns (ArchiveThreadResponse);
+}
+
+message CreateThreadRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  string title = 3;
+}
+
+message CreateThreadResponse {
+  ThreadView thread = 1;
+}
+
+message ListThreadsRequest {
+  StableIdentity workspace_id = 1;
+  PageRequest page = 2;
+  bool include_archived = 3;
+}
+
+message ListThreadsResponse {
+  repeated ThreadView threads = 1;
+  PageInfo page = 2;
+}
+
+message GetThreadPageRequest {
+  StableIdentity thread_id = 1;
+  PageRequest page = 2;
+}
+
+message GetThreadPageResponse {
+  ThreadView thread = 1;
+  repeated MessageView messages = 2;
+  PageInfo page = 3;
+}
+
+message SendMessageRequest {
+  MutationControl control = 1;
+  StableIdentity thread_id = 2;
+  string body = 3;
+  repeated string attachment_paths = 4;
+  bool create_draft_task = 5;
+}
+
+message SendMessageResponse {
+  MessageView message = 1;
+  TaskView draft_task = 2;
+}
+
+message RenameThreadRequest {
+  MutationControl control = 1;
+  StableIdentity thread_id = 2;
+  string title = 3;
+}
+
+message RenameThreadResponse {
+  ThreadView thread = 1;
+}
+
+message ArchiveThreadRequest {
+  MutationControl control = 1;
+  StableIdentity thread_id = 2;
+  bool archived = 3;
+}
+
+message ArchiveThreadResponse {
+  ThreadView thread = 1;
+}
+
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc StartTask(StartTaskRequest) returns (StartTaskResponse);
+  rpc PauseTask(PauseTaskRequest) returns (PauseTaskResponse);
+  rpc ResumeTask(ResumeTaskRequest) returns (ResumeTaskResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+  rpc ApproveAction(ApproveActionRequest) returns (ApproveActionResponse);
+  rpc SetBudget(SetBudgetRequest) returns (SetBudgetResponse);
+  rpc RequestRepair(RequestRepairRequest) returns (RequestRepairResponse);
+  rpc RollbackTask(RollbackTaskRequest) returns (RollbackTaskResponse);
+}
+
+message CreateTaskRequest {
+  MutationControl control = 1;
+  StableIdentity thread_id = 2;
+  StableIdentity source_message_id = 3;
+  string requirement = 4;
+}
+
+message CreateTaskResponse {
+  TaskView task = 1;
+}
+
+message GetTaskRequest {
+  StableIdentity task_id = 1;
+}
+
+message GetTaskResponse {
+  TaskView task = 1;
+}
+
+message StartTaskRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  uint64 approved_plan_revision = 3;
+}
+
+message StartTaskResponse {
+  TaskView task = 1;
+}
+
+message PauseTaskRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+}
+
+message PauseTaskResponse {
+  TaskView task = 1;
+}
+
+message ResumeTaskRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+}
+
+message ResumeTaskResponse {
+  TaskView task = 1;
+}
+
+message CancelTaskRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+}
+
+message CancelTaskResponse {
+  TaskView task = 1;
+}
+
+message ApproveActionRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  StableIdentity approval_id = 3;
+  string decision = 4;
+  string scope = 5;
+}
+
+message ApproveActionResponse {
+  TaskView task = 1;
+  uint64 approval_revision = 2;
+}
+
+message SetBudgetRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  Money hard_limit = 3;
+}
+
+message SetBudgetResponse {
+  BudgetView budget = 1;
+}
+
+message RequestRepairRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string feedback = 3;
+  repeated StableIdentity evidence_ids = 4;
+}
+
+message RequestRepairResponse {
+  TaskView task = 1;
+  uint64 plan_revision = 2;
+}
+
+message RollbackTaskRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  StableIdentity checkpoint_id = 3;
+}
+
+message RollbackTaskResponse {
+  TaskView task = 1;
+}
+
+service GraphService {
+  rpc GetGraphSlice(GetGraphSliceRequest) returns (GetGraphSliceResponse);
+  rpc ExpandGraph(ExpandGraphRequest) returns (ExpandGraphResponse);
+  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+  rpc ExplainNode(ExplainNodeRequest) returns (ExplainNodeResponse);
+  rpc CompareGraphRevisions(CompareGraphRevisionsRequest) returns (CompareGraphRevisionsResponse);
+}
+
+message GetGraphSliceRequest {
+  StableIdentity task_id = 1;
+  string mode = 2;
+  uint32 max_nodes = 3;
+  uint32 max_edges = 4;
+}
+
+message GetGraphSliceResponse {
+  GraphSliceView graph = 1;
+}
+
+message ExpandGraphRequest {
+  StableIdentity graph_revision_id = 1;
+  repeated StableIdentity root_node_ids = 2;
+  string continuation_cursor = 3;
+  uint32 max_nodes = 4;
+  uint32 max_edges = 5;
+}
+
+message ExpandGraphResponse {
+  GraphSliceView graph = 1;
+}
+
+message GetNodeRequest {
+  StableIdentity graph_revision_id = 1;
+  StableIdentity node_id = 2;
+}
+
+message GetNodeResponse {
+  GraphNodeView node = 1;
+  repeated StableIdentity related_message_ids = 2;
+  repeated StableIdentity evidence_ids = 3;
+}
+
+message ExplainNodeRequest {
+  StableIdentity graph_revision_id = 1;
+  StableIdentity node_id = 2;
+}
+
+message ExplainNodeResponse {
+  GraphNodeView node = 1;
+  RedactedText explanation = 2;
+}
+
+message CompareGraphRevisionsRequest {
+  StableIdentity from_graph_revision_id = 1;
+  StableIdentity to_graph_revision_id = 2;
+  uint32 max_changes = 3;
+  string continuation_cursor = 4;
+}
+
+message CompareGraphRevisionsResponse {
+  repeated GraphNodeView added_nodes = 1;
+  repeated GraphNodeView changed_nodes = 2;
+  repeated StableIdentity removed_node_ids = 3;
+  string continuation_cursor = 4;
+  bool truncated = 5;
+}
+
+service ReviewService {
+  rpc GetDiffSummary(GetDiffSummaryRequest) returns (GetDiffSummaryResponse);
+  rpc GetValidationReport(GetValidationReportRequest) returns (GetValidationReportResponse);
+  rpc AcceptChange(AcceptChangeRequest) returns (AcceptChangeResponse);
+  rpc RejectChange(RejectChangeRequest) returns (RejectChangeResponse);
+  rpc OpenInEditor(OpenInEditorRequest) returns (OpenInEditorResponse);
+}
+
+message GetDiffSummaryRequest {
+  StableIdentity task_id = 1;
+}
+
+message GetDiffSummaryResponse {
+  DiffSummaryView diff = 1;
+}
+
+message GetValidationReportRequest {
+  StableIdentity task_id = 1;
+}
+
+message GetValidationReportResponse {
+  ValidationReportView report = 1;
+}
+
+message AcceptChangeRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string expected_diff_identity = 3;
+  uint64 expected_validation_revision = 4;
+}
+
+message AcceptChangeResponse {
+  TaskView task = 1;
+  RedactedText acceptance_summary = 2;
+}
+
+message RejectChangeRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+  bool preserve_patch = 4;
+}
+
+message RejectChangeResponse {
+  TaskView task = 1;
+}
+
+message OpenInEditorRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  string workspace_relative_path = 3;
+  uint32 line = 4;
+  uint32 column = 5;
+}
+
+message OpenInEditorResponse {
+  string decision = 1;
+  SafePath path = 2;
+}
+
+service SettingsService {
+  rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
+  rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
+  rpc SetBudgetDefaults(SetBudgetDefaultsRequest) returns (SetBudgetDefaultsResponse);
+  rpc ConfigureProvider(ConfigureProviderRequest) returns (ConfigureProviderResponse);
+  rpc TestProvider(TestProviderRequest) returns (TestProviderResponse);
+}
+
+message GetModelsRequest {
+  StableIdentity workspace_id = 1;
+}
+
+message GetModelsResponse {
+  repeated ModelView models = 1;
+}
+
+message GetPolicyRequest {
+  StableIdentity workspace_id = 1;
+}
+
+message GetPolicyResponse {
+  PolicyView policy = 1;
+}
+
+message SetPolicyRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  PolicyView policy = 3;
+}
+
+message SetPolicyResponse {
+  PolicyView policy = 1;
+}
+
+message SetBudgetDefaultsRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  Money default_hard_limit = 3;
+}
+
+message SetBudgetDefaultsResponse {
+  Money default_hard_limit = 1;
+  uint64 revision = 2;
+}
+
+message ConfigureProviderRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  StableIdentity provider_id = 3;
+  string credential_reference = 4;
+  string model_id = 5;
+}
+
+message ConfigureProviderResponse {
+  ProviderView provider = 1;
+}
+
+message TestProviderRequest {
+  StableIdentity provider_id = 1;
+}
+
+message TestProviderResponse {
+  bool reachable = 1;
+  RedactedText summary = 2;
+}
+
+service SessionService {
+  rpc SubscribeSession(SubscribeSessionRequest) returns (stream SubscribeSessionResponse);
+}
+
+message SubscribeSessionRequest {
+  StableIdentity session_id = 1;
+  uint64 after_sequence = 2;
+}
+
+message SubscribeSessionResponse {
+  SessionEvent event = 1;
+}

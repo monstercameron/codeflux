@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+import "codeflux/v1/identity.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Versioning convention: the protobuf package and Go package carry the
+// breaking API major. Additive changes stay in codeflux.v1; incompatible
+// changes require a new codeflux.vN package. Removed field numbers and names
+// are reserved permanently.
+
+// ErrorCode is stable across safe-message wording changes.
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_NOT_FOUND = 1;
+  ERROR_CODE_INVALID_ARGUMENT = 2;
+  ERROR_CODE_INVALID_TRANSITION = 3;
+  ERROR_CODE_STALE_REVISION = 4;
+  ERROR_CODE_DUPLICATE = 5;
+  ERROR_CODE_DENIED = 6;
+  ERROR_CODE_BUDGET_EXHAUSTED = 7;
+  ERROR_CODE_CANCELLED = 8;
+  ERROR_CODE_PROVIDER_RETRYABLE = 9;
+  ERROR_CODE_CORRUPTION = 10;
+  ERROR_CODE_RECOVERY_REQUIRED = 11;
+  ERROR_CODE_UNAUTHENTICATED = 12;
+  ERROR_CODE_DEADLINE_EXCEEDED = 13;
+  ERROR_CODE_INTERNAL = 14;
+}
+
+// ApiErrorDetail is attached to a gRPC status. safe_message is redacted and
+// user-presentable; it never contains a credential, raw provider body, SQL,
+// command output, or absolute local path.
+message ApiErrorDetail {
+  ErrorCode code = 1;
+  string safe_message = 2;
+  bool retryable = 3;
+  StableIdentity entity_id = 4;
+  reserved 5 to 9;
+  reserved "raw_message", "debug_detail";
+}
+
+// MutationControl supplies delivery identity and optional optimistic
+// concurrency. The effective idempotency scope is authenticated session,
+// method, owning entity, and idempotency_key.
+message MutationControl {
+  string idempotency_key = 1;
+  optional uint64 expected_revision = 2;
+}
+
+// PageRequest uses an opaque server-issued cursor. Clients cannot infer
+// storage keys, offsets, table names, or row identifiers from it.
+message PageRequest {
+  string cursor = 1;
+  uint32 limit = 2;
+}
+
+message PageInfo {
+  string next_cursor = 1;
+  bool has_more = 2;
+}
+
+// Money is exact: minor_units is interpreted using decimal_places and the
+// uppercase ISO-4217 currency_code. Unknown monetary values are represented by
+// absence of Money, never by zero.
+message Money {
+  string currency_code = 1;
+  int64 minor_units = 2;
+  uint32 decimal_places = 3;
+}
+
+message TokenAmount {
+  uint64 tokens = 1;
+}
+
+// RedactedText explicitly marks all user-presentable provider/tool/repository
+// output as passing through the redaction boundary.
+message RedactedText {
+  string value = 1;
+  bool truncated = 2;
+  uint64 original_bytes = 3;
+}
+
+message SafePath {
+  string workspace_relative_slash_path = 1;
+  bool exists = 2;
+  bool directory = 3;
+}
+
+message GitStateView {
+  string head_revision = 1;
+  string branch = 2;
+  bool detached = 3;
+  bool dirty = 4;
+  bool conflicted = 5;
+  bool operation_in_progress = 6;
+  uint32 changed_path_count = 7;
+}
+
+// Temporal values use standard protobuf UTC timestamps and nonnegative
+// protobuf durations. Invalid or unnormalized values are rejected at input.
+message TimeBounds {
+  google.protobuf.Timestamp observed_at = 1;
+  google.protobuf.Duration elapsed = 2;
+}
