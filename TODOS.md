@@ -343,14 +343,23 @@ WASM generator exists yet.
 
 ## Continuous Integration
 
-- [ ] `M01-047` Add CI for the primary development operating system.
-- [ ] `M01-048` Add CI for all declared prototype operating systems.
-- [ ] `M01-049` Cache Go modules without caching generated correctness results.
-- [ ] `M01-050` Run formatting, vet, lint, unit tests, migration checks, generation checks, and secret scanning in CI.
-- [ ] `M01-051` Run race tests on at least one CI job.
-- [ ] `M01-052` Upload redacted test artifacts only when a job fails.
-- [ ] `M01-053` Prevent CI logs from printing provider secrets.
-- [ ] `M01-054` Add a dependency-update policy and review cadence.
+- [x] `M01-047` Add CI for the primary development operating system.
+- [x] `M01-048` Add CI for all declared prototype operating systems.
+- [x] `M01-049` Cache Go modules without caching generated correctness results.
+- [x] `M01-050` Run formatting, vet, lint, unit tests, migration checks, generation checks, and secret scanning in CI.
+- [x] `M01-051` Run race tests on at least one CI job.
+- [x] `M01-052` Upload redacted test artifacts only when a job fails.
+- [x] `M01-053` Prevent CI logs from printing provider secrets.
+- [x] `M01-054` Add a dependency-update policy and review cadence.
+
+Evidence:
+
+- `.github/workflows/ci.yml` assigns the primary quality job to GitHub-hosted Windows 11 ARM64 and build/test matrix jobs to every frozen prototype target.
+- `actions/setup-go` keys dependency caching from `go.sum`; no generated tree, test result, or `.artifacts` path is cached.
+- Quality invokes the repository lint aggregate, deterministic regeneration, coverage tests, and build; Ubuntu AMD64 invokes the race helper.
+- Failure uploads select only the helper-generated allow-listed `context.json`; unit coverage, raw logs, environment variables, and provider credentials are never upload inputs.
+- Provider credential variables are explicitly empty in every job, checkout credentials are not persisted, and Dependabot groups Go and workflow updates on a weekly review cadence.
+- The failure-artifact unit test, fast suite, lint aggregate, `actionlint` v1.7.12, and whitespace validation passed locally.
 
 ## Agent Instruction and Harness Files
 

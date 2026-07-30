@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-012
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-011
+Request-or-TODO: M01-047 through M01-054
+Goal: Enforce repository quality on every declared prototype platform without
+  exposing provider credentials or treating cached output as correctness
+Decisions: Use GitHub-hosted Windows 11 ARM64 as the primary job and a build
+  matrix covering Windows AMD64, macOS ARM64, and Ubuntu AMD64; cache only
+  setup-go dependency inputs; upload only an allow-listed JSON failure context
+Files-or-schemas: .github workflows and Dependabot policy; codeflux-dev
+  failure-artifact helper; no runtime schema
+Validation: Failure-artifact unit test proved environment values are excluded;
+  fast suite and lint passed; actionlint v1.7.12 accepted the workflow; manual
+  failure artifact contained only schema, commit, Go, OS, and architecture
+Failures-or-discarded-approaches: actionlint v1.7.7 predated the current
+  GitHub-hosted windows-11-arm label and rejected it; current v1.7.12 validates
+  the official label
+Known-limitations: Hosted execution requires a GitHub remote and is deferred to
+  the M01 platform gate; no repository remote is configured
+Next-safe-step: Commit the CI cluster, then track and validate the existing
+  authoritative AGENTS.md and thin CLAUDE.md instruction files.
+
 Dev-Log: DL-20260730-011
 Date: 2026-07-30
 Status: Complete

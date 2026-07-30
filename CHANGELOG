@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-011
+Date: 2026-07-30
+Type: Cross-platform continuous integration
+Request-or-TODO: M01-047 through M01-054
+Outcome: Added current hosted-runner coverage for every frozen platform,
+  aggregate quality and deterministic-generation enforcement, Linux race
+  tests, allow-listed failure metadata, and weekly dependency review
+Affected-behavior: Pull requests and pushes reject build, test, formatting,
+  vet, Staticcheck, migration, generation, or provider-token violations
+Compatibility-or-migration: CI selects patched Go 1.26.5 while preserving Go
+  1.26.0 language compatibility; no runtime migration
+Verification: Failure-artifact tests, fast suite, lint, actionlint v1.7.12,
+  manual allow-list inspection, and whitespace checks passed
+Dev-Log: DL-20260730-012
+
 Change-ID: CL-20260730-010
 Date: 2026-07-30
 Type: Developer documentation

@@ -42,6 +42,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runGenerate(ctx, stdout, stderr)
 	case "generate-check":
 		return runGenerateCheck(ctx, stdout, stderr)
+	case "ci-failure-artifact":
+		return runCIFailureArtifact(ctx, stderr)
 	case "test-fast":
 		return runGo(ctx, stdout, stderr, "test", "./...")
 	case "test-race":
@@ -62,6 +64,7 @@ func printHelp(output io.Writer) {
 	fmt.Fprintln(output)
 	fmt.Fprintln(output, "Commands:")
 	fmt.Fprintln(output, "  build      Compile all packages and write command binaries to .artifacts/bin")
+	fmt.Fprintln(output, "  ci-failure-artifact  Write allow-listed CI failure context under .artifacts")
 	fmt.Fprintln(output, "  generate   Regenerate source from pinned protobuf tools")
 	fmt.Fprintln(output, "  generate-check  Regenerate under .artifacts and reject committed drift")
 	fmt.Fprintln(output, "  test-fast  Run the complete fast Go test suite")

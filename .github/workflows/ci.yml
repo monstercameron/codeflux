@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANTHROPIC_API_KEY: ""
+  CODEFLUX_LIVE_PROVIDER: ""
+  GOTOOLCHAIN: local
+  OPENAI_API_KEY: ""
+
+jobs:
+  quality:
+    name: Quality (Windows 11 ARM64)
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.5
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Install pinned Staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+      - name: Check formatting, vet, lint, migrations, and secrets
+        run: go run ./cmd/codeflux-dev lint
+      - name: Check deterministic generation
+        run: go run ./cmd/codeflux-dev generate-check
+      - name: Run unit tests with coverage
+        run: go run ./cmd/codeflux-dev test-coverage
+      - name: Build
+        run: go run ./cmd/codeflux-dev build
+      - name: Create allow-listed failure metadata
+        if: failure()
+        run: go run ./cmd/codeflux-dev ci-failure-artifact
+      - name: Upload redacted failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-windows-arm64-failure
+          path: .artifacts/test-failures/context.json
+          if-no-files-found: error
+          retention-days: 7
+
+  platform:
+    name: Build and test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows 11 ARM64
+            runner: windows-11-arm
+          - name: Windows Server 2025 AMD64
+            runner: windows-2025
+          - name: macOS 15 ARM64
+            runner: macos-15
+          - name: Ubuntu 24.04 AMD64
+            runner: ubuntu-24.04
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.5
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Run fast tests
+        run: go run ./cmd/codeflux-dev test-fast
+      - name: Build
+        run: go run ./cmd/codeflux-dev build
+      - name: Create allow-listed failure metadata
+        if: failure()
+        run: go run ./cmd/codeflux-dev ci-failure-artifact
+      - name: Upload redacted failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: platform-${{ matrix.runner }}-failure
+          path: .artifacts/test-failures/context.json
+          if-no-files-found: error
+          retention-days: 7
+
+  race:
+    name: Race tests (Ubuntu 24.04 AMD64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.5
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Run race tests
+        run: go run ./cmd/codeflux-dev test-race
+      - name: Create allow-listed failure metadata
+        if: failure()
+        run: go run ./cmd/codeflux-dev ci-failure-artifact
+      - name: Upload redacted failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: race-ubuntu-amd64-failure
+          path: .artifacts/test-failures/context.json
+          if-no-files-found: error
+          retention-days: 7
