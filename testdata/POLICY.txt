@@ -1,0 +1,10 @@
+CODEFLUX TESTDATA POLICY
+
+Only synthetic or explicitly redistributable fixtures may be stored here.
+Never copy private repositories, customer data, provider credentials, tokens,
+personal paths, production URLs, or unredacted logs into testdata.
+
+Every repository fixture must identify its synthetic purpose in a nearby
+non-secret source or test comment. Secret-scanning fixtures must use documented
+non-live markers that cannot authenticate to a real service. Generated,
+temporary, or failure-capture output belongs under .artifacts/, not testdata.

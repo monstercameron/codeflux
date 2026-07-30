@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-003
+Date: 2026-07-30
+Type: Internal package architecture
+Request-or-TODO: M01-007 through M01-025
+Outcome: Added the user command, all initial internal package boundaries,
+  frontend/protobuf/migration source packages, and a synthetic testdata policy
+Affected-behavior: The complete initial module compiles with documented inward
+  dependency direction and no invented subsystem behavior
+Compatibility-or-migration: Initial package layout; no runtime or schema change
+Verification: `go list ./...`, package-doc check, command build, `go test ./...`,
+  and `go vet ./...` passed; binary output was confined to .artifacts/bin
+Dev-Log: DL-20260730-004
+
 Change-ID: CL-20260730-002
 Date: 2026-07-30
 Type: Repository bootstrap

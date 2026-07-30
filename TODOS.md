@@ -254,25 +254,30 @@ Repository bootstrap evidence:
 - Root `README.md`: intentionally absent because the user did not explicitly request that file; this does not block M01.
 - License: Apache License 2.0.
 - Text normalization: LF by default, CRLF only for Windows batch command files, and common binary assets marked binary.
-- [ ] `M01-007` Create `cmd/codeflux` for the user-facing executable.
-- [ ] `M01-008` Create `internal/coordinator` for coordinator application logic.
-- [ ] `M01-009` Create `internal/worker` for task-worker logic.
-- [ ] `M01-010` Create `internal/domain` for stable domain types.
-- [ ] `M01-011` Create `internal/storage` for SQLite repositories and transactions.
-- [ ] `M01-012` Create `internal/events` for journal and stream contracts.
-- [ ] `M01-013` Create `internal/providers` for model-provider abstractions.
-- [ ] `M01-014` Create `internal/workspace` for repository discovery and context assembly.
-- [ ] `M01-015` Create `internal/executor` for mediated tool and command execution.
-- [ ] `M01-016` Create `internal/gitwork` for Git/worktree operations.
-- [ ] `M01-017` Create `internal/agent` for planning and execution orchestration.
-- [ ] `M01-018` Create `internal/graph` for graph projection and queries.
-- [ ] `M01-019` Create `internal/review` for diffs, validation, and evidence.
-- [ ] `M01-020` Create `internal/transport` for gRPC and browser bridging.
-- [ ] `M01-021` Create `web` or the v5-prescribed directory for GoWebComponents client code.
-- [ ] `M01-022` Create `api/proto` for protobuf definitions.
-- [ ] `M01-023` Create `migrations` for embedded SQL migrations.
-- [ ] `M01-024` Create `testdata` with clear rules preventing secrets or private repositories.
-- [ ] `M01-025` Add package documentation stating the dependency direction between internal packages.
+- [x] `M01-007` Create `cmd/codeflux` for the user-facing executable.
+- [x] `M01-008` Create `internal/coordinator` for coordinator application logic.
+- [x] `M01-009` Create `internal/worker` for task-worker logic.
+- [x] `M01-010` Create `internal/domain` for stable domain types.
+- [x] `M01-011` Create `internal/storage` for SQLite repositories and transactions.
+- [x] `M01-012` Create `internal/events` for journal and stream contracts.
+- [x] `M01-013` Create `internal/providers` for model-provider abstractions.
+- [x] `M01-014` Create `internal/workspace` for repository discovery and context assembly.
+- [x] `M01-015` Create `internal/executor` for mediated tool and command execution.
+- [x] `M01-016` Create `internal/gitwork` for Git/worktree operations.
+- [x] `M01-017` Create `internal/agent` for planning and execution orchestration.
+- [x] `M01-018` Create `internal/graph` for graph projection and queries.
+- [x] `M01-019` Create `internal/review` for diffs, validation, and evidence.
+- [x] `M01-020` Create `internal/transport` for gRPC and browser bridging.
+- [x] `M01-021` Create `web` or the v5-prescribed directory for GoWebComponents client code.
+- [x] `M01-022` Create `api/proto` for protobuf definitions.
+- [x] `M01-023` Create `migrations` for embedded SQL migrations.
+- [x] `M01-024` Create `testdata` with clear rules preventing secrets or private repositories.
+- [x] `M01-025` Add package documentation stating the dependency direction between internal packages.
+
+Package-skeleton evidence: `go list ./...` found 19 documented packages;
+`go build -o .artifacts/bin/codeflux.exe ./cmd/codeflux`, `go test ./...`,
+and `go vet ./...` passed; the testdata policy permits only synthetic or
+explicitly redistributable, secret-free fixtures.
 
 ## Build and Quality Tooling
 
