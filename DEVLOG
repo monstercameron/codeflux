@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-007
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-006
+Request-or-TODO: M01-033
+Goal: Add real, version-pinned protobuf generation without requiring a global
+  protoc installation
+Assumptions: A pinned `go run` invocation of Buf 1.72.0 plus the pinned remote
+  protocolbuffers/go 1.36.11 plugin is reproducible for the frozen schema
+Decisions: Use Buf's internal compiler and remote Go plugin; commit generated
+  Go and its runtime dependency; keep generation explicitly network-capable
+Files-or-schemas: buf.yaml, buf.gen.yaml, api/proto/codeflux/v1/system.proto,
+  generated api/gen source, cmd/codeflux-dev, go.mod, go.sum
+Validation: Buf lint passed; two generations produced identical SHA-256
+  E9E6331D9AD000D782C80EB91663B2CA2DA670D2FB09FBBEC4DAEC639FEE5280;
+  the generated header is present; module graph tidied to protobuf runtime
+  v1.36.11; build, fast tests, vet, and Staticcheck passed
+Failures-or-discarded-approaches: Rejected retaining Buf as a Go tool directive
+  because it expanded the application module graph with the CLI's large
+  transitive dependency set; use a version-qualified go run tool instead
+Known-limitations: First generation requires network access to fetch the pinned
+  Buf command and remote plugin; clean-clone bootstrap will make that explicit
+Next-safe-step: Commit protobuf generation, then add migration embedding and
+  deterministic frontend asset packaging for M01-034 and M01-035.
+
 Dev-Log: DL-20260730-006
 Date: 2026-07-30
 Status: Complete

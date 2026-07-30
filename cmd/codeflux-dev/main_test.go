@@ -18,7 +18,7 @@ func TestRunHelp(t *testing.T) {
 	if code != exitSuccess {
 		t.Fatalf("run help exit = %d, want %d; stderr=%q", code, exitSuccess, stderr.String())
 	}
-	for _, command := range []string{"build", "test-fast", "test-race", "test-coverage", "lint"} {
+	for _, command := range []string{"build", "generate", "test-fast", "test-race", "test-coverage", "lint"} {
 		if !strings.Contains(stdout.String(), command) {
 			t.Errorf("help omits command %q: %s", command, stdout.String())
 		}

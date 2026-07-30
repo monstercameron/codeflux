@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package codeflux.v1;
+
+option go_package = "codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1";
+
+// BuildIdentity reports the exact source and schema identity of one Codeflux
+// executable. Additional runtime status belongs in later service contracts.
+message BuildIdentity {
+  string semantic_version = 1;
+  string commit = 2;
+  string build_date = 3;
+  string go_version = 4;
+  uint32 schema_version = 5;
+  string frontend_version = 6;
+}

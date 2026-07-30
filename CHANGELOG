@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-006
+Date: 2026-07-30
+Type: Protobuf generation
+Request-or-TODO: M01-033
+Outcome: Added a pinned Buf/protoc-gen-go pipeline and the first generated
+  build-identity message contract
+Affected-behavior: `codeflux-dev generate` reproducibly compiles protobuf
+  sources without requiring a global protoc installation
+Compatibility-or-migration: Initial protobuf contract; protobuf runtime
+  v1.36.11 is now a direct dependency
+Verification: Buf lint, two identical generations, generated-header check,
+  build, fast tests, vet, and Staticcheck passed
+Dev-Log: DL-20260730-007
+
 Change-ID: CL-20260730-005
 Date: 2026-07-30
 Type: Quality enforcement

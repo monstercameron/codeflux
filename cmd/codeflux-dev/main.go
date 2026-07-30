@@ -38,6 +38,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return exitSuccess
 	case "build":
 		return runBuild(ctx, stdout, stderr)
+	case "generate":
+		return runGenerate(ctx, stdout, stderr)
 	case "test-fast":
 		return runGo(ctx, stdout, stderr, "test", "./...")
 	case "test-race":
@@ -58,10 +60,29 @@ func printHelp(output io.Writer) {
 	fmt.Fprintln(output)
 	fmt.Fprintln(output, "Commands:")
 	fmt.Fprintln(output, "  build      Compile all packages and write command binaries to .artifacts/bin")
+	fmt.Fprintln(output, "  generate   Regenerate source from pinned protobuf tools")
 	fmt.Fprintln(output, "  test-fast  Run the complete fast Go test suite")
 	fmt.Fprintln(output, "  test-race  Run Go race tests on a supported host")
 	fmt.Fprintln(output, "  test-coverage  Write unit coverage to .artifacts/coverage")
 	fmt.Fprintln(output, "  lint       Verify formatting, vet, and staticcheck 2026.1")
+}
+
+func runGenerate(ctx context.Context, stdout, stderr io.Writer) int {
+	root, err := repositoryRoot()
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev generate: %v\n", err)
+		return exitFailure
+	}
+	return runCommandIn(
+		ctx,
+		root,
+		stdout,
+		stderr,
+		"go",
+		"run",
+		"github.com/bufbuild/buf/cmd/buf@v1.72.0",
+		"generate",
+	)
 }
 
 func runBuild(ctx context.Context, stdout, stderr io.Writer) int {

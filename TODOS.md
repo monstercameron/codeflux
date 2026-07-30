@@ -300,7 +300,13 @@ Quality-command evidence:
 - `lint` verifies formatting in-process, runs `go vet ./...`, and requires/runs Staticcheck 2026.1.
 - `test-race` runs `go test -race ./...` on supported hosts and fails explicitly on the current unsupported Windows ARM64 host; the supported CI execution is tracked by M01-051.
 - `test-coverage` writes `.artifacts/coverage/unit.out`; coverage is diagnostic and has no raw-percentage gate.
-- [ ] `M01-033` Add protobuf generation through a pinned tool version.
+- [x] `M01-033` Add protobuf generation through a pinned tool version.
+
+Protobuf generation evidence: Buf 1.72.0 compiles
+`api/proto/codeflux/v1/system.proto` and invokes the pinned
+`buf.build/protocolbuffers/go:v1.36.11` plugin; a second generation produced
+the identical SHA-256
+`E9E6331D9AD000D782C80EB91663B2CA2DA670D2FB09FBBEC4DAEC639FEE5280`.
 - [ ] `M01-034` Add migration embedding through `go:embed`.
 - [ ] `M01-035` Add frontend WASM asset embedding or deterministic packaging.
 - [ ] `M01-036` Ensure generated files carry a generated-file header.
