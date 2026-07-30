@@ -47,7 +47,7 @@ func developmentCommandRegistry() []commandSpec {
 	}
 	specs := []commandSpec{
 		{Name: "benchmark", Purpose: "Run a named benchmark beneath the artifact root.", Prerequisites: []string{"implemented benchmark subsystem"}, Arguments: []string{"[name]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
-		{Name: "bootstrap", Purpose: "Verify the pinned development toolchain and generators.", Prerequisites: []string{"Go", "Git", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "bootstrap", Purpose: "Verify the pinned development toolchain and generators.", Prerequisites: []string{"Go", "Git", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
 		{Name: "build", Purpose: "Compile packages and command binaries beneath the artifact root.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "ci-failure-artifact", Purpose: "Write allow-listed CI failure context.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "doctor", Purpose: "Run environment and product subsystem diagnostics.", Prerequisites: []string{"Go", "Git"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},

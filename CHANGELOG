@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-016
+Date: 2026-07-30
+Type: Development bootstrap
+Request-or-TODO: M01-081
+Outcome: Added patched Go selection, pinned local generator/linter installation,
+  Git verification, secret-scrubbed subprocesses, and an explicit deferred
+  GoWebComponents boundary
+Affected-behavior: Fresh contributors can provision and inspect the exact M01
+  toolchain beneath the ignored artifact root with text or versioned JSON output
+Compatibility-or-migration: Bootstrap result schema v1; no runtime migration
+Verification: Bootstrap unit cases, real tool installation/version probes,
+  aggregate lint, fast tests, and staged whitespace checks
+Dev-Log: DL-20260730-017
+
 Change-ID: CL-20260730-015
 Date: 2026-07-30
 Type: Development command registry

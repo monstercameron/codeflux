@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-017
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-016
+Request-or-TODO: M01-081
+Goal: Make a fresh contributor's required Go and generation toolchain explicit,
+  patched, repository-local, machine-readable, and safe from provider secrets
+Assumptions: GoWebComponents must remain unselected until the mandatory M06-001
+  spike; bootstrap verifies that boundary and reports it as deferred
+Decisions: Select Go 1.26.5, Buf 1.72.0, protoc-gen-go 1.36.11, and Staticcheck
+  2026.1; install tools under a validated .artifacts root; scrub credential-
+  shaped environment variables from tool subprocesses
+Files-or-schemas: codeflux-dev bootstrap implementation and tests; bootstrap
+  result schema version 1; no runtime database schema
+Validation: Unit checks, real JSON bootstrap installation/version probes,
+  staged aggregate lint, fast tests, and whitespace checks passed
+Failures-or-discarded-approaches: None
+Known-limitations: The first bootstrap may require network access and took
+  approximately 78 seconds on this host; M06-001 must replace the deferred
+  GoWebComponents result with the selected exact release
+Next-safe-step: Stage and run aggregate checks, commit bootstrap, then expand
+  generation beyond protobuf to every currently declared source family.
+
 Dev-Log: DL-20260730-016
 Date: 2026-07-30
 Status: Complete

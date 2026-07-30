@@ -418,7 +418,7 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 
 - [x] `M01-079 BLOCKER` Create `cmd/codeflux-dev` as the cross-platform development entry point without requiring Make, Bash, PowerShell, Node scripts, or a global task runner.
 - [x] `M01-080` Define the development command registry with name, purpose, prerequisites, arguments, exit codes, and machine-readable-output capability.
-- [ ] `M01-081` Implement `codeflux-dev bootstrap` to verify pinned Go, Git, protobuf, GoWebComponents, and generator requirements.
+- [x] `M01-081` Implement `codeflux-dev bootstrap` to verify pinned Go, Git, protobuf, GoWebComponents, and generator requirements.
 - [ ] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
 - [ ] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
 - [ ] `M01-084` Implement `codeflux-dev run` with temporary SQLite, fake credentials, scripted provider, ephemeral port, and no external network.
@@ -449,6 +449,13 @@ Developer-command registry evidence:
 - Registry schema v1 records each command's purpose, prerequisites, arguments, availability, stable exit meanings, and current machine-output capability; JSON discovery is deterministic.
 - Every declared command supports text and JSON help. Unimplemented subsystem commands return exit 3 and a versioned unavailable result instead of claiming success.
 - Shared root resolution defaults to a command child beneath `.artifacts`, rejects the repository root, and rejects any repository-local destination outside `.artifacts`.
+
+Bootstrap evidence:
+
+- `go run ./cmd/codeflux-dev bootstrap --json` selected and verified Go 1.26.5, Git 2.54.0, Buf 1.72.0, protoc-gen-go 1.36.11, and Staticcheck 2026.1.
+- Pinned tools install beneath `.artifacts/tools/bin`; provider-token, credential, password, and secret-shaped environment variables are removed before tool subprocesses.
+- Bootstrap validates `go.mod`, Buf configuration, and generator source pins before installation.
+- The GoWebComponents check proves the dependency is absent and M06-001 remains the authority for selecting the exact v5 release; this intentional deferred result does not masquerade as an installed framework.
 
 ## Gate
 

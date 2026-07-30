@@ -69,6 +69,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 	}
 
 	switch spec.Name {
+	case "bootstrap":
+		return runBootstrap(ctx, stdout, stderr, invocation)
 	case "build":
 		return runBuild(ctx, stdout, stderr)
 	case "generate":
