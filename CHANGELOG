@@ -1,0 +1,48 @@
+CODEFLUX CHANGE LOG
+
+Purpose
+-------
+This tracked ledger records completed commit-level outcomes. Every authorized
+commit must add one focused entry and carry the matching Change-Log trailer.
+
+Commit binding
+--------------
+An entry uses a stable Change-ID because a commit cannot contain its own final
+hash. The commit message must include:
+
+Change-Log: CL-YYYYMMDD-NNN
+
+Resolve the final commit with:
+
+git log --grep="Change-Log: CL-YYYYMMDD-NNN"
+
+Entry fields
+------------
+Change-ID:
+Date:
+Type:
+Request-or-TODO:
+Outcome:
+Affected-behavior:
+Compatibility-or-migration:
+Verification:
+Dev-Log:
+
+Entries
+-------
+Change-ID: CL-20260730-001
+Date: 2026-07-30
+Type: Product contract, evaluation fixture, and documentation check
+Request-or-TODO: M00-001 through M00-G05
+Outcome: Froze the bounded Codeflux prototype contract, objective measurement
+  definitions, current-agent baselines, branch authorization gates, one
+  independently testable ReserveFlow task, and executable plan traceability
+Affected-behavior: Implementation may proceed to M01 only through the declared
+  platform, repository, concurrency, authority, acceptance, performance, and
+  evaluation boundaries
+Compatibility-or-migration: Initial contract; no runtime or schema migration
+Verification: Plan trace check passed; evaluator self-containment test passed;
+  the independent Task 1 acceptance test is intentionally red against the
+  frozen empty ReserveFlow scaffold; all M00 checklist items and gates were
+  reviewed against recorded evidence
+Dev-Log: DL-20260730-002

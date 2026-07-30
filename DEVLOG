@@ -1,0 +1,78 @@
+CODEFLUX DEVELOPMENT LOG
+
+Purpose
+-------
+This tracked ledger records implementation chronology, decisions, validation,
+failures, limitations, and the next safe step. It is not a raw transcript and
+must never contain secrets or private model reasoning.
+
+Entry fields
+------------
+Dev-Log:
+Date:
+Status:
+Change-ID:
+Request-or-TODO:
+Goal:
+Assumptions:
+Decisions:
+Files-or-schemas:
+Validation:
+Failures-or-discarded-approaches:
+Known-limitations:
+Next-safe-step:
+
+Entries
+-------
+Dev-Log: DL-20260730-002
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-001
+Request-or-TODO: M00-001 through M00-G05; user requested completion of all
+  Codeflux TODOs in dependency order
+Goal: Freeze a bounded, independently evaluable prototype contract before
+  repository implementation begins
+Assumptions: The first internal build may target Windows 11 x64 while portable
+  interfaces and declared cross-platform release gates remain mandatory; the
+  ReserveFlow scaffold and evaluator will remain sibling repositories
+Decisions: Work starts at the first incomplete dependency-safe task; current
+  provider/model/pricing facts are verified from official provider sources;
+  deferred and research tracks remain outside the prototype critical path
+Files-or-schemas: docs/plan.md, docs/check-plan-trace.ps1, TODOS.md, DEVLOG,
+  CHANGELOG; separate reserveflow and reserveflow-evaluator Git repositories;
+  no runtime schema
+Validation: Plan trace check passed for M00-M24, Layers 0-20, referenced plan
+  sections, and the subsystem declaration rule; evaluator self-containment
+  test passed; Task 1 black-box test failed as expected against the frozen empty
+  scaffold because no server is implemented; both fixture repositories are
+  clean and pinned to recorded revisions
+Failures-or-discarded-approaches: OpenAI Developer Docs MCP was not available
+  in the active session; installed the official server for future sessions and
+  used official OpenAI web documentation as the bounded fallback
+Known-limitations: The PowerShell plan check is an allowed Windows-first
+  bootstrap check; M01 must move equivalent enforcement into the planned
+  cross-platform Go development helper. The frozen Task 1 evaluator remains
+  red until the evaluated Codeflux journey implements the visible contract.
+Next-safe-step: Begin M01-001 by selecting and initializing the Go module,
+  preserving the frozen M00 contract and platform boundaries.
+
+Dev-Log: DL-20260730-001
+Date: 2026-07-30
+Status: Uncommitted
+Change-ID: None until a commit is authorized
+Request-or-TODO: User requested persistent commit and implementation ledgers
+Goal: Establish CHANGELOG and DEVLOG governance plus atomic commit discipline
+Assumptions: Extensionless tracked ledgers satisfy the prior prohibition on
+  creating unspecified Markdown files
+Decisions: Bind ledger entries to commits with stable IDs and commit trailers;
+  keep implementation chronology separate from completed commit outcomes
+Files-or-schemas: AGENTS.md, CHANGELOG, DEVLOG
+Validation: Confirmed all three required AGENTS rules are present; CHANGELOG
+  and DEVLOG are not ignored; no new Markdown file was created; no known build
+  artifact exists outside .artifacts; no trailing whitespace was found
+Failures-or-discarded-approaches: Rejected embedding the final commit hash in
+  the same commit because changing the file would change that hash
+Known-limitations: No commit exists yet and this request does not itself
+  authorize creating one
+Next-safe-step: Validate the rules and ledgers; add a CHANGELOG entry only when
+  an atomic commit is explicitly authorized
