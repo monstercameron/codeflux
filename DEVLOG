@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-034
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-033
+Request-or-TODO: M03-026 through M03-043
+Goal: Materialize the plan's Phase 1 durable authority before repositories can
+  persist incompatible or under-constrained records
+Assumptions: Unix-microsecond integers are the canonical storage timestamp;
+  exact costs use currency plus integer minor units; mutable aggregates use
+  optimistic revisions; explicit deletion work must remain possible
+Decisions: Add all initial entities in one ordered migration; enforce domain
+  state sets and non-negative numeric values in SQLite; use unique idempotency
+  and monotonic sequence constraints; index the declared access paths; trigger
+  update rejection only for append-only facts and leave aggregate transitions
+  to revision-aware repository transactions
+Files-or-schemas: migration 000001, generated migration and build catalogs,
+  storage schema tests, docs/storage.md, TODOS.md, CHANGELOG, DEVLOG; schema
+  version advances from 0 to 1
+Validation: Migration/recovery commit passed public CI run 30522494849. A real
+  migrated database contains all 26 tables and required indexes. Tests reject
+  missing lineage, unknown task state, duplicate message and event sequence,
+  negative budget values, task-event and message rewrites; scan every table
+  column for credential-bearing names; and pass foreign-key and integrity
+  checks. Every committed migration start version upgrades successfully.
+Failures-or-discarded-approaches: The first schema run safely restored after an
+  index referenced an omitted model-request timestamp; added the lifecycle
+  timestamps before regeneration. Updated the original embed test to validate
+  an ordered growing catalog rather than assuming exactly one migration.
+Known-limitations: Domain repositories and transaction operations are not yet
+  implemented; provider-specific usage remains validated JSON until its adapter
+  contract is introduced
+Next-safe-step: Define the context-cancellable transaction runner, domain
+  repository interfaces, typed storage failures, and real-SQLite repository
+  implementations and concurrency/idempotency/rollback tests in M03-044 onward
+
 Dev-Log: DL-20260730-033
 Date: 2026-07-30
 Status: Complete

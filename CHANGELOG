@@ -30,6 +30,23 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-033
+Date: 2026-07-30
+Type: Initial operational SQLite schema
+Request-or-TODO: M03-026 through M03-043
+Outcome: Added the first append-only application migration with all 26 Phase 1
+  operational tables, lineage, exact-value and state checks, idempotency and
+  sequence constraints, query indexes, and immutable-fact triggers
+Affected-behavior: SQLite can now durably represent projects through evidence
+  without credential columns or floating-point cost and rejects malformed,
+  orphaned, duplicate, or in-place-rewritten facts
+Compatibility-or-migration: Advances the generated schema version from 0 to 1;
+  migration recovery creates a pre-upgrade snapshot before applying it
+Verification: Real-SQLite schema enumeration, constraint, trigger, index,
+  credential-column, foreign-key, integrity, and every-version migration tests
+  pass with the full repository suites
+Dev-Log: DL-20260730-034
+
 Change-ID: CL-20260730-032
 Date: 2026-07-30
 Type: Transactional SQLite migration and recovery

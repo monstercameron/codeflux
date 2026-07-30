@@ -79,3 +79,17 @@ also refuses an automatic retry.
 Primary reference:
 
 - <https://www.sqlite.org/backup.html>
+
+## Initial schema mutability
+
+Migration `000001_initial_operational_schema.sql` creates the Phase 1
+operational entities. Mutable aggregate roots carry an optimistic integer
+revision and lifecycle timestamps; repositories must compare and advance that
+revision in the same transaction as each state change.
+
+Rows that are facts rather than aggregates reject in-place updates with SQLite
+triggers: messages, task events, permission decisions, pricing snapshots,
+forecasts, usage records, redacted output chunks, and diff summaries. New facts
+append new rows. Deletion is deliberately not trigger-blocked here because the
+later explicit deletion lifecycle must be able to satisfy user erasure without
+manual database mutation.

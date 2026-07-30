@@ -691,24 +691,39 @@ Migration-system evidence:
 
 ## Initial Operational Schema
 
-- [ ] `M03-026 BLOCKER DATA` Create project and repository tables.
-- [ ] `M03-027 BLOCKER DATA` Create workspace and worktree-binding tables.
-- [ ] `M03-028 BLOCKER DATA` Create thread and message tables.
-- [ ] `M03-029 BLOCKER DATA` Create task, run, and task-event tables.
-- [ ] `M03-030 BLOCKER DATA` Create approval and permission-decision tables.
-- [ ] `M03-031 BLOCKER DATA` Create provider, model-catalog, pricing-snapshot, and model-request tables without credential columns.
-- [ ] `M03-032 BLOCKER DATA` Create forecast, budget, and usage tables.
-- [ ] `M03-033 BLOCKER DATA` Create command-execution and redacted-output tables.
-- [ ] `M03-034 BLOCKER DATA` Create checkpoint and recovery-attempt tables.
-- [ ] `M03-035 BLOCKER DATA` Create artifact, diff-summary, validation, and evidence tables.
-- [ ] `M03-036 DATA` Add created, updated, and immutable-revision timestamps where semantically valid.
-- [ ] `M03-037 DATA` Add foreign keys for ownership and lineage.
-- [ ] `M03-038 DATA` Add uniqueness constraints for idempotency keys.
-- [ ] `M03-039 DATA` Add uniqueness constraints for monotonic per-session event sequences.
-- [ ] `M03-040 DATA` Add indexes for active tasks, thread pagination, event replay, approvals, worktree binding, and cost aggregation.
-- [ ] `M03-041 DATA` Add check constraints for non-negative token, time, and cost values.
-- [ ] `M03-042 DATA` Add check constraints for enumerated state values or validate them through strict repository code.
-- [ ] `M03-043 DATA` Decide where immutable rows are enforced by triggers versus application code.
+- [x] `M03-026 BLOCKER DATA` Create project and repository tables.
+- [x] `M03-027 BLOCKER DATA` Create workspace and worktree-binding tables.
+- [x] `M03-028 BLOCKER DATA` Create thread and message tables.
+- [x] `M03-029 BLOCKER DATA` Create task, run, and task-event tables.
+- [x] `M03-030 BLOCKER DATA` Create approval and permission-decision tables.
+- [x] `M03-031 BLOCKER DATA` Create provider, model-catalog, pricing-snapshot, and model-request tables without credential columns.
+- [x] `M03-032 BLOCKER DATA` Create forecast, budget, and usage tables.
+- [x] `M03-033 BLOCKER DATA` Create command-execution and redacted-output tables.
+- [x] `M03-034 BLOCKER DATA` Create checkpoint and recovery-attempt tables.
+- [x] `M03-035 BLOCKER DATA` Create artifact, diff-summary, validation, and evidence tables.
+- [x] `M03-036 DATA` Add created, updated, and immutable-revision timestamps where semantically valid.
+- [x] `M03-037 DATA` Add foreign keys for ownership and lineage.
+- [x] `M03-038 DATA` Add uniqueness constraints for idempotency keys.
+- [x] `M03-039 DATA` Add uniqueness constraints for monotonic per-session event sequences.
+- [x] `M03-040 DATA` Add indexes for active tasks, thread pagination, event replay, approvals, worktree binding, and cost aggregation.
+- [x] `M03-041 DATA` Add check constraints for non-negative token, time, and cost values.
+- [x] `M03-042 DATA` Add check constraints for enumerated state values or validate them through strict repository code.
+- [x] `M03-043 DATA` Decide where immutable rows are enforced by triggers versus application code.
+
+Initial-schema evidence:
+
+- Migration 1 creates all 26 Phase 1 operational tables with ownership and
+  lineage foreign keys and no provider-credential columns.
+- Mutable aggregates carry lifecycle timestamps and optimistic revisions.
+  Append-only facts reject in-place updates through triggers while explicit
+  deletion remains available to the later user-erasure lifecycle.
+- Idempotency keys, message/event/output sequences, active-task, pagination,
+  replay, approval, worktree, and cost queries have database constraints or
+  indexes at their authority boundary.
+- Real-SQLite schema tests enumerate every required table and index, reject
+  invalid lineage, invented states, duplicate sequences, negative exact values,
+  and immutable rewrites, scan every column for credential shapes, and pass
+  foreign-key plus full integrity checks.
 
 ## Repository Layer
 
