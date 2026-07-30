@@ -422,10 +422,10 @@ Plan: §27B Process and Package Ownership; §27D Planned Repository Layout, Deve
 - [x] `M01-082` Implement `codeflux-dev generate` as the only normal entry point for protobuf, event registry, migration catalog, version metadata, and frontend generation.
 - [x] `M01-083` Implement `codeflux-dev generate-check` using an isolated generation target and committed-output comparison.
 - [x] `M01-084` Implement `codeflux-dev run` with temporary SQLite, fake credentials, scripted provider, ephemeral port, and no external network.
-- [ ] `M01-085` Implement `codeflux-dev run-live` with explicit provider, credential reference, database, and visible cost warning.
-- [ ] `M01-086` Implement named `test-fast`, `test-integration`, `test-browser`, `test-security`, `test-race`, and `test-all` commands.
-- [ ] `M01-087` Implement `lint` orchestration for format, vet, selected linters, documentation links, protobuf compatibility, migrations, atom names, and atom comments.
-- [ ] `M01-088` Implement `seed`, `replay`, `inspect-db`, `benchmark`, and `doctor` command skeletons with honest unavailable messages until their subsystems exist.
+- [x] `M01-085` Implement `codeflux-dev run-live` with explicit provider, credential reference, database, and visible cost warning.
+- [x] `M01-086` Implement named `test-fast`, `test-integration`, `test-browser`, `test-security`, `test-race`, and `test-all` commands.
+- [x] `M01-087` Implement `lint` orchestration for format, vet, selected linters, documentation links, protobuf compatibility, migrations, atom names, and atom comments.
+- [x] `M01-088` Implement `seed`, `replay`, `inspect-db`, `benchmark`, and `doctor` command skeletons with honest unavailable messages until their subsystems exist.
 - [x] `M01-089` Define deterministic, interactive-fake, live-provider, and fault-injection development profiles.
 - [ ] `M01-090` Ensure each development command accepts an explicit temporary/application root and never defaults destructive work to the repository root.
 - [ ] `M01-091` Ensure each command supports `--help`, stable non-zero failure codes, and the exact failing sub-step.
@@ -470,6 +470,14 @@ Development-profile evidence:
 - The HTTP client disables proxies and the profile declares external provider access false; no provider credential is read or persisted.
 - Registry data defines deterministic, interactive-fake, live-provider, and 13-boundary fault-injection profiles without claiming their later coordinator/storage/provider subsystems already exist.
 - Unit tests verify loopback-only binding, zero-length new SQLite target, fake state, profile inventory, fault boundaries, and safe artifact-child classification.
+
+Command-orchestration evidence:
+
+- `run-live` requires an explicit supported provider, non-secret `os://` credential reference, and absolute database outside the repository; it shows the real-cost warning and returns stable unavailable exit 3 until M04/M12 adapters exist.
+- Current-scope integration and security commands run real Go suites; browser returns a versioned unavailable result until M16; race retains the platform-specific failure and Ubuntu CI route.
+- `test-all` ran lint, isolated generation, fast, integration, and security sub-steps in order and named the precise sub-step on failure.
+- Lint now covers gofmt, repository instructions/links, migration ordering, atom comments/names, generated paths, provider-token scanning, Buf lint, Buf breaking against committed `HEAD`, Go vet, and Staticcheck 2026.1.
+- Seed, replay, inspect-db, benchmark, and doctor skeletons all return stable exit 3 with text or versioned JSON rather than fabricated subsystem results.
 
 ## Gate
 

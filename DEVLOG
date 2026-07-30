@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-020
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-019
+Request-or-TODO: M01-085 through M01-088
+Goal: Complete the current-scope command semantics while making later subsystem
+  absence, live cost, credential authority, and skipped platform work explicit
+Assumptions: M01 may validate live-provider intent but must not access a real
+  credential or provider before M04/M12; browser tests remain M16-owned
+Decisions: Require os:// credential references and out-of-repository live
+  databases; use exit 3 for unavailable subsystems; make test-all include only
+  current required local checks; add Buf lint and HEAD compatibility to lint
+Files-or-schemas: codeflux-dev live gate, test orchestration, registry, lint,
+  and tests; live gate schema version 1; no runtime schema
+Validation: Live positive/negative gates, skeleton status tests, Buf lint and
+  breaking, integration, security, full current-scope test-all, staged lint,
+  fast tests, and whitespace checks passed
+Failures-or-discarded-approaches: None
+Known-limitations: run-live intentionally sends no request until M04/M12;
+  browser remains unavailable until M16; local Windows ARM64 race remains
+  unsupported and enforced by Ubuntu AMD64 CI
+Next-safe-step: Stage and validate command orchestration, commit it, then make
+  root/output and artifact-escape policy uniform across every command.
+
 Dev-Log: DL-20260730-019
 Date: 2026-07-30
 Status: Complete

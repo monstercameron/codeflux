@@ -76,6 +76,11 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		fmt.Fprintf(stderr, "codeflux-dev %s: --once is only valid for run\n", spec.Name)
 		return exitUsage
 	}
+	if spec.Name != "run-live" &&
+		(invocation.Provider != "" || invocation.CredentialRef != "" || invocation.Database != "") {
+		fmt.Fprintf(stderr, "codeflux-dev %s: live-provider options are only valid for run-live\n", spec.Name)
+		return exitUsage
+	}
 
 	switch spec.Name {
 	case "bootstrap":
@@ -98,6 +103,14 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runLint(ctx, stdout, stderr)
 	case "run":
 		return runDeterministicProfile(ctx, stdout, stderr, invocation)
+	case "run-live":
+		return runLiveGate(stdout, stderr, invocation)
+	case "test-all":
+		return runAllTests(ctx, stdout, stderr, invocation)
+	case "test-integration":
+		return runIntegrationTests(ctx, stdout, stderr, invocation)
+	case "test-security":
+		return runSecurityTests(ctx, stdout, stderr, invocation)
 	default:
 		return runUnavailable(stderr, spec, invocation)
 	}
@@ -367,13 +380,30 @@ func runLint(ctx context.Context, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "codeflux-dev lint: repository check: %v\n", err)
 		return exitFailure
 	}
+	if code := runPinnedBuf(ctx, root, stdout, stderr, "lint"); code != exitSuccess {
+		fmt.Fprintln(stderr, "codeflux-dev lint: sub-step protobuf-lint failed")
+		return code
+	}
+	if code := runPinnedBuf(
+		ctx,
+		root,
+		stdout,
+		stderr,
+		"breaking",
+		"--against",
+		".git#ref=HEAD",
+	); code != exitSuccess {
+		fmt.Fprintln(stderr, "codeflux-dev lint: sub-step protobuf-compatibility failed")
+		return code
+	}
 	if code := runGoIn(ctx, root, stdout, stderr, "vet", "./..."); code != exitSuccess {
 		return code
 	}
-	if code := requireStaticcheckVersion(ctx, root, stderr); code != exitSuccess {
+	staticcheck := staticcheckExecutable(root)
+	if code := requireStaticcheckVersion(ctx, root, stderr, staticcheck); code != exitSuccess {
 		return code
 	}
-	return runCommandIn(ctx, root, stdout, stderr, "staticcheck", "./...")
+	return runCommandIn(ctx, root, stdout, stderr, staticcheck, "./...")
 }
 
 func unformattedGoFiles(root string) ([]string, error) {
@@ -413,8 +443,24 @@ func unformattedGoFiles(root string) ([]string, error) {
 	return unformatted, err
 }
 
-func requireStaticcheckVersion(ctx context.Context, root string, stderr io.Writer) int {
-	command := exec.CommandContext(ctx, "staticcheck", "-version")
+func staticcheckExecutable(root string) string {
+	executable := filepath.Join(root, ".artifacts", "tools", "bin", "staticcheck")
+	if runtime.GOOS == "windows" {
+		executable += ".exe"
+	}
+	if info, err := os.Stat(executable); err == nil && !info.IsDir() {
+		return executable
+	}
+	return "staticcheck"
+}
+
+func requireStaticcheckVersion(
+	ctx context.Context,
+	root string,
+	stderr io.Writer,
+	staticcheck string,
+) int {
+	command := exec.CommandContext(ctx, staticcheck, "-version")
 	command.Dir = root
 	output, err := command.CombinedOutput()
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -101,6 +102,35 @@ func TestUnavailableCommandHasStableExitAndJSON(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), `"status":"unavailable"`) {
 		t.Fatalf("seed JSON = %q", stderr.String())
+	}
+}
+
+func TestCurrentSkeletonCommandsAreHonestlyUnavailable(t *testing.T) {
+	for _, command := range []string{"benchmark", "doctor", "inspect-db", "replay", "seed", "test-browser"} {
+		t.Run(command, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run(context.Background(), &stdout, &stderr, []string{command, "--json"})
+			if code != exitUnavailable {
+				t.Fatalf("%s exit = %d, stderr=%q", command, code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), `"status":"unavailable"`) ||
+				!strings.Contains(stderr.String(), `"command":"`+command+`"`) {
+				t.Fatalf("%s result = %q", command, stderr.String())
+			}
+		})
+	}
+}
+
+func TestStaticcheckExecutablePrefersBootstrappedTool(t *testing.T) {
+	root := t.TempDir()
+	want := filepath.Join(root, ".artifacts", "tools", "bin", "staticcheck")
+	if runtime.GOOS == "windows" {
+		want += ".exe"
+	}
+	writeTestFile(t, want, "fixture")
+	if got := staticcheckExecutable(root); got != want {
+		t.Fatalf("staticcheck executable = %q, want %q", got, want)
 	}
 }
 

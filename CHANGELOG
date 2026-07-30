@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-019
+Date: 2026-07-30
+Type: Development command orchestration
+Request-or-TODO: M01-085 through M01-088
+Outcome: Added live-provider authority/cost gating, current integration,
+  security, and pre-submit suites, protobuf lint/compatibility enforcement,
+  and honest unavailable subsystem commands
+Affected-behavior: Developer commands now distinguish runnable checks from
+  deferred browser/provider/storage features with stable exits and exact steps
+Compatibility-or-migration: Live gate result schema v1; no runtime migration
+Verification: Live gate and skeleton tests, Buf checks, integration/security/
+  all commands, aggregate lint, fast suite, and staged whitespace checks
+Dev-Log: DL-20260730-020
+
 Change-ID: CL-20260730-018
 Date: 2026-07-30
 Type: Deterministic development profile

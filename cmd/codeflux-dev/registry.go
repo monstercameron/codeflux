@@ -27,11 +27,14 @@ type commandSpec struct {
 }
 
 type commandInvocation struct {
-	Help       bool
-	JSON       bool
-	Once       bool
-	Root       string
-	Positional []string
+	Help          bool
+	JSON          bool
+	Once          bool
+	Root          string
+	Provider      string
+	CredentialRef string
+	Database      string
+	Positional    []string
 }
 
 type commandRegistryDocument struct {
@@ -55,18 +58,18 @@ func developmentCommandRegistry() []commandSpec {
 		{Name: "generate", Purpose: "Regenerate every declared generated source family.", Prerequisites: []string{"Go", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "generate-check", Purpose: "Regenerate in isolation and reject committed drift.", Prerequisites: []string{"Go", "network for uncached pinned tools"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "inspect-db", Purpose: "Print a safe structured application database summary.", Prerequisites: []string{"implemented storage subsystem"}, Arguments: []string{"[database]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
-		{Name: "lint", Purpose: "Run format, vet, Staticcheck, documentation, schema, and repository checks.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "lint", Purpose: "Run format, vet, Staticcheck, protobuf, documentation, schema, and repository checks.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1", "Buf 1.72.0"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "replay", Purpose: "Replay a redacted event fixture or development session.", Prerequisites: []string{"implemented event subsystem"}, Arguments: []string{"[fixture]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "run", Purpose: "Start the isolated deterministic development profile.", Prerequisites: []string{"Go", "loopback TCP listener"}, Arguments: []string{"[--root PATH]", "[--once]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
-		{Name: "run-live", Purpose: "Start an explicitly selected live-provider profile.", Prerequisites: []string{"implemented provider, credential, coordinator, and storage subsystems"}, Arguments: []string{"--provider NAME", "--credential-ref REF", "--database PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "run-live", Purpose: "Validate and visibly gate an explicitly selected live-provider profile.", Prerequisites: []string{"provider and credential adapters at M04/M12"}, Arguments: []string{"--provider NAME", "--credential-ref os://REF", "--database ABSOLUTE_PATH", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "gated"},
 		{Name: "seed", Purpose: "Create a named deterministic development scenario.", Prerequisites: []string{"implemented storage and event subsystems"}, Arguments: []string{"[scenario]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
-		{Name: "test-all", Purpose: "Run the required local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-all", Purpose: "Run the required current-scope local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1", "pinned Buf"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-browser", Purpose: "Run browser component and end-to-end scenarios.", Prerequisites: []string{"implemented browser harness"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
 		{Name: "test-coverage", Purpose: "Run unit tests and write a coverage profile beneath the artifact root.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-fast", Purpose: "Run unit and pure package tests.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
-		{Name: "test-integration", Purpose: "Run real SQLite, Git, process, transport, and migration tests.", Prerequisites: []string{"implemented integration harness"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-integration", Purpose: "Run current and integration-tagged package tests.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-race", Purpose: "Run Go race tests on a supported host.", Prerequisites: []string{"Go race detector support"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
-		{Name: "test-security", Purpose: "Run path, origin, permission, redaction, secret, and payload cases.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "skeleton"},
+		{Name: "test-security", Purpose: "Run current path, permission, redaction, secret, artifact, instruction, atom, and credential cases.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 	}
 	sort.Slice(specs, func(i, j int) bool {
 		return specs[i].Name < specs[j].Name
@@ -105,6 +108,30 @@ func parseCommandInvocation(args []string) (commandInvocation, error) {
 			if invocation.Root == "" {
 				return commandInvocation{}, fmt.Errorf("--root requires a path")
 			}
+		case argument == "--provider":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--provider requires a value")
+			}
+			invocation.Provider = args[index]
+		case strings.HasPrefix(argument, "--provider="):
+			invocation.Provider = strings.TrimPrefix(argument, "--provider=")
+		case argument == "--credential-ref":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--credential-ref requires a value")
+			}
+			invocation.CredentialRef = args[index]
+		case strings.HasPrefix(argument, "--credential-ref="):
+			invocation.CredentialRef = strings.TrimPrefix(argument, "--credential-ref=")
+		case argument == "--database":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--database requires a value")
+			}
+			invocation.Database = args[index]
+		case strings.HasPrefix(argument, "--database="):
+			invocation.Database = strings.TrimPrefix(argument, "--database=")
 		case strings.HasPrefix(argument, "-"):
 			return commandInvocation{}, fmt.Errorf("unknown option %q", argument)
 		default:
