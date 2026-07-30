@@ -106,3 +106,16 @@ runner temporarily bounds that connection's busy timeout to the remaining
 deadline. It restores the configured value before releasing the connection.
 This is required because the SQLite busy handler itself does not observe Go
 context cancellation while waiting for a writer.
+
+## Repository contracts
+
+Repositories expose named domain operations rather than generic CRUD. Typed
+domain IDs cross the boundary directly and are revalidated by their SQL scanner
+implementations.
+
+Project and source-repository identity are separate. Thread creation verifies
+that its repository belongs to its project. Thread pages use an exclusive
+`(updated_at, id)` cursor over deterministic descending order. Message append
+allocates its per-thread sequence and checks its idempotency claim in the same
+immediate transaction; an identical retry returns the original row and a
+changed retry fails with a typed conflict.

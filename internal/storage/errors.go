@@ -92,3 +92,19 @@ func classifyKind(err error) error {
 	}
 	return nil
 }
+
+func repositoryConstraintKind(err error) error {
+	var sqliteError *sqlite.Error
+	if !errors.As(err, &sqliteError) {
+		return nil
+	}
+	switch sqliteError.Code() {
+	case 1555, 2067:
+		return ErrConflict
+	default:
+		if sqliteError.Code()&0xff == 19 {
+			return ErrConstraint
+		}
+		return nil
+	}
+}

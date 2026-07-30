@@ -24,6 +24,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-036
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-035
+Request-or-TODO: M03-045 through M03-048
+Goal: Establish domain-shaped persistence and deterministic conversation
+  primitives without leaking generic SQL into application packages
+Assumptions: Callers supply already parsed stable IDs and canonical repository
+  locations; message retries reuse both identity and idempotency key; thread
+  sort order is newest update then stable typed identity
+Decisions: Define ProjectOperations and ConversationOperations; scan SQL
+  directly into typed IDs; verify repository/project lineage during thread
+  insert; paginate with an exclusive composite cursor; allocate sequence and
+  compare idempotent message content inside one immediate transaction
+Files-or-schemas: internal/storage repository contracts, project, repository,
+  thread, message implementations and real-database tests, docs/storage.md,
+  TODOS.md, CHANGELOG, DEVLOG; no schema change
+Validation: Typed project and repository records round-trip; duplicates map to
+  conflict, missing identities to not-found, missing parents and cross-project
+  lineage to constraint. Three threads paginate 2+1 without duplication.
+  Identical message retry returns sequence 1, the next append gets sequence 2,
+  and changed content under the same key conflicts. Full test-all, lint,
+  generation, migration, and artifact checks pass.
+Failures-or-discarded-approaches: Corrected the repository test prefix from
+  `rep_` to the canonical `repo_`; replaced blanket constraint-to-conflict
+  mapping with extended SQLite classification so FK/check failures remain
+  constraints while uniqueness failures are conflicts
+Known-limitations: Task, event, approval, budget, checkpoint, validation, and
+  evidence repositories remain in the next repository slice
+Next-safe-step: Implement atomic task creation/transition/event sequence,
+  approval resolution, exact budget accounting, checkpoint persistence, and
+  validation/evidence operations with idempotent and concurrent tests
+
 Dev-Log: DL-20260730-035
 Date: 2026-07-30
 Status: Complete

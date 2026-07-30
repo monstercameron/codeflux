@@ -728,10 +728,10 @@ Initial-schema evidence:
 ## Repository Layer
 
 - [x] `M03-044 BLOCKER` Define a transaction runner with context cancellation.
-- [ ] `M03-045` Define repository interfaces around domain operations, not generic CRUD.
-- [ ] `M03-046` Implement project and repository persistence.
-- [ ] `M03-047` Implement thread creation and cursor pagination.
-- [ ] `M03-048` Implement message append with idempotency.
+- [x] `M03-045` Define repository interfaces around domain operations, not generic CRUD.
+- [x] `M03-046` Implement project and repository persistence.
+- [x] `M03-047` Implement thread creation and cursor pagination.
+- [x] `M03-048` Implement message append with idempotency.
 - [ ] `M03-049` Implement task creation and transition persistence.
 - [ ] `M03-050` Implement atomic event append and sequence allocation.
 - [ ] `M03-051` Implement approval creation and resolution.

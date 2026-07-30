@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-035
+Date: 2026-07-30
+Type: Core identity and conversation repositories
+Request-or-TODO: M03-045 through M03-048
+Outcome: Added operation-oriented repository contracts and real-SQLite
+  persistence for projects, repositories, threads, stable cursor pages, and
+  immutable idempotent message append
+Affected-behavior: Typed IDs survive repository round trips; cross-project
+  thread lineage is rejected; identical message retries reuse the original
+  sequence while changed retries fail with conflict
+Compatibility-or-migration: No schema change
+Verification: Real-SQLite tests cover typed round trips, not-found, conflict,
+  constraint lineage, two-page stable ordering, message sequence allocation,
+  identical retries, and changed retries; full repository suites pass
+Dev-Log: DL-20260730-036
+
 Change-ID: CL-20260730-034
 Date: 2026-07-30
 Type: Cancellable SQLite transaction boundary
