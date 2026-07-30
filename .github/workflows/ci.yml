@@ -24,11 +24,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source without persisted credentials
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: 1.26.5
           cache: true
@@ -85,11 +85,11 @@ jobs:
             runner: ubuntu-24.04
     steps:
       - name: Check out source without persisted credentials
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: 1.26.5
           cache: true
@@ -122,11 +122,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source without persisted credentials
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: 1.26.5
           cache: true
