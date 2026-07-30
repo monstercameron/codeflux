@@ -24,6 +24,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-010
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-009
+Request-or-TODO: M01-042 through M01-044
+Goal: Make every development build identify its source, toolchain, schema, and
+  frontend version and expose that identity through the CLI
+Assumptions: The current commit timestamp is a deterministic development build
+  date; absent linker values must display as unknown rather than fabricated
+Decisions: Derive ldflags from Git; disable duplicate automatic VCS stamping;
+  make doctor return unavailable until required subsystems exist
+Files-or-schemas: internal/buildinfo, cmd/codeflux, cmd/codeflux-dev; schema
+  version remains 0
+Validation: Build-info, CLI, and development-helper tests passed; built
+  `codeflux version` reported all required fields with the exact Git short
+  commit and commit date; doctor reported working executable/runtime/Git checks
+  and returned expected unavailable exit 3 for future subsystems; lint passed
+Failures-or-discarded-approaches: Rejected wall-clock build timestamps because
+  they would break reproducibility
+Known-limitations: Doctor checks only the current executable, Go runtime, and
+  Git presence until later subsystem tasks implement deeper probes
+Next-safe-step: Commit CLI identity, then add operator documentation to the
+  authorized existing plan/agent files for M01-045 and M01-046.
+
 Dev-Log: DL-20260730-009
 Date: 2026-07-30
 Status: Complete

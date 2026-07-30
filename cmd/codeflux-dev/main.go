@@ -162,12 +162,19 @@ func runBuild(ctx context.Context, stdout, stderr io.Writer) int {
 	targets := []struct {
 		name    string
 		pkgPath string
+		ldflags string
 	}{
 		{name: "codeflux" + suffix, pkgPath: "./cmd/codeflux"},
 		{name: "codeflux-worker" + suffix, pkgPath: "./cmd/codeflux-worker"},
 	}
+	ldflags, err := buildLinkerFlags(ctx, root)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev build: version metadata: %v\n", err)
+		return exitFailure
+	}
 	for _, target := range targets {
 		outputPath := filepath.Join(binDir, target.name)
+		target.ldflags = ldflags
 		if code := runGoIn(
 			ctx,
 			root,
@@ -175,6 +182,9 @@ func runBuild(ctx context.Context, stdout, stderr io.Writer) int {
 			stderr,
 			"build",
 			"-trimpath",
+			"-buildvcs=false",
+			"-ldflags",
+			target.ldflags,
 			"-o",
 			outputPath,
 			target.pkgPath,
@@ -183,6 +193,38 @@ func runBuild(ctx context.Context, stdout, stderr io.Writer) int {
 		}
 	}
 	return exitSuccess
+}
+
+func buildLinkerFlags(ctx context.Context, root string) (string, error) {
+	commit, err := gitOutput(ctx, root, "rev-parse", "--short=12", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	buildDate, err := gitOutput(ctx, root, "show", "-s", "--format=%cI", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	const prefix = "codeflux.dev/codeflux/internal/buildinfo."
+	return strings.Join([]string{
+		"-X", prefix + "version=0.0.0-dev",
+		"-X", prefix + "commit=" + commit,
+		"-X", prefix + "buildDate=" + buildDate,
+		"-X", prefix + "frontendVersion=0.0.0-dev",
+	}, " "), nil
+}
+
+func gitOutput(ctx context.Context, root string, args ...string) (string, error) {
+	command := exec.CommandContext(ctx, "git", args...)
+	command.Dir = root
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w", args[0], err)
+	}
+	value := strings.TrimSpace(string(output))
+	if value == "" {
+		return "", fmt.Errorf("git %s returned empty output", args[0])
+	}
+	return value, nil
 }
 
 func runRace(ctx context.Context, stdout, stderr io.Writer) int {

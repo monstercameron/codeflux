@@ -30,6 +30,19 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-009
+Date: 2026-07-30
+Type: Executable identity and diagnostics
+Request-or-TODO: M01-042 through M01-044
+Outcome: Added structured build identity, `codeflux version`, and an honest
+  prerequisite-only doctor skeleton
+Affected-behavior: Development binaries report semantic version, commit,
+  deterministic commit date, Go version, schema version, and frontend version
+Compatibility-or-migration: Initial CLI output; schema version remains 0
+Verification: Build-info and CLI unit tests, linked binary output, expected
+  doctor exit 3, build, vet, and Staticcheck passed
+Dev-Log: DL-20260730-010
+
 Change-ID: CL-20260730-008
 Date: 2026-07-30
 Type: Repository integrity and security checks

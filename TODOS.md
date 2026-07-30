@@ -325,9 +325,14 @@ Repository-integrity evidence:
 - `generate-check` regenerates beneath a validated `.artifacts/tmp` child, compares the exact `api/gen` tree, and removes only that child.
 - `lint` requires generated headers, contiguous unique migration numbers, no tracked SQLite extension or magic, and no common OpenAI, Anthropic, or GitHub token shape in tracked text.
 - `.githooks/pre-commit` invokes the same lint command; CI enforcement is added separately by M01-050.
-- [ ] `M01-042` Add structured version metadata: semantic version, commit, build date, Go version, schema version, and frontend version.
-- [ ] `M01-043` Add `codeflux version`.
-- [ ] `M01-044` Add `codeflux doctor` skeleton.
+- [x] `M01-042` Add structured version metadata: semantic version, commit, build date, Go version, schema version, and frontend version.
+- [x] `M01-043` Add `codeflux version`.
+- [x] `M01-044` Add `codeflux doctor` skeleton.
+
+Version/doctor evidence: the development build links deterministic Git commit
+and commit-date metadata, reports all six required fields, and returns exit 3
+from `doctor` while explicitly naming storage, credential-store, and browser
+transport as unavailable rather than healthy.
 - [ ] `M01-045 DOC` Document required native dependencies, if any.
 - [ ] `M01-046 DOC` Document how to regenerate protobuf and WASM assets.
 
