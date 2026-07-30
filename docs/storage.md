@@ -188,6 +188,18 @@ reference. A run configuration can be inserted only when its revision matches
 the owning task's binding.
 
 The storage boundary accepts bounded JSON objects and recursively rejects
-secret-, credential-, key-, token-, password-, and authorization-shaped field
-names before serialization. Effective run snapshots are content-hashed and
-idempotent; a changed retry conflicts.
+secret-, credential-, API/private-key-, token-, password-, and
+authorization-shaped field names before serialization. Effective run snapshots
+are content-hashed and idempotent; a changed retry conflicts.
+
+## Provider credential references
+
+Migration `000003_provider_credential_references.sql` binds a provider only to
+an opaque `os://service/account` identity. The table has no credential-value,
+secret, key, token, password, or authorization column. The binding is
+idempotent and immutable; changing it requires a later explicit lifecycle
+operation rather than overwriting the reference implicitly.
+
+A real-database security test exercises an opaque provider secret in memory,
+persists only its reference, checkpoints and closes SQLite, and scans the main
+database plus any remaining WAL and shared-memory pages for the known material.

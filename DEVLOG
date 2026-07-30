@@ -24,6 +24,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-042
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-041
+Request-or-TODO: M04-010 through M04-020
+Goal: Make provider credential handling possible on Windows without allowing
+  raw values into formatting, serialization, SQLite, or worker processes
+Assumptions: Windows is the active development platform; macOS Keychain and
+  Linux Secret Service remain honest unavailable backends in this milestone;
+  explicit environment fallback is read-only
+Decisions: Represent secrets as opaque copied bytes with callback-only use and
+  explicit clearing. Implement generic Credential Manager records through the
+  native Windows API behind a testable adapter. Persist only
+  `os://service/account`; scrub child environments by explicit names and common
+  provider-secret suffixes. Keep non-Windows native stores unavailable instead
+  of selecting environment fallback automatically.
+Files-or-schemas: internal/credentials, internal/worker environment boundary,
+  migration 000003 and generated schema metadata, provider credential-reference
+  repository/tests, CLI doctor, docs/plan.md, docs/storage.md, TODOS.md,
+  CHANGELOG, DEVLOG
+Validation: Unit tests passed secret formatting/serialization refusal,
+  temporary-copy clearing, destroy behavior, explicit environment fallback,
+  and Windows create/update/retrieve/test/delete through a deterministic fake.
+  A real child process received no API-key/access-token fixtures. A real SQLite
+  database retained the opaque reference but none of the known secret material
+  in database or sidecar pages. Linux AMD64 and macOS ARM64 credential test
+  binaries compiled beneath `.artifacts/bin`.
+Failures-or-discarded-approaches: Native keyring integration tests do not write
+  disposable fixtures into the user's real Credential Manager; the Windows API
+  boundary is injected and tested without mutating user credentials. Removed
+  any implicit non-Windows or environment fallback.
+Known-limitations: Native macOS and Linux stores remain unavailable by explicit
+  product decision. The redaction pipeline and full mock-task secret gate are
+  still incomplete.
+Next-safe-step: Implement one streaming-safe redaction pipeline used before
+  persistence, prompt, UI, and diagnostic boundaries, then run the three M04
+  security gates.
+
 Dev-Log: DL-20260730-041
 Date: 2026-07-30
 Status: Complete

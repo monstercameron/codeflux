@@ -9,6 +9,7 @@ import (
 	"os/exec"
 
 	"codeflux.dev/codeflux/internal/buildinfo"
+	"codeflux.dev/codeflux/internal/credentials"
 	"codeflux.dev/codeflux/internal/storage"
 )
 
@@ -86,7 +87,7 @@ func runDoctor(output, errorsOutput io.Writer, args []string) int {
 		path, err = storage.DefaultDatabasePath()
 		if err != nil {
 			fmt.Fprintln(output, "storage: error (default location unavailable)")
-			fmt.Fprintln(output, "credential-store: unavailable (Milestone 04 not implemented)")
+			printCredentialStoreStatus(output)
 			fmt.Fprintln(output, "browser-transport: unavailable (Milestone 06 not implemented)")
 			return exitFailure
 		}
@@ -123,9 +124,17 @@ func runDoctor(output, errorsOutput io.Writer, args []string) int {
 			}
 		}
 	}
-	fmt.Fprintln(output, "credential-store: unavailable (Milestone 04 not implemented)")
+	printCredentialStoreStatus(output)
 	fmt.Fprintln(output, "browser-transport: unavailable (Milestone 06 not implemented)")
 	return exitUnavailable
+}
+
+func printCredentialStoreStatus(output io.Writer) {
+	if available, backend := credentials.PlatformStatus(); available {
+		fmt.Fprintf(output, "credential-store: ok (%s)\n", backend)
+	} else {
+		fmt.Fprintf(output, "credential-store: unavailable (%s)\n", backend)
+	}
 }
 
 func runBackup(output, errorsOutput io.Writer, args []string) int {

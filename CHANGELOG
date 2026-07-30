@@ -30,6 +30,23 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-041
+Date: 2026-07-30
+Type: Native credential boundary
+Request-or-TODO: M04-010 through M04-020
+Outcome: Added opaque credential values, Windows Credential Manager operations,
+  explicit read-only environment fallback, honest unsupported-platform status,
+  SQLite opaque references, and worker-environment secret removal
+Affected-behavior: Provider material cannot format or serialize, is never sent
+  to task-worker child environments, and never crosses the SQLite boundary;
+  doctor now reports the real platform credential backend status
+Compatibility-or-migration: Forward migration 3 adds only opaque provider
+  references; schema version advances from 2 to 3
+Verification: Credential, Windows-backend fake, real child-environment,
+  real-SQLite page-absence, migration, CLI doctor, Linux AMD64 compile, and
+  macOS ARM64 compile tests pass
+Dev-Log: DL-20260730-042
+
 Change-ID: CL-20260730-040
 Date: 2026-07-30
 Type: Versioned settings persistence

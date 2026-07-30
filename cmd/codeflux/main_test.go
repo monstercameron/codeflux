@@ -40,7 +40,7 @@ func TestDoctorIsHonestAboutUnavailableSubsystems(t *testing.T) {
 	if code != exitUnavailable {
 		t.Fatalf("doctor exit = %d, want %d", code, exitUnavailable)
 	}
-	for _, subsystem := range []string{"storage: missing", "credential-store: unavailable", "browser-transport: unavailable"} {
+	for _, subsystem := range []string{"storage: missing", "credential-store:", "browser-transport: unavailable"} {
 		if !strings.Contains(stdout.String(), subsystem) {
 			t.Errorf("doctor output omits %q: %s", subsystem, stdout.String())
 		}

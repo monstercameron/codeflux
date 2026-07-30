@@ -131,6 +131,28 @@ type ConfigurationOperations interface {
 	GetRunConfiguration(context.Context, domain.RunID) (RunConfiguration, error)
 }
 
+// ProviderCredentialReference is the non-secret OS-store identity bound to a
+// provider. It never contains credential material.
+type ProviderCredentialReference struct {
+	ProviderID      domain.ProviderID
+	OpaqueReference string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Revision        uint64
+}
+
+// BindProviderCredentialReference declares an idempotent opaque binding.
+type BindProviderCredentialReference struct {
+	ProviderID      domain.ProviderID
+	OpaqueReference string
+}
+
+// ProviderCredentialOperations groups non-secret provider reference storage.
+type ProviderCredentialOperations interface {
+	BindProviderCredentialReference(context.Context, BindProviderCredentialReference) (ProviderCredentialReference, error)
+	GetProviderCredentialReference(context.Context, domain.ProviderID) (ProviderCredentialReference, error)
+}
+
 // NewRepositories creates domain repositories without opening external state.
 func NewRepositories(database *Database, now func() time.Time) (*Repositories, error) {
 	if database == nil {

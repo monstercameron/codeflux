@@ -865,17 +865,32 @@ Configuration-contract evidence:
 
 ## Credential Store
 
-- [ ] `M04-010 BLOCKER SECURITY` Define a credential-store interface.
-- [ ] `M04-011 SECURITY` Implement Windows Credential Manager support.
-- [ ] `M04-012 SECURITY` Implement macOS Keychain support or mark it unavailable for the current platform build.
-- [ ] `M04-013 SECURITY` Implement Linux Secret Service support or mark it unavailable for the current platform build.
-- [ ] `M04-014 SECURITY` Implement explicit environment-variable fallback.
-- [ ] `M04-015 SECURITY` Store only a credential reference in SQLite.
-- [ ] `M04-016 SECURITY` Add credential create, update, test, and delete operations.
-- [ ] `M04-017 SECURITY` Ensure task workers never receive raw provider keys.
-- [ ] `M04-018 SECURITY` Prevent credential values from implementing accidental string formatting.
-- [ ] `M04-019 TEST` Verify credentials are absent from database pages after provider use.
-- [ ] `M04-020 TEST` Verify credentials are absent from child-process environments.
+- [x] `M04-010 BLOCKER SECURITY` Define a credential-store interface.
+- [x] `M04-011 SECURITY` Implement Windows Credential Manager support.
+- [x] `M04-012 SECURITY` Implement macOS Keychain support or mark it unavailable for the current platform build.
+- [x] `M04-013 SECURITY` Implement Linux Secret Service support or mark it unavailable for the current platform build.
+- [x] `M04-014 SECURITY` Implement explicit environment-variable fallback.
+- [x] `M04-015 SECURITY` Store only a credential reference in SQLite.
+- [x] `M04-016 SECURITY` Add credential create, update, test, and delete operations.
+- [x] `M04-017 SECURITY` Ensure task workers never receive raw provider keys.
+- [x] `M04-018 SECURITY` Prevent credential values from implementing accidental string formatting.
+- [x] `M04-019 TEST` Verify credentials are absent from database pages after provider use.
+- [x] `M04-020 TEST` Verify credentials are absent from child-process environments.
+
+Credential-boundary evidence:
+
+- The store contract exposes create, update, retrieve, test, and delete by
+  validated opaque reference. Windows uses Credential Manager; macOS and Linux
+  builds return an explicit unavailable result rather than a silent fallback.
+- Environment fallback is explicitly mapped and read-only. Secret values reject
+  JSON/text serialization and every formatting verb, expose only a temporary
+  cleared callback copy, and support explicit destruction.
+- Schema 3 stores only an `os://service/account` reference. A real-SQLite test
+  performs in-memory provider use, closes/checkpoints the database, and proves
+  the known material is absent from database, WAL, and shared-memory pages.
+- Worker environment construction strips known and suffix-shaped provider
+  secret names. A real child test proves raw API-key and access-token fixtures
+  are absent while ordinary environment values remain.
 
 ## Redaction
 

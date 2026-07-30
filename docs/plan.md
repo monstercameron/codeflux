@@ -3142,6 +3142,19 @@ Environment variables are an explicit fallback. Secrets must never be written to
 
 The local coordinator performs provider calls so task workers never receive raw credentials. Logs and tool output pass through redaction before persistence or model context.
 
+Credential values are opaque byte capabilities. They cannot be formatted or
+serialized and may be exposed only to a bounded callback over a temporary copy
+that is cleared afterward. Windows builds use the current user's Credential
+Manager. macOS and Linux builds report the native backend unavailable until
+their Keychain and Secret Service adapters are implemented; they do not fall
+back silently.
+
+Environment fallback is explicit, reference-to-variable mapped, and read-only.
+Task-worker environments remove known and suffix-shaped API keys, access
+tokens, bearer tokens, secrets, and passwords plus caller-declared sensitive
+names. SQLite stores only an `os://service/account` opaque reference associated
+with a provider row.
+
 ### Initial Model Providers
 
 Support a small provider interface with:
