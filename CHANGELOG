@@ -30,6 +30,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-052
+Date: 2026-07-30
+Type: Deterministic Go repository map
+Request-or-TODO: M08-015 through M08-028
+Outcome: Added a revision-bound multi-module Go mapper covering packages,
+  files, imports, tests, targets, symbols, references, calls, interface
+  implementations, build constraints, generated files, commands,
+  instructions, and bounded warnings
+Affected-behavior: Codeflux can now derive the same ordered map for the same
+  Git revision without downloading dependencies or allowing repository content
+  to become executable authority; one invalid package no longer prevents valid
+  packages from being indexed
+Compatibility-or-migration: Additive workspace behavior only; no protobuf or
+  database schema change
+Verification: Representative clean and invalid multi-module fixtures,
+  deterministic revision comparison, fixed-command recording,
+  network-disabled missing dependency test, workspace package tests, vet,
+  repository lint, and full local suite pass
+Dev-Log: DL-20260730-053
+
 Change-ID: CL-20260730-051
 Date: 2026-07-30
 Type: Native bridge test lifecycle correction

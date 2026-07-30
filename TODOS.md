@@ -1414,20 +1414,39 @@ Repository-opening evidence:
 
 ## Go Repository Map
 
-- [ ] `M08-015 BLOCKER` Locate `go.mod`, `go.work`, and relevant nested modules.
-- [ ] `M08-016` Parse module paths and declared Go versions.
-- [ ] `M08-017` Run bounded `go list` commands through the mediated executor.
-- [ ] `M08-018` Collect package names, directories, imports, test files, and build targets.
-- [ ] `M08-019` Collect exported and unexported symbols through Go syntax/type tooling.
-- [ ] `M08-020` Collect symbol definitions and references.
-- [ ] `M08-021` Collect function callers and callees where Go tooling can resolve them cheaply.
-- [ ] `M08-022` Collect interface implementations where feasible.
-- [ ] `M08-023` Collect build tags and platform-specific file constraints.
-- [ ] `M08-024` Identify generated files.
-- [ ] `M08-025` Identify likely formatter, test, lint, and build commands from project files.
-- [ ] `M08-026` Identify nearby tests for each source package.
-- [ ] `M08-027` Identify repository instruction files and classify them as untrusted input.
-- [ ] `M08-028` Record map warnings instead of failing the whole repository for one unparsable package.
+- [x] `M08-015 BLOCKER` Locate `go.mod`, `go.work`, and relevant nested modules.
+- [x] `M08-016` Parse module paths and declared Go versions.
+- [x] `M08-017` Run bounded `go list` commands through the mediated executor.
+- [x] `M08-018` Collect package names, directories, imports, test files, and build targets.
+- [x] `M08-019` Collect exported and unexported symbols through Go syntax/type tooling.
+- [x] `M08-020` Collect symbol definitions and references.
+- [x] `M08-021` Collect function callers and callees where Go tooling can resolve them cheaply.
+- [x] `M08-022` Collect interface implementations where feasible.
+- [x] `M08-023` Collect build tags and platform-specific file constraints.
+- [x] `M08-024` Identify generated files.
+- [x] `M08-025` Identify likely formatter, test, lint, and build commands from project files.
+- [x] `M08-026` Identify nearby tests for each source package.
+- [x] `M08-027` Identify repository instruction files and classify them as untrusted input.
+- [x] `M08-028` Record map warnings instead of failing the whole repository for one unparsable package.
+
+Go-map evidence:
+
+- The mapper locates bounded module, workspace, instruction, and command files;
+  runs only `go list -e -json ./...` through the argument-array runner with Go
+  proxy/checksum network access disabled; and records module paths/versions,
+  packages, source/tests, imports, and logical build targets.
+- Standard Go parser/AST tooling records exported/unexported definitions,
+  references, syntactic caller/callee edges, and feasible interface method-set
+  matches. File records include content hashes, build constraints, generated
+  markers, source/test/configuration kinds, and the exact repository revision.
+- Built-in Go format/test/build recipes are distinguished from untrusted
+  repository-suggested Make/Task/lint commands, which require approval.
+  Instruction files are labeled untrusted repository data. Unparsable packages
+  create bounded warnings while valid packages remain mapped.
+- A representative multi-module repository proves deterministic map identity,
+  nested modules, tests, generated/platform files, symbols/references/calls,
+  interface implementations, command and instruction classification, parse
+  isolation, missing-module rejection, and network-disabled dependency lookup.
 
 ## Deterministic Context Selection
 

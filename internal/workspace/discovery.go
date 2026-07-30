@@ -61,6 +61,7 @@ func (runner ExecRunner) Run(
 	}
 	command := exec.CommandContext(ctx, executable, arguments...)
 	command.Dir = directory
+	command.Env = networkDisabledEnvironment()
 	stdout := &limitedBuffer{remaining: limit}
 	stderr := &limitedBuffer{remaining: limit}
 	command.Stdout = stdout
@@ -564,6 +565,18 @@ func boundedDiagnostic(value []byte) string {
 		value = value[:limit]
 	}
 	return string(value)
+}
+
+func networkDisabledEnvironment() []string {
+	environment := make([]string, 0, len(os.Environ())+2)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if strings.EqualFold(key, "GOPROXY") || strings.EqualFold(key, "GOSUMDB") {
+			continue
+		}
+		environment = append(environment, entry)
+	}
+	return append(environment, "GOPROXY=off", "GOSUMDB=off")
 }
 
 type limitedBuffer struct {

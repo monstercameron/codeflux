@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-053
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-052
+Request-or-TODO: M08-015 through M08-028
+Goal: Produce a deterministic, revision-bound Go repository map without
+  embedding the repository or granting authority to its content
+Assumptions: The M08 runner is a narrow mediated read-only port; M10 later owns
+  the complete typed worker command protocol and approval ledger
+Decisions: Walk bounded non-vendor inputs without following symlinks, execute a
+  fixed `go list -e -json ./...` per module with GOPROXY/GOSUMDB disabled, and
+  parse local Go files with standard AST tooling. Preserve invalid-file hashes
+  and bounded warnings, use sorted slices and a canonical digest for map
+  revision, infer only cheap syntactic call/method-set relationships, and mark
+  repository command/instruction sources untrusted and approval-required.
+Files-or-schemas: Network-disabled workspace command runner, Go repository map
+  implementation/tests, and M08 evidence; no schema change
+Validation: A committed multi-module fixture proves module Go versions,
+  packages/imports/tests/targets, exported and internal symbols, definitions
+  and references, caller/callee edges, interface implementations, generated
+  files, build constraints, command discovery, instruction classification, and
+  deterministic map revision. An invalid package records warnings without
+  hiding valid packages; absent modules and network-dependent imports fail
+  safely. Workspace tests, vet, lint, and the full local suite pass.
+Failures-or-discarded-approaches: Whole-repository embeddings and dependency
+  downloads were excluded. Human-readable go-list output, shell commands,
+  vendor traversal, and pretending ambiguous selector calls are resolved were
+  rejected. Invalid files remain hashed but do not contribute false symbols.
+Known-limitations: Caller/callee and implementation relationships are
+  conservative syntax/method-set candidates rather than whole-program
+  pointer-analysis proof. Dependency packages outside the repository are not
+  indexed.
+Next-safe-step: Build deterministic, budgeted context selection with explicit
+  path/symbol priority, explanations, secret exclusion, and SQLite manifests.
+
 Dev-Log: DL-20260730-052
 Date: 2026-07-30
 Status: Complete
