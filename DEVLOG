@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-066
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-065
+Request-or-TODO: M15 public CI follow-up
+Goal: Restore the public cross-platform quality gate without weakening the
+  repository's adapter-dependency policy
+Assumptions: Storage errors are implementation details and transport handlers
+  require only stable application-port classifications
+Decisions: Keep transport-facing error sentinels at its application port and
+  translate storage sentinels in the coordinator composition layer
+Files-or-schemas: Task-control transport service, coordinator adapter, focused
+  transport test; no schema change
+Validation: `go test ./internal/transport ./internal/coordinator` and
+  `go run ./cmd/codeflux-dev lint` pass
+Failures-or-discarded-approaches: The original M15 implementation imported the
+  storage adapter from the transport adapter; local validation had passed only
+  because the tracked-file lint view was evaluated before that commit existed
+Known-limitations: The superseded public M15 workflow remains red by design;
+  the corrective commit must complete a fresh public workflow
+Next-safe-step: Commit and push this focused correction, verify its public CI,
+  then continue M16 shell integration
+
 Dev-Log: DL-20260731-065
 Date: 2026-07-31
 Status: Complete

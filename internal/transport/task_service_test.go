@@ -8,7 +8,6 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
-	"codeflux.dev/codeflux/internal/storage"
 )
 
 func TestTaskServicePauseMapsRevisionedCommandAndTaskView(t *testing.T) {
@@ -100,7 +99,7 @@ func TestTaskServiceMapsStaleControlWithoutLeakingInternals(t *testing.T) {
 		t.Fatal(err)
 	}
 	application := &taskControlApplicationStub{
-		cancelErr: storage.ErrStaleRevision,
+		cancelErr: ErrTaskControlStaleRevision,
 	}
 	service, err := NewTaskService(application)
 	if err != nil {

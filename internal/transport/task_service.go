@@ -8,8 +8,17 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
-	"codeflux.dev/codeflux/internal/storage"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+var (
+	// ErrTaskControlStaleRevision identifies an optimistic-concurrency conflict
+	// without coupling the transport adapter to a persistence implementation.
+	ErrTaskControlStaleRevision = errors.New("task control stale revision")
+	// ErrTaskControlNotFound identifies a missing task at the application port.
+	ErrTaskControlNotFound = errors.New("task control target not found")
+	// ErrTaskControlConflict identifies an invalid task state transition.
+	ErrTaskControlConflict = errors.New("task control state conflict")
 )
 
 // TaskControlCommand is the transport-independent command accepted by the
@@ -196,19 +205,19 @@ func mapTaskControlError(
 ) error {
 	entity, _ := TaskIDToProto(taskID)
 	switch {
-	case errors.Is(err, storage.ErrStaleRevision):
+	case errors.Is(err, ErrTaskControlStaleRevision):
 		return &ApplicationError{
 			Code:        codefluxv1.ErrorCode_ERROR_CODE_STALE_REVISION,
 			SafeMessage: "The task changed before this control request.",
 			EntityID:    entity,
 		}
-	case errors.Is(err, storage.ErrNotFound):
+	case errors.Is(err, ErrTaskControlNotFound):
 		return &ApplicationError{
 			Code:        codefluxv1.ErrorCode_ERROR_CODE_NOT_FOUND,
 			SafeMessage: "The task could not be found.",
 			EntityID:    entity,
 		}
-	case errors.Is(err, storage.ErrConflict):
+	case errors.Is(err, ErrTaskControlConflict):
 		return &ApplicationError{
 			Code:        codefluxv1.ErrorCode_ERROR_CODE_INVALID_TRANSITION,
 			SafeMessage: "The task cannot accept that control in its current state.",

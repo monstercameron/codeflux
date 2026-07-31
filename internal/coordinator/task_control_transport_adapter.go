@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
@@ -17,11 +18,11 @@ func (service *TaskControlService) PauseTaskControl(
 		ctx, command, storage.TaskControlReplayPause,
 	)
 	if err != nil || replay.Found {
-		return controlTransportView(replay.Control), err
+		return controlTransportView(replay.Control), taskControlPortError(err)
 	}
 	current, err := service.currentControl(ctx, command)
 	if err != nil {
-		return transport.TaskControlView{}, err
+		return transport.TaskControlView{}, taskControlPortError(err)
 	}
 	requestEventID, err := service.dependencies.NewEventID()
 	if err != nil {
@@ -44,7 +45,7 @@ func (service *TaskControlService) PauseTaskControl(
 			IdempotencyKey:       command.IdempotencyKey,
 		},
 	)
-	return controlTransportView(result), err
+	return controlTransportView(result), taskControlPortError(err)
 }
 
 func (service *TaskControlService) ResumeTaskControl(
@@ -55,7 +56,7 @@ func (service *TaskControlService) ResumeTaskControl(
 		ctx, command, storage.TaskControlReplayResume,
 	)
 	if err != nil {
-		return transport.TaskControlView{}, err
+		return transport.TaskControlView{}, taskControlPortError(err)
 	}
 	if replay.Found {
 		replayErr := error(nil)
@@ -66,7 +67,7 @@ func (service *TaskControlService) ResumeTaskControl(
 	}
 	current, err := service.currentControl(ctx, command)
 	if err != nil {
-		return transport.TaskControlView{}, err
+		return transport.TaskControlView{}, taskControlPortError(err)
 	}
 	resumedEventID, err := service.dependencies.NewEventID()
 	if err != nil {
@@ -88,7 +89,7 @@ func (service *TaskControlService) ResumeTaskControl(
 			IdempotencyKey:       command.IdempotencyKey,
 		},
 	)
-	return controlTransportView(result.Control), err
+	return controlTransportView(result.Control), taskControlPortError(err)
 }
 
 func (service *TaskControlService) CancelTaskControl(
@@ -99,11 +100,11 @@ func (service *TaskControlService) CancelTaskControl(
 		ctx, command, storage.TaskControlReplayCancel,
 	)
 	if err != nil || replay.Found {
-		return controlTransportView(replay.Control), err
+		return controlTransportView(replay.Control), taskControlPortError(err)
 	}
 	current, err := service.currentControl(ctx, command)
 	if err != nil {
-		return transport.TaskControlView{}, err
+		return transport.TaskControlView{}, taskControlPortError(err)
 	}
 	eventID, err := service.dependencies.NewEventID()
 	if err != nil {
@@ -121,7 +122,20 @@ func (service *TaskControlService) CancelTaskControl(
 			IdempotencyKey:       command.IdempotencyKey,
 		},
 	)
-	return controlTransportView(result), err
+	return controlTransportView(result), taskControlPortError(err)
+}
+
+func taskControlPortError(err error) error {
+	switch {
+	case errors.Is(err, storage.ErrStaleRevision):
+		return transport.ErrTaskControlStaleRevision
+	case errors.Is(err, storage.ErrNotFound):
+		return transport.ErrTaskControlNotFound
+	case errors.Is(err, storage.ErrConflict):
+		return transport.ErrTaskControlConflict
+	default:
+		return err
+	}
 }
 
 func (service *TaskControlService) controlReplay(

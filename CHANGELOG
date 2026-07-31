@@ -30,6 +30,20 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-065
+Date: 2026-07-31
+Type: Architecture-boundary correction
+Request-or-TODO: M15 public CI follow-up
+Outcome: Removed the task-control transport adapter's direct dependency on the
+  storage adapter by translating persistence failures at the coordinator port
+Affected-behavior: Authenticated pause, resume, and cancellation preserve their
+  existing public error codes while respecting the enforced adapter boundary
+Compatibility-or-migration: No protocol, schema, or persisted-data change
+Verification: Focused transport and coordinator tests pass; the complete
+  repository architecture, formatting, vet, static-analysis, migration, and
+  secret lint gate passes locally
+Dev-Log: DL-20260731-066
+
 Change-ID: CL-20260731-064
 Date: 2026-07-31
 Type: Durable checkpoint, interruption, and crash recovery
