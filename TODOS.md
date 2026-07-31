@@ -2364,134 +2364,134 @@ Milestone output: a keyboard-accessible GoWebComponents v5 shell with thread rai
 
 ## Visual and Interaction Tokens
 
-- [ ] `M16-001 UX` Define the neutral, accent, success, warning, failure, active, blocked, and invalidated color tokens.
-- [ ] `M16-002 UX` Define light-theme values for every color token.
-- [ ] `M16-003 UX` Define dark-theme values for every color token.
-- [ ] `M16-004 UX` Verify text/background token pairs meet WCAG AA contrast.
-- [ ] `M16-005 UX` Define typeface stacks that do not require a remote font request.
-- [ ] `M16-006 UX` Define body, compact metadata, heading, code, and numeric typography tokens.
-- [ ] `M16-007 UX` Define spacing tokens on a small consistent scale.
-- [ ] `M16-008 UX` Define border, radius, shadow, and focus-ring tokens.
-- [ ] `M16-009 UX` Define motion-duration and easing tokens.
-- [ ] `M16-010 UX` Define reduced-motion overrides.
-- [ ] `M16-011 UX` Define minimum pointer target size.
-- [ ] `M16-012 UX` Define status iconography that does not depend on color.
-- [ ] `M16-013 UX` Define density rules for long technical threads.
-- [ ] `M16-014 UX` Implement a development-only token specimen page.
-- [ ] `M16-015 TEST` Add automated contrast checks for fixed token pairs.
+- [x] `M16-001 UX` Define the neutral, accent, success, warning, failure, active, blocked, and invalidated color tokens.
+- [x] `M16-002 UX` Define light-theme values for every color token.
+- [x] `M16-003 UX` Define dark-theme values for every color token.
+- [x] `M16-004 UX` Verify text/background token pairs meet WCAG AA contrast.
+- [x] `M16-005 UX` Define typeface stacks that do not require a remote font request.
+- [x] `M16-006 UX` Define body, compact metadata, heading, code, and numeric typography tokens.
+- [x] `M16-007 UX` Define spacing tokens on a small consistent scale.
+- [x] `M16-008 UX` Define border, radius, shadow, and focus-ring tokens.
+- [x] `M16-009 UX` Define motion-duration and easing tokens.
+- [x] `M16-010 UX` Define reduced-motion overrides.
+- [x] `M16-011 UX` Define minimum pointer target size.
+- [x] `M16-012 UX` Define status iconography that does not depend on color.
+- [x] `M16-013 UX` Define density rules for long technical threads.
+- [x] `M16-014 UX` Implement a development-only token specimen page.
+- [x] `M16-015 TEST` Add automated contrast checks for fixed token pairs.
 
 ## Application Bootstrap
 
-- [ ] `M16-016 BLOCKER` Create the GoWebComponents v5 application entry point.
-- [ ] `M16-017` Load the per-launch session secret without placing it in persistent browser storage.
-- [ ] `M16-018` Call the coordinator health endpoint on startup.
-- [ ] `M16-019` Fetch the current application, API, schema, and frontend versions.
-- [ ] `M16-020` Reject an incompatible client/server version with a clear reload message.
-- [ ] `M16-021` Show a bounded startup loading state.
-- [ ] `M16-022` Show a coordinator-unavailable state with retry.
-- [ ] `M16-023` Show a migration-required or database-error state without exposing raw paths or SQL.
-- [ ] `M16-024` Restore the last non-sensitive selected repository and thread.
-- [ ] `M16-025` Avoid automatically reopening a repository that no longer exists.
-- [ ] `M16-026` Initialize the unified session-stream client only after authentication.
-- [ ] `M16-027` Dispose all subscriptions when the application root unmounts.
+- [x] `M16-016 BLOCKER` Create the GoWebComponents v5 application entry point.
+- [x] `M16-017` Load the per-launch session secret without placing it in persistent browser storage.
+- [x] `M16-018` Call the coordinator health endpoint on startup.
+- [x] `M16-019` Fetch the current application, API, schema, and frontend versions.
+- [x] `M16-020` Reject an incompatible client/server version with a clear reload message.
+- [x] `M16-021` Show a bounded startup loading state.
+- [x] `M16-022` Show a coordinator-unavailable state with retry.
+- [x] `M16-023` Show a migration-required or database-error state without exposing raw paths or SQL.
+- [x] `M16-024` Restore the last non-sensitive selected repository and thread.
+- [x] `M16-025` Avoid automatically reopening a repository that no longer exists.
+- [x] `M16-026` Initialize the unified session-stream client only after authentication.
+- [x] `M16-027` Dispose all subscriptions when the application root unmounts.
 
 ## Shell Regions
 
-- [ ] `M16-028 BLOCKER UX` Implement the top application bar.
-- [ ] `M16-029 UX` Add repository and branch placeholders to the top bar.
-- [ ] `M16-030 UX` Add worktree status placeholder.
-- [ ] `M16-031 UX` Add task-state and connection-state placeholders.
-- [ ] `M16-032 UX` Add model and effort placeholders.
-- [ ] `M16-033 UX` Add forecast, actual cost, and hard-budget placeholders.
-- [ ] `M16-034 UX` Add pause, stop, and overflow-control placeholders.
-- [ ] `M16-035 BLOCKER UX` Implement the left thread/task rail.
-- [ ] `M16-036 UX` Implement collapse and expand for the rail.
-- [ ] `M16-037 UX` Persist rail width as a non-sensitive UI preference.
-- [ ] `M16-038 BLOCKER UX` Implement the central conversation pane.
-- [ ] `M16-039 BLOCKER UX` Implement the right graph pane.
-- [ ] `M16-040 UX` Implement a draggable chat/graph splitter.
-- [ ] `M16-041 UX` Clamp splitter positions to usable minimum widths.
-- [ ] `M16-042 UX` Persist the splitter preference.
-- [ ] `M16-043 UX` Implement graph-pane collapse.
-- [ ] `M16-044 UX` Implement graph-pane restore.
-- [ ] `M16-045 UX` Implement a bottom connection/diagnostic status strip only if usability testing shows it adds value.
+- [x] `M16-028 BLOCKER UX` Implement the top application bar.
+- [x] `M16-029 UX` Add repository and branch placeholders to the top bar.
+- [x] `M16-030 UX` Add worktree status placeholder.
+- [x] `M16-031 UX` Add task-state and connection-state placeholders.
+- [x] `M16-032 UX` Add model and effort placeholders.
+- [x] `M16-033 UX` Add forecast, actual cost, and hard-budget placeholders.
+- [x] `M16-034 UX` Add pause, stop, and overflow-control placeholders.
+- [x] `M16-035 BLOCKER UX` Implement the left thread/task rail.
+- [x] `M16-036 UX` Implement collapse and expand for the rail.
+- [x] `M16-037 UX` Persist rail width as a non-sensitive UI preference.
+- [x] `M16-038 BLOCKER UX` Implement the central conversation pane.
+- [x] `M16-039 BLOCKER UX` Implement the right graph pane.
+- [x] `M16-040 UX` Implement a draggable chat/graph splitter.
+- [x] `M16-041 UX` Clamp splitter positions to usable minimum widths.
+- [x] `M16-042 UX` Persist the splitter preference.
+- [x] `M16-043 UX` Implement graph-pane collapse.
+- [x] `M16-044 UX` Implement graph-pane restore.
+- [x] `M16-045 UX` Implement a bottom connection/diagnostic status strip only if usability testing shows it adds value.
 
 ## Responsive Behavior
 
-- [ ] `M16-046 UX` Define wide, medium, and narrow viewport breakpoints from content needs rather than device names.
-- [ ] `M16-047 UX` Keep side-by-side chat and graph on wide layouts.
-- [ ] `M16-048 UX` Collapse the thread rail to an overlay on medium layouts.
-- [ ] `M16-049 UX` Convert graph and conversation into tabs or a drawer on narrow layouts.
-- [ ] `M16-050 UX` Preserve the selected graph node while switching narrow-layout tabs.
-- [ ] `M16-051 UX` Keep the composer visible above the on-screen keyboard where supported.
-- [ ] `M16-052 UX` Prevent horizontal page scrolling at all supported widths.
-- [ ] `M16-053 TEST` Add component-level viewport tests for all breakpoints.
+- [x] `M16-046 UX` Define wide, medium, and narrow viewport breakpoints from content needs rather than device names.
+- [x] `M16-047 UX` Keep side-by-side chat and graph on wide layouts.
+- [x] `M16-048 UX` Collapse the thread rail to an overlay on medium layouts.
+- [x] `M16-049 UX` Convert graph and conversation into tabs or a drawer on narrow layouts.
+- [x] `M16-050 UX` Preserve the selected graph node while switching narrow-layout tabs.
+- [x] `M16-051 UX` Keep the composer visible above the on-screen keyboard where supported.
+- [x] `M16-052 UX` Prevent horizontal page scrolling at all supported widths.
+- [x] `M16-053 TEST` Add component-level viewport tests for all breakpoints.
 
 ## Keyboard and Accessibility
 
-- [ ] `M16-054 UX` Add a skip link to the conversation.
-- [ ] `M16-055 UX` Establish a logical heading hierarchy.
-- [ ] `M16-056 UX` Define tab order across rail, chat, composer, graph, and inspector.
-- [ ] `M16-057 UX` Make the splitter keyboard adjustable.
-- [ ] `M16-058 UX` Expose splitter values through appropriate accessibility attributes.
-- [ ] `M16-059 UX` Add visible focus for every interactive control.
-- [ ] `M16-060 UX` Ensure collapsed controls retain accessible names.
-- [ ] `M16-061 UX` Define keyboard shortcuts for focus-chat, focus-graph, pause, and stop.
-- [ ] `M16-062 UX` Prevent shortcuts from firing while the user types unless explicitly scoped.
-- [ ] `M16-063 UX` Add a shortcut help dialog.
-- [ ] `M16-064 TEST` Navigate the complete empty shell with keyboard only.
-- [ ] `M16-065 TEST` Run automated accessibility checks against the shell.
+- [x] `M16-054 UX` Add a skip link to the conversation.
+- [x] `M16-055 UX` Establish a logical heading hierarchy.
+- [x] `M16-056 UX` Define tab order across rail, chat, composer, graph, and inspector.
+- [x] `M16-057 UX` Make the splitter keyboard adjustable.
+- [x] `M16-058 UX` Expose splitter values through appropriate accessibility attributes.
+- [x] `M16-059 UX` Add visible focus for every interactive control.
+- [x] `M16-060 UX` Ensure collapsed controls retain accessible names.
+- [x] `M16-061 UX` Define keyboard shortcuts for focus-chat, focus-graph, pause, and stop.
+- [x] `M16-062 UX` Prevent shortcuts from firing while the user types unless explicitly scoped.
+- [x] `M16-063 UX` Add a shortcut help dialog.
+- [x] `M16-064 TEST` Navigate the complete empty shell with keyboard only.
+- [x] `M16-065 TEST` Run automated accessibility checks against the shell.
 
 ## Component Isolation
 
-- [ ] `M16-066` Define route-level components.
-- [ ] `M16-067` Define shell-level state separately from task/session state.
-- [ ] `M16-068` Define the top-bar view model.
-- [ ] `M16-069` Define the thread-rail view model.
-- [ ] `M16-070` Define conversation and graph pane boundaries.
-- [ ] `M16-071` Instrument render counts in development builds.
-- [ ] `M16-072 TEST` Verify a top-bar cost update does not rerender the full thread.
-- [ ] `M16-073 TEST` Verify a chat append does not rerender the graph viewport.
-- [ ] `M16-074 TEST` Verify graph selection does not rerender every message.
+- [x] `M16-066` Define route-level components.
+- [x] `M16-067` Define shell-level state separately from task/session state.
+- [x] `M16-068` Define the top-bar view model.
+- [x] `M16-069` Define the thread-rail view model.
+- [x] `M16-070` Define conversation and graph pane boundaries.
+- [x] `M16-071` Instrument render counts in development builds.
+- [x] `M16-072 TEST` Verify a top-bar cost update does not rerender the full thread.
+- [x] `M16-073 TEST` Verify a chat append does not rerender the graph viewport.
+- [x] `M16-074 TEST` Verify graph selection does not rerender every message.
 
 ## Complete Frontend Component Contract
 
 Plan: §27C Route Map through Root and Shell Component Contracts; Shared Primitive Components; Focus, Keyboard, and Accessibility.
 
-- [ ] `M16-075 BLOCKER` Implement the route map for repository choice, thread workspace, memory, settings, diagnostics, and first run.
-- [ ] `M16-076` Implement `AppRoot`, `SessionBootstrap`, `AppRouter`, `GlobalErrorBoundary`, `GlobalShortcutManager`, `AccessibilityAnnouncer`, `DialogHost`, and `ToastHost`.
-- [ ] `M16-077` Define immutable view models for top bar, thread rail, conversation, graph, review, settings, memory, diagnostics, and first run.
-- [ ] `M16-078` Define authoritative remote state separately from ephemeral client state and prohibit durable task transitions from local-only reducers.
-- [ ] `M16-079` Implement `SessionStore`, `WorkspaceStore`, `ThreadStore`, `TaskStore`, `GraphStore`, `ReviewStore`, `SettingsStore`, and `UIStore` ownership boundaries.
-- [ ] `M16-080` Implement shared Button, IconButton, ToggleButton, Menu, Tabs, Dialog, Drawer, Popover, Tooltip, input, Badge, progress, Skeleton, InlineAlert, Disclosure, VirtualList, ResizableSplit, CopyButton, CodeBlock, EmptyState, and ErrorState primitives as actually needed.
-- [ ] `M16-081 UX` Define keyboard, focus, accessible-name, disabled, busy, high-contrast, reduced-motion, and pointer-target behavior for every shared primitive before feature reuse.
-- [ ] `M16-082 UX` Implement repository chooser with recent-valid workspace, browse/open, canonical-path result, warnings, loading, empty, unavailable, and retry states.
-- [ ] `M16-083 UX` Implement Settings route shells for providers, models, policy, appearance, and data.
-- [ ] `M16-084 UX` Implement Memory route shell with list, details, and action regions.
-- [ ] `M16-085 UX` Implement Diagnostics route shell with health, versions, tasks, logs, backup, and export regions.
-- [ ] `M16-086 UX` Implement First-run route shell with resumable local-promise, provider, repository, worktree/permissions, and first-thread steps.
-- [ ] `M16-087` Implement route restoration that refuses missing repositories, archived inaccessible threads, expired sessions, and incompatible client/server state.
-- [ ] `M16-088` Implement component-level not-requested, loading, ready-empty, ready-data, partial/stale, recoverable-error, denied, incompatible, and disconnected states.
-- [ ] `M16-089 UX` Implement rate-limited accessibility announcements for connection, approval, pause, completion, validation failure, and recovery only.
-- [ ] `M16-090 UX` Ensure routine events and token deltas never steal focus or create assertive announcements.
-- [ ] `M16-091 UX` Add stable full labels for long atom names while permitting visual truncation only.
-- [ ] `M16-092 TEST` Render every route in each top-level bootstrap state.
-- [ ] `M16-093 TEST` Test focus restoration after dialog, drawer, responsive rail, and graph pane close.
-- [ ] `M16-094 TEST` Test shared primitives in keyboard, disabled, busy, high-contrast, and reduced-motion modes.
-- [ ] `M16-095 TEST` Test route and draft preservation across recoverable component failure.
-- [ ] `M16-096 TEST` Verify settings, memory, diagnostics, and first-run shells make no unauthorized data fetches.
-- [ ] `M16-097 TEST` Verify client stores cannot create an unsupported durable task transition.
-- [ ] `M16-098 TEST` Verify every data-owning component has explicit empty, error, and disconnected presentation.
-- [ ] `M16-099 TEST` Verify no embedded asset or UI primitive performs an external network request.
-- [ ] `M16-100 TEST` Verify user-facing terminology consistently distinguishes Thread, Task, Attempt, Plan revision, Approval, Checkpoint, and Recovery.
+- [x] `M16-075 BLOCKER` Implement the route map for repository choice, thread workspace, memory, settings, diagnostics, and first run.
+- [x] `M16-076` Implement `AppRoot`, `SessionBootstrap`, `AppRouter`, `GlobalErrorBoundary`, `GlobalShortcutManager`, `AccessibilityAnnouncer`, `DialogHost`, and `ToastHost`.
+- [x] `M16-077` Define immutable view models for top bar, thread rail, conversation, graph, review, settings, memory, diagnostics, and first run.
+- [x] `M16-078` Define authoritative remote state separately from ephemeral client state and prohibit durable task transitions from local-only reducers.
+- [x] `M16-079` Implement `SessionStore`, `WorkspaceStore`, `ThreadStore`, `TaskStore`, `GraphStore`, `ReviewStore`, `SettingsStore`, and `UIStore` ownership boundaries.
+- [x] `M16-080` Implement shared Button, IconButton, ToggleButton, Menu, Tabs, Dialog, Drawer, Popover, Tooltip, input, Badge, progress, Skeleton, InlineAlert, Disclosure, VirtualList, ResizableSplit, CopyButton, CodeBlock, EmptyState, and ErrorState primitives as actually needed.
+- [x] `M16-081 UX` Define keyboard, focus, accessible-name, disabled, busy, high-contrast, reduced-motion, and pointer-target behavior for every shared primitive before feature reuse.
+- [x] `M16-082 UX` Implement repository chooser with recent-valid workspace, browse/open, canonical-path result, warnings, loading, empty, unavailable, and retry states.
+- [x] `M16-083 UX` Implement Settings route shells for providers, models, policy, appearance, and data.
+- [x] `M16-084 UX` Implement Memory route shell with list, details, and action regions.
+- [x] `M16-085 UX` Implement Diagnostics route shell with health, versions, tasks, logs, backup, and export regions.
+- [x] `M16-086 UX` Implement First-run route shell with resumable local-promise, provider, repository, worktree/permissions, and first-thread steps.
+- [x] `M16-087` Implement route restoration that refuses missing repositories, archived inaccessible threads, expired sessions, and incompatible client/server state.
+- [x] `M16-088` Implement component-level not-requested, loading, ready-empty, ready-data, partial/stale, recoverable-error, denied, incompatible, and disconnected states.
+- [x] `M16-089 UX` Implement rate-limited accessibility announcements for connection, approval, pause, completion, validation failure, and recovery only.
+- [x] `M16-090 UX` Ensure routine events and token deltas never steal focus or create assertive announcements.
+- [x] `M16-091 UX` Add stable full labels for long atom names while permitting visual truncation only.
+- [x] `M16-092 TEST` Render every route in each top-level bootstrap state.
+- [x] `M16-093 TEST` Test focus restoration after dialog, drawer, responsive rail, and graph pane close.
+- [x] `M16-094 TEST` Test shared primitives in keyboard, disabled, busy, high-contrast, and reduced-motion modes.
+- [x] `M16-095 TEST` Test route and draft preservation across recoverable component failure.
+- [x] `M16-096 TEST` Verify settings, memory, diagnostics, and first-run shells make no unauthorized data fetches.
+- [x] `M16-097 TEST` Verify client stores cannot create an unsupported durable task transition.
+- [x] `M16-098 TEST` Verify every data-owning component has explicit empty, error, and disconnected presentation.
+- [x] `M16-099 TEST` Verify no embedded asset or UI primitive performs an external network request.
+- [x] `M16-100 TEST` Verify user-facing terminology consistently distinguishes Thread, Task, Attempt, Plan revision, Approval, Checkpoint, and Recovery.
 
 ## Gate
 
-- [ ] `M16-G01 GATE` The empty shell loads from the embedded local server with no external asset requests.
-- [ ] `M16-G02 GATE` Every shell action is keyboard accessible and has a visible focus state.
-- [ ] `M16-G03 GATE` Wide, medium, and narrow layouts remain usable without lost state.
-- [ ] `M16-G04 GATE` Component render instrumentation confirms chat and graph update isolation.
-- [ ] `M16-G05 GATE` Every route, shared primitive, store, and shell component has explicit ownership, loading/empty/error/disconnected behavior, and keyboard/accessibility coverage.
+- [x] `M16-G01 GATE` The empty shell loads from the embedded local server with no external asset requests.
+- [x] `M16-G02 GATE` Every shell action is keyboard accessible and has a visible focus state.
+- [x] `M16-G03 GATE` Wide, medium, and narrow layouts remain usable without lost state.
+- [x] `M16-G04 GATE` Component render instrumentation confirms chat and graph update isolation.
+- [x] `M16-G05 GATE` Every route, shared primitive, store, and shell component has explicit ownership, loading/empty/error/disconnected behavior, and keyboard/accessibility coverage.
 
 ---
 

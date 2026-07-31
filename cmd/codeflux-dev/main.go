@@ -126,6 +126,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runLiveGate(ctx, stdout, stderr, invocation)
 	case "test-all":
 		return runAllTests(ctx, stdout, stderr, invocation)
+	case "test-browser":
+		return runBrowserTests(ctx, stdout, stderr, invocation)
 	case "test-integration":
 		return runIntegrationTests(ctx, stdout, stderr, invocation)
 	case "test-security":
@@ -400,7 +402,10 @@ func runRace(
 		fmt.Fprintln(stderr, "codeflux-dev test-race: unsupported on windows/arm64; run the declared Linux amd64 CI race job")
 		return exitFailure
 	}
-	return runGo(ctx, stdout, stderr, "test", "-race", "./...")
+	// The storage property suite deliberately explores thousands of concurrent
+	// schedules. Race instrumentation can push that package beyond Go's default
+	// ten-minute package timeout on shared CI runners.
+	return runGo(ctx, stdout, stderr, "test", "-race", "-timeout=20m", "./...")
 }
 
 func runCoverage(

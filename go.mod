@@ -6,6 +6,7 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/monstercameron/GoGRPCBridge v1.1.1
 	github.com/monstercameron/GoWebComponents/v5 v5.0.1
+	github.com/mxschmitt/playwright-go v0.6100.0
 	golang.org/x/sys v0.46.0
 	google.golang.org/grpc v1.81.0
 	google.golang.org/protobuf v1.36.11
@@ -14,10 +15,13 @@ require (
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

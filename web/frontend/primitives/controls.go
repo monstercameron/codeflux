@@ -1,0 +1,307 @@
+package primitives
+
+import (
+	"strings"
+
+	"codeflux.dev/codeflux/web/frontend/design"
+	"github.com/monstercameron/GoWebComponents/v5/css"
+	"github.com/monstercameron/GoWebComponents/v5/css/u"
+	"github.com/monstercameron/GoWebComponents/v5/html"
+	"github.com/monstercameron/GoWebComponents/v5/ui"
+)
+
+type ButtonProps struct {
+	ID              string
+	Label           string
+	AccessibleLabel string
+	Primary         bool
+	Disabled        bool
+	Busy            bool
+	Expanded        *bool
+	Controls        string
+	Mode            Mode
+	OnClick         func()
+}
+
+func Button(props ButtonProps) ui.Node {
+	name := AccessibleName(props.Label, props.AccessibleLabel)
+	if name == "" {
+		return contractError("button", "accessible label is required")
+	}
+	state := InteractionState{Disabled: props.Disabled, Busy: props.Busy}
+	htmlProps := html.PropsOf(html.OnClick(props.OnClick))
+	htmlProps.ID = props.ID
+	htmlProps.Type = "button"
+	htmlProps.Disabled = !state.Enabled()
+	htmlProps.Class = controlClass(props.Mode.Tokens(), props.Primary)
+	htmlProps.Aria = map[string]string{"label": name, "busy": boolARIA(props.Busy)}
+	if props.Expanded != nil {
+		htmlProps.Aria["expanded"] = boolARIA(*props.Expanded)
+	}
+	if props.Controls != "" {
+		htmlProps.Aria["controls"] = props.Controls
+	}
+	htmlProps.Data = map[string]string{
+		"component":       "button",
+		"state":           stateName(state),
+		"reduced-motion":  boolARIA(props.Mode.ReducedMotion),
+		"high-contrast":   boolARIA(props.Mode.HighContrast),
+		"pointer-minimum": "44",
+	}
+	label := props.Label
+	if props.Busy {
+		label = "Working… " + props.Label
+	}
+	return html.Button(htmlProps, html.Text(label))
+}
+
+type IconButtonProps struct {
+	ID              string
+	Icon            string
+	AccessibleLabel string
+	Disabled        bool
+	Busy            bool
+	Pressed         *bool
+	Mode            Mode
+	OnClick         func()
+}
+
+func IconButton(props IconButtonProps) ui.Node {
+	if strings.TrimSpace(props.AccessibleLabel) == "" {
+		return contractError("icon-button", "accessible label is required")
+	}
+	state := InteractionState{Disabled: props.Disabled, Busy: props.Busy}
+	htmlProps := html.PropsOf(html.OnClick(props.OnClick))
+	htmlProps.ID = props.ID
+	htmlProps.Type = "button"
+	htmlProps.Title = props.AccessibleLabel
+	htmlProps.Disabled = !state.Enabled()
+	htmlProps.Class = controlClass(props.Mode.Tokens(), false)
+	htmlProps.Aria = map[string]string{
+		"label": props.AccessibleLabel,
+		"busy":  boolARIA(props.Busy),
+	}
+	if props.Pressed != nil {
+		htmlProps.Aria["pressed"] = boolARIA(*props.Pressed)
+	}
+	htmlProps.Data = map[string]string{
+		"component":      "icon-button",
+		"state":          stateName(state),
+		"reduced-motion": boolARIA(props.Mode.ReducedMotion),
+		"high-contrast":  boolARIA(props.Mode.HighContrast),
+	}
+	return html.Button(
+		htmlProps,
+		html.Span(html.Props{Aria: map[string]string{"hidden": "true"}}, html.Text(props.Icon)),
+	)
+}
+
+type ToggleButtonProps struct {
+	ID              string
+	Label           string
+	AccessibleLabel string
+	Pressed         bool
+	Disabled        bool
+	Busy            bool
+	Mode            Mode
+	OnToggle        func(bool)
+}
+
+func ToggleButton(props ToggleButtonProps) ui.Node {
+	onClick := func() {
+		if props.OnToggle != nil {
+			props.OnToggle(!props.Pressed)
+		}
+	}
+	pressed := props.Pressed
+	return toggleButton(props, pressed, onClick)
+}
+
+func toggleButton(props ToggleButtonProps, pressed bool, onClick func()) ui.Node {
+	name := AccessibleName(props.Label, props.AccessibleLabel)
+	if name == "" {
+		return contractError("toggle-button", "accessible label is required")
+	}
+	state := InteractionState{Disabled: props.Disabled, Busy: props.Busy}
+	htmlProps := html.PropsOf(html.OnClick(onClick))
+	htmlProps.ID = props.ID
+	htmlProps.Type = "button"
+	htmlProps.Disabled = !state.Enabled()
+	htmlProps.Class = controlClass(props.Mode.Tokens(), pressed)
+	htmlProps.Aria = map[string]string{
+		"label":   name,
+		"pressed": boolARIA(pressed),
+		"busy":    boolARIA(props.Busy),
+	}
+	htmlProps.Data = map[string]string{"component": "toggle-button", "state": stateName(state)}
+	return html.Button(htmlProps, html.Text(props.Label))
+}
+
+type TabItem struct {
+	ID       string
+	Label    string
+	Disabled bool
+}
+
+type TabsProps struct {
+	Label      string
+	Items      []TabItem
+	SelectedID string
+	Mode       Mode
+	OnSelect   func(string)
+}
+
+// ResolveTabsKey implements the horizontal tabs keyboard model.
+func ResolveTabsKey(items []TabItem, selectedID, key string) string {
+	enabled := make([]TabItem, 0, len(items))
+	for _, item := range items {
+		if !item.Disabled && item.ID != "" {
+			enabled = append(enabled, item)
+		}
+	}
+	if len(enabled) == 0 {
+		return ""
+	}
+	current := 0
+	for index, item := range enabled {
+		if item.ID == selectedID {
+			current = index
+			break
+		}
+	}
+	switch key {
+	case "ArrowRight":
+		return enabled[(current+1)%len(enabled)].ID
+	case "ArrowLeft":
+		return enabled[(current-1+len(enabled))%len(enabled)].ID
+	case "Home":
+		return enabled[0].ID
+	case "End":
+		return enabled[len(enabled)-1].ID
+	default:
+		return selectedID
+	}
+}
+
+func Tabs(props TabsProps) ui.Node {
+	if strings.TrimSpace(props.Label) == "" {
+		return contractError("tabs", "group label is required")
+	}
+	for _, item := range props.Items {
+		if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.Label) == "" {
+			return contractError("tabs", "every item requires an id and label")
+		}
+	}
+	tokens := props.Mode.Tokens()
+	children := make([]ui.Node, 0, len(props.Items))
+	for _, item := range props.Items {
+		item := item
+		selected := item.ID == props.SelectedID
+		onClick := func() {
+			if !item.Disabled && props.OnSelect != nil {
+				props.OnSelect(item.ID)
+			}
+		}
+		onKeyDown := func(event ui.KeyboardEvent) {
+			next := ResolveTabsKey(props.Items, props.SelectedID, event.GetKey())
+			if next != "" && next != props.SelectedID && props.OnSelect != nil {
+				event.PreventDefault()
+				props.OnSelect(next)
+			}
+		}
+		tabIndex := -1
+		if selected {
+			tabIndex = html.TabIndexZero
+		}
+		buttonProps := html.PropsOf(html.OnClick(onClick), html.OnKeyDown(onKeyDown))
+		buttonProps.ID = item.ID
+		buttonProps.Type = "button"
+		buttonProps.Role = "tab"
+		buttonProps.Disabled = item.Disabled
+		buttonProps.TabIndex = tabIndex
+		buttonProps.Class = controlClass(tokens, selected)
+		buttonProps.Aria = map[string]string{
+			"selected": boolARIA(selected),
+			"controls": item.ID + "-panel",
+		}
+		buttonProps.Data = map[string]string{"component": "tab", "state": stateName(InteractionState{Disabled: item.Disabled})}
+		children = append(children, html.Button(buttonProps, html.Text(item.Label)))
+	}
+	return html.Div(
+		html.Props{
+			Role:  "tablist",
+			Aria:  map[string]string{"label": props.Label, "orientation": "horizontal"},
+			Data:  map[string]string{"component": "tabs", "keyboard": "arrows-home-end"},
+			Class: css.New(u.Flex, css.Gap(css.Px(tokens.Spacing.XS))).String(),
+		},
+		children...,
+	)
+}
+
+type TextFieldProps struct {
+	ID              string
+	Label           string
+	AccessibleLabel string
+	Value           string
+	Placeholder     string
+	Disabled        bool
+	Required        bool
+	InvalidMessage  string
+	Mode            Mode
+	OnInput         func(string)
+}
+
+func TextField(props TextFieldProps) ui.Node {
+	name := AccessibleName(props.Label, props.AccessibleLabel)
+	if name == "" {
+		return contractError("text-field", "accessible label is required")
+	}
+	tokens := props.Mode.Tokens()
+	onInput := func(event ui.InputEvent) {
+		if props.OnInput != nil {
+			props.OnInput(event.GetValue())
+		}
+	}
+	inputProps := html.PropsOf(html.OnInput(onInput))
+	inputProps.ID = props.ID
+	inputProps.Type = "text"
+	inputProps.Value = props.Value
+	inputProps.Placeholder = props.Placeholder
+	inputProps.Disabled = props.Disabled
+	inputProps.Required = props.Required
+	inputProps.Aria = map[string]string{"label": name, "invalid": boolARIA(props.InvalidMessage != "")}
+	if props.InvalidMessage != "" {
+		inputProps.Aria["errormessage"] = props.ID + "-error"
+	}
+	inputProps.Data = map[string]string{"component": "text-field", "state": stateName(InteractionState{Disabled: props.Disabled})}
+	inputProps.Class = fieldClass(tokens)
+	children := []ui.Node{html.Label(html.Props{For: props.ID}, html.Text(props.Label)), html.Input(inputProps)}
+	if props.InvalidMessage != "" {
+		children = append(children, html.Span(
+			html.Props{ID: props.ID + "-error", Role: "alert"},
+			html.Text(props.InvalidMessage),
+		))
+	}
+	return html.Div(html.Props{Class: stackClass(tokens)}, children...)
+}
+
+func fieldClass(tokens design.Tokens) string {
+	rules := []css.Rule{
+		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
+		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+	}
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	return css.New(rules...).String()
+}
+
+func stackClass(tokens design.Tokens) string {
+	return css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS))).String()
+}

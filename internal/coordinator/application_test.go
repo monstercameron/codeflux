@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -104,6 +105,84 @@ func TestApplicationHostsAuthenticatedTaskControlService(t *testing.T) {
 	}
 }
 
+func TestApplicationHostsGeneratedFrontendOnCoordinatorOrigin(t *testing.T) {
+	root := t.TempDir()
+	assets := filepath.Join(root, "frontend")
+	if err := os.MkdirAll(filepath.Join(assets, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for relative, content := range map[string]string{
+		"index.html":    "<generated-codeflux-shell>",
+		"wasm_exec.js":  "generated Go runtime",
+		"bin/main.wasm": "generated application",
+	} {
+		if err := os.WriteFile(
+			filepath.Join(assets, filepath.FromSlash(relative)),
+			[]byte(content),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	application, err := StartApplication(
+		t.Context(),
+		ApplicationOptions{
+			DatabasePath:            filepath.Join(root, "codeflux.sqlite3"),
+			BackupDirectory:         filepath.Join(root, "backups"),
+			ListenAddress:           "127.0.0.1:0",
+			TaskListenAddress:       "127.0.0.1:0",
+			TaskControls:            &applicationTaskControlStub{},
+			FrontendAssetsDirectory: assets,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := application.Shutdown(context.Background()); err != nil {
+			t.Error(err)
+		}
+	})
+
+	client := &http.Client{}
+	response, err := client.Get("http://" + application.Address() + "/tasks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, readErr := io.ReadAll(response.Body)
+	response.Body.Close()
+	if readErr != nil || response.StatusCode != http.StatusOK ||
+		string(body) != "<generated-codeflux-shell>" {
+		t.Fatalf("frontend = %d %q, %v", response.StatusCode, body, readErr)
+	}
+	if len(response.Cookies()) != 1 || !response.Cookies()[0].HttpOnly {
+		t.Fatalf("frontend cookies = %#v", response.Cookies())
+	}
+
+	bootstrap, err := client.Get(
+		"http://" + application.Address() + "/bootstrap",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bootstrapBody, readErr := io.ReadAll(bootstrap.Body)
+	bootstrap.Body.Close()
+	if readErr != nil || bootstrap.StatusCode != http.StatusOK ||
+		strings.Contains(
+			string(bootstrapBody),
+			application.BrowserSessionSecret(),
+		) ||
+		!strings.Contains(string(bootstrapBody), `"bridge_path":"/grpc"`) ||
+		strings.Contains(string(bootstrapBody), `"selected_session_id"`) {
+		t.Fatalf(
+			"bootstrap = %d %q, %v",
+			bootstrap.StatusCode,
+			bootstrapBody,
+			readErr,
+		)
+	}
+}
+
 func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T) {
 	root := t.TempDir()
 	workers := &recordingWorkerController{}
@@ -153,7 +232,7 @@ func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T
 	body, err := io.ReadAll(response.Body)
 	response.Body.Close()
 	if err != nil || response.StatusCode != http.StatusOK ||
-		string(body) != `{"status":"ok","isolation":"mediated workspace confinement, not a perfect sandbox"}` {
+		string(body) != `{"status":"ok","database":"ready","migrations":"current","isolation":"mediated workspace confinement, not a perfect sandbox"}` {
 		t.Fatalf("health = %d %q, %v", response.StatusCode, body, err)
 	}
 	if _, err := StartApplication(t.Context(), options); err == nil {
@@ -179,6 +258,37 @@ func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T
 	if err := application.Shutdown(context.Background()); err != nil ||
 		workers.calls() != 1 {
 		t.Fatalf("repeated shutdown = %v, calls=%d", err, workers.calls())
+	}
+}
+
+func TestHealthReportsDatabaseFailureWithoutRawDetail(t *testing.T) {
+	root := t.TempDir()
+	application, err := StartApplication(t.Context(), ApplicationOptions{
+		DatabasePath:    filepath.Join(root, "codeflux.db"),
+		BackupDirectory: filepath.Join(root, "backups"),
+		ListenAddress:   "127.0.0.1:0",
+		Workers:         &recordingWorkerController{},
+		TaskControls:    &applicationTaskControlStub{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = application.Shutdown(context.Background()) })
+	if err := application.database.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.Get("http://" + application.Address() + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, readErr := io.ReadAll(response.Body)
+	response.Body.Close()
+	if readErr != nil || response.StatusCode != http.StatusServiceUnavailable ||
+		string(body) != `{"status":"error","database":"unavailable","migrations":"unknown"}` {
+		t.Fatalf("database failure health = %d %q, %v", response.StatusCode, body, readErr)
+	}
+	if strings.Contains(string(body), root) || strings.Contains(string(body), "SELECT") || strings.Contains(string(body), ".db") {
+		t.Fatalf("database failure exposed sensitive detail: %q", body)
 	}
 }
 

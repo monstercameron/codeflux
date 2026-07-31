@@ -21,6 +21,7 @@ import (
 	"codeflux.dev/codeflux/internal/credentials"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
+	"codeflux.dev/codeflux/internal/frontendserver"
 	"codeflux.dev/codeflux/internal/gitwork"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
@@ -37,18 +38,19 @@ type WorkerController interface {
 }
 
 type ApplicationOptions struct {
-	DatabasePath        string
-	BackupDirectory     string
-	ListenAddress       string
-	WorkerLimit         int
-	ProviderLimits      map[string]int
-	HeartbeatTimeout    time.Duration
-	Now                 func() time.Time
-	Random              func([]byte) (int, error)
-	Workers             WorkerController
-	ShutdownCheckpoints GracefulShutdownCheckpointer
-	TaskControls        transport.TaskControlApplication
-	TaskListenAddress   string
+	DatabasePath            string
+	BackupDirectory         string
+	ListenAddress           string
+	WorkerLimit             int
+	ProviderLimits          map[string]int
+	HeartbeatTimeout        time.Duration
+	Now                     func() time.Time
+	Random                  func([]byte) (int, error)
+	Workers                 WorkerController
+	ShutdownCheckpoints     GracefulShutdownCheckpointer
+	TaskControls            transport.TaskControlApplication
+	TaskListenAddress       string
+	FrontendAssetsDirectory string
 }
 
 type OrphanedWorkerCandidate struct {
@@ -234,8 +236,9 @@ func StartApplication(
 		return nil, err
 	}
 	application.transport, err = transport.NewBoundary(transport.BoundaryOptions{
-		SessionToken: application.secret,
-		Now:          options.Now,
+		SessionToken:         application.secret,
+		TrustBridgeRequestID: options.FrontendAssetsDirectory != "",
+		Now:                  options.Now,
 	})
 	if err != nil {
 		return nil, err
@@ -405,6 +408,69 @@ func StartApplication(
 		"POST /internal/worker/heartbeat",
 		application.gateway.Handler(),
 	)
+	if options.FrontendAssetsDirectory != "" {
+		routeAccess, routeAccessErr := repositories.ReadFrontendRouteAccess(ctx)
+		if routeAccessErr != nil {
+			return nil, routeAccessErr
+		}
+		accessibleRepositories := make(
+			[]*codefluxv1.StableIdentity,
+			0,
+			len(routeAccess.AccessibleRepositories),
+		)
+		for _, repositoryID := range routeAccess.AccessibleRepositories {
+			accessibleRepositories = append(accessibleRepositories, &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+				Value: repositoryID.String(),
+			})
+		}
+		accessibleThreads := make(
+			[]*codefluxv1.StableIdentity,
+			0,
+			len(routeAccess.AccessibleThreads),
+		)
+		for _, threadID := range routeAccess.AccessibleThreads {
+			accessibleThreads = append(accessibleThreads, &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
+				Value: threadID.String(),
+			})
+		}
+		archivedThreads := make(
+			[]*codefluxv1.StableIdentity,
+			0,
+			len(routeAccess.ArchivedThreads),
+		)
+		for _, threadID := range routeAccess.ArchivedThreads {
+			archivedThreads = append(archivedThreads, &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
+				Value: threadID.String(),
+			})
+		}
+		info := buildinfo.Current()
+		frontend, frontendErr := frontendserver.NewHandler(
+			frontendserver.Options{
+				AssetsDirectory: options.FrontendAssetsDirectory,
+				GRPCServer:      application.taskServer,
+				SessionToken:    application.secret,
+				Bootstrap: frontendserver.Bootstrap{
+					ApplicationVersion: info.Version,
+					APIVersion:         "codeflux.v1",
+					SchemaVersion:      int(info.SchemaVersion),
+					FrontendVersion:    info.FrontendVersion,
+					RouteAccess: frontendserver.RouteAccess{
+						FirstRunComplete:       routeAccess.FirstRunComplete,
+						AccessibleRepositories: accessibleRepositories,
+						AccessibleThreads:      accessibleThreads,
+						ArchivedThreads:        archivedThreads,
+					},
+				},
+			},
+		)
+		if frontendErr != nil {
+			return nil, frontendErr
+		}
+		mux.Handle("/", frontend)
+	}
 	application.server = &http.Server{
 		Handler: mux, ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout: 30 * time.Second,
@@ -516,14 +582,32 @@ func (application *Application) health(
 	writer http.ResponseWriter,
 	request *http.Request,
 ) {
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("Cache-Control", "no-store")
 	if !application.accepting.Load() {
-		http.Error(writer, "shutting down", http.StatusServiceUnavailable)
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = writer.Write([]byte(`{"status":"error","database":"unknown","migrations":"unknown"}`))
 		return
 	}
-	writer.Header().Set("Content-Type", "application/json")
+	if application.database == nil {
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = writer.Write([]byte(`{"status":"error","database":"unavailable","migrations":"unknown"}`))
+		return
+	}
+	diagnostics, err := application.database.Diagnose(request.Context())
+	if err != nil {
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = writer.Write([]byte(`{"status":"error","database":"unavailable","migrations":"unknown"}`))
+		return
+	}
+	if diagnostics.SchemaVersion != migrations.LatestVersion() || diagnostics.FailedMigrations != 0 {
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = writer.Write([]byte(`{"status":"error","database":"ready","migrations":"required"}`))
+		return
+	}
 	writer.WriteHeader(http.StatusOK)
 	_, _ = writer.Write([]byte(
-		`{"status":"ok","isolation":"` + worker.DefaultIsolationLabel + `"}`,
+		`{"status":"ok","database":"ready","migrations":"current","isolation":"` + worker.DefaultIsolationLabel + `"}`,
 	))
 }
 

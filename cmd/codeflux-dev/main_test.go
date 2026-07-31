@@ -109,7 +109,7 @@ func TestUnavailableCommandHasStableExitAndJSON(t *testing.T) {
 }
 
 func TestCurrentSkeletonCommandsAreHonestlyUnavailable(t *testing.T) {
-	for _, command := range []string{"doctor", "inspect-db", "package", "replay", "seed", "test-browser"} {
+	for _, command := range []string{"doctor", "inspect-db", "package", "replay", "seed"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer

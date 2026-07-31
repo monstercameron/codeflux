@@ -30,6 +30,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-066
+Date: 2026-07-31
+Type: Frontend shell and design foundation
+Request-or-TODO: M16-001 through M16-100 and M16-G01 through M16-G05
+Outcome: Added the typed-Go GoWebComponents v5 product shell, local bootstrap
+  and session lifecycle, responsive conversation/graph workspace, design
+  tokens and themes, route shells, shared primitives, accessibility behavior,
+  render isolation, embedded local server, and adversarial browser harness.
+Affected-behavior: CodeFlux now starts from its loopback coordinator, restores
+  only server-confirmed non-sensitive route state, renders the reference-aligned
+  dark/light/high-contrast shell at all supported widths, preserves layout and
+  graph selection, supports complete keyboard navigation and focus recovery,
+  and performs no external frontend requests.
+Compatibility-or-migration: No protocol or database schema change. The new
+  frontend remains generated from Go source; no handwritten JavaScript, HTML,
+  or CSS is added to the repository.
+Verification: The 247-check Chromium route, viewport, accessibility, focus,
+  interaction, visual-viewport, and external-network matrix passes. Mounted
+  Chromium render counters prove isolated cost, chat, and graph updates.
+  `test-all`, lint, integration, security, artifact, native Go, and WASM build
+  gates pass.
+Dev-Log: DL-20260731-067
+
 Change-ID: CL-20260731-065
 Date: 2026-07-31
 Type: Architecture-boundary correction

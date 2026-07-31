@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-067
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-066
+Request-or-TODO: M16-001 through M16-100 and M16-G01 through M16-G05; user
+  requested reference-render fidelity, theming, i18n, live preview, full E2E,
+  adversarial refinement, marked TODOs, and typed Go/GWC only.
+Goal: Deliver the accessible local application shell and its browser evidence
+  before streaming conversation and graph behavior add complexity.
+Assumptions: The untracked design/reference directory is user-owned and
+  read-only; generated scaffold assets remain disposable under `.artifacts`;
+  server-confirmed identifiers are the only route state eligible for restore.
+Decisions: Keep every authored frontend component in GoWebComponents v5; use
+  system font stacks and local design tokens; compose explicit route and async
+  state owners; persist only bounded layout values; lift graph selection into
+  ephemeral root state; use one embedded loopback server; and gate acceptance
+  on real browser behavior plus mounted render-boundary counters.
+Files-or-schemas: Go client bootstrap/session entry points; frontend design,
+  i18n, preferences, routes, primitives, shell, shortcut, session-client, and
+  state packages; embedded frontend server and browser harness; coordinator
+  route-access/bootstrap integration; local development command; M16 checklist
+  and ledgers. No migration or durable schema change.
+Validation: 247/247 Chromium checks pass across direct routes, wide/standard/
+  compact/minimum layouts, keyboard traversal, visible focus, dialogs, rail
+  and graph focus restoration, reduced visual viewport, selection persistence,
+  accessibility, and zero external requests. Mounted Chromium evidence records
+  cost `{T1 G1 M1 C1}->{T1 G1 M1 C2}`, chat
+  `{T1 G1 M1 C2}->{T1 G1 M2 C2}`, and graph
+  `{T1 G1 M2 C2}->{T1 G2 M2 C2}`. Full `test-all`, lint, generation,
+  integration, security, artifact, native Go, and WASM gates pass.
+Failures-or-discarded-approaches: Replaced a hook-owning accessible overlay
+  invoked as a plain function after its closed/open transition crashed; rejected
+  stale live bundles during visual review; fixed a first-paint preference race;
+  and corrected a browser assertion that excluded the intentionally hidden
+  selected graph node after switching tabs.
+Known-limitations: M17 and later milestones will replace sample conversation,
+  graph, metric, review, and assurance content with live task projections and
+  command workflows. The current server remains a local development runtime.
+Next-safe-step: Commit and publicly verify M16, then implement M17 thread rail,
+  conversation timeline, composer, forecast, and plan-review behavior against
+  the completed shell contracts.
+
 Dev-Log: DL-20260731-066
 Date: 2026-07-31
 Status: Complete

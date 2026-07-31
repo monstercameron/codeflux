@@ -65,7 +65,7 @@ func runAllTests(
 			return code
 		}
 	}
-	fmt.Fprintln(stdout, "codeflux-dev test-all: browser tests remain unavailable until the M16 harness; race tests run in the declared Ubuntu CI job")
+	fmt.Fprintln(stdout, "codeflux-dev test-all: browser tests are opt-in through test-browser against a running local frontend; race tests run in the declared Ubuntu CI job")
 	return exitSuccess
 }
 
