@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-067
+Date: 2026-07-31
+Type: Cross-platform frontend build correction
+Request-or-TODO: M16 public CI follow-up
+Outcome: Added the native host sentinel for the browser-only Go/WASM client
+  command so repository-wide builds can type-check shared client sources.
+Affected-behavior: Linux, macOS, and Windows native build jobs no longer fail
+  because the `web/client` main package has no host entry point; the actual
+  browser entry point remains restricted to js/wasm.
+Compatibility-or-migration: No runtime, protocol, schema, or browser behavior
+  change.
+Verification: Native client build and tests pass; the existing WASM entry point
+  and browser bundle remain unchanged.
+Dev-Log: DL-20260731-068
+
 Change-ID: CL-20260731-066
 Date: 2026-07-31
 Type: Frontend shell and design foundation

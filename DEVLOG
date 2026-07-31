@@ -24,6 +24,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-068
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-067
+Request-or-TODO: M16 public CI follow-up
+Goal: Restore the cross-platform build gate without weakening the browser-only
+  WASM entry-point boundary.
+Assumptions: Shared client code must type-check natively even though executable
+  browser startup exists only for js/wasm.
+Decisions: Add a build-tagged no-op native main rather than exposing browser
+  behavior on host targets or excluding the package from repository builds.
+Files-or-schemas: Native client entry sentinel and change/development ledgers;
+  no schema change.
+Validation: `go build ./web/client` and `go test ./web/client -count=1` pass.
+Failures-or-discarded-approaches: The M16 public platform jobs exposed the
+  missing host main after their fast tests passed; changing the CI build scope
+  was rejected because it would hide a real package-build defect.
+Known-limitations: The replacement public workflow must confirm all supported
+  operating systems; browser behavior remains covered by the separate WASM and
+  Chromium gates.
+Next-safe-step: Commit and push the focused correction, verify replacement CI,
+  and continue M17 implementation.
+
 Dev-Log: DL-20260731-067
 Date: 2026-07-31
 Status: Complete
