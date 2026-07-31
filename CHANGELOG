@@ -30,6 +30,31 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-069
+Date: 2026-07-31
+Type: Authoritative live task workspace
+Request-or-TODO: M18-001 through M18-070 and M18-G01 through M18-G05
+Outcome: Added the atomic session task projection, seven-state delivery model,
+  idempotent live task and recovery commands, exact budget/cost presentation,
+  complete task-state action matrix, diagnostics cursor, and content-free local
+  frontend telemetry through the typed Go/GWC workspace.
+Affected-behavior: A selected session replays from a sequence-bound SQLite
+  snapshot before controls become live, repairs gaps and invalidations through
+  the same snapshot boundary, retains drafts and command keys through uncertain
+  outcomes, and exposes only server-owned task correctness facts. All supported
+  controls traverse the authenticated gRPC bridge; unavailable future actions
+  are disabled before activation with accessible reasons.
+Compatibility-or-migration: Adds migrations 000018 and 000019 for bounded
+  frontend telemetry and crash-repair projection notifications; extends the
+  protobuf task/session/settings/recovery contracts and generated Go sources.
+  No handwritten JavaScript, TypeScript, HTML, or CSS source is added.
+Verification: Full Go tests, vet, generation, lint, migration, artifact, WASM,
+  diff, and source-boundary checks pass. The fixed loopback runtime passes all
+  260 Chromium checks plus live visual inspection, real message settlement,
+  GWC client routing, telemetry modal/delete, responsive, graph, keyboard,
+  focus, replay, repair, recovery, budget, and task-state matrix evidence.
+Dev-Log: DL-20260731-070
+
 Change-ID: CL-20260731-068
 Date: 2026-07-31
 Type: Authoritative conversation workspace

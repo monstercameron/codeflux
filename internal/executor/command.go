@@ -2,14 +2,18 @@ package executor
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"runtime"
 
 	"codeflux.dev/codeflux/internal/redact"
 )
@@ -21,6 +25,8 @@ type AuthorizedToolRequest struct {
 	Request            ToolRequest
 	Classification     AuthorityClassification
 	WorktreePath       string
+	ExpectedExecutable string
+	ExpectedExecutableSHA256 string
 	Environment        map[string]string
 	AllowedEnvironment []string
 	Redactor           *redact.Pipeline
@@ -82,13 +88,22 @@ func ExecuteAuthorizedTool(
 		return ToolResult{}, err
 	}
 	_ = worktree
-	resolved, err := exec.LookPath(values[0])
+	resolved, _, err := ResolveExecutableIdentity(values[0])
 	if err != nil {
-		return ToolResult{}, fmt.Errorf("resolve command executable: %w", err)
+		return ToolResult{}, err
 	}
-	resolved, err = filepath.Abs(resolved)
-	if err != nil {
-		return ToolResult{}, fmt.Errorf("canonicalize command executable: %w", err)
+	if authorized.ExpectedExecutable != "" || authorized.ExpectedExecutableSHA256 != "" {
+		if authorized.ExpectedExecutable == "" || authorized.ExpectedExecutableSHA256 == "" ||
+			!sameExecutablePath(resolved, authorized.ExpectedExecutable) {
+			return ToolResult{}, errors.New("resolved executable differs from validation intent")
+		}
+		digest, digestErr := executableSHA256(resolved)
+		if digestErr != nil {
+			return ToolResult{}, digestErr
+		}
+		if digest != authorized.ExpectedExecutableSHA256 {
+			return ToolResult{}, errors.New("executable content differs from validation intent")
+		}
 	}
 	environment, err := minimalEnvironment(
 		os.Environ(),
@@ -182,6 +197,54 @@ func ExecuteAuthorizedTool(
 		RequestID: request.ID, State: state,
 	})
 	return result, nil
+}
+
+// ResolveExecutableIdentity returns the exact canonical executable path and
+// content digest that a mediated command will verify again before process
+// start. The digest is safe metadata; executable contents are never retained.
+func ResolveExecutableIdentity(executable string) (string, string, error) {
+	if strings.TrimSpace(executable) == "" {
+		return "", "", errors.New("command executable is required")
+	}
+	resolved, err := exec.LookPath(executable)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve command executable: %w", err)
+	}
+	resolved, err = filepath.Abs(resolved)
+	if err != nil {
+		return "", "", fmt.Errorf("canonicalize command executable: %w", err)
+	}
+	resolved, err = filepath.EvalSymlinks(resolved)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve command executable links: %w", err)
+	}
+	digest, err := executableSHA256(resolved)
+	if err != nil {
+		return "", "", err
+	}
+	return resolved, digest, nil
+}
+
+func executableSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("hash command executable: %w", err)
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("hash command executable: %w", err)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func sameExecutablePath(left, right string) bool {
+	left = filepath.Clean(left)
+	right = filepath.Clean(right)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
 }
 
 func validateCommandDirectory(worktreePath, directory string) (string, string, error) {

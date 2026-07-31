@@ -79,6 +79,17 @@ func TestTransportAcceptanceWaitsForAuthoritativeTimelineConfirmation(t *testing
 	}
 }
 
+func TestComposerSettlementDependencyChangesAcrossEqualSequenceThreads(t *testing.T) {
+	first, _ := domain.ParseThreadID("thr_01890f3c-4a00-7abc-8def-0123456789ab")
+	second, _ := domain.ParseThreadID("thr_02890f3c-4a00-7abc-8def-0123456789ab")
+	event := events.SessionEvent{ThreadID: first, Sequence: 7, Kind: events.KindMessageFinal}
+	firstDependency := composerSettlementDependency(first, event, composer.SendAttempt{}, false)
+	secondDependency := composerSettlementDependency(second, event, composer.SendAttempt{}, false)
+	if firstDependency == secondDependency {
+		t.Fatalf("equal-sequence thread switch retained settlement dependency %q", firstDependency)
+	}
+}
+
 func clientTimelineConfirmation(
 	t *testing.T,
 	threadID domain.ThreadID,

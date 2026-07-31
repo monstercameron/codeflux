@@ -280,7 +280,9 @@ type Completion struct {
 	MemoryInfluence []string
 }
 
-type TaskState struct {
+// TaskTransition is the presentation payload for a task-state event. The
+// authoritative state type remains domain.TaskState.
+type TaskTransition struct {
 	From     string
 	To       string
 	Approval string
@@ -326,7 +328,7 @@ type Card struct {
 	Recovery     *Recovery
 	Error        *Error
 	Completion   *Completion
-	TaskState    *TaskState
+	TaskState    *TaskTransition
 	Usage        *Usage
 	GraphChange  *GraphChange
 	Unknown      *Unknown

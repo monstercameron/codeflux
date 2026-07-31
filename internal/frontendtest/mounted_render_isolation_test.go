@@ -9,10 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/mxschmitt/playwright-go"
 )
@@ -40,17 +40,6 @@ func (counter *mountedRenderCounter) record(boundary string) {
 	counter.mu.Lock()
 	defer counter.mu.Unlock()
 	counter.counts[boundary]++
-}
-
-func (counter *mountedRenderCounter) snapshot() RenderCounts {
-	counter.mu.Lock()
-	defer counter.mu.Unlock()
-	return RenderCounts{
-		Thread:  counter.counts["thread-rail"],
-		Graph:   counter.counts["graph-pane"],
-		Message: counter.counts["conversation-pane"],
-		Cost:    counter.counts["application-bar"],
-	}
 }
 
 func TestMountedGWCInteractionsPreserveRenderIsolation(t *testing.T) {
@@ -98,26 +87,32 @@ func TestMountedGWCInteractionsPreserveRenderIsolation(t *testing.T) {
 	if err := browserAssertions().Locator(page.GetByTestId("render-isolation-fixture")).ToBeVisible(); err != nil {
 		t.Fatalf("wait for mounted GWC fixture: %v", err)
 	}
-	waitForStableMountedCounts(t, counter, func(counts RenderCounts) bool {
-		return counts.Thread > 0 && counts.Graph > 0 && counts.Message > 0 && counts.Cost > 0
-	})
+	initial := mountedDOMRevisions(t, page)
+	if initial != (RenderCounts{Thread: 1, Graph: 1, Message: 1, Cost: 1}) {
+		t.Fatalf("initial mounted DOM revisions = %+v", initial)
+	}
 
 	evidence := mountedRenderEvidence{SchemaVersion: 1, Runtime: "GWC v5 mounted in Chromium"}
 	evidence.Events = append(evidence.Events, exerciseMountedRenderEvent(
 		t,
-		counter,
+		page,
 		RenderEventCostUpdate,
 		func() error { return page.GetByTestId("update-cost").Click() },
 	))
 	evidence.Events = append(evidence.Events, exerciseMountedRenderEvent(
 		t,
-		counter,
+		page,
 		RenderEventChatAppend,
-		func() error { return page.GetByTestId("append-message").Click() },
+		func() error {
+			_, err := page.GetByTestId("append-message").SelectOption(
+				playwright.SelectOptionValues{Values: &[]string{"append"}},
+			)
+			return err
+		},
 	))
 	evidence.Events = append(evidence.Events, exerciseMountedRenderEvent(
 		t,
-		counter,
+		page,
 		RenderEventGraphSelection,
 		func() error {
 			node := page.Locator(`[data-node-id="node-2"]`)
@@ -127,6 +122,9 @@ func TestMountedGWCInteractionsPreserveRenderIsolation(t *testing.T) {
 			return browserAssertions().Locator(node).ToHaveAttribute("aria-pressed", "true")
 		},
 	))
+	t.Run("M18SessionConnectionAcceptance", func(t *testing.T) {
+		exerciseMountedM18SessionAcceptance(t, page)
+	})
 
 	encoded, err := json.MarshalIndent(evidence, "", "  ")
 	if err != nil {
@@ -144,29 +142,99 @@ func TestMountedGWCInteractionsPreserveRenderIsolation(t *testing.T) {
 	}
 }
 
+func TestMountedGWCM18JourneyAcceptance(t *testing.T) {
+	if os.Getenv(mountedRenderIsolationEnvironment) != "1" {
+		t.Skip("set " + mountedRenderIsolationEnvironment + "=1 to build and run mounted browser evidence")
+	}
+
+	repository := repositoryRootForMountedTest(t)
+	artifactDirectory := filepath.Join(repository, ".artifacts", "m18-mounted-journey")
+	prepareMountedFixtureAssets(t, repository, artifactDirectory)
+
+	server := newMountedFixtureServer(
+		t,
+		artifactDirectory,
+		&mountedRenderCounter{counts: map[string]int{}},
+	)
+	defer server.Close()
+
+	instance, err := playwright.Run(&playwright.RunOptions{
+		DriverDirectory:     os.Getenv("PLAYWRIGHT_DRIVER_PATH"),
+		SkipInstallBrowsers: true,
+	})
+	if err != nil {
+		t.Fatalf("start Playwright: %v", err)
+	}
+	defer func() { _ = instance.Stop() }()
+
+	launch := playwright.BrowserTypeLaunchOptions{Headless: playwright.Bool(true)}
+	if executable := os.Getenv("CODEFLUX_CHROMIUM_EXECUTABLE"); executable != "" {
+		launch.ExecutablePath = playwright.String(executable)
+	}
+	browser, err := instance.Chromium.Launch(launch)
+	if err != nil {
+		t.Fatalf("launch Chromium: %v", err)
+	}
+	defer func() { _ = browser.Close() }()
+
+	page, err := browser.NewPage(playwright.BrowserNewPageOptions{
+		Viewport: &playwright.Size{Width: 1280, Height: 900},
+	})
+	if err != nil {
+		t.Fatalf("create browser page: %v", err)
+	}
+	page.SetDefaultTimeout(10_000)
+	if _, err := page.Goto(server.URL); err != nil {
+		t.Fatalf("load mounted M18 fixture: %v", err)
+	}
+	if err := browserAssertions().Locator(page.GetByTestId("render-isolation-fixture")).ToBeVisible(); err != nil {
+		t.Fatalf("wait for mounted M18 fixture: %v", err)
+	}
+	exerciseMountedM18SessionAcceptance(t, page)
+	t.Run("M18TaskActionMatrixAcceptance", func(t *testing.T) {
+		exerciseMountedM18TaskActionMatrixAcceptance(t, page)
+	})
+}
+
 func exerciseMountedRenderEvent(
 	t *testing.T,
-	counter *mountedRenderCounter,
+	page playwright.Page,
 	event RenderEvent,
 	interact func() error,
 ) mountedRenderEvent {
 	t.Helper()
-	before := counter.snapshot()
+	before := mountedDOMRevisions(t, page)
 	if err := interact(); err != nil {
 		t.Fatalf("%s browser interaction: %v", event, err)
 	}
-	after := waitForStableMountedCounts(t, counter, func(counts RenderCounts) bool {
-		switch event {
-		case RenderEventCostUpdate:
-			return counts.Cost > before.Cost
-		case RenderEventChatAppend:
-			return counts.Message > before.Message
-		case RenderEventGraphSelection:
-			return counts.Graph > before.Graph
-		default:
-			return false
-		}
-	})
+	want := before
+	var owner playwright.Locator
+	switch event {
+	case RenderEventCostUpdate:
+		want.Cost++
+		owner = page.Locator(`[data-component="application-bar"]`)
+	case RenderEventChatAppend:
+		want.Message++
+		owner = page.Locator(`[data-component="conversation-pane"]`).First()
+	case RenderEventGraphSelection:
+		want.Graph++
+		owner = page.Locator(`[data-component="graph-pane"]`).First()
+	default:
+		t.Fatalf("unknown mounted render event %q", event)
+	}
+	var revision int
+	switch event {
+	case RenderEventCostUpdate:
+		revision = want.Cost
+	case RenderEventChatAppend:
+		revision = want.Message
+	case RenderEventGraphSelection:
+		revision = want.Graph
+	}
+	if err := browserAssertions().Locator(owner).ToHaveAttribute("data-revision", strconv.Itoa(revision)); err != nil {
+		t.Fatalf("%s owning DOM revision: %v", event, err)
+	}
+	after := mountedDOMRevisions(t, page)
 	if err := ValidateRenderIsolation(before, after, event); err != nil {
 		t.Fatalf("%s ownership contract: %v", event, err)
 	}
@@ -174,6 +242,29 @@ func exerciseMountedRenderEvent(
 		t.Fatalf("%s exclusive mounted ownership: %v", event, err)
 	}
 	return mountedRenderEvent{Event: event, Before: before, After: after}
+}
+
+func mountedDOMRevisions(t *testing.T, page playwright.Page) RenderCounts {
+	t.Helper()
+	read := func(component string, first bool) int {
+		locator := page.Locator(`[data-component="` + component + `"]`)
+		if first {
+			locator = locator.First()
+		}
+		raw, err := locator.GetAttribute("data-revision")
+		if err != nil {
+			t.Fatalf("read %s DOM revision: %v", component, err)
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			t.Fatalf("parse %s DOM revision %q: %v", component, raw, err)
+		}
+		return value
+	}
+	return RenderCounts{
+		Thread: read("thread-rail", true), Graph: read("graph-pane", true),
+		Message: read("conversation-pane", true), Cost: read("application-bar", true),
+	}
 }
 
 func validateOnlyOwningSubtreeChanged(before, after RenderCounts, event RenderEvent) error {
@@ -192,36 +283,6 @@ func validateOnlyOwningSubtreeChanged(before, after RenderCounts, event RenderEv
 		return fmt.Errorf("non-owning subtree rendered: before=%+v after=%+v", before, after)
 	}
 	return nil
-}
-
-func waitForStableMountedCounts(
-	t *testing.T,
-	counter *mountedRenderCounter,
-	ready func(RenderCounts) bool,
-) RenderCounts {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	last := counter.snapshot()
-	stableSince := time.Time{}
-	for time.Now().Before(deadline) {
-		current := counter.snapshot()
-		if ready(current) {
-			if current == last {
-				if stableSince.IsZero() {
-					stableSince = time.Now()
-				}
-				if time.Since(stableSince) >= 150*time.Millisecond {
-					return current
-				}
-			} else {
-				stableSince = time.Time{}
-			}
-		}
-		last = current
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("render counts did not reach stable expected state: %+v", counter.snapshot())
-	return RenderCounts{}
 }
 
 func newMountedFixtureServer(
@@ -247,6 +308,10 @@ func newMountedFixtureServer(
 }
 
 func prepareMountedFixtureAssets(t *testing.T, repository, artifactDirectory string) {
+	prepareMountedFixtureAssetsForPackage(t, repository, artifactDirectory, "./internal/frontendtest/renderfixture")
+}
+
+func prepareMountedFixtureAssetsForPackage(t *testing.T, repository, artifactDirectory, fixturePackage string) {
 	t.Helper()
 	relative, err := filepath.Rel(filepath.Join(repository, ".artifacts"), artifactDirectory)
 	if err != nil || relative == "." || relative == ".." || filepath.IsAbs(relative) ||
@@ -293,7 +358,7 @@ func prepareMountedFixtureAssets(t *testing.T, repository, artifactDirectory str
 		environment,
 		"go", "build", "-trimpath",
 		"-o", filepath.Join(artifactDirectory, "bin", "main.wasm"),
-		"./internal/frontendtest/renderfixture",
+		fixturePackage,
 	)
 }
 

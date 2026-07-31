@@ -62,6 +62,32 @@ func TestRecoveryFactsAreImmutableIdempotentAndExactlyBound(t *testing.T) {
 	if !reflect.DeepEqual(assessment, replayed) {
 		t.Fatalf("idempotent assessment = %#v, want %#v", replayed, assessment)
 	}
+	if _, err := repositories.database.sql.ExecContext(
+		t.Context(),
+		`UPDATE tasks SET state = 'recovery-required', revision = revision + 1 WHERE id = ?`,
+		task.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var recoveryRevision uint64
+	if err := repositories.database.sql.QueryRowContext(
+		t.Context(),
+		`SELECT revision FROM tasks WHERE id = ?`,
+		task.ID,
+	).Scan(&recoveryRevision); err != nil {
+		t.Fatal(err)
+	}
+	current, err := repositories.GetCurrentRecoveryAssessment(
+		t.Context(), task.ID, recoveryRevision,
+	)
+	if err != nil || current.ID != assessment.ID {
+		t.Fatalf("current recovery assessment = %#v, error=%v", current, err)
+	}
+	if _, err := repositories.GetCurrentRecoveryAssessment(
+		t.Context(), task.ID, recoveryRevision+1,
+	); !errors.Is(err, ErrStaleRevision) {
+		t.Fatalf("stale recovery assessment error = %v", err)
+	}
 	conflict := assessmentInput
 	conflict.Classification = RecoveryClassificationReconcile
 	if _, err := repositories.RecordRecoveryAssessment(

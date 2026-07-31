@@ -142,7 +142,7 @@ func classifyStartupFailure(cause error, health healthEnvelope) error {
 func sessionForStartupFailure(err error) frontendstate.SessionView {
 	view := frontendstate.SessionView{
 		Bootstrap:  frontendstate.BootstrapCoordinatorUnavailable,
-		Connection: frontendstate.ConnectionOffline,
+		Connection: frontendstate.ConnectionDisconnected,
 		Message:    "The local coordinator could not complete secure startup.",
 	}
 	var failure *startupFailure

@@ -29,6 +29,7 @@ func TestRendererEmitsCanvasInteractionAndAccessibilityContract(t *testing.T) {
 		`data-selected-node-id="implementation"`,
 		`data-component="graph-render-surface"`,
 		`data-node-id="requirements"`,
+		`value="requirements"`,
 		`aria-label="Shell requirements - Complete"`,
 		`aria-label="GWC workspace - Active"`,
 		`aria-label="Zoom in"`,

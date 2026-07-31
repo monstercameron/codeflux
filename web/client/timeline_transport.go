@@ -3,10 +3,38 @@ package main
 import (
 	"sort"
 
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"codeflux.dev/codeflux/web/frontend/timeline"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
 )
+
+// relatedTimelineStableKey resolves a recovery event identity only through
+// identities accepted into the authoritative session stream. It deliberately
+// does not guess from sequence numbers or presentation labels.
+func relatedTimelineStableKey(stream timeline.State, eventID domain.EventID) (string, bool) {
+	if eventID.IsZero() {
+		return "", false
+	}
+	for _, item := range stream.Items {
+		matched := false
+		for _, event := range item.Events {
+			matched = (event.CausationID != nil && *event.CausationID == eventID) ||
+				(event.CorrelationID != nil && *event.CorrelationID == eventID)
+			if matched {
+				break
+			}
+		}
+		if !matched || len(item.Events) == 0 {
+			continue
+		}
+		card, err := timelinecard.Project(item.Events[len(item.Events)-1])
+		if err == nil {
+			return card.StableKey, true
+		}
+	}
+	return "", false
+}
 
 func authoritativeTimelineCards(
 	thread threadrail.Thread,

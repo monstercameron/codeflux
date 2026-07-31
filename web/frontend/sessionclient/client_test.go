@@ -24,6 +24,7 @@ func TestClientReconnectsFromLastAppliedSequenceWithoutDuplicates(t *testing.T) 
 		{response: testResponse(identity, 1)},
 		{response: testResponse(identity, 2)},
 		{response: testResponse(identity, 3)},
+		{response: testReplayBoundary(3)},
 		{err: status.Error(codes.PermissionDenied, "test terminal")},
 	}}}
 	connector := &fakeConnector{connections: []Connection{first, second}}
@@ -72,6 +73,7 @@ func TestClientStartsAfterConfiguredSequenceAndIgnoresReplayDuplicate(t *testing
 	connection := &fakeConnection{stream: &scriptedStream{items: []streamItem{
 		{response: testResponse(identity, 5)},
 		{response: testResponse(identity, 6)},
+		{response: testReplayBoundary(6)},
 		{err: status.Error(codes.Unauthenticated, "test terminal")},
 	}}}
 	connector := &fakeConnector{connections: []Connection{connection}}
@@ -100,6 +102,69 @@ func TestClientStartsAfterConfiguredSequenceAndIgnoresReplayDuplicate(t *testing
 	}
 	if got := client.Status(); got.LastSequence != 6 || got.Failure != FailureAuthentication || got.ControlsAllowed {
 		t.Fatalf("terminal status = %+v", got)
+	}
+}
+
+func TestClientKeepsControlsDisabledUntilExactReplayBoundary(t *testing.T) {
+	identity := testSessionIdentity()
+	connection := &fakeConnection{stream: &scriptedStream{items: []streamItem{
+		{response: testResponse(identity, 1)},
+		{response: testResponse(identity, 2)},
+		{response: testReplayBoundary(2)},
+		{err: status.Error(codes.PermissionDenied, "test terminal")},
+	}}}
+	var observed []Status
+	client := newTestClient(t, Config{
+		Connector:    &fakeConnector{connections: []Connection{connection}},
+		SessionID:    identity,
+		Apply:        func(context.Context, *codefluxv1.SessionEvent) error { return nil },
+		Observe:      func(status Status) { observed = append(observed, status) },
+		WaitForRetry: noRetryWait,
+	})
+	if err := client.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Wait(); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("Wait() error = %v", err)
+	}
+	var sawBoundary bool
+	for _, status := range observed {
+		if status.State == StateLive {
+			sawBoundary = true
+			if status.LastSequence != 2 || !status.ControlsAllowed {
+				t.Fatalf("live boundary status = %+v", status)
+			}
+			continue
+		}
+		if status.LastSequence > 0 && status.ControlsAllowed {
+			t.Fatalf("controls enabled before replay boundary: %+v", status)
+		}
+	}
+	if !sawBoundary {
+		t.Fatalf("replay boundary never transitioned live: %+v", observed)
+	}
+}
+
+func TestClientRejectsReplayBoundaryThatDoesNotMatchAppliedCursor(t *testing.T) {
+	identity := testSessionIdentity()
+	connection := &fakeConnection{stream: &scriptedStream{items: []streamItem{
+		{response: testResponse(identity, 1)},
+		{response: testReplayBoundary(2)},
+	}}}
+	client := newTestClient(t, Config{
+		Connector:    &fakeConnector{connections: []Connection{connection}},
+		SessionID:    identity,
+		Apply:        func(context.Context, *codefluxv1.SessionEvent) error { return nil },
+		WaitForRetry: noRetryWait,
+	})
+	if err := client.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Wait(); !errors.Is(err, ErrInvalidReplayBoundary) {
+		t.Fatalf("Wait() error = %v, want invalid replay boundary", err)
+	}
+	if got := client.Status(); got.State != StateFailed || got.Failure != FailureProtocol || got.ControlsAllowed {
+		t.Fatalf("invalid boundary status = %+v", got)
 	}
 }
 
@@ -158,6 +223,46 @@ func TestClientDoesNotAdvanceCursorWhenReducerFails(t *testing.T) {
 	}
 	if got := client.Status(); got.LastSequence != 0 || got.State != StateFailed || got.Failure != FailureApplication || got.ControlsAllowed {
 		t.Fatalf("terminal status = %+v", got)
+	}
+}
+
+func TestClientRepairsProjectionFromFreshSnapshotBeforeResubscribing(t *testing.T) {
+	identity := testSessionIdentity()
+	first := &fakeConnection{stream: &scriptedStream{items: []streamItem{
+		{response: testResponse(identity, 1)},
+	}}}
+	second := &fakeConnection{stream: &scriptedStream{items: []streamItem{
+		{response: testReplayBoundary(5)},
+		{response: testResponse(identity, 6)},
+		{err: status.Error(codes.PermissionDenied, "test terminal")},
+	}}}
+	connector := &fakeConnector{connections: []Connection{first, second}}
+	var applied []uint64
+	repairs := 0
+	client := newTestClient(t, Config{
+		Connector: connector, SessionID: identity,
+		Apply: func(_ context.Context, event *codefluxv1.SessionEvent) error {
+			applied = append(applied, event.GetSequence())
+			if event.GetSequence() == 1 {
+				return errors.New("projection inconsistency")
+			}
+			return nil
+		},
+		Repair: func(context.Context) (uint64, error) {
+			repairs++
+			return 5, nil
+		},
+		WaitForRetry: noRetryWait,
+	})
+	if err := client.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Wait(); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("Wait() error = %v", err)
+	}
+	if repairs != 1 || !reflect.DeepEqual(connector.afterSequences(), []uint64{0, 5}) ||
+		!reflect.DeepEqual(applied, []uint64{1, 6}) {
+		t.Fatalf("repairs=%d after=%v applied=%v", repairs, connector.afterSequences(), applied)
 	}
 }
 
@@ -263,6 +368,12 @@ func testResponse(identity *codefluxv1.StableIdentity, sequence uint64) *codeflu
 		Sequence:  sequence,
 		SessionId: &codefluxv1.StableIdentity{Kind: identity.GetKind(), Value: identity.GetValue()},
 	}}
+}
+
+func testReplayBoundary(sequence uint64) *codefluxv1.SubscribeSessionResponse {
+	return &codefluxv1.SubscribeSessionResponse{
+		ReplayBoundary: &codefluxv1.SessionReplayBoundary{ThroughSequence: sequence},
+	}
 }
 
 func noRetryWait(context.Context, time.Duration) error { return nil }

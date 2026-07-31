@@ -385,6 +385,30 @@ func (repositories *Repositories) AppendTaskEvent(
 	return event, err
 }
 
+// FindTaskEventByIdempotencyKey returns the immutable task fact selected by a
+// producer key. It supports repairable derived projections without allocating
+// fresh identities on command retries.
+func (repositories *Repositories) FindTaskEventByIdempotencyKey(
+	ctx context.Context,
+	taskID domain.TaskID,
+	key string,
+) (TaskEvent, bool, error) {
+	if taskID.IsZero() {
+		return TaskEvent{}, false, errors.New("task ID must not be empty")
+	}
+	if err := validateBounded("task event idempotency key", key, 255); err != nil {
+		return TaskEvent{}, false, err
+	}
+	var event TaskEvent
+	var found bool
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		var err error
+		event, found, err = findTaskEventByIdempotency(ctx, transaction, taskID, key)
+		return err
+	})
+	return event, found, err
+}
+
 // ReplayTask reconstructs task state exclusively from its ordered immutable
 // events. Task creation establishes the implicit draft state.
 func (repositories *Repositories) ReplayTask(

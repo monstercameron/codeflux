@@ -24,6 +24,124 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-071
+Date: 2026-07-31
+Status: In progress
+Change-ID: Pending CL-20260731-070
+Request-or-TODO: M19-001 through M19-108 and M19-G01 through M19-G04;
+  user required the graph to be dynamic, interactive, visually meaningful by
+  node purpose, fully observable through the fixed live GWC UI, and tested.
+Goal: Deliver a task-scoped, derived, read-only program/execution/evidence graph
+  with immutable revisions, bounded SQLite queries, deterministic stable layout,
+  accessible interaction, bidirectional chat linkage, and explicit inspection.
+Assumptions: Chat remains the control surface; graph identity is distinct from
+  revision identity; server-issued project/task/repository IDs bound every read;
+  sessions without graph evidence render an honest empty graph; `design/` stays
+  user-owned and excluded.
+Decisions: Normalize durable task facts through a typed semantic seam rather
+  than infer structure from redacted display text; commit graph changes only for
+  material facts; keep token deltas revision-free; use schema-versioned immutable
+  revisions, typed metadata only, bounded continuation queries, deterministic
+  SCC-aware left-to-right layout, and authored Go/GWC SVG interaction.
+Files-or-schemas: In progress across internal graph/domain projection, migration
+  000020, SQLite graph query repository, graph layout, typed GraphService bridge,
+  GWC authoritative graph canvas, inspector, and performance/browser evidence.
+Validation: Domain, projection, migration, storage query, layout, graphcanvas,
+  web frontend, WASM, vet, lint, generation, and artifact checks are being run
+  per tranche; repeated layout-query tests are green after deterministic fixture
+  correction. M18's fixed-port 260-check browser gate remains green.
+Failures-or-discarded-approaches: Adversarial review rejected topology commits
+  not bound to the exact pending candidate, CSS-pixel transforms applied to a
+  fixed SVG viewBox, selection strokes that erased status encoding, dangling
+  tabpanel relationships, and production-only legacy graph data. Those findings
+  now have concrete code fixes or active integration ownership.
+Known-limitations: The authoritative graph is not complete until the typed
+  service is mounted in the production shell and inspector/performance/browser
+  gates pass against the rebuilt fixed-port runtime.
+Next-safe-step: Finish GraphService mounting and inspector/benchmark tranches,
+  run combined gates, visually inspect the live authoritative graph, mark only
+  evidence-backed TODOs, commit, push, and verify public CI.
+
+Dev-Log: DL-20260731-070
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-069
+Request-or-TODO: M18-001 through M18-070 and M18-G01 through M18-G05;
+  user required uninterrupted completion, a fixed live GWC UI, backend-owned
+  state, four-agent implementation, full interaction testing, and marked TODOs.
+Goal: Deliver authoritative task projection, seven-state connection certainty,
+  idempotent task controls, exact cost/budget presentation, calm recovery, and
+  local content-free telemetry through the existing Go/GWC workspace.
+Assumptions: The selected server-issued thread/session/task identities remain
+  the only authority; unknown pricing and absent recovery evidence must remain
+  unknown; the untracked user-owned `design/` tree remains excluded.
+Decisions: Keep the fixed server on 127.0.0.1:63131; use GWC resource and
+  lifecycle hooks rather than any React model; project only ordered SQLite
+  events; add an authoritative TaskService read path; disable mutations while
+  sequence certainty is unresolved; retain browser-local drafts across replay.
+Files-or-schemas: Frontend session/task reducers, GWC client resources and
+  controls, coordinator/transport task reads, frontend telemetry, migrations
+  000018 and 000019, browser acceptance fixtures, and directly affected tests.
+  Client mutation settlement now covers pause, resume, stop, exact budget,
+  preserve patch, reconcile, safe resume, and composer send. The diagnostics
+  route now receives the identity-checked mounted session projection and shows
+  its content-free last applied durable sequence, including distinct unknown,
+  known-zero, replay, live, and gap-repair states.
+  The production composer now renders every §27C Draft-through-Rolled-back row
+  from `taskprojection.AvailableTaskActions`; implemented commands share the
+  mounted callbacks, while later-milestone actions are inert and carry exact
+  accessible disabled reasons. TaskView is query metadata only: task identity,
+  lifecycle, revisions, budget, recovery, and action availability come solely
+  from the accepted session task projection.
+Validation: Focused composer/session/task packages pass. Live browser selection
+  and a second real composer send passed through the gRPC bridge; its durable
+  message event cleared and re-enabled the composer without a page refresh.
+  The eight-row production mutation contract test, `go test ./web/...`, the
+  js/wasm client build, and `go test ./...` pass. M18-G02 is satisfied for
+  pause, resume, stop, and budget change. M18-014 targeted client, shell, state,
+  and frontend tests pass; both client and browser-fixture WASM builds pass;
+  mounted Chromium verifies sequence 0 through replay/disconnect, sequence 1
+  during gap repair, and repaired sequence 3 through replay/live/disconnect.
+  Native client/projection/action/composer/primitives tests and both WASM builds
+  pass. Mounted Chromium exhaustively verifies all 14 §27C rows, exact action
+  membership/order, real supported callbacks, pre-click disabled reasons,
+  `aria-describedby`, and keyboard focus retention after activation.
+  M18-052 is now backed by a typed, atomically cursor-bound
+  GetSessionSnapshot path from SQLite through authenticated gRPC; reconnect and
+  invalidation repair re-enter only through ApplySessionSnapshot, while ordered
+  delivery enters only through ApplySessionEvent. Focused event, storage,
+  transport, coordinator, reducer, session-client, web-client, and WASM checks
+  pass, including delayed session binding, crash-boundary backfill, every event
+  category, sequence-gap repair, complete review bindings, and metadata-only
+  TaskView regression coverage.
+  Final production evidence includes 260/260 Chromium checks against the fixed
+  127.0.0.1:63131 runtime, visual inspection of the live selected-session
+  workspace, a real gRPC-bridge message commit, GWC navigation without document
+  reload, responsive rail selection, telemetry deletion confirmation/cancel,
+  retained approval command identity, graph controls, and accessibility/focus.
+Failures-or-discarded-approaches: The live TaskService GetTask probe exposed an
+  unimplemented server method; a composer RPC/event settlement race left the
+  first send busy until its GWC dependency included ordered event and attempt
+  state. No React or useEffect source exists in the frontend. Rejected adapting
+  the current TaskView directly into the session projection: GetTask has no
+  atomic session cursor, omits approval, validation, and complete recovery
+  facts, and the corresponding production task writes do not yet append those
+  session events. Such an adapter would preserve the existing double authority
+  while merely hiding it behind ApplySessionSnapshot. Per-row raw event
+  closures caused unstable GWC handler identity, so the action surface uses one
+  stable value-dispatch handler. Animated disclosure made pointer actionability
+  timing flaky in mounted Chromium; the acceptance test now activates focused
+  enabled buttons by keyboard and asserts the resulting focus and invocation.
+  The final browser loop also corrected stale fixture assumptions: root
+  restoration is stateful, mutation checks select a durable session, graph fit
+  has its own computed zoom, rapid settlement need not expose a busy frame, and
+  responsive thread-rail closure is verified through its real control.
+Known-limitations: The graph shown for sessions without authoritative graph
+  data is intentionally empty rather than fabricated. Later M19 work supplies
+  derived graph revisions, queries, and accessible interactive projection.
+Next-safe-step: Commit and push M18 with its complete evidence, then continue
+  M19 graph projection, query, layout, interaction, inspection, and benchmarks.
+
 Dev-Log: DL-20260731-069
 Date: 2026-07-31
 Status: Complete

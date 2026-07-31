@@ -78,4 +78,11 @@ func TestSessionServiceReplaysTypedThreadLifecycleEvent(t *testing.T) {
 	if response.GetEvent().GetKind() != codefluxv1.SessionEventKind_SESSION_EVENT_KIND_THREAD_CREATED || response.GetEvent().GetThreadCreated().GetTitle() != "Authoritative" || response.GetEvent().GetThreadCreated().GetWorkspaceId().GetValue() != workspaceID.String() {
 		t.Fatalf("replayed event = %#v", response.GetEvent())
 	}
+	boundary, err := stream.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if boundary.GetEvent() != nil || boundary.GetReplayBoundary().GetThroughSequence() != event.Sequence {
+		t.Fatalf("replay boundary = %#v", boundary)
+	}
 }

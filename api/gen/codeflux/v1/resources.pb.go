@@ -192,18 +192,21 @@ func (x *RepositorySummary) GetRevision() uint64 {
 }
 
 type ThreadView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ThreadId      *StableIdentity        `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	WorkspaceId   *StableIdentity        `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Title         *RedactedText          `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
-	Archived      bool                   `protobuf:"varint,4,opt,name=archived,proto3" json:"archived,omitempty"`
-	Revision      uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	SessionId     *StableIdentity        `protobuf:"bytes,7,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	TaskId        *StableIdentity        `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	TaskState     string                 `protobuf:"bytes,9,opt,name=task_state,json=taskState,proto3" json:"task_state,omitempty"`
-	Attention     string                 `protobuf:"bytes,10,opt,name=attention,proto3" json:"attention,omitempty"`
-	UnreadCount   uint32                 `protobuf:"varint,11,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId    *StableIdentity        `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	WorkspaceId *StableIdentity        `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Title       *RedactedText          `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Archived    bool                   `protobuf:"varint,4,opt,name=archived,proto3" json:"archived,omitempty"`
+	Revision    uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SessionId   *StableIdentity        `protobuf:"bytes,7,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	TaskId      *StableIdentity        `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	TaskState   string                 `protobuf:"bytes,9,opt,name=task_state,json=taskState,proto3" json:"task_state,omitempty"`
+	Attention   string                 `protobuf:"bytes,10,opt,name=attention,proto3" json:"attention,omitempty"`
+	UnreadCount uint32                 `protobuf:"varint,11,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	// Project scope is required by task-owned resources such as GraphService.
+	// It is a typed identity only and does not expose repository content.
+	ProjectId     *StableIdentity `protobuf:"bytes,12,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -313,6 +316,13 @@ func (x *ThreadView) GetUnreadCount() uint32 {
 		return x.UnreadCount
 	}
 	return 0
+}
+
+func (x *ThreadView) GetProjectId() *StableIdentity {
+	if x != nil {
+		return x.ProjectId
+	}
+	return nil
 }
 
 type MessageView struct {
@@ -425,21 +435,41 @@ func (x *MessageView) GetSequence() uint64 {
 }
 
 type TaskView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TaskId        *StableIdentity        `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	ThreadId      *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	SessionId     *StableIdentity        `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	Revision      uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
-	PlanRevision  uint64                 `protobuf:"varint,6,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
-	Summary       *RedactedText          `protobuf:"bytes,7,opt,name=summary,proto3" json:"summary,omitempty"`
-	ActualCost    *Money                 `protobuf:"bytes,8,opt,name=actual_cost,json=actualCost,proto3" json:"actual_cost,omitempty"`
-	HardBudget    *Money                 `protobuf:"bytes,9,opt,name=hard_budget,json=hardBudget,proto3" json:"hard_budget,omitempty"`
-	ActualTokens  *TokenAmount           `protobuf:"bytes,10,opt,name=actual_tokens,json=actualTokens,proto3" json:"actual_tokens,omitempty"`
-	Elapsed       *durationpb.Duration   `protobuf:"bytes,11,opt,name=elapsed,proto3" json:"elapsed,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	TaskId       *StableIdentity        `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	ThreadId     *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	SessionId    *StableIdentity        `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	State        string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
+	Revision     uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	PlanRevision uint64                 `protobuf:"varint,6,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
+	Summary      *RedactedText          `protobuf:"bytes,7,opt,name=summary,proto3" json:"summary,omitempty"`
+	ActualCost   *Money                 `protobuf:"bytes,8,opt,name=actual_cost,json=actualCost,proto3" json:"actual_cost,omitempty"`
+	HardBudget   *Money                 `protobuf:"bytes,9,opt,name=hard_budget,json=hardBudget,proto3" json:"hard_budget,omitempty"`
+	ActualTokens *TokenAmount           `protobuf:"bytes,10,opt,name=actual_tokens,json=actualTokens,proto3" json:"actual_tokens,omitempty"`
+	Elapsed      *durationpb.Duration   `protobuf:"bytes,11,opt,name=elapsed,proto3" json:"elapsed,omitempty"`
+	UpdatedAt    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Revision of the authoritative budget aggregate. It may legitimately be
+	// zero for a newly created budget; clients pair it with hard_budget
+	// presence and use it for SetBudget rather than the independent task
+	// revision.
+	BudgetRevision           uint64            `protobuf:"varint,13,opt,name=budget_revision,json=budgetRevision,proto3" json:"budget_revision,omitempty"`
+	SelectedProvider         string            `protobuf:"bytes,14,opt,name=selected_provider,json=selectedProvider,proto3" json:"selected_provider,omitempty"`
+	SelectedModel            string            `protobuf:"bytes,15,opt,name=selected_model,json=selectedModel,proto3" json:"selected_model,omitempty"`
+	SelectedEffort           string            `protobuf:"bytes,16,opt,name=selected_effort,json=selectedEffort,proto3" json:"selected_effort,omitempty"`
+	Forecast                 *TaskForecastView `protobuf:"bytes,17,opt,name=forecast,proto3" json:"forecast,omitempty"`
+	ActualPricingSnapshotIds []string          `protobuf:"bytes,18,rep,name=actual_pricing_snapshot_ids,json=actualPricingSnapshotIds,proto3" json:"actual_pricing_snapshot_ids,omitempty"`
+	RemainingHardBudget      *Money            `protobuf:"bytes,19,opt,name=remaining_hard_budget,json=remainingHardBudget,proto3" json:"remaining_hard_budget,omitempty"`
+	WarningThreshold         *Money            `protobuf:"bytes,20,opt,name=warning_threshold,json=warningThreshold,proto3" json:"warning_threshold,omitempty"`
+	WarningReached           bool              `protobuf:"varint,21,opt,name=warning_reached,json=warningReached,proto3" json:"warning_reached,omitempty"`
+	HardCapReached           bool              `protobuf:"varint,22,opt,name=hard_cap_reached,json=hardCapReached,proto3" json:"hard_cap_reached,omitempty"`
+	// Presence distinguishes an authoritative false value from unavailable
+	// provider-settlement state.
+	SettlingProviderRequest  *bool           `protobuf:"varint,23,opt,name=settling_provider_request,json=settlingProviderRequest,proto3,oneof" json:"settling_provider_request,omitempty"`
+	LatestCheckpointId       *StableIdentity `protobuf:"bytes,24,opt,name=latest_checkpoint_id,json=latestCheckpointId,proto3" json:"latest_checkpoint_id,omitempty"`
+	LatestCheckpointState    string          `protobuf:"bytes,25,opt,name=latest_checkpoint_state,json=latestCheckpointState,proto3" json:"latest_checkpoint_state,omitempty"`
+	LatestCheckpointPlanStep string          `protobuf:"bytes,26,opt,name=latest_checkpoint_plan_step,json=latestCheckpointPlanStep,proto3" json:"latest_checkpoint_plan_step,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *TaskView) Reset() {
@@ -556,6 +586,263 @@ func (x *TaskView) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *TaskView) GetBudgetRevision() uint64 {
+	if x != nil {
+		return x.BudgetRevision
+	}
+	return 0
+}
+
+func (x *TaskView) GetSelectedProvider() string {
+	if x != nil {
+		return x.SelectedProvider
+	}
+	return ""
+}
+
+func (x *TaskView) GetSelectedModel() string {
+	if x != nil {
+		return x.SelectedModel
+	}
+	return ""
+}
+
+func (x *TaskView) GetSelectedEffort() string {
+	if x != nil {
+		return x.SelectedEffort
+	}
+	return ""
+}
+
+func (x *TaskView) GetForecast() *TaskForecastView {
+	if x != nil {
+		return x.Forecast
+	}
+	return nil
+}
+
+func (x *TaskView) GetActualPricingSnapshotIds() []string {
+	if x != nil {
+		return x.ActualPricingSnapshotIds
+	}
+	return nil
+}
+
+func (x *TaskView) GetRemainingHardBudget() *Money {
+	if x != nil {
+		return x.RemainingHardBudget
+	}
+	return nil
+}
+
+func (x *TaskView) GetWarningThreshold() *Money {
+	if x != nil {
+		return x.WarningThreshold
+	}
+	return nil
+}
+
+func (x *TaskView) GetWarningReached() bool {
+	if x != nil {
+		return x.WarningReached
+	}
+	return false
+}
+
+func (x *TaskView) GetHardCapReached() bool {
+	if x != nil {
+		return x.HardCapReached
+	}
+	return false
+}
+
+func (x *TaskView) GetSettlingProviderRequest() bool {
+	if x != nil && x.SettlingProviderRequest != nil {
+		return *x.SettlingProviderRequest
+	}
+	return false
+}
+
+func (x *TaskView) GetLatestCheckpointId() *StableIdentity {
+	if x != nil {
+		return x.LatestCheckpointId
+	}
+	return nil
+}
+
+func (x *TaskView) GetLatestCheckpointState() string {
+	if x != nil {
+		return x.LatestCheckpointState
+	}
+	return ""
+}
+
+func (x *TaskView) GetLatestCheckpointPlanStep() string {
+	if x != nil {
+		return x.LatestCheckpointPlanStep
+	}
+	return ""
+}
+
+// TaskForecastView is the latest immutable transparent forecast. Optional
+// Money values stay absent when their exact rational value is not representable
+// as integral currency minor units; servers must never round them.
+type TaskForecastView struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AlgorithmVersion   string                 `protobuf:"bytes,1,opt,name=algorithm_version,json=algorithmVersion,proto3" json:"algorithm_version,omitempty"`
+	EstimateNotice     string                 `protobuf:"bytes,2,opt,name=estimate_notice,json=estimateNotice,proto3" json:"estimate_notice,omitempty"`
+	LatencyKnown       bool                   `protobuf:"varint,3,opt,name=latency_known,json=latencyKnown,proto3" json:"latency_known,omitempty"`
+	LatencyP50Ms       int64                  `protobuf:"varint,4,opt,name=latency_p50_ms,json=latencyP50Ms,proto3" json:"latency_p50_ms,omitempty"`
+	LatencyP90Ms       int64                  `protobuf:"varint,5,opt,name=latency_p90_ms,json=latencyP90Ms,proto3" json:"latency_p90_ms,omitempty"`
+	TokensKnown        bool                   `protobuf:"varint,6,opt,name=tokens_known,json=tokensKnown,proto3" json:"tokens_known,omitempty"`
+	TokensP50          uint64                 `protobuf:"varint,7,opt,name=tokens_p50,json=tokensP50,proto3" json:"tokens_p50,omitempty"`
+	TokensP90          uint64                 `protobuf:"varint,8,opt,name=tokens_p90,json=tokensP90,proto3" json:"tokens_p90,omitempty"`
+	CostP50            *Money                 `protobuf:"bytes,9,opt,name=cost_p50,json=costP50,proto3" json:"cost_p50,omitempty"`
+	CostP90            *Money                 `protobuf:"bytes,10,opt,name=cost_p90,json=costP90,proto3" json:"cost_p90,omitempty"`
+	PriceSnapshotId    string                 `protobuf:"bytes,11,opt,name=price_snapshot_id,json=priceSnapshotId,proto3" json:"price_snapshot_id,omitempty"`
+	PriceSource        string                 `protobuf:"bytes,12,opt,name=price_source,json=priceSource,proto3" json:"price_source,omitempty"`
+	PriceCapturedAt    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=price_captured_at,json=priceCapturedAt,proto3" json:"price_captured_at,omitempty"`
+	UncertaintyReasons []string               `protobuf:"bytes,14,rep,name=uncertainty_reasons,json=uncertaintyReasons,proto3" json:"uncertainty_reasons,omitempty"`
+	Revision           uint64                 `protobuf:"varint,15,opt,name=revision,proto3" json:"revision,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *TaskForecastView) Reset() {
+	*x = TaskForecastView{}
+	mi := &file_codeflux_v1_resources_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskForecastView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskForecastView) ProtoMessage() {}
+
+func (x *TaskForecastView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_resources_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskForecastView.ProtoReflect.Descriptor instead.
+func (*TaskForecastView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TaskForecastView) GetAlgorithmVersion() string {
+	if x != nil {
+		return x.AlgorithmVersion
+	}
+	return ""
+}
+
+func (x *TaskForecastView) GetEstimateNotice() string {
+	if x != nil {
+		return x.EstimateNotice
+	}
+	return ""
+}
+
+func (x *TaskForecastView) GetLatencyKnown() bool {
+	if x != nil {
+		return x.LatencyKnown
+	}
+	return false
+}
+
+func (x *TaskForecastView) GetLatencyP50Ms() int64 {
+	if x != nil {
+		return x.LatencyP50Ms
+	}
+	return 0
+}
+
+func (x *TaskForecastView) GetLatencyP90Ms() int64 {
+	if x != nil {
+		return x.LatencyP90Ms
+	}
+	return 0
+}
+
+func (x *TaskForecastView) GetTokensKnown() bool {
+	if x != nil {
+		return x.TokensKnown
+	}
+	return false
+}
+
+func (x *TaskForecastView) GetTokensP50() uint64 {
+	if x != nil {
+		return x.TokensP50
+	}
+	return 0
+}
+
+func (x *TaskForecastView) GetTokensP90() uint64 {
+	if x != nil {
+		return x.TokensP90
+	}
+	return 0
+}
+
+func (x *TaskForecastView) GetCostP50() *Money {
+	if x != nil {
+		return x.CostP50
+	}
+	return nil
+}
+
+func (x *TaskForecastView) GetCostP90() *Money {
+	if x != nil {
+		return x.CostP90
+	}
+	return nil
+}
+
+func (x *TaskForecastView) GetPriceSnapshotId() string {
+	if x != nil {
+		return x.PriceSnapshotId
+	}
+	return ""
+}
+
+func (x *TaskForecastView) GetPriceSource() string {
+	if x != nil {
+		return x.PriceSource
+	}
+	return ""
+}
+
+func (x *TaskForecastView) GetPriceCapturedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PriceCapturedAt
+	}
+	return nil
+}
+
+func (x *TaskForecastView) GetUncertaintyReasons() []string {
+	if x != nil {
+		return x.UncertaintyReasons
+	}
+	return nil
+}
+
+func (x *TaskForecastView) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
 type BudgetView struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BudgetId      *StableIdentity        `protobuf:"bytes,1,opt,name=budget_id,json=budgetId,proto3" json:"budget_id,omitempty"`
@@ -570,7 +857,7 @@ type BudgetView struct {
 
 func (x *BudgetView) Reset() {
 	*x = BudgetView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[5]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -582,7 +869,7 @@ func (x *BudgetView) String() string {
 func (*BudgetView) ProtoMessage() {}
 
 func (x *BudgetView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[5]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -595,7 +882,7 @@ func (x *BudgetView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BudgetView.ProtoReflect.Descriptor instead.
 func (*BudgetView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{5}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BudgetView) GetBudgetId() *StableIdentity {
@@ -641,21 +928,31 @@ func (x *BudgetView) GetRevision() uint64 {
 }
 
 type GraphNodeView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        *StableIdentity        `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
-	Label         *RedactedText          `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
-	SourcePath    *SafePath              `protobuf:"bytes,5,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
-	SourceLine    uint32                 `protobuf:"varint,6,opt,name=source_line,json=sourceLine,proto3" json:"source_line,omitempty"`
-	Rank          uint32                 `protobuf:"varint,7,opt,name=rank,proto3" json:"rank,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState     `protogen:"open.v1"`
+	NodeId            *StableIdentity            `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Kind              string                     `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	State             string                     `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	Label             *RedactedText              `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
+	SourcePath        *SafePath                  `protobuf:"bytes,5,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
+	SourceLine        uint32                     `protobuf:"varint,6,opt,name=source_line,json=sourceLine,proto3" json:"source_line,omitempty"`
+	Rank              uint32                     `protobuf:"varint,7,opt,name=rank,proto3" json:"rank,omitempty"`
+	ContractPurpose   *RedactedText              `protobuf:"bytes,8,opt,name=contract_purpose,json=contractPurpose,proto3" json:"contract_purpose,omitempty"`
+	ContractInputs    []*RedactedText            `protobuf:"bytes,9,rep,name=contract_inputs,json=contractInputs,proto3" json:"contract_inputs,omitempty"`
+	ContractOutputs   []*RedactedText            `protobuf:"bytes,10,rep,name=contract_outputs,json=contractOutputs,proto3" json:"contract_outputs,omitempty"`
+	ContractEffects   []*RedactedText            `protobuf:"bytes,11,rep,name=contract_effects,json=contractEffects,proto3" json:"contract_effects,omitempty"`
+	Tombstoned        bool                       `protobuf:"varint,12,opt,name=tombstoned,proto3" json:"tombstoned,omitempty"`
+	RelatedMessageIds []*StableIdentity          `protobuf:"bytes,13,rep,name=related_message_ids,json=relatedMessageIds,proto3" json:"related_message_ids,omitempty"`
+	EventIds          []*StableIdentity          `protobuf:"bytes,14,rep,name=event_ids,json=eventIds,proto3" json:"event_ids,omitempty"`
+	PlanSteps         []*GraphPlanStepLinkView   `protobuf:"bytes,15,rep,name=plan_steps,json=planSteps,proto3" json:"plan_steps,omitempty"`
+	SourceLocations   []*GraphSourceLocationView `protobuf:"bytes,16,rep,name=source_locations,json=sourceLocations,proto3" json:"source_locations,omitempty"`
+	Layout            *GraphLayoutHintView       `protobuf:"bytes,17,opt,name=layout,proto3" json:"layout,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GraphNodeView) Reset() {
 	*x = GraphNodeView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[6]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +964,7 @@ func (x *GraphNodeView) String() string {
 func (*GraphNodeView) ProtoMessage() {}
 
 func (x *GraphNodeView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[6]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +977,7 @@ func (x *GraphNodeView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GraphNodeView.ProtoReflect.Descriptor instead.
 func (*GraphNodeView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{6}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GraphNodeView) GetNodeId() *StableIdentity {
@@ -732,19 +1029,92 @@ func (x *GraphNodeView) GetRank() uint32 {
 	return 0
 }
 
+func (x *GraphNodeView) GetContractPurpose() *RedactedText {
+	if x != nil {
+		return x.ContractPurpose
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetContractInputs() []*RedactedText {
+	if x != nil {
+		return x.ContractInputs
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetContractOutputs() []*RedactedText {
+	if x != nil {
+		return x.ContractOutputs
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetContractEffects() []*RedactedText {
+	if x != nil {
+		return x.ContractEffects
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetTombstoned() bool {
+	if x != nil {
+		return x.Tombstoned
+	}
+	return false
+}
+
+func (x *GraphNodeView) GetRelatedMessageIds() []*StableIdentity {
+	if x != nil {
+		return x.RelatedMessageIds
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetEventIds() []*StableIdentity {
+	if x != nil {
+		return x.EventIds
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetPlanSteps() []*GraphPlanStepLinkView {
+	if x != nil {
+		return x.PlanSteps
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetSourceLocations() []*GraphSourceLocationView {
+	if x != nil {
+		return x.SourceLocations
+	}
+	return nil
+}
+
+func (x *GraphNodeView) GetLayout() *GraphLayoutHintView {
+	if x != nil {
+		return x.Layout
+	}
+	return nil
+}
+
 type GraphEdgeView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	EdgeId        *StableIdentity        `protobuf:"bytes,1,opt,name=edge_id,json=edgeId,proto3" json:"edge_id,omitempty"`
-	FromNodeId    *StableIdentity        `protobuf:"bytes,2,opt,name=from_node_id,json=fromNodeId,proto3" json:"from_node_id,omitempty"`
-	ToNodeId      *StableIdentity        `protobuf:"bytes,3,opt,name=to_node_id,json=toNodeId,proto3" json:"to_node_id,omitempty"`
-	Kind          string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	EdgeId        *StableIdentity          `protobuf:"bytes,1,opt,name=edge_id,json=edgeId,proto3" json:"edge_id,omitempty"`
+	FromNodeId    *StableIdentity          `protobuf:"bytes,2,opt,name=from_node_id,json=fromNodeId,proto3" json:"from_node_id,omitempty"`
+	ToNodeId      *StableIdentity          `protobuf:"bytes,3,opt,name=to_node_id,json=toNodeId,proto3" json:"to_node_id,omitempty"`
+	Kind          string                   `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	Tombstoned    bool                     `protobuf:"varint,5,opt,name=tombstoned,proto3" json:"tombstoned,omitempty"`
+	EventIds      []*StableIdentity        `protobuf:"bytes,6,rep,name=event_ids,json=eventIds,proto3" json:"event_ids,omitempty"`
+	PlanSteps     []*GraphPlanStepLinkView `protobuf:"bytes,7,rep,name=plan_steps,json=planSteps,proto3" json:"plan_steps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GraphEdgeView) Reset() {
 	*x = GraphEdgeView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[7]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -756,7 +1126,7 @@ func (x *GraphEdgeView) String() string {
 func (*GraphEdgeView) ProtoMessage() {}
 
 func (x *GraphEdgeView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[7]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -769,7 +1139,7 @@ func (x *GraphEdgeView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GraphEdgeView.ProtoReflect.Descriptor instead.
 func (*GraphEdgeView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{7}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GraphEdgeView) GetEdgeId() *StableIdentity {
@@ -800,23 +1170,295 @@ func (x *GraphEdgeView) GetKind() string {
 	return ""
 }
 
+func (x *GraphEdgeView) GetTombstoned() bool {
+	if x != nil {
+		return x.Tombstoned
+	}
+	return false
+}
+
+func (x *GraphEdgeView) GetEventIds() []*StableIdentity {
+	if x != nil {
+		return x.EventIds
+	}
+	return nil
+}
+
+func (x *GraphEdgeView) GetPlanSteps() []*GraphPlanStepLinkView {
+	if x != nil {
+		return x.PlanSteps
+	}
+	return nil
+}
+
+type GraphPlanStepLinkView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlanRevision  uint64                 `protobuf:"varint,1,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
+	StepId        string                 `protobuf:"bytes,2,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GraphPlanStepLinkView) Reset() {
+	*x = GraphPlanStepLinkView{}
+	mi := &file_codeflux_v1_resources_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GraphPlanStepLinkView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GraphPlanStepLinkView) ProtoMessage() {}
+
+func (x *GraphPlanStepLinkView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_resources_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GraphPlanStepLinkView.ProtoReflect.Descriptor instead.
+func (*GraphPlanStepLinkView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GraphPlanStepLinkView) GetPlanRevision() uint64 {
+	if x != nil {
+		return x.PlanRevision
+	}
+	return 0
+}
+
+func (x *GraphPlanStepLinkView) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+type GraphSourceLocationView struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	RepositoryId           *StableIdentity        `protobuf:"bytes,1,opt,name=repository_id,json=repositoryId,proto3" json:"repository_id,omitempty"`
+	RepositoryRevision     string                 `protobuf:"bytes,2,opt,name=repository_revision,json=repositoryRevision,proto3" json:"repository_revision,omitempty"`
+	RepositoryRelativePath *SafePath              `protobuf:"bytes,3,opt,name=repository_relative_path,json=repositoryRelativePath,proto3" json:"repository_relative_path,omitempty"`
+	StartLine              uint32                 `protobuf:"varint,4,opt,name=start_line,json=startLine,proto3" json:"start_line,omitempty"`
+	StartColumn            uint32                 `protobuf:"varint,5,opt,name=start_column,json=startColumn,proto3" json:"start_column,omitempty"`
+	EndLine                uint32                 `protobuf:"varint,6,opt,name=end_line,json=endLine,proto3" json:"end_line,omitempty"`
+	EndColumn              uint32                 `protobuf:"varint,7,opt,name=end_column,json=endColumn,proto3" json:"end_column,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GraphSourceLocationView) Reset() {
+	*x = GraphSourceLocationView{}
+	mi := &file_codeflux_v1_resources_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GraphSourceLocationView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GraphSourceLocationView) ProtoMessage() {}
+
+func (x *GraphSourceLocationView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_resources_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GraphSourceLocationView.ProtoReflect.Descriptor instead.
+func (*GraphSourceLocationView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GraphSourceLocationView) GetRepositoryId() *StableIdentity {
+	if x != nil {
+		return x.RepositoryId
+	}
+	return nil
+}
+
+func (x *GraphSourceLocationView) GetRepositoryRevision() string {
+	if x != nil {
+		return x.RepositoryRevision
+	}
+	return ""
+}
+
+func (x *GraphSourceLocationView) GetRepositoryRelativePath() *SafePath {
+	if x != nil {
+		return x.RepositoryRelativePath
+	}
+	return nil
+}
+
+func (x *GraphSourceLocationView) GetStartLine() uint32 {
+	if x != nil {
+		return x.StartLine
+	}
+	return 0
+}
+
+func (x *GraphSourceLocationView) GetStartColumn() uint32 {
+	if x != nil {
+		return x.StartColumn
+	}
+	return 0
+}
+
+func (x *GraphSourceLocationView) GetEndLine() uint32 {
+	if x != nil {
+		return x.EndLine
+	}
+	return 0
+}
+
+func (x *GraphSourceLocationView) GetEndColumn() uint32 {
+	if x != nil {
+		return x.EndColumn
+	}
+	return 0
+}
+
+type GraphLayoutHintView struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Algorithm        string                 `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	AlgorithmVersion uint64                 `protobuf:"varint,2,opt,name=algorithm_version,json=algorithmVersion,proto3" json:"algorithm_version,omitempty"`
+	XMilli           int64                  `protobuf:"zigzag64,3,opt,name=x_milli,json=xMilli,proto3" json:"x_milli,omitempty"`
+	YMilli           int64                  `protobuf:"zigzag64,4,opt,name=y_milli,json=yMilli,proto3" json:"y_milli,omitempty"`
+	WidthMilli       uint64                 `protobuf:"varint,5,opt,name=width_milli,json=widthMilli,proto3" json:"width_milli,omitempty"`
+	HeightMilli      uint64                 `protobuf:"varint,6,opt,name=height_milli,json=heightMilli,proto3" json:"height_milli,omitempty"`
+	Rank             uint64                 `protobuf:"varint,7,opt,name=rank,proto3" json:"rank,omitempty"`
+	SiblingOrder     uint64                 `protobuf:"varint,8,opt,name=sibling_order,json=siblingOrder,proto3" json:"sibling_order,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *GraphLayoutHintView) Reset() {
+	*x = GraphLayoutHintView{}
+	mi := &file_codeflux_v1_resources_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GraphLayoutHintView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GraphLayoutHintView) ProtoMessage() {}
+
+func (x *GraphLayoutHintView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_resources_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GraphLayoutHintView.ProtoReflect.Descriptor instead.
+func (*GraphLayoutHintView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GraphLayoutHintView) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *GraphLayoutHintView) GetAlgorithmVersion() uint64 {
+	if x != nil {
+		return x.AlgorithmVersion
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetXMilli() int64 {
+	if x != nil {
+		return x.XMilli
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetYMilli() int64 {
+	if x != nil {
+		return x.YMilli
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetWidthMilli() uint64 {
+	if x != nil {
+		return x.WidthMilli
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetHeightMilli() uint64 {
+	if x != nil {
+		return x.HeightMilli
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetRank() uint64 {
+	if x != nil {
+		return x.Rank
+	}
+	return 0
+}
+
+func (x *GraphLayoutHintView) GetSiblingOrder() uint64 {
+	if x != nil {
+		return x.SiblingOrder
+	}
+	return 0
+}
+
 type GraphSliceView struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	GraphId            *StableIdentity        `protobuf:"bytes,1,opt,name=graph_id,json=graphId,proto3" json:"graph_id,omitempty"`
-	GraphRevisionId    *StableIdentity        `protobuf:"bytes,2,opt,name=graph_revision_id,json=graphRevisionId,proto3" json:"graph_revision_id,omitempty"`
-	TaskId             *StableIdentity        `protobuf:"bytes,3,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	Revision           uint64                 `protobuf:"varint,4,opt,name=revision,proto3" json:"revision,omitempty"`
-	Nodes              []*GraphNodeView       `protobuf:"bytes,5,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	Edges              []*GraphEdgeView       `protobuf:"bytes,6,rep,name=edges,proto3" json:"edges,omitempty"`
-	ContinuationCursor string                 `protobuf:"bytes,7,opt,name=continuation_cursor,json=continuationCursor,proto3" json:"continuation_cursor,omitempty"`
-	Truncated          bool                   `protobuf:"varint,8,opt,name=truncated,proto3" json:"truncated,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	GraphId                *StableIdentity        `protobuf:"bytes,1,opt,name=graph_id,json=graphId,proto3" json:"graph_id,omitempty"`
+	GraphRevisionId        *StableIdentity        `protobuf:"bytes,2,opt,name=graph_revision_id,json=graphRevisionId,proto3" json:"graph_revision_id,omitempty"`
+	TaskId                 *StableIdentity        `protobuf:"bytes,3,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Revision               uint64                 `protobuf:"varint,4,opt,name=revision,proto3" json:"revision,omitempty"`
+	Nodes                  []*GraphNodeView       `protobuf:"bytes,5,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Edges                  []*GraphEdgeView       `protobuf:"bytes,6,rep,name=edges,proto3" json:"edges,omitempty"`
+	ContinuationCursor     string                 `protobuf:"bytes,7,opt,name=continuation_cursor,json=continuationCursor,proto3" json:"continuation_cursor,omitempty"`
+	Truncated              bool                   `protobuf:"varint,8,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	Mode                   string                 `protobuf:"bytes,9,opt,name=mode,proto3" json:"mode,omitempty"`
+	GraphSchemaVersion     uint32                 `protobuf:"varint,10,opt,name=graph_schema_version,json=graphSchemaVersion,proto3" json:"graph_schema_version,omitempty"`
+	ContentSha256          string                 `protobuf:"bytes,11,opt,name=content_sha256,json=contentSha256,proto3" json:"content_sha256,omitempty"`
+	LayoutAlgorithm        string                 `protobuf:"bytes,12,opt,name=layout_algorithm,json=layoutAlgorithm,proto3" json:"layout_algorithm,omitempty"`
+	LayoutAlgorithmVersion uint64                 `protobuf:"varint,13,opt,name=layout_algorithm_version,json=layoutAlgorithmVersion,proto3" json:"layout_algorithm_version,omitempty"`
+	CreatedAt              *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ParentGraphRevisionId  *StableIdentity        `protobuf:"bytes,15,opt,name=parent_graph_revision_id,json=parentGraphRevisionId,proto3" json:"parent_graph_revision_id,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *GraphSliceView) Reset() {
 	*x = GraphSliceView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[8]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +1470,7 @@ func (x *GraphSliceView) String() string {
 func (*GraphSliceView) ProtoMessage() {}
 
 func (x *GraphSliceView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[8]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +1483,7 @@ func (x *GraphSliceView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GraphSliceView.ProtoReflect.Descriptor instead.
 func (*GraphSliceView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{8}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GraphSliceView) GetGraphId() *StableIdentity {
@@ -900,6 +1542,147 @@ func (x *GraphSliceView) GetTruncated() bool {
 	return false
 }
 
+func (x *GraphSliceView) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *GraphSliceView) GetGraphSchemaVersion() uint32 {
+	if x != nil {
+		return x.GraphSchemaVersion
+	}
+	return 0
+}
+
+func (x *GraphSliceView) GetContentSha256() string {
+	if x != nil {
+		return x.ContentSha256
+	}
+	return ""
+}
+
+func (x *GraphSliceView) GetLayoutAlgorithm() string {
+	if x != nil {
+		return x.LayoutAlgorithm
+	}
+	return ""
+}
+
+func (x *GraphSliceView) GetLayoutAlgorithmVersion() uint64 {
+	if x != nil {
+		return x.LayoutAlgorithmVersion
+	}
+	return 0
+}
+
+func (x *GraphSliceView) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *GraphSliceView) GetParentGraphRevisionId() *StableIdentity {
+	if x != nil {
+		return x.ParentGraphRevisionId
+	}
+	return nil
+}
+
+type GraphRevisionChangeView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntityKind    string                 `protobuf:"bytes,1,opt,name=entity_kind,json=entityKind,proto3" json:"entity_kind,omitempty"`
+	ChangeKind    string                 `protobuf:"bytes,2,opt,name=change_kind,json=changeKind,proto3" json:"change_kind,omitempty"`
+	StableId      string                 `protobuf:"bytes,3,opt,name=stable_id,json=stableId,proto3" json:"stable_id,omitempty"`
+	BeforeNode    *GraphNodeView         `protobuf:"bytes,4,opt,name=before_node,json=beforeNode,proto3" json:"before_node,omitempty"`
+	AfterNode     *GraphNodeView         `protobuf:"bytes,5,opt,name=after_node,json=afterNode,proto3" json:"after_node,omitempty"`
+	BeforeEdge    *GraphEdgeView         `protobuf:"bytes,6,opt,name=before_edge,json=beforeEdge,proto3" json:"before_edge,omitempty"`
+	AfterEdge     *GraphEdgeView         `protobuf:"bytes,7,opt,name=after_edge,json=afterEdge,proto3" json:"after_edge,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GraphRevisionChangeView) Reset() {
+	*x = GraphRevisionChangeView{}
+	mi := &file_codeflux_v1_resources_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GraphRevisionChangeView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GraphRevisionChangeView) ProtoMessage() {}
+
+func (x *GraphRevisionChangeView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_resources_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GraphRevisionChangeView.ProtoReflect.Descriptor instead.
+func (*GraphRevisionChangeView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GraphRevisionChangeView) GetEntityKind() string {
+	if x != nil {
+		return x.EntityKind
+	}
+	return ""
+}
+
+func (x *GraphRevisionChangeView) GetChangeKind() string {
+	if x != nil {
+		return x.ChangeKind
+	}
+	return ""
+}
+
+func (x *GraphRevisionChangeView) GetStableId() string {
+	if x != nil {
+		return x.StableId
+	}
+	return ""
+}
+
+func (x *GraphRevisionChangeView) GetBeforeNode() *GraphNodeView {
+	if x != nil {
+		return x.BeforeNode
+	}
+	return nil
+}
+
+func (x *GraphRevisionChangeView) GetAfterNode() *GraphNodeView {
+	if x != nil {
+		return x.AfterNode
+	}
+	return nil
+}
+
+func (x *GraphRevisionChangeView) GetBeforeEdge() *GraphEdgeView {
+	if x != nil {
+		return x.BeforeEdge
+	}
+	return nil
+}
+
+func (x *GraphRevisionChangeView) GetAfterEdge() *GraphEdgeView {
+	if x != nil {
+		return x.AfterEdge
+	}
+	return nil
+}
+
 type DiffSummaryView struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TaskId        *StableIdentity        `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
@@ -915,7 +1698,7 @@ type DiffSummaryView struct {
 
 func (x *DiffSummaryView) Reset() {
 	*x = DiffSummaryView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[9]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -927,7 +1710,7 @@ func (x *DiffSummaryView) String() string {
 func (*DiffSummaryView) ProtoMessage() {}
 
 func (x *DiffSummaryView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[9]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -940,7 +1723,7 @@ func (x *DiffSummaryView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffSummaryView.ProtoReflect.Descriptor instead.
 func (*DiffSummaryView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{9}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DiffSummaryView) GetTaskId() *StableIdentity {
@@ -1004,7 +1787,7 @@ type ValidationItemView struct {
 
 func (x *ValidationItemView) Reset() {
 	*x = ValidationItemView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[10]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1016,7 +1799,7 @@ func (x *ValidationItemView) String() string {
 func (*ValidationItemView) ProtoMessage() {}
 
 func (x *ValidationItemView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[10]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1029,7 +1812,7 @@ func (x *ValidationItemView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationItemView.ProtoReflect.Descriptor instead.
 func (*ValidationItemView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{10}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ValidationItemView) GetValidationId() *StableIdentity {
@@ -1073,7 +1856,7 @@ type ValidationReportView struct {
 
 func (x *ValidationReportView) Reset() {
 	*x = ValidationReportView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[11]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1085,7 +1868,7 @@ func (x *ValidationReportView) String() string {
 func (*ValidationReportView) ProtoMessage() {}
 
 func (x *ValidationReportView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[11]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1098,7 +1881,7 @@ func (x *ValidationReportView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationReportView.ProtoReflect.Descriptor instead.
 func (*ValidationReportView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{11}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ValidationReportView) GetTaskId() *StableIdentity {
@@ -1149,7 +1932,7 @@ type ModelView struct {
 
 func (x *ModelView) Reset() {
 	*x = ModelView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[12]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1161,7 +1944,7 @@ func (x *ModelView) String() string {
 func (*ModelView) ProtoMessage() {}
 
 func (x *ModelView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[12]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1174,7 +1957,7 @@ func (x *ModelView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModelView.ProtoReflect.Descriptor instead.
 func (*ModelView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{12}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ModelView) GetProviderId() *StableIdentity {
@@ -1225,7 +2008,7 @@ type PolicyView struct {
 
 func (x *PolicyView) Reset() {
 	*x = PolicyView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[13]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1237,7 +2020,7 @@ func (x *PolicyView) String() string {
 func (*PolicyView) ProtoMessage() {}
 
 func (x *PolicyView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[13]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1250,7 +2033,7 @@ func (x *PolicyView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolicyView.ProtoReflect.Descriptor instead.
 func (*PolicyView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{13}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PolicyView) GetPreset() string {
@@ -1301,7 +2084,7 @@ type ProviderView struct {
 
 func (x *ProviderView) Reset() {
 	*x = ProviderView{}
-	mi := &file_codeflux_v1_resources_proto_msgTypes[14]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1313,7 +2096,7 @@ func (x *ProviderView) String() string {
 func (*ProviderView) ProtoMessage() {}
 
 func (x *ProviderView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_resources_proto_msgTypes[14]
+	mi := &file_codeflux_v1_resources_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1326,7 +2109,7 @@ func (x *ProviderView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProviderView.ProtoReflect.Descriptor instead.
 func (*ProviderView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{14}
+	return file_codeflux_v1_resources_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ProviderView) GetProviderId() *StableIdentity {
@@ -1383,7 +2166,7 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x02 \x01(\v2\x19.codeflux.v1.RedactedTextR\vdisplayName\x12)\n" +
 	"\x04root\x18\x03 \x01(\v2\x15.codeflux.v1.SafePathR\x04root\x12+\n" +
 	"\x03git\x18\x04 \x01(\v2\x19.codeflux.v1.GitStateViewR\x03git\x12\x1a\n" +
-	"\brevision\x18\x05 \x01(\x04R\brevision\"\xfc\x03\n" +
+	"\brevision\x18\x05 \x01(\x04R\brevision\"\xb8\x04\n" +
 	"\n" +
 	"ThreadView\x128\n" +
 	"\tthread_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12>\n" +
@@ -1400,7 +2183,9 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"task_state\x18\t \x01(\tR\ttaskState\x12\x1c\n" +
 	"\tattention\x18\n" +
 	" \x01(\tR\tattention\x12!\n" +
-	"\funread_count\x18\v \x01(\rR\vunreadCount\"\xb6\x03\n" +
+	"\funread_count\x18\v \x01(\rR\vunreadCount\x12:\n" +
+	"\n" +
+	"project_id\x18\f \x01(\v2\x1b.codeflux.v1.StableIdentityR\tprojectId\"\xb6\x03\n" +
 	"\vMessageView\x12:\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\tmessageId\x128\n" +
@@ -1412,7 +2197,8 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12B\n" +
 	"\x0eattachment_ids\x18\b \x03(\v2\x1b.codeflux.v1.StableIdentityR\rattachmentIds\x12\x1a\n" +
-	"\bsequence\x18\t \x01(\x04R\bsequence\"\xdb\x04\n" +
+	"\bsequence\x18\t \x01(\x04R\bsequence\"\xfc\n" +
+	"\n" +
 	"\bTaskView\x124\n" +
 	"\atask_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\x128\n" +
 	"\tthread_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12:\n" +
@@ -1430,7 +2216,41 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	" \x01(\v2\x18.codeflux.v1.TokenAmountR\factualTokens\x123\n" +
 	"\aelapsed\x18\v \x01(\v2\x19.google.protobuf.DurationR\aelapsed\x129\n" +
 	"\n" +
-	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xa7\x02\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
+	"\x0fbudget_revision\x18\r \x01(\x04R\x0ebudgetRevision\x12+\n" +
+	"\x11selected_provider\x18\x0e \x01(\tR\x10selectedProvider\x12%\n" +
+	"\x0eselected_model\x18\x0f \x01(\tR\rselectedModel\x12'\n" +
+	"\x0fselected_effort\x18\x10 \x01(\tR\x0eselectedEffort\x129\n" +
+	"\bforecast\x18\x11 \x01(\v2\x1d.codeflux.v1.TaskForecastViewR\bforecast\x12=\n" +
+	"\x1bactual_pricing_snapshot_ids\x18\x12 \x03(\tR\x18actualPricingSnapshotIds\x12F\n" +
+	"\x15remaining_hard_budget\x18\x13 \x01(\v2\x12.codeflux.v1.MoneyR\x13remainingHardBudget\x12?\n" +
+	"\x11warning_threshold\x18\x14 \x01(\v2\x12.codeflux.v1.MoneyR\x10warningThreshold\x12'\n" +
+	"\x0fwarning_reached\x18\x15 \x01(\bR\x0ewarningReached\x12(\n" +
+	"\x10hard_cap_reached\x18\x16 \x01(\bR\x0ehardCapReached\x12?\n" +
+	"\x19settling_provider_request\x18\x17 \x01(\bH\x00R\x17settlingProviderRequest\x88\x01\x01\x12M\n" +
+	"\x14latest_checkpoint_id\x18\x18 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x12latestCheckpointId\x126\n" +
+	"\x17latest_checkpoint_state\x18\x19 \x01(\tR\x15latestCheckpointState\x12=\n" +
+	"\x1blatest_checkpoint_plan_step\x18\x1a \x01(\tR\x18latestCheckpointPlanStepB\x1c\n" +
+	"\x1a_settling_provider_request\"\xfc\x04\n" +
+	"\x10TaskForecastView\x12+\n" +
+	"\x11algorithm_version\x18\x01 \x01(\tR\x10algorithmVersion\x12'\n" +
+	"\x0festimate_notice\x18\x02 \x01(\tR\x0eestimateNotice\x12#\n" +
+	"\rlatency_known\x18\x03 \x01(\bR\flatencyKnown\x12$\n" +
+	"\x0elatency_p50_ms\x18\x04 \x01(\x03R\flatencyP50Ms\x12$\n" +
+	"\x0elatency_p90_ms\x18\x05 \x01(\x03R\flatencyP90Ms\x12!\n" +
+	"\ftokens_known\x18\x06 \x01(\bR\vtokensKnown\x12\x1d\n" +
+	"\n" +
+	"tokens_p50\x18\a \x01(\x04R\ttokensP50\x12\x1d\n" +
+	"\n" +
+	"tokens_p90\x18\b \x01(\x04R\ttokensP90\x12-\n" +
+	"\bcost_p50\x18\t \x01(\v2\x12.codeflux.v1.MoneyR\acostP50\x12-\n" +
+	"\bcost_p90\x18\n" +
+	" \x01(\v2\x12.codeflux.v1.MoneyR\acostP90\x12*\n" +
+	"\x11price_snapshot_id\x18\v \x01(\tR\x0fpriceSnapshotId\x12!\n" +
+	"\fprice_source\x18\f \x01(\tR\vpriceSource\x12F\n" +
+	"\x11price_captured_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x0fpriceCapturedAt\x12/\n" +
+	"\x13uncertainty_reasons\x18\x0e \x03(\tR\x12uncertaintyReasons\x12\x1a\n" +
+	"\brevision\x18\x0f \x01(\x04R\brevision\"\xa7\x02\n" +
 	"\n" +
 	"BudgetView\x128\n" +
 	"\tbudget_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bbudgetId\x124\n" +
@@ -1439,7 +2259,7 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"hard_limit\x18\x03 \x01(\v2\x12.codeflux.v1.MoneyR\thardLimit\x12.\n" +
 	"\breserved\x18\x04 \x01(\v2\x12.codeflux.v1.MoneyR\breserved\x12*\n" +
 	"\x06actual\x18\x05 \x01(\v2\x12.codeflux.v1.MoneyR\x06actual\x12\x1a\n" +
-	"\brevision\x18\x06 \x01(\x04R\brevision\"\x8d\x02\n" +
+	"\brevision\x18\x06 \x01(\x04R\brevision\"\x98\a\n" +
 	"\rGraphNodeView\x124\n" +
 	"\anode_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06nodeId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x14\n" +
@@ -1449,14 +2269,57 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"sourcePath\x12\x1f\n" +
 	"\vsource_line\x18\x06 \x01(\rR\n" +
 	"sourceLine\x12\x12\n" +
-	"\x04rank\x18\a \x01(\rR\x04rank\"\xd3\x01\n" +
+	"\x04rank\x18\a \x01(\rR\x04rank\x12D\n" +
+	"\x10contract_purpose\x18\b \x01(\v2\x19.codeflux.v1.RedactedTextR\x0fcontractPurpose\x12B\n" +
+	"\x0fcontract_inputs\x18\t \x03(\v2\x19.codeflux.v1.RedactedTextR\x0econtractInputs\x12D\n" +
+	"\x10contract_outputs\x18\n" +
+	" \x03(\v2\x19.codeflux.v1.RedactedTextR\x0fcontractOutputs\x12D\n" +
+	"\x10contract_effects\x18\v \x03(\v2\x19.codeflux.v1.RedactedTextR\x0fcontractEffects\x12\x1e\n" +
+	"\n" +
+	"tombstoned\x18\f \x01(\bR\n" +
+	"tombstoned\x12K\n" +
+	"\x13related_message_ids\x18\r \x03(\v2\x1b.codeflux.v1.StableIdentityR\x11relatedMessageIds\x128\n" +
+	"\tevent_ids\x18\x0e \x03(\v2\x1b.codeflux.v1.StableIdentityR\beventIds\x12A\n" +
+	"\n" +
+	"plan_steps\x18\x0f \x03(\v2\".codeflux.v1.GraphPlanStepLinkViewR\tplanSteps\x12O\n" +
+	"\x10source_locations\x18\x10 \x03(\v2$.codeflux.v1.GraphSourceLocationViewR\x0fsourceLocations\x128\n" +
+	"\x06layout\x18\x11 \x01(\v2 .codeflux.v1.GraphLayoutHintViewR\x06layout\"\xf0\x02\n" +
 	"\rGraphEdgeView\x124\n" +
 	"\aedge_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06edgeId\x12=\n" +
 	"\ffrom_node_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\n" +
 	"fromNodeId\x129\n" +
 	"\n" +
 	"to_node_id\x18\x03 \x01(\v2\x1b.codeflux.v1.StableIdentityR\btoNodeId\x12\x12\n" +
-	"\x04kind\x18\x04 \x01(\tR\x04kind\"\x96\x03\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x1e\n" +
+	"\n" +
+	"tombstoned\x18\x05 \x01(\bR\n" +
+	"tombstoned\x128\n" +
+	"\tevent_ids\x18\x06 \x03(\v2\x1b.codeflux.v1.StableIdentityR\beventIds\x12A\n" +
+	"\n" +
+	"plan_steps\x18\a \x03(\v2\".codeflux.v1.GraphPlanStepLinkViewR\tplanSteps\"U\n" +
+	"\x15GraphPlanStepLinkView\x12#\n" +
+	"\rplan_revision\x18\x01 \x01(\x04R\fplanRevision\x12\x17\n" +
+	"\astep_id\x18\x02 \x01(\tR\x06stepId\"\xd9\x02\n" +
+	"\x17GraphSourceLocationView\x12@\n" +
+	"\rrepository_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\frepositoryId\x12/\n" +
+	"\x13repository_revision\x18\x02 \x01(\tR\x12repositoryRevision\x12O\n" +
+	"\x18repository_relative_path\x18\x03 \x01(\v2\x15.codeflux.v1.SafePathR\x16repositoryRelativePath\x12\x1d\n" +
+	"\n" +
+	"start_line\x18\x04 \x01(\rR\tstartLine\x12!\n" +
+	"\fstart_column\x18\x05 \x01(\rR\vstartColumn\x12\x19\n" +
+	"\bend_line\x18\x06 \x01(\rR\aendLine\x12\x1d\n" +
+	"\n" +
+	"end_column\x18\a \x01(\rR\tendColumn\"\x8f\x02\n" +
+	"\x13GraphLayoutHintView\x12\x1c\n" +
+	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12+\n" +
+	"\x11algorithm_version\x18\x02 \x01(\x04R\x10algorithmVersion\x12\x17\n" +
+	"\ax_milli\x18\x03 \x01(\x12R\x06xMilli\x12\x17\n" +
+	"\ay_milli\x18\x04 \x01(\x12R\x06yMilli\x12\x1f\n" +
+	"\vwidth_milli\x18\x05 \x01(\x04R\n" +
+	"widthMilli\x12!\n" +
+	"\fheight_milli\x18\x06 \x01(\x04R\vheightMilli\x12\x12\n" +
+	"\x04rank\x18\a \x01(\x04R\x04rank\x12#\n" +
+	"\rsibling_order\x18\b \x01(\x04R\fsiblingOrder\"\xf9\x05\n" +
 	"\x0eGraphSliceView\x126\n" +
 	"\bgraph_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\agraphId\x12G\n" +
 	"\x11graph_revision_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x0fgraphRevisionId\x124\n" +
@@ -1465,7 +2328,30 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\x05nodes\x18\x05 \x03(\v2\x1a.codeflux.v1.GraphNodeViewR\x05nodes\x120\n" +
 	"\x05edges\x18\x06 \x03(\v2\x1a.codeflux.v1.GraphEdgeViewR\x05edges\x12/\n" +
 	"\x13continuation_cursor\x18\a \x01(\tR\x12continuationCursor\x12\x1c\n" +
-	"\ttruncated\x18\b \x01(\bR\ttruncated\"\xb1\x02\n" +
+	"\ttruncated\x18\b \x01(\bR\ttruncated\x12\x12\n" +
+	"\x04mode\x18\t \x01(\tR\x04mode\x120\n" +
+	"\x14graph_schema_version\x18\n" +
+	" \x01(\rR\x12graphSchemaVersion\x12%\n" +
+	"\x0econtent_sha256\x18\v \x01(\tR\rcontentSha256\x12)\n" +
+	"\x10layout_algorithm\x18\f \x01(\tR\x0flayoutAlgorithm\x128\n" +
+	"\x18layout_algorithm_version\x18\r \x01(\x04R\x16layoutAlgorithmVersion\x129\n" +
+	"\n" +
+	"created_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12T\n" +
+	"\x18parent_graph_revision_id\x18\x0f \x01(\v2\x1b.codeflux.v1.StableIdentityR\x15parentGraphRevisionId\"\xe8\x02\n" +
+	"\x17GraphRevisionChangeView\x12\x1f\n" +
+	"\ventity_kind\x18\x01 \x01(\tR\n" +
+	"entityKind\x12\x1f\n" +
+	"\vchange_kind\x18\x02 \x01(\tR\n" +
+	"changeKind\x12\x1b\n" +
+	"\tstable_id\x18\x03 \x01(\tR\bstableId\x12;\n" +
+	"\vbefore_node\x18\x04 \x01(\v2\x1a.codeflux.v1.GraphNodeViewR\n" +
+	"beforeNode\x129\n" +
+	"\n" +
+	"after_node\x18\x05 \x01(\v2\x1a.codeflux.v1.GraphNodeViewR\tafterNode\x12;\n" +
+	"\vbefore_edge\x18\x06 \x01(\v2\x1a.codeflux.v1.GraphEdgeViewR\n" +
+	"beforeEdge\x129\n" +
+	"\n" +
+	"after_edge\x18\a \x01(\v2\x1a.codeflux.v1.GraphEdgeViewR\tafterEdge\"\xb1\x02\n" +
 	"\x0fDiffSummaryView\x124\n" +
 	"\atask_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\x12#\n" +
 	"\rdiff_identity\x18\x02 \x01(\tR\fdiffIdentity\x12#\n" +
@@ -1522,97 +2408,129 @@ func file_codeflux_v1_resources_proto_rawDescGZIP() []byte {
 	return file_codeflux_v1_resources_proto_rawDescData
 }
 
-var file_codeflux_v1_resources_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_codeflux_v1_resources_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_codeflux_v1_resources_proto_goTypes = []any{
-	(*WorkspaceView)(nil),         // 0: codeflux.v1.WorkspaceView
-	(*RepositorySummary)(nil),     // 1: codeflux.v1.RepositorySummary
-	(*ThreadView)(nil),            // 2: codeflux.v1.ThreadView
-	(*MessageView)(nil),           // 3: codeflux.v1.MessageView
-	(*TaskView)(nil),              // 4: codeflux.v1.TaskView
-	(*BudgetView)(nil),            // 5: codeflux.v1.BudgetView
-	(*GraphNodeView)(nil),         // 6: codeflux.v1.GraphNodeView
-	(*GraphEdgeView)(nil),         // 7: codeflux.v1.GraphEdgeView
-	(*GraphSliceView)(nil),        // 8: codeflux.v1.GraphSliceView
-	(*DiffSummaryView)(nil),       // 9: codeflux.v1.DiffSummaryView
-	(*ValidationItemView)(nil),    // 10: codeflux.v1.ValidationItemView
-	(*ValidationReportView)(nil),  // 11: codeflux.v1.ValidationReportView
-	(*ModelView)(nil),             // 12: codeflux.v1.ModelView
-	(*PolicyView)(nil),            // 13: codeflux.v1.PolicyView
-	(*ProviderView)(nil),          // 14: codeflux.v1.ProviderView
-	(*StableIdentity)(nil),        // 15: codeflux.v1.StableIdentity
-	(*SafePath)(nil),              // 16: codeflux.v1.SafePath
-	(*GitStateView)(nil),          // 17: codeflux.v1.GitStateView
-	(*RedactedText)(nil),          // 18: codeflux.v1.RedactedText
-	(*timestamppb.Timestamp)(nil), // 19: google.protobuf.Timestamp
-	(*Money)(nil),                 // 20: codeflux.v1.Money
-	(*TokenAmount)(nil),           // 21: codeflux.v1.TokenAmount
-	(*durationpb.Duration)(nil),   // 22: google.protobuf.Duration
+	(*WorkspaceView)(nil),           // 0: codeflux.v1.WorkspaceView
+	(*RepositorySummary)(nil),       // 1: codeflux.v1.RepositorySummary
+	(*ThreadView)(nil),              // 2: codeflux.v1.ThreadView
+	(*MessageView)(nil),             // 3: codeflux.v1.MessageView
+	(*TaskView)(nil),                // 4: codeflux.v1.TaskView
+	(*TaskForecastView)(nil),        // 5: codeflux.v1.TaskForecastView
+	(*BudgetView)(nil),              // 6: codeflux.v1.BudgetView
+	(*GraphNodeView)(nil),           // 7: codeflux.v1.GraphNodeView
+	(*GraphEdgeView)(nil),           // 8: codeflux.v1.GraphEdgeView
+	(*GraphPlanStepLinkView)(nil),   // 9: codeflux.v1.GraphPlanStepLinkView
+	(*GraphSourceLocationView)(nil), // 10: codeflux.v1.GraphSourceLocationView
+	(*GraphLayoutHintView)(nil),     // 11: codeflux.v1.GraphLayoutHintView
+	(*GraphSliceView)(nil),          // 12: codeflux.v1.GraphSliceView
+	(*GraphRevisionChangeView)(nil), // 13: codeflux.v1.GraphRevisionChangeView
+	(*DiffSummaryView)(nil),         // 14: codeflux.v1.DiffSummaryView
+	(*ValidationItemView)(nil),      // 15: codeflux.v1.ValidationItemView
+	(*ValidationReportView)(nil),    // 16: codeflux.v1.ValidationReportView
+	(*ModelView)(nil),               // 17: codeflux.v1.ModelView
+	(*PolicyView)(nil),              // 18: codeflux.v1.PolicyView
+	(*ProviderView)(nil),            // 19: codeflux.v1.ProviderView
+	(*StableIdentity)(nil),          // 20: codeflux.v1.StableIdentity
+	(*SafePath)(nil),                // 21: codeflux.v1.SafePath
+	(*GitStateView)(nil),            // 22: codeflux.v1.GitStateView
+	(*RedactedText)(nil),            // 23: codeflux.v1.RedactedText
+	(*timestamppb.Timestamp)(nil),   // 24: google.protobuf.Timestamp
+	(*Money)(nil),                   // 25: codeflux.v1.Money
+	(*TokenAmount)(nil),             // 26: codeflux.v1.TokenAmount
+	(*durationpb.Duration)(nil),     // 27: google.protobuf.Duration
 }
 var file_codeflux_v1_resources_proto_depIdxs = []int32{
-	15, // 0: codeflux.v1.WorkspaceView.workspace_id:type_name -> codeflux.v1.StableIdentity
-	15, // 1: codeflux.v1.WorkspaceView.repository_id:type_name -> codeflux.v1.StableIdentity
-	16, // 2: codeflux.v1.WorkspaceView.root:type_name -> codeflux.v1.SafePath
-	17, // 3: codeflux.v1.WorkspaceView.git:type_name -> codeflux.v1.GitStateView
-	18, // 4: codeflux.v1.WorkspaceView.warnings:type_name -> codeflux.v1.RedactedText
-	19, // 5: codeflux.v1.WorkspaceView.observed_at:type_name -> google.protobuf.Timestamp
-	15, // 6: codeflux.v1.RepositorySummary.repository_id:type_name -> codeflux.v1.StableIdentity
-	18, // 7: codeflux.v1.RepositorySummary.display_name:type_name -> codeflux.v1.RedactedText
-	16, // 8: codeflux.v1.RepositorySummary.root:type_name -> codeflux.v1.SafePath
-	17, // 9: codeflux.v1.RepositorySummary.git:type_name -> codeflux.v1.GitStateView
-	15, // 10: codeflux.v1.ThreadView.thread_id:type_name -> codeflux.v1.StableIdentity
-	15, // 11: codeflux.v1.ThreadView.workspace_id:type_name -> codeflux.v1.StableIdentity
-	18, // 12: codeflux.v1.ThreadView.title:type_name -> codeflux.v1.RedactedText
-	19, // 13: codeflux.v1.ThreadView.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 14: codeflux.v1.ThreadView.session_id:type_name -> codeflux.v1.StableIdentity
-	15, // 15: codeflux.v1.ThreadView.task_id:type_name -> codeflux.v1.StableIdentity
-	15, // 16: codeflux.v1.MessageView.message_id:type_name -> codeflux.v1.StableIdentity
-	15, // 17: codeflux.v1.MessageView.thread_id:type_name -> codeflux.v1.StableIdentity
-	18, // 18: codeflux.v1.MessageView.body:type_name -> codeflux.v1.RedactedText
-	16, // 19: codeflux.v1.MessageView.attachments:type_name -> codeflux.v1.SafePath
-	19, // 20: codeflux.v1.MessageView.created_at:type_name -> google.protobuf.Timestamp
-	15, // 21: codeflux.v1.MessageView.attachment_ids:type_name -> codeflux.v1.StableIdentity
-	15, // 22: codeflux.v1.TaskView.task_id:type_name -> codeflux.v1.StableIdentity
-	15, // 23: codeflux.v1.TaskView.thread_id:type_name -> codeflux.v1.StableIdentity
-	15, // 24: codeflux.v1.TaskView.session_id:type_name -> codeflux.v1.StableIdentity
-	18, // 25: codeflux.v1.TaskView.summary:type_name -> codeflux.v1.RedactedText
-	20, // 26: codeflux.v1.TaskView.actual_cost:type_name -> codeflux.v1.Money
-	20, // 27: codeflux.v1.TaskView.hard_budget:type_name -> codeflux.v1.Money
-	21, // 28: codeflux.v1.TaskView.actual_tokens:type_name -> codeflux.v1.TokenAmount
-	22, // 29: codeflux.v1.TaskView.elapsed:type_name -> google.protobuf.Duration
-	19, // 30: codeflux.v1.TaskView.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 31: codeflux.v1.BudgetView.budget_id:type_name -> codeflux.v1.StableIdentity
-	15, // 32: codeflux.v1.BudgetView.task_id:type_name -> codeflux.v1.StableIdentity
-	20, // 33: codeflux.v1.BudgetView.hard_limit:type_name -> codeflux.v1.Money
-	20, // 34: codeflux.v1.BudgetView.reserved:type_name -> codeflux.v1.Money
-	20, // 35: codeflux.v1.BudgetView.actual:type_name -> codeflux.v1.Money
-	15, // 36: codeflux.v1.GraphNodeView.node_id:type_name -> codeflux.v1.StableIdentity
-	18, // 37: codeflux.v1.GraphNodeView.label:type_name -> codeflux.v1.RedactedText
-	16, // 38: codeflux.v1.GraphNodeView.source_path:type_name -> codeflux.v1.SafePath
-	15, // 39: codeflux.v1.GraphEdgeView.edge_id:type_name -> codeflux.v1.StableIdentity
-	15, // 40: codeflux.v1.GraphEdgeView.from_node_id:type_name -> codeflux.v1.StableIdentity
-	15, // 41: codeflux.v1.GraphEdgeView.to_node_id:type_name -> codeflux.v1.StableIdentity
-	15, // 42: codeflux.v1.GraphSliceView.graph_id:type_name -> codeflux.v1.StableIdentity
-	15, // 43: codeflux.v1.GraphSliceView.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	15, // 44: codeflux.v1.GraphSliceView.task_id:type_name -> codeflux.v1.StableIdentity
-	6,  // 45: codeflux.v1.GraphSliceView.nodes:type_name -> codeflux.v1.GraphNodeView
-	7,  // 46: codeflux.v1.GraphSliceView.edges:type_name -> codeflux.v1.GraphEdgeView
-	15, // 47: codeflux.v1.DiffSummaryView.task_id:type_name -> codeflux.v1.StableIdentity
-	18, // 48: codeflux.v1.DiffSummaryView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 49: codeflux.v1.ValidationItemView.validation_id:type_name -> codeflux.v1.StableIdentity
-	18, // 50: codeflux.v1.ValidationItemView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 51: codeflux.v1.ValidationReportView.task_id:type_name -> codeflux.v1.StableIdentity
-	10, // 52: codeflux.v1.ValidationReportView.items:type_name -> codeflux.v1.ValidationItemView
-	18, // 53: codeflux.v1.ValidationReportView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 54: codeflux.v1.ModelView.provider_id:type_name -> codeflux.v1.StableIdentity
-	18, // 55: codeflux.v1.ModelView.display_name:type_name -> codeflux.v1.RedactedText
-	22, // 56: codeflux.v1.ModelView.default_timeout:type_name -> google.protobuf.Duration
-	15, // 57: codeflux.v1.ProviderView.provider_id:type_name -> codeflux.v1.StableIdentity
-	18, // 58: codeflux.v1.ProviderView.display_name:type_name -> codeflux.v1.RedactedText
-	59, // [59:59] is the sub-list for method output_type
-	59, // [59:59] is the sub-list for method input_type
-	59, // [59:59] is the sub-list for extension type_name
-	59, // [59:59] is the sub-list for extension extendee
-	0,  // [0:59] is the sub-list for field type_name
+	20, // 0: codeflux.v1.WorkspaceView.workspace_id:type_name -> codeflux.v1.StableIdentity
+	20, // 1: codeflux.v1.WorkspaceView.repository_id:type_name -> codeflux.v1.StableIdentity
+	21, // 2: codeflux.v1.WorkspaceView.root:type_name -> codeflux.v1.SafePath
+	22, // 3: codeflux.v1.WorkspaceView.git:type_name -> codeflux.v1.GitStateView
+	23, // 4: codeflux.v1.WorkspaceView.warnings:type_name -> codeflux.v1.RedactedText
+	24, // 5: codeflux.v1.WorkspaceView.observed_at:type_name -> google.protobuf.Timestamp
+	20, // 6: codeflux.v1.RepositorySummary.repository_id:type_name -> codeflux.v1.StableIdentity
+	23, // 7: codeflux.v1.RepositorySummary.display_name:type_name -> codeflux.v1.RedactedText
+	21, // 8: codeflux.v1.RepositorySummary.root:type_name -> codeflux.v1.SafePath
+	22, // 9: codeflux.v1.RepositorySummary.git:type_name -> codeflux.v1.GitStateView
+	20, // 10: codeflux.v1.ThreadView.thread_id:type_name -> codeflux.v1.StableIdentity
+	20, // 11: codeflux.v1.ThreadView.workspace_id:type_name -> codeflux.v1.StableIdentity
+	23, // 12: codeflux.v1.ThreadView.title:type_name -> codeflux.v1.RedactedText
+	24, // 13: codeflux.v1.ThreadView.updated_at:type_name -> google.protobuf.Timestamp
+	20, // 14: codeflux.v1.ThreadView.session_id:type_name -> codeflux.v1.StableIdentity
+	20, // 15: codeflux.v1.ThreadView.task_id:type_name -> codeflux.v1.StableIdentity
+	20, // 16: codeflux.v1.ThreadView.project_id:type_name -> codeflux.v1.StableIdentity
+	20, // 17: codeflux.v1.MessageView.message_id:type_name -> codeflux.v1.StableIdentity
+	20, // 18: codeflux.v1.MessageView.thread_id:type_name -> codeflux.v1.StableIdentity
+	23, // 19: codeflux.v1.MessageView.body:type_name -> codeflux.v1.RedactedText
+	21, // 20: codeflux.v1.MessageView.attachments:type_name -> codeflux.v1.SafePath
+	24, // 21: codeflux.v1.MessageView.created_at:type_name -> google.protobuf.Timestamp
+	20, // 22: codeflux.v1.MessageView.attachment_ids:type_name -> codeflux.v1.StableIdentity
+	20, // 23: codeflux.v1.TaskView.task_id:type_name -> codeflux.v1.StableIdentity
+	20, // 24: codeflux.v1.TaskView.thread_id:type_name -> codeflux.v1.StableIdentity
+	20, // 25: codeflux.v1.TaskView.session_id:type_name -> codeflux.v1.StableIdentity
+	23, // 26: codeflux.v1.TaskView.summary:type_name -> codeflux.v1.RedactedText
+	25, // 27: codeflux.v1.TaskView.actual_cost:type_name -> codeflux.v1.Money
+	25, // 28: codeflux.v1.TaskView.hard_budget:type_name -> codeflux.v1.Money
+	26, // 29: codeflux.v1.TaskView.actual_tokens:type_name -> codeflux.v1.TokenAmount
+	27, // 30: codeflux.v1.TaskView.elapsed:type_name -> google.protobuf.Duration
+	24, // 31: codeflux.v1.TaskView.updated_at:type_name -> google.protobuf.Timestamp
+	5,  // 32: codeflux.v1.TaskView.forecast:type_name -> codeflux.v1.TaskForecastView
+	25, // 33: codeflux.v1.TaskView.remaining_hard_budget:type_name -> codeflux.v1.Money
+	25, // 34: codeflux.v1.TaskView.warning_threshold:type_name -> codeflux.v1.Money
+	20, // 35: codeflux.v1.TaskView.latest_checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	25, // 36: codeflux.v1.TaskForecastView.cost_p50:type_name -> codeflux.v1.Money
+	25, // 37: codeflux.v1.TaskForecastView.cost_p90:type_name -> codeflux.v1.Money
+	24, // 38: codeflux.v1.TaskForecastView.price_captured_at:type_name -> google.protobuf.Timestamp
+	20, // 39: codeflux.v1.BudgetView.budget_id:type_name -> codeflux.v1.StableIdentity
+	20, // 40: codeflux.v1.BudgetView.task_id:type_name -> codeflux.v1.StableIdentity
+	25, // 41: codeflux.v1.BudgetView.hard_limit:type_name -> codeflux.v1.Money
+	25, // 42: codeflux.v1.BudgetView.reserved:type_name -> codeflux.v1.Money
+	25, // 43: codeflux.v1.BudgetView.actual:type_name -> codeflux.v1.Money
+	20, // 44: codeflux.v1.GraphNodeView.node_id:type_name -> codeflux.v1.StableIdentity
+	23, // 45: codeflux.v1.GraphNodeView.label:type_name -> codeflux.v1.RedactedText
+	21, // 46: codeflux.v1.GraphNodeView.source_path:type_name -> codeflux.v1.SafePath
+	23, // 47: codeflux.v1.GraphNodeView.contract_purpose:type_name -> codeflux.v1.RedactedText
+	23, // 48: codeflux.v1.GraphNodeView.contract_inputs:type_name -> codeflux.v1.RedactedText
+	23, // 49: codeflux.v1.GraphNodeView.contract_outputs:type_name -> codeflux.v1.RedactedText
+	23, // 50: codeflux.v1.GraphNodeView.contract_effects:type_name -> codeflux.v1.RedactedText
+	20, // 51: codeflux.v1.GraphNodeView.related_message_ids:type_name -> codeflux.v1.StableIdentity
+	20, // 52: codeflux.v1.GraphNodeView.event_ids:type_name -> codeflux.v1.StableIdentity
+	9,  // 53: codeflux.v1.GraphNodeView.plan_steps:type_name -> codeflux.v1.GraphPlanStepLinkView
+	10, // 54: codeflux.v1.GraphNodeView.source_locations:type_name -> codeflux.v1.GraphSourceLocationView
+	11, // 55: codeflux.v1.GraphNodeView.layout:type_name -> codeflux.v1.GraphLayoutHintView
+	20, // 56: codeflux.v1.GraphEdgeView.edge_id:type_name -> codeflux.v1.StableIdentity
+	20, // 57: codeflux.v1.GraphEdgeView.from_node_id:type_name -> codeflux.v1.StableIdentity
+	20, // 58: codeflux.v1.GraphEdgeView.to_node_id:type_name -> codeflux.v1.StableIdentity
+	20, // 59: codeflux.v1.GraphEdgeView.event_ids:type_name -> codeflux.v1.StableIdentity
+	9,  // 60: codeflux.v1.GraphEdgeView.plan_steps:type_name -> codeflux.v1.GraphPlanStepLinkView
+	20, // 61: codeflux.v1.GraphSourceLocationView.repository_id:type_name -> codeflux.v1.StableIdentity
+	21, // 62: codeflux.v1.GraphSourceLocationView.repository_relative_path:type_name -> codeflux.v1.SafePath
+	20, // 63: codeflux.v1.GraphSliceView.graph_id:type_name -> codeflux.v1.StableIdentity
+	20, // 64: codeflux.v1.GraphSliceView.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	20, // 65: codeflux.v1.GraphSliceView.task_id:type_name -> codeflux.v1.StableIdentity
+	7,  // 66: codeflux.v1.GraphSliceView.nodes:type_name -> codeflux.v1.GraphNodeView
+	8,  // 67: codeflux.v1.GraphSliceView.edges:type_name -> codeflux.v1.GraphEdgeView
+	24, // 68: codeflux.v1.GraphSliceView.created_at:type_name -> google.protobuf.Timestamp
+	20, // 69: codeflux.v1.GraphSliceView.parent_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	7,  // 70: codeflux.v1.GraphRevisionChangeView.before_node:type_name -> codeflux.v1.GraphNodeView
+	7,  // 71: codeflux.v1.GraphRevisionChangeView.after_node:type_name -> codeflux.v1.GraphNodeView
+	8,  // 72: codeflux.v1.GraphRevisionChangeView.before_edge:type_name -> codeflux.v1.GraphEdgeView
+	8,  // 73: codeflux.v1.GraphRevisionChangeView.after_edge:type_name -> codeflux.v1.GraphEdgeView
+	20, // 74: codeflux.v1.DiffSummaryView.task_id:type_name -> codeflux.v1.StableIdentity
+	23, // 75: codeflux.v1.DiffSummaryView.summary:type_name -> codeflux.v1.RedactedText
+	20, // 76: codeflux.v1.ValidationItemView.validation_id:type_name -> codeflux.v1.StableIdentity
+	23, // 77: codeflux.v1.ValidationItemView.summary:type_name -> codeflux.v1.RedactedText
+	20, // 78: codeflux.v1.ValidationReportView.task_id:type_name -> codeflux.v1.StableIdentity
+	15, // 79: codeflux.v1.ValidationReportView.items:type_name -> codeflux.v1.ValidationItemView
+	23, // 80: codeflux.v1.ValidationReportView.summary:type_name -> codeflux.v1.RedactedText
+	20, // 81: codeflux.v1.ModelView.provider_id:type_name -> codeflux.v1.StableIdentity
+	23, // 82: codeflux.v1.ModelView.display_name:type_name -> codeflux.v1.RedactedText
+	27, // 83: codeflux.v1.ModelView.default_timeout:type_name -> google.protobuf.Duration
+	20, // 84: codeflux.v1.ProviderView.provider_id:type_name -> codeflux.v1.StableIdentity
+	23, // 85: codeflux.v1.ProviderView.display_name:type_name -> codeflux.v1.RedactedText
+	86, // [86:86] is the sub-list for method output_type
+	86, // [86:86] is the sub-list for method input_type
+	86, // [86:86] is the sub-list for extension type_name
+	86, // [86:86] is the sub-list for extension extendee
+	0,  // [0:86] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_resources_proto_init() }
@@ -1622,13 +2540,14 @@ func file_codeflux_v1_resources_proto_init() {
 	}
 	file_codeflux_v1_conventions_proto_init()
 	file_codeflux_v1_identity_proto_init()
+	file_codeflux_v1_resources_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codeflux_v1_resources_proto_rawDesc), len(file_codeflux_v1_resources_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

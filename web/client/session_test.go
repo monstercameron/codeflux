@@ -87,10 +87,13 @@ func TestSessionViewForLifecycleKeepsUncertainControlsOfflineOrRecovering(t *tes
 		want   frontendstate.ConnectionState
 	}{
 		{status: sessionclient.Status{State: sessionclient.StateConnecting}, want: frontendstate.ConnectionConnecting},
-		{status: sessionclient.Status{State: sessionclient.StateReplaying}, want: frontendstate.ConnectionRecovering},
-		{status: sessionclient.Status{State: sessionclient.StateGap}, want: frontendstate.ConnectionRecovering},
+		{status: sessionclient.Status{State: sessionclient.StateReplaying}, want: frontendstate.ConnectionReplaying},
+		{status: sessionclient.Status{State: sessionclient.StateReconnecting}, want: frontendstate.ConnectionDegraded},
+		{status: sessionclient.Status{State: sessionclient.StateGap}, want: frontendstate.ConnectionDegraded},
 		{status: sessionclient.Status{State: sessionclient.StateLive}, want: frontendstate.ConnectionLive},
-		{status: sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureAuthentication}, want: frontendstate.ConnectionOffline},
+		{status: sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureAuthentication}, want: frontendstate.ConnectionUnauthorized},
+		{status: sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureIncompatible}, want: frontendstate.ConnectionIncompatible},
+		{status: sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureUnavailable}, want: frontendstate.ConnectionDisconnected},
 	}
 	for _, test := range tests {
 		got := sessionViewForLifecycle(test.status)

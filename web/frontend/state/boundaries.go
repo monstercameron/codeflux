@@ -5,18 +5,25 @@ import "slices"
 // TopBarView is the complete shell chrome projection. Empty values deliberately
 // render as placeholders while their authoritative owners are loading.
 type TopBarView struct {
-	Repository     string
-	Branch         string
-	WorktreeStatus string
-	TaskState      string
-	Connection     ConnectionState
-	Model          string
-	Effort         string
-	ForecastCost   string
-	ActualCost     string
-	HardBudget     string
-	CanPause       bool
-	CanStop        bool
+	Repository      string
+	Branch          string
+	WorktreeStatus  string
+	TaskTitle       string
+	TaskSummary     string
+	TaskState       string
+	Connection      ConnectionState
+	Provider        string
+	Model           string
+	Effort          string
+	ForecastCost    string
+	ActualTokens    string
+	ActualCost      string
+	PricingSnapshot string
+	HardBudget      string
+	RemainingBudget string
+	BudgetWarning   string
+	CanPause        bool
+	CanStop         bool
 }
 
 type ReviewView struct {
@@ -39,13 +46,18 @@ type MemoryView struct {
 }
 
 type DiagnosticsView struct {
-	State       DataState
-	Health      string
-	AppVersion  string
-	APIVersion  string
-	Schema      string
-	Frontend    string
-	ActiveTasks int
+	State                    DataState
+	Health                   string
+	AppVersion               string
+	APIVersion               string
+	Schema                   string
+	Frontend                 string
+	ActiveTasks              int
+	LastAppliedSequence      uint64
+	LastAppliedSequenceKnown bool
+	SessionReplayActive      bool
+	SessionLive              bool
+	SessionGapRepairRequired bool
 }
 
 type FirstRunView struct {

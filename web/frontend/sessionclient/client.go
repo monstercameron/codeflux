@@ -25,6 +25,7 @@ var (
 	ErrSessionEventSequenceGap       = errors.New("session event sequence gap")
 	ErrSessionEventIdentityMismatch  = errors.New("session event identity mismatch")
 	ErrSessionEventApplicationFailed = errors.New("session event application failed")
+	ErrInvalidReplayBoundary         = errors.New("invalid session replay boundary")
 )
 
 // State is the connection-certainty state exposed to the frontend.
@@ -108,8 +109,12 @@ type Config struct {
 	AfterSequence uint64
 	Retry         RetryPolicy
 	Apply         func(context.Context, *codefluxv1.SessionEvent) error
-	Observe       func(Status)
-	WaitForRetry  func(context.Context, time.Duration) error
+	// Repair fetches and applies a fresh authoritative snapshot after Apply
+	// rejects an event. The returned cursor must be the snapshot's durable
+	// through-sequence; replay resumes strictly after it.
+	Repair       func(context.Context) (uint64, error)
+	Observe      func(Status)
+	WaitForRetry func(context.Context, time.Duration) error
 }
 
 // Client owns one cancellable, reconnecting ordered session subscription.
@@ -272,6 +277,20 @@ func (client *Client) run(ctx context.Context) error {
 			client.transition(StateStopped, FailureNone, failures)
 			return nil
 		}
+		if errors.Is(streamError, ErrSessionEventApplicationFailed) && client.config.Repair != nil {
+			client.transition(StateReplaying, FailureApplication, failures)
+			repairedThrough, repairErr := client.config.Repair(ctx)
+			if repairErr != nil {
+				client.transition(StateFailed, FailureApplication, failures)
+				return fmt.Errorf("repair session snapshot: %w", repairErr)
+			}
+			if repairedThrough < client.Status().LastSequence {
+				client.transition(StateFailed, FailureProtocol, failures)
+				return ErrInvalidReplayBoundary
+			}
+			client.applySnapshotCursor(repairedThrough)
+			continue
+		}
 		if terminal := client.terminalStreamFailure(streamError); terminal != nil {
 			return terminal
 		}
@@ -279,6 +298,20 @@ func (client *Client) run(ctx context.Context) error {
 		if retryError := client.retry(ctx, failures, streamError); retryError != nil {
 			return retryError
 		}
+	}
+}
+
+func (client *Client) applySnapshotCursor(sequence uint64) {
+	client.mu.Lock()
+	client.status.LastSequence = sequence
+	client.status.State = StateReplaying
+	client.status.ControlsAllowed = false
+	client.status.Failure = FailureNone
+	snapshot := client.status
+	observer := client.config.Observe
+	client.mu.Unlock()
+	if observer != nil {
+		observer(snapshot)
 	}
 }
 
@@ -290,6 +323,16 @@ func (client *Client) receive(ctx context.Context, stream Stream) (error, bool) 
 			return err, madeProgress
 		}
 		event := response.GetEvent()
+		boundary := response.GetReplayBoundary()
+		if boundary != nil {
+			status := client.Status()
+			if event != nil || status.State != StateReplaying ||
+				boundary.GetThroughSequence() != status.LastSequence {
+				return ErrInvalidReplayBoundary, madeProgress
+			}
+			client.markLive()
+			continue
+		}
 		if event == nil || event.GetSequence() == 0 {
 			return ErrInvalidSessionEvent, madeProgress
 		}
@@ -351,7 +394,8 @@ func (client *Client) terminalStreamFailure(err error) error {
 		client.transition(StateFailed, FailureApplication, client.Status().ReconnectCount)
 		return err
 	}
-	if errors.Is(err, ErrInvalidSessionEvent) || errors.Is(err, ErrSessionEventIdentityMismatch) {
+	if errors.Is(err, ErrInvalidSessionEvent) || errors.Is(err, ErrSessionEventIdentityMismatch) ||
+		errors.Is(err, ErrInvalidReplayBoundary) {
 		client.transition(StateFailed, FailureProtocol, client.Status().ReconnectCount)
 		return err
 	}
@@ -385,6 +429,17 @@ func (client *Client) releaseConnection(connection Connection) {
 func (client *Client) advance(sequence uint64) {
 	client.mu.Lock()
 	client.status.LastSequence = sequence
+	client.status.ControlsAllowed = client.status.State == StateLive
+	snapshot := client.status
+	observer := client.config.Observe
+	client.mu.Unlock()
+	if observer != nil {
+		observer(snapshot)
+	}
+}
+
+func (client *Client) markLive() {
+	client.mu.Lock()
 	client.status.State = StateLive
 	client.status.ControlsAllowed = true
 	client.status.Failure = FailureNone
@@ -429,6 +484,13 @@ func normalizeRetryPolicy(policy RetryPolicy) RetryPolicy {
 	return policy
 }
 
+// NormalizedRetryPolicy returns the exact bounded policy used by Client.
+// Projection code may use it to explain automatic reconnect without owning a
+// second retry lifecycle.
+func NormalizedRetryPolicy(policy RetryPolicy) RetryPolicy {
+	return normalizeRetryPolicy(policy)
+}
+
 func retryDelay(policy RetryPolicy, failures int) time.Duration {
 	delay := policy.InitialDelay
 	for attempt := 1; attempt < failures; attempt++ {
@@ -439,6 +501,15 @@ func retryDelay(policy RetryPolicy, failures int) time.Duration {
 		delay = next
 	}
 	return delay
+}
+
+// RetryBackoff returns the exact bounded delay Client uses after the numbered
+// consecutive failure. A non-positive failure count has no retry delay.
+func RetryBackoff(policy RetryPolicy, failures int) time.Duration {
+	if failures <= 0 {
+		return 0
+	}
+	return retryDelay(normalizeRetryPolicy(policy), failures)
 }
 
 func waitForRetry(ctx context.Context, delay time.Duration) error {

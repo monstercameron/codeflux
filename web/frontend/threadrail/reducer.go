@@ -314,6 +314,10 @@ func CommitCreate(state State, key CommandKey, thread Thread) (State, error) {
 		}
 	}
 	next.rows = rows
+	if next.load == LoadNotRequested || next.load == LoadLoading {
+		next.load = LoadReady
+		next.requestedSet = false
+	}
 	record.status = CommandCommitted
 	record.threadID = authoritative.ID()
 	next.commands[key] = record

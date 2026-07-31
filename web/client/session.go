@@ -60,21 +60,26 @@ func sessionViewForLifecycle(status sessionclient.Status) frontendstate.SessionV
 	case sessionclient.StateConnecting:
 		view.Connection = frontendstate.ConnectionConnecting
 		view.Message = "Connecting to live session updates."
-	case sessionclient.StateReplaying, sessionclient.StateReconnecting, sessionclient.StateGap:
-		view.Connection = frontendstate.ConnectionRecovering
+	case sessionclient.StateReplaying:
+		view.Connection = frontendstate.ConnectionReplaying
+		view.Message = "Replaying committed session updates."
+	case sessionclient.StateReconnecting, sessionclient.StateGap:
+		view.Connection = frontendstate.ConnectionDegraded
 		view.Message = "Live session updates are reconnecting."
 	case sessionclient.StateFailed:
-		view.Connection = frontendstate.ConnectionOffline
 		switch status.Failure {
 		case sessionclient.FailureAuthentication:
+			view.Connection = frontendstate.ConnectionUnauthorized
 			view.Message = "The local session is no longer authorized. Reload to authenticate again."
 		case sessionclient.FailureIncompatible:
+			view.Connection = frontendstate.ConnectionIncompatible
 			view.Message = "The frontend and coordinator stream contracts do not match."
 		default:
+			view.Connection = frontendstate.ConnectionDisconnected
 			view.Message = "Live session updates are unavailable."
 		}
 	default:
-		view.Connection = frontendstate.ConnectionOffline
+		view.Connection = frontendstate.ConnectionDisconnected
 		view.Message = "No live session is connected."
 	}
 	return view

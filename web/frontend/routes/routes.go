@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"codeflux.dev/codeflux/internal/domain"
 )
@@ -52,7 +55,19 @@ func Map() []Spec {
 
 var ErrInvalidRoute = errors.New("frontend routes: invalid route")
 
-const taskSelectionQueryKey = "selection"
+const (
+	taskSelectionQueryKey = "selection"
+	taskEventQueryKey     = "event"
+	taskFileQueryKey      = "file"
+)
+
+// TaskDetailSelection is non-authority UI state layered over an independently
+// authorized thread selection. Event and file are mutually exclusive.
+type TaskDetailSelection struct {
+	Route      Route
+	EventID    *domain.EventID
+	ReviewFile string
+}
 
 // Parse parses only path state. Query and fragment values never participate in
 // authorization or route identity.
@@ -138,6 +153,30 @@ func Path(route Route) (string, error) {
 // UI state for the local /tasks surface. Callers must still restore the result
 // only against independently authorized, loaded thread rows.
 func TaskSelectionPath(route Route) (string, error) {
+	return TaskDetailSelectionPath(TaskDetailSelection{Route: route})
+}
+
+// TaskEventSelectionPath addresses one durable related event without changing
+// the independently authorized thread selection.
+func TaskEventSelectionPath(route Route, eventID domain.EventID) (string, error) {
+	if eventID.IsZero() {
+		return "", fmt.Errorf("%w: task event selection requires an event id", ErrInvalidRoute)
+	}
+	return TaskDetailSelectionPath(TaskDetailSelection{Route: route, EventID: &eventID})
+}
+
+// TaskFileSelectionPath addresses one safe workspace-relative review file.
+func TaskFileSelectionPath(route Route, file string) (string, error) {
+	file, err := ValidateWorkspaceRelativePath(file)
+	if err != nil {
+		return "", err
+	}
+	return TaskDetailSelectionPath(TaskDetailSelection{Route: route, ReviewFile: file})
+}
+
+// TaskDetailSelectionPath encodes typed detail state for the local /tasks UI.
+func TaskDetailSelectionPath(selection TaskDetailSelection) (string, error) {
+	route := selection.Route
 	if route.Name != ThreadWorkspace {
 		return "", fmt.Errorf("%w: task selection requires a thread workspace", ErrInvalidRoute)
 	}
@@ -147,25 +186,90 @@ func TaskSelectionPath(route Route) (string, error) {
 	}
 	values := url.Values{}
 	values.Set(taskSelectionQueryKey, canonical)
+	if selection.EventID != nil && strings.TrimSpace(selection.ReviewFile) != "" {
+		return "", fmt.Errorf("%w: task detail selects both event and file", ErrInvalidRoute)
+	}
+	if selection.EventID != nil {
+		if selection.EventID.IsZero() {
+			return "", fmt.Errorf("%w: task event selection requires an event id", ErrInvalidRoute)
+		}
+		values.Set(taskEventQueryKey, selection.EventID.String())
+	}
+	if strings.TrimSpace(selection.ReviewFile) != "" {
+		file, validateErr := ValidateWorkspaceRelativePath(selection.ReviewFile)
+		if validateErr != nil {
+			return "", validateErr
+		}
+		values.Set(taskFileQueryKey, file)
+	}
 	return "/tasks?" + values.Encode(), nil
 }
 
 // ParseTaskSelection parses the non-authority /tasks query through the same
 // typed route parser used for canonical deep links.
 func ParseTaskSelection(rawQuery string) (Route, error) {
+	selection, err := ParseTaskDetailSelection(rawQuery)
+	if err != nil {
+		return Route{}, err
+	}
+	return selection.Route, nil
+}
+
+// ParseTaskDetailSelection parses typed non-authority task detail state.
+func ParseTaskDetailSelection(rawQuery string) (TaskDetailSelection, error) {
 	values, err := url.ParseQuery(rawQuery)
 	if err != nil {
-		return Route{}, fmt.Errorf("%w: task selection query: %v", ErrInvalidRoute, err)
+		return TaskDetailSelection{}, fmt.Errorf("%w: task selection query: %v", ErrInvalidRoute, err)
 	}
 	raw := values.Get(taskSelectionQueryKey)
 	if raw == "" {
-		return Route{}, fmt.Errorf("%w: task selection is missing", ErrInvalidRoute)
+		return TaskDetailSelection{}, fmt.Errorf("%w: task selection is missing", ErrInvalidRoute)
 	}
 	route, err := Parse(raw)
 	if err != nil || route.Name != ThreadWorkspace {
-		return Route{}, fmt.Errorf("%w: task selection", ErrInvalidRoute)
+		return TaskDetailSelection{}, fmt.Errorf("%w: task selection", ErrInvalidRoute)
 	}
-	return route, nil
+	eventValue := strings.TrimSpace(values.Get(taskEventQueryKey))
+	fileValue := strings.TrimSpace(values.Get(taskFileQueryKey))
+	if eventValue != "" && fileValue != "" {
+		return TaskDetailSelection{}, fmt.Errorf("%w: task detail selects both event and file", ErrInvalidRoute)
+	}
+	selection := TaskDetailSelection{Route: route}
+	if eventValue != "" {
+		eventID, parseErr := domain.ParseEventID(eventValue)
+		if parseErr != nil {
+			return TaskDetailSelection{}, fmt.Errorf("%w: task event selection", ErrInvalidRoute)
+		}
+		selection.EventID = &eventID
+	}
+	if fileValue != "" {
+		file, validateErr := ValidateWorkspaceRelativePath(fileValue)
+		if validateErr != nil {
+			return TaskDetailSelection{}, validateErr
+		}
+		selection.ReviewFile = file
+	}
+	return selection, nil
+}
+
+// ValidateWorkspaceRelativePath returns a normalized identity only when raw
+// already names a canonical workspace-relative path. Browser route state must
+// never become an authority to escape the selected workspace.
+func ValidateWorkspaceRelativePath(raw string) (string, error) {
+	if raw == "" || strings.TrimSpace(raw) != raw || !utf8.ValidString(raw) || strings.Contains(raw, "\\") ||
+		strings.HasPrefix(raw, "/") || strings.Contains(raw, ":") {
+		return "", fmt.Errorf("%w: unsafe workspace-relative file", ErrInvalidRoute)
+	}
+	for _, value := range raw {
+		if unicode.IsControl(value) {
+			return "", fmt.Errorf("%w: unsafe workspace-relative file", ErrInvalidRoute)
+		}
+	}
+	cleaned := path.Clean(raw)
+	if cleaned == "." || cleaned == ".." || cleaned != raw || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("%w: unsafe workspace-relative file", ErrInvalidRoute)
+	}
+	return cleaned, nil
 }
 
 // RestorationContext contains only server-confirmed access information.

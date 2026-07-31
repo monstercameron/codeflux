@@ -592,6 +592,41 @@ func (service *TaskControlService) ResumeTask(
 	}, nil
 }
 
+// ResumeVerifiedRecovery reacquires execution only after a separate recovery
+// authority transaction has moved the exact run to a paused boundary. It
+// deliberately reuses the full resume verifier and worker/action compensation
+// path rather than bypassing it from the recovery RPC.
+func (service *TaskControlService) ResumeVerifiedRecovery(
+	ctx context.Context,
+	paused storage.TaskControlSnapshot,
+	reasonRedacted string,
+	idempotencyKey string,
+) (storage.TaskControlSnapshot, error) {
+	if service == nil || paused.TaskID.IsZero() || paused.RunID.IsZero() ||
+		paused.Disposition != storage.TaskControlPaused ||
+		strings.TrimSpace(reasonRedacted) != reasonRedacted || reasonRedacted == "" ||
+		strings.TrimSpace(idempotencyKey) != idempotencyKey || idempotencyKey == "" {
+		return storage.TaskControlSnapshot{}, errors.New("verified recovery resume input is invalid")
+	}
+	blockedEventID, err := service.dependencies.NewEventID()
+	if err != nil {
+		return storage.TaskControlSnapshot{}, err
+	}
+	resumedEventID, err := service.dependencies.NewEventID()
+	if err != nil {
+		return storage.TaskControlSnapshot{}, err
+	}
+	result, err := service.ResumeTask(ctx, ResumeTaskInput{
+		TaskID: paused.TaskID, RunID: paused.RunID,
+		ExpectedTaskRevision: paused.TaskRevision,
+		ExpectedRunRevision:  paused.RunRevision,
+		IdempotencyKey:       idempotencyKey,
+		BlockedEventID:       blockedEventID,
+		ResumedEventID:       resumedEventID,
+	})
+	return result.Control, err
+}
+
 func (service *TaskControlService) markResumeRecovery(
 	ctx context.Context,
 	input ResumeTaskInput,

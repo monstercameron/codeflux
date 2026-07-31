@@ -337,6 +337,83 @@ func TestThreadRailSessionTargetRejectsPendingMissingAndUntrustedTargets(t *test
 	}
 }
 
+func TestNotifyMountedThreadSelectionPreservesAuthoritativeSession(t *testing.T) {
+	fixture := newThreadRailTransportFixture(t)
+	state := loadThreadRailFixture(t, fixture)
+
+	var selected threadrail.Thread
+	if !notifyMountedThreadSelection(state, fixture.threadID, func(thread threadrail.Thread) {
+		selected = thread
+	}) {
+		t.Fatal("authoritative selected thread was not restored")
+	}
+	if selected.ID() != fixture.threadID || selected.SessionID() != fixture.sessionID {
+		t.Fatalf("restored selection = %s/%s", selected.ID(), selected.SessionID())
+	}
+
+	otherID, err := domain.ParseThreadID("thr_01890f3c-4a00-7abc-8def-0123456789ac")
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	if notifyMountedThreadSelection(state, otherID, func(threadrail.Thread) { called = true }) || called {
+		t.Fatal("missing row was allowed to replace the authoritative selection")
+	}
+}
+
+func TestMountedThreadTemporarySurfaceCancellationRestoresSelectionAndFocus(t *testing.T) {
+	fixture := newThreadRailTransportFixture(t)
+	state := loadThreadRailFixture(t, fixture)
+	selected := domain.ThreadID{}
+	renameClosed := 0
+	renameFocused := 0
+	if !cancelMountedThreadRename(
+		state,
+		fixture.threadID,
+		func(thread threadrail.Thread) { selected = thread.ID() },
+		func() { renameClosed++ },
+		func() { renameFocused++ },
+	) {
+		t.Fatal("rename cancellation did not restore its authoritative selection")
+	}
+	if selected != fixture.threadID || renameClosed != 1 || renameFocused != 1 {
+		t.Fatalf(
+			"rename cancellation = selected %s, closed %d, focused %d",
+			selected,
+			renameClosed,
+			renameFocused,
+		)
+	}
+
+	archiveClosed := 0
+	archiveFocused := 0
+	cancelMountedThreadArchive(
+		func() { archiveClosed++ },
+		func() { archiveFocused++ },
+	)
+	if archiveClosed != 1 || archiveFocused != 1 {
+		t.Fatalf("archive cancellation = closed %d, focused %d", archiveClosed, archiveFocused)
+	}
+}
+
+func loadThreadRailFixture(t *testing.T, fixture threadRailTransportFixture) threadrail.State {
+	t.Helper()
+	state, err := threadrail.NewState(fixture.repositoryID, fixture.workspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loading, _ := threadrail.BeginFirstPage(state)
+	state, err = threadrail.ApplyPage(loading, threadrail.Page{Threads: []threadrail.Thread{fixture.thread}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _, err = threadrail.SelectThread(state, state.Rows()[0].Key())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
 func TestThreadRailBridgeLeaseScopesLoadsAndAlwaysCloses(t *testing.T) {
 	fixture := newThreadRailTransportFixture(t)
 	client := &fakeThreadRailPageClient{page: threadrail.Page{Threads: []threadrail.Thread{fixture.thread}}}

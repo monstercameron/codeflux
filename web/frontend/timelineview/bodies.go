@@ -209,17 +209,33 @@ func renderPlan(value timelinecard.Plan, props Props) ui.Node {
 		),
 	}
 	actions := make([]ui.Node, 0, 3)
-	if value.ApprovalPending && !value.Superseded && props.Actions.OnApprovePlan != nil {
+	if value.ApprovalPending && !value.Superseded {
 		revision := value.Revision
-		actions = append(actions, primitives.Button(primitives.ButtonProps{
-			Label: "Approve plan", Mode: mode, OnClick: func() { props.Actions.OnApprovePlan(revision) },
-		}))
+		command := ActionCommandState{}
+		if props.Actions.ApprovePlanCommand != nil {
+			command = props.Actions.ApprovePlanCommand(revision)
+		}
+		var invoke func()
+		if props.Actions.OnApprovePlan != nil {
+			invoke = func() { props.Actions.OnApprovePlan(revision) }
+		}
+		actions = append(actions, timelineCommandButton(
+			"timeline-plan-approve", "Approve plan", command, mode, invoke,
+		))
 	}
-	if !value.Superseded && props.Actions.OnRequestPlanChange != nil {
+	if !value.Superseded {
 		revision := value.Revision
-		actions = append(actions, primitives.Button(primitives.ButtonProps{
-			Label: "Request plan change", Mode: mode, OnClick: func() { props.Actions.OnRequestPlanChange(revision) },
-		}))
+		command := ActionCommandState{}
+		if props.Actions.PlanChangeCommand != nil {
+			command = props.Actions.PlanChangeCommand(revision)
+		}
+		var invoke func()
+		if props.Actions.OnRequestPlanChange != nil {
+			invoke = func() { props.Actions.OnRequestPlanChange(revision) }
+		}
+		actions = append(actions, timelineCommandButton(
+			"timeline-plan-request-change", "Request plan change", command, mode, invoke,
+		))
 	}
 	if len(value.PriorRevisions) > 0 && props.Actions.OnComparePlanRevision != nil {
 		revision := value.Revision
@@ -307,17 +323,18 @@ func renderApproval(value timelinecard.Approval, props Props) ui.Node {
 		buttons := make([]ui.Node, 0, 3)
 		for _, action := range value.AvailableActions() {
 			selected := action
-			buttons = append(buttons, primitives.Button(primitives.ButtonProps{
-				Label: approvalActionLabel(selected), Primary: selected == timelinecard.ApprovalAllowOnce,
-				Busy:     command.Busy,
-				Disabled: command.Busy || props.Actions.OnApproval == nil,
-				Mode:     props.Mode,
-				OnClick: func() {
-					if props.Actions.OnApproval != nil {
-						props.Actions.OnApproval(value.ID, selected)
-					}
-				},
-			}))
+			actionCommand := command
+			if props.Actions.ApprovalActionCommand != nil {
+				actionCommand = props.Actions.ApprovalActionCommand(value.ID, selected)
+			}
+			var invoke func()
+			if props.Actions.OnApproval != nil {
+				invoke = func() { props.Actions.OnApproval(value.ID, selected) }
+			}
+			buttons = append(buttons, timelineCommandButton(
+				ApprovalFocusTargetID(value.ID)+"-"+string(selected),
+				approvalActionLabel(selected), actionCommand, props.Mode, invoke,
+			))
 		}
 		children = append(children, html.Div(html.Props{
 			Role: "group", Aria: map[string]string{"label": "Resolve approval"}, Class: actionRowClass(props.Mode),
@@ -338,6 +355,32 @@ func renderApproval(value timelinecard.Approval, props Props) ui.Node {
 			"focus-retained": "card-after-resolution",
 		},
 	}, stack(props.Mode, children...))
+}
+
+func timelineCommandButton(
+	id, label string,
+	command ActionCommandState,
+	mode primitives.Mode,
+	onClick func(),
+) ui.Node {
+	reason := strings.TrimSpace(command.DisabledReason)
+	if onClick == nil && reason == "" {
+		reason = "This command is not currently available."
+	}
+	reasonID := id + "-reason"
+	children := []ui.Node{primitives.Button(primitives.ButtonProps{
+		ID: id, Label: label, Busy: command.Busy,
+		Disabled:    command.Busy || reason != "" || onClick == nil,
+		DescribedBy: map[bool]string{true: reasonID}[reason != ""],
+		Mode:        mode, OnClick: onClick,
+	})}
+	if reason != "" {
+		children = append(children, html.P(html.Props{ID: reasonID, Text: reason}))
+	}
+	return html.Div(html.Props{Data: map[string]string{
+		"component": "timeline-command", "command-key": command.IdempotencyKey,
+		"transport-mode": command.TransportMode, "disabled-reason": reason,
+	}}, children...)
 }
 
 func renderCheckpoint(value timelinecard.Checkpoint, mode primitives.Mode) ui.Node {
@@ -472,7 +515,7 @@ func renderCompletion(value timelinecard.Completion, mode primitives.Mode) ui.No
 	)
 }
 
-func renderTaskState(value timelinecard.TaskState, mode primitives.Mode) ui.Node {
+func renderTaskState(value timelinecard.TaskTransition, mode primitives.Mode) ui.Node {
 	return definitionList(mode,
 		definition{"From", humanize(value.From)}, definition{"To", humanize(value.To)},
 		definition{"Approval state", humanize(value.Approval)},

@@ -14,6 +14,7 @@ type ButtonProps struct {
 	ID              string
 	Label           string
 	AccessibleLabel string
+	Value           string
 	Primary         bool
 	Disabled        bool
 	Busy            bool
@@ -22,6 +23,10 @@ type ButtonProps struct {
 	DescribedBy     string
 	Mode            Mode
 	OnClick         func()
+	// StableOnClick allows a hook-owning parent to pass ui.UseEvent without
+	// weakening the ordinary callback contract used by stateless callers.
+	OnClickHandler ui.Handler
+	StableOnClick  bool
 }
 
 func Button(props ButtonProps) ui.Node {
@@ -31,8 +36,12 @@ func Button(props ButtonProps) ui.Node {
 	}
 	state := InteractionState{Disabled: props.Disabled, Busy: props.Busy}
 	htmlProps := html.PropsOf(html.OnClick(props.OnClick))
+	if props.StableOnClick {
+		htmlProps.OnClick = props.OnClickHandler
+	}
 	htmlProps.ID = props.ID
 	htmlProps.Type = "button"
+	htmlProps.Value = props.Value
 	htmlProps.Disabled = !state.Enabled()
 	htmlProps.Class = controlClass(props.Mode.Tokens(), props.Primary)
 	htmlProps.Aria = map[string]string{"label": name, "busy": boolARIA(props.Busy)}

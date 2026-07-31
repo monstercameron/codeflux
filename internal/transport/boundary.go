@@ -29,8 +29,12 @@ const (
 
 	maxSafeStringBytes = 64 << 10
 	maxPageSize        = 200
-	maxGraphNodes      = 1_200
-	maxGraphEdges      = 2_400
+	maxGraphNodes      = 500
+	maxGraphEdges      = 1_000
+	maxGraphSearch     = 100
+	maxGraphChanges    = 500
+	maxGraphHops       = 8
+	maxGraphRoots      = 32
 )
 
 type boundaryContextKey uint8
@@ -271,13 +275,56 @@ func ValidateRequest(request any) error {
 	}
 	switch typed := request.(type) {
 	case *codefluxv1.GetGraphSliceRequest:
-		return validateGraphBounds(typed.GetMaxNodes(), typed.GetMaxEdges())
-	case *codefluxv1.ExpandGraphRequest:
-		return validateGraphBounds(typed.GetMaxNodes(), typed.GetMaxEdges())
-	case *codefluxv1.CompareGraphRevisionsRequest:
-		if typed.GetMaxChanges() == 0 || typed.GetMaxChanges() > maxGraphNodes {
-			return &RequestValidationError{Field: "max_changes", Reason: "must be between 1 and 1200"}
+		if err := validateGraphBounds(typed.GetMaxNodes(), typed.GetMaxEdges()); err != nil {
+			return err
 		}
+		if err := validateGraphCursorAndLayout(typed.GetContinuationCursor(), typed.GetLayoutAlgorithm(), typed.GetLayoutAlgorithmVersion()); err != nil {
+			return err
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
+	case *codefluxv1.ExpandGraphRequest:
+		if err := validateGraphBounds(typed.GetMaxNodes(), typed.GetMaxEdges()); err != nil {
+			return err
+		}
+		if len(typed.GetRootNodeIds()) == 0 || len(typed.GetRootNodeIds()) > maxGraphRoots {
+			return &RequestValidationError{Field: "root_node_ids", Reason: "must contain between 1 and 32 identities"}
+		}
+		if typed.GetMaxHops() == 0 || typed.GetMaxHops() > maxGraphHops {
+			return &RequestValidationError{Field: "max_hops", Reason: "must be between 1 and 8"}
+		}
+		if err := validateGraphCursorAndLayout(typed.GetContinuationCursor(), typed.GetLayoutAlgorithm(), typed.GetLayoutAlgorithmVersion()); err != nil {
+			return err
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
+	case *codefluxv1.SearchGraphRequest:
+		if typed.GetMaxResults() == 0 || typed.GetMaxResults() > maxGraphSearch {
+			return &RequestValidationError{Field: "max_results", Reason: "must be between 1 and 100"}
+		}
+		if len(strings.TrimSpace(typed.GetQuery())) > 256 {
+			return &RequestValidationError{Field: "query", Reason: "must not exceed 256 bytes"}
+		}
+		if err := validateGraphCursorAndLayout(typed.GetContinuationCursor(), typed.GetLayoutAlgorithm(), typed.GetLayoutAlgorithmVersion()); err != nil {
+			return err
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
+	case *codefluxv1.GetNodeRequest:
+		if err := validateGraphCursorAndLayout("", typed.GetLayoutAlgorithm(), typed.GetLayoutAlgorithmVersion()); err != nil {
+			return err
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
+	case *codefluxv1.ExplainNodeRequest:
+		if err := validateGraphCursorAndLayout("", typed.GetLayoutAlgorithm(), typed.GetLayoutAlgorithmVersion()); err != nil {
+			return err
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
+	case *codefluxv1.CompareGraphRevisionsRequest:
+		if typed.GetMaxChanges() == 0 || typed.GetMaxChanges() > maxGraphChanges {
+			return &RequestValidationError{Field: "max_changes", Reason: "must be between 1 and 500"}
+		}
+		if len(typed.GetContinuationCursor()) > 1024 {
+			return &RequestValidationError{Field: "continuation_cursor", Reason: "must not exceed 1024 bytes"}
+		}
+		return validateRequiredRequestFields(message.ProtoReflect())
 	}
 	return validateRequiredRequestFields(message.ProtoReflect())
 }
@@ -393,6 +440,9 @@ func validateRequiredRequestFields(message protoreflect.Message) error {
 			!strings.HasSuffix(string(field.Name()), "_id") {
 			continue
 		}
+		if strings.HasPrefix(string(field.Name()), "expected_") {
+			continue
+		}
 		if !message.Has(field) {
 			return &RequestValidationError{
 				Field:  string(field.Name()),
@@ -401,17 +451,20 @@ func validateRequiredRequestFields(message protoreflect.Message) error {
 		}
 	}
 	requiredStrings := map[protoreflect.FullName][]protoreflect.Name{
-		"codeflux.v1.OpenWorkspaceRequest":     {"selected_path"},
-		"codeflux.v1.CreateThreadRequest":      {"title"},
-		"codeflux.v1.SendMessageRequest":       {"body"},
-		"codeflux.v1.RenameThreadRequest":      {"title"},
-		"codeflux.v1.CreateTaskRequest":        {"requirement"},
-		"codeflux.v1.ApproveActionRequest":     {"decision", "scope"},
-		"codeflux.v1.RequestRepairRequest":     {"feedback"},
-		"codeflux.v1.GetGraphSliceRequest":     {"mode"},
-		"codeflux.v1.AcceptChangeRequest":      {"expected_diff_identity"},
-		"codeflux.v1.OpenInEditorRequest":      {"workspace_relative_path"},
-		"codeflux.v1.ConfigureProviderRequest": {"credential_reference", "model_id"},
+		"codeflux.v1.OpenWorkspaceRequest":         {"selected_path"},
+		"codeflux.v1.CreateThreadRequest":          {"title"},
+		"codeflux.v1.SendMessageRequest":           {"body"},
+		"codeflux.v1.RenameThreadRequest":          {"title"},
+		"codeflux.v1.CreateTaskRequest":            {"requirement"},
+		"codeflux.v1.ApproveActionRequest":         {"decision", "scope"},
+		"codeflux.v1.RequestRepairRequest":         {"feedback"},
+		"codeflux.v1.PreserveRecoveryPatchRequest": {"reason"},
+		"codeflux.v1.GetGraphSliceRequest":         {"mode"},
+		"codeflux.v1.ExpandGraphRequest":           {"mode", "traversal"},
+		"codeflux.v1.SearchGraphRequest":           {"mode", "query"},
+		"codeflux.v1.AcceptChangeRequest":          {"expected_diff_identity"},
+		"codeflux.v1.OpenInEditorRequest":          {"workspace_relative_path"},
+		"codeflux.v1.ConfigureProviderRequest":     {"credential_reference", "model_id"},
 	}
 	for _, fieldName := range requiredStrings[message.Descriptor().FullName()] {
 		field := message.Descriptor().Fields().ByName(fieldName)
@@ -502,10 +555,20 @@ func validateMoney(money *codefluxv1.Money, path string) error {
 
 func validateGraphBounds(nodes, edges uint32) error {
 	if nodes == 0 || nodes > maxGraphNodes {
-		return &RequestValidationError{Field: "max_nodes", Reason: "must be between 1 and 1200"}
+		return &RequestValidationError{Field: "max_nodes", Reason: "must be between 1 and 500"}
 	}
 	if edges == 0 || edges > maxGraphEdges {
-		return &RequestValidationError{Field: "max_edges", Reason: "must be between 1 and 2400"}
+		return &RequestValidationError{Field: "max_edges", Reason: "must be between 1 and 1000"}
+	}
+	return nil
+}
+
+func validateGraphCursorAndLayout(cursor, algorithm string, version uint64) error {
+	if len(cursor) > 1024 {
+		return &RequestValidationError{Field: "continuation_cursor", Reason: "must not exceed 1024 bytes"}
+	}
+	if (strings.TrimSpace(algorithm) == "") != (version == 0) {
+		return &RequestValidationError{Field: "layout", Reason: "algorithm and version must be selected together"}
 	}
 	return nil
 }

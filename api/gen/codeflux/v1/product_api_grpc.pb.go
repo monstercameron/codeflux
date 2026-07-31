@@ -527,16 +527,19 @@ var ThreadService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	TaskService_CreateTask_FullMethodName    = "/codeflux.v1.TaskService/CreateTask"
-	TaskService_GetTask_FullMethodName       = "/codeflux.v1.TaskService/GetTask"
-	TaskService_StartTask_FullMethodName     = "/codeflux.v1.TaskService/StartTask"
-	TaskService_PauseTask_FullMethodName     = "/codeflux.v1.TaskService/PauseTask"
-	TaskService_ResumeTask_FullMethodName    = "/codeflux.v1.TaskService/ResumeTask"
-	TaskService_CancelTask_FullMethodName    = "/codeflux.v1.TaskService/CancelTask"
-	TaskService_ApproveAction_FullMethodName = "/codeflux.v1.TaskService/ApproveAction"
-	TaskService_SetBudget_FullMethodName     = "/codeflux.v1.TaskService/SetBudget"
-	TaskService_RequestRepair_FullMethodName = "/codeflux.v1.TaskService/RequestRepair"
-	TaskService_RollbackTask_FullMethodName  = "/codeflux.v1.TaskService/RollbackTask"
+	TaskService_CreateTask_FullMethodName            = "/codeflux.v1.TaskService/CreateTask"
+	TaskService_GetTask_FullMethodName               = "/codeflux.v1.TaskService/GetTask"
+	TaskService_StartTask_FullMethodName             = "/codeflux.v1.TaskService/StartTask"
+	TaskService_PauseTask_FullMethodName             = "/codeflux.v1.TaskService/PauseTask"
+	TaskService_ResumeTask_FullMethodName            = "/codeflux.v1.TaskService/ResumeTask"
+	TaskService_CancelTask_FullMethodName            = "/codeflux.v1.TaskService/CancelTask"
+	TaskService_ApproveAction_FullMethodName         = "/codeflux.v1.TaskService/ApproveAction"
+	TaskService_SetBudget_FullMethodName             = "/codeflux.v1.TaskService/SetBudget"
+	TaskService_RequestRepair_FullMethodName         = "/codeflux.v1.TaskService/RequestRepair"
+	TaskService_RollbackTask_FullMethodName          = "/codeflux.v1.TaskService/RollbackTask"
+	TaskService_PreserveRecoveryPatch_FullMethodName = "/codeflux.v1.TaskService/PreserveRecoveryPatch"
+	TaskService_ReconcileRecovery_FullMethodName     = "/codeflux.v1.TaskService/ReconcileRecovery"
+	TaskService_SafeResumeRecovery_FullMethodName    = "/codeflux.v1.TaskService/SafeResumeRecovery"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -553,6 +556,9 @@ type TaskServiceClient interface {
 	SetBudget(ctx context.Context, in *SetBudgetRequest, opts ...grpc.CallOption) (*SetBudgetResponse, error)
 	RequestRepair(ctx context.Context, in *RequestRepairRequest, opts ...grpc.CallOption) (*RequestRepairResponse, error)
 	RollbackTask(ctx context.Context, in *RollbackTaskRequest, opts ...grpc.CallOption) (*RollbackTaskResponse, error)
+	PreserveRecoveryPatch(ctx context.Context, in *PreserveRecoveryPatchRequest, opts ...grpc.CallOption) (*PreserveRecoveryPatchResponse, error)
+	ReconcileRecovery(ctx context.Context, in *ReconcileRecoveryRequest, opts ...grpc.CallOption) (*ReconcileRecoveryResponse, error)
+	SafeResumeRecovery(ctx context.Context, in *SafeResumeRecoveryRequest, opts ...grpc.CallOption) (*SafeResumeRecoveryResponse, error)
 }
 
 type taskServiceClient struct {
@@ -663,6 +669,36 @@ func (c *taskServiceClient) RollbackTask(ctx context.Context, in *RollbackTaskRe
 	return out, nil
 }
 
+func (c *taskServiceClient) PreserveRecoveryPatch(ctx context.Context, in *PreserveRecoveryPatchRequest, opts ...grpc.CallOption) (*PreserveRecoveryPatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreserveRecoveryPatchResponse)
+	err := c.cc.Invoke(ctx, TaskService_PreserveRecoveryPatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ReconcileRecovery(ctx context.Context, in *ReconcileRecoveryRequest, opts ...grpc.CallOption) (*ReconcileRecoveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReconcileRecoveryResponse)
+	err := c.cc.Invoke(ctx, TaskService_ReconcileRecovery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) SafeResumeRecovery(ctx context.Context, in *SafeResumeRecoveryRequest, opts ...grpc.CallOption) (*SafeResumeRecoveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SafeResumeRecoveryResponse)
+	err := c.cc.Invoke(ctx, TaskService_SafeResumeRecovery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -677,6 +713,9 @@ type TaskServiceServer interface {
 	SetBudget(context.Context, *SetBudgetRequest) (*SetBudgetResponse, error)
 	RequestRepair(context.Context, *RequestRepairRequest) (*RequestRepairResponse, error)
 	RollbackTask(context.Context, *RollbackTaskRequest) (*RollbackTaskResponse, error)
+	PreserveRecoveryPatch(context.Context, *PreserveRecoveryPatchRequest) (*PreserveRecoveryPatchResponse, error)
+	ReconcileRecovery(context.Context, *ReconcileRecoveryRequest) (*ReconcileRecoveryResponse, error)
+	SafeResumeRecovery(context.Context, *SafeResumeRecoveryRequest) (*SafeResumeRecoveryResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -716,6 +755,15 @@ func (UnimplementedTaskServiceServer) RequestRepair(context.Context, *RequestRep
 }
 func (UnimplementedTaskServiceServer) RollbackTask(context.Context, *RollbackTaskRequest) (*RollbackTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RollbackTask not implemented")
+}
+func (UnimplementedTaskServiceServer) PreserveRecoveryPatch(context.Context, *PreserveRecoveryPatchRequest) (*PreserveRecoveryPatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreserveRecoveryPatch not implemented")
+}
+func (UnimplementedTaskServiceServer) ReconcileRecovery(context.Context, *ReconcileRecoveryRequest) (*ReconcileRecoveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReconcileRecovery not implemented")
+}
+func (UnimplementedTaskServiceServer) SafeResumeRecovery(context.Context, *SafeResumeRecoveryRequest) (*SafeResumeRecoveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SafeResumeRecovery not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -918,6 +966,60 @@ func _TaskService_RollbackTask_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_PreserveRecoveryPatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreserveRecoveryPatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).PreserveRecoveryPatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_PreserveRecoveryPatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).PreserveRecoveryPatch(ctx, req.(*PreserveRecoveryPatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ReconcileRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReconcileRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ReconcileRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ReconcileRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ReconcileRecovery(ctx, req.(*ReconcileRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_SafeResumeRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SafeResumeRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).SafeResumeRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_SafeResumeRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).SafeResumeRecovery(ctx, req.(*SafeResumeRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -965,6 +1067,18 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RollbackTask",
 			Handler:    _TaskService_RollbackTask_Handler,
 		},
+		{
+			MethodName: "PreserveRecoveryPatch",
+			Handler:    _TaskService_PreserveRecoveryPatch_Handler,
+		},
+		{
+			MethodName: "ReconcileRecovery",
+			Handler:    _TaskService_ReconcileRecovery_Handler,
+		},
+		{
+			MethodName: "SafeResumeRecovery",
+			Handler:    _TaskService_SafeResumeRecovery_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "codeflux/v1/product_api.proto",
@@ -974,6 +1088,7 @@ const (
 	GraphService_GetGraphSlice_FullMethodName         = "/codeflux.v1.GraphService/GetGraphSlice"
 	GraphService_ExpandGraph_FullMethodName           = "/codeflux.v1.GraphService/ExpandGraph"
 	GraphService_GetNode_FullMethodName               = "/codeflux.v1.GraphService/GetNode"
+	GraphService_SearchGraph_FullMethodName           = "/codeflux.v1.GraphService/SearchGraph"
 	GraphService_ExplainNode_FullMethodName           = "/codeflux.v1.GraphService/ExplainNode"
 	GraphService_CompareGraphRevisions_FullMethodName = "/codeflux.v1.GraphService/CompareGraphRevisions"
 )
@@ -985,6 +1100,7 @@ type GraphServiceClient interface {
 	GetGraphSlice(ctx context.Context, in *GetGraphSliceRequest, opts ...grpc.CallOption) (*GetGraphSliceResponse, error)
 	ExpandGraph(ctx context.Context, in *ExpandGraphRequest, opts ...grpc.CallOption) (*ExpandGraphResponse, error)
 	GetNode(ctx context.Context, in *GetNodeRequest, opts ...grpc.CallOption) (*GetNodeResponse, error)
+	SearchGraph(ctx context.Context, in *SearchGraphRequest, opts ...grpc.CallOption) (*SearchGraphResponse, error)
 	ExplainNode(ctx context.Context, in *ExplainNodeRequest, opts ...grpc.CallOption) (*ExplainNodeResponse, error)
 	CompareGraphRevisions(ctx context.Context, in *CompareGraphRevisionsRequest, opts ...grpc.CallOption) (*CompareGraphRevisionsResponse, error)
 }
@@ -1027,6 +1143,16 @@ func (c *graphServiceClient) GetNode(ctx context.Context, in *GetNodeRequest, op
 	return out, nil
 }
 
+func (c *graphServiceClient) SearchGraph(ctx context.Context, in *SearchGraphRequest, opts ...grpc.CallOption) (*SearchGraphResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchGraphResponse)
+	err := c.cc.Invoke(ctx, GraphService_SearchGraph_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *graphServiceClient) ExplainNode(ctx context.Context, in *ExplainNodeRequest, opts ...grpc.CallOption) (*ExplainNodeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExplainNodeResponse)
@@ -1054,6 +1180,7 @@ type GraphServiceServer interface {
 	GetGraphSlice(context.Context, *GetGraphSliceRequest) (*GetGraphSliceResponse, error)
 	ExpandGraph(context.Context, *ExpandGraphRequest) (*ExpandGraphResponse, error)
 	GetNode(context.Context, *GetNodeRequest) (*GetNodeResponse, error)
+	SearchGraph(context.Context, *SearchGraphRequest) (*SearchGraphResponse, error)
 	ExplainNode(context.Context, *ExplainNodeRequest) (*ExplainNodeResponse, error)
 	CompareGraphRevisions(context.Context, *CompareGraphRevisionsRequest) (*CompareGraphRevisionsResponse, error)
 	mustEmbedUnimplementedGraphServiceServer()
@@ -1074,6 +1201,9 @@ func (UnimplementedGraphServiceServer) ExpandGraph(context.Context, *ExpandGraph
 }
 func (UnimplementedGraphServiceServer) GetNode(context.Context, *GetNodeRequest) (*GetNodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetNode not implemented")
+}
+func (UnimplementedGraphServiceServer) SearchGraph(context.Context, *SearchGraphRequest) (*SearchGraphResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchGraph not implemented")
 }
 func (UnimplementedGraphServiceServer) ExplainNode(context.Context, *ExplainNodeRequest) (*ExplainNodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExplainNode not implemented")
@@ -1156,6 +1286,24 @@ func _GraphService_GetNode_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GraphService_SearchGraph_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchGraphRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GraphServiceServer).SearchGraph(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GraphService_SearchGraph_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GraphServiceServer).SearchGraph(ctx, req.(*SearchGraphRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GraphService_ExplainNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ExplainNodeRequest)
 	if err := dec(in); err != nil {
@@ -1210,6 +1358,10 @@ var GraphService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetNode",
 			Handler:    _GraphService_GetNode_Handler,
+		},
+		{
+			MethodName: "SearchGraph",
+			Handler:    _GraphService_SearchGraph_Handler,
 		},
 		{
 			MethodName: "ExplainNode",
@@ -1479,12 +1631,15 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	SettingsService_GetModels_FullMethodName         = "/codeflux.v1.SettingsService/GetModels"
-	SettingsService_GetPolicy_FullMethodName         = "/codeflux.v1.SettingsService/GetPolicy"
-	SettingsService_SetPolicy_FullMethodName         = "/codeflux.v1.SettingsService/SetPolicy"
-	SettingsService_SetBudgetDefaults_FullMethodName = "/codeflux.v1.SettingsService/SetBudgetDefaults"
-	SettingsService_ConfigureProvider_FullMethodName = "/codeflux.v1.SettingsService/ConfigureProvider"
-	SettingsService_TestProvider_FullMethodName      = "/codeflux.v1.SettingsService/TestProvider"
+	SettingsService_GetModels_FullMethodName               = "/codeflux.v1.SettingsService/GetModels"
+	SettingsService_GetPolicy_FullMethodName               = "/codeflux.v1.SettingsService/GetPolicy"
+	SettingsService_SetPolicy_FullMethodName               = "/codeflux.v1.SettingsService/SetPolicy"
+	SettingsService_SetBudgetDefaults_FullMethodName       = "/codeflux.v1.SettingsService/SetBudgetDefaults"
+	SettingsService_ConfigureProvider_FullMethodName       = "/codeflux.v1.SettingsService/ConfigureProvider"
+	SettingsService_TestProvider_FullMethodName            = "/codeflux.v1.SettingsService/TestProvider"
+	SettingsService_RecordFrontendTelemetry_FullMethodName = "/codeflux.v1.SettingsService/RecordFrontendTelemetry"
+	SettingsService_ListFrontendTelemetry_FullMethodName   = "/codeflux.v1.SettingsService/ListFrontendTelemetry"
+	SettingsService_DeleteFrontendTelemetry_FullMethodName = "/codeflux.v1.SettingsService/DeleteFrontendTelemetry"
 )
 
 // SettingsServiceClient is the client API for SettingsService service.
@@ -1497,6 +1652,9 @@ type SettingsServiceClient interface {
 	SetBudgetDefaults(ctx context.Context, in *SetBudgetDefaultsRequest, opts ...grpc.CallOption) (*SetBudgetDefaultsResponse, error)
 	ConfigureProvider(ctx context.Context, in *ConfigureProviderRequest, opts ...grpc.CallOption) (*ConfigureProviderResponse, error)
 	TestProvider(ctx context.Context, in *TestProviderRequest, opts ...grpc.CallOption) (*TestProviderResponse, error)
+	RecordFrontendTelemetry(ctx context.Context, in *RecordFrontendTelemetryRequest, opts ...grpc.CallOption) (*RecordFrontendTelemetryResponse, error)
+	ListFrontendTelemetry(ctx context.Context, in *ListFrontendTelemetryRequest, opts ...grpc.CallOption) (*ListFrontendTelemetryResponse, error)
+	DeleteFrontendTelemetry(ctx context.Context, in *DeleteFrontendTelemetryRequest, opts ...grpc.CallOption) (*DeleteFrontendTelemetryResponse, error)
 }
 
 type settingsServiceClient struct {
@@ -1567,6 +1725,36 @@ func (c *settingsServiceClient) TestProvider(ctx context.Context, in *TestProvid
 	return out, nil
 }
 
+func (c *settingsServiceClient) RecordFrontendTelemetry(ctx context.Context, in *RecordFrontendTelemetryRequest, opts ...grpc.CallOption) (*RecordFrontendTelemetryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordFrontendTelemetryResponse)
+	err := c.cc.Invoke(ctx, SettingsService_RecordFrontendTelemetry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingsServiceClient) ListFrontendTelemetry(ctx context.Context, in *ListFrontendTelemetryRequest, opts ...grpc.CallOption) (*ListFrontendTelemetryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFrontendTelemetryResponse)
+	err := c.cc.Invoke(ctx, SettingsService_ListFrontendTelemetry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingsServiceClient) DeleteFrontendTelemetry(ctx context.Context, in *DeleteFrontendTelemetryRequest, opts ...grpc.CallOption) (*DeleteFrontendTelemetryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteFrontendTelemetryResponse)
+	err := c.cc.Invoke(ctx, SettingsService_DeleteFrontendTelemetry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SettingsServiceServer is the server API for SettingsService service.
 // All implementations must embed UnimplementedSettingsServiceServer
 // for forward compatibility.
@@ -1577,6 +1765,9 @@ type SettingsServiceServer interface {
 	SetBudgetDefaults(context.Context, *SetBudgetDefaultsRequest) (*SetBudgetDefaultsResponse, error)
 	ConfigureProvider(context.Context, *ConfigureProviderRequest) (*ConfigureProviderResponse, error)
 	TestProvider(context.Context, *TestProviderRequest) (*TestProviderResponse, error)
+	RecordFrontendTelemetry(context.Context, *RecordFrontendTelemetryRequest) (*RecordFrontendTelemetryResponse, error)
+	ListFrontendTelemetry(context.Context, *ListFrontendTelemetryRequest) (*ListFrontendTelemetryResponse, error)
+	DeleteFrontendTelemetry(context.Context, *DeleteFrontendTelemetryRequest) (*DeleteFrontendTelemetryResponse, error)
 	mustEmbedUnimplementedSettingsServiceServer()
 }
 
@@ -1604,6 +1795,15 @@ func (UnimplementedSettingsServiceServer) ConfigureProvider(context.Context, *Co
 }
 func (UnimplementedSettingsServiceServer) TestProvider(context.Context, *TestProviderRequest) (*TestProviderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestProvider not implemented")
+}
+func (UnimplementedSettingsServiceServer) RecordFrontendTelemetry(context.Context, *RecordFrontendTelemetryRequest) (*RecordFrontendTelemetryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordFrontendTelemetry not implemented")
+}
+func (UnimplementedSettingsServiceServer) ListFrontendTelemetry(context.Context, *ListFrontendTelemetryRequest) (*ListFrontendTelemetryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFrontendTelemetry not implemented")
+}
+func (UnimplementedSettingsServiceServer) DeleteFrontendTelemetry(context.Context, *DeleteFrontendTelemetryRequest) (*DeleteFrontendTelemetryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteFrontendTelemetry not implemented")
 }
 func (UnimplementedSettingsServiceServer) mustEmbedUnimplementedSettingsServiceServer() {}
 func (UnimplementedSettingsServiceServer) testEmbeddedByValue()                         {}
@@ -1734,6 +1934,60 @@ func _SettingsService_TestProvider_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingsService_RecordFrontendTelemetry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordFrontendTelemetryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).RecordFrontendTelemetry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_RecordFrontendTelemetry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).RecordFrontendTelemetry(ctx, req.(*RecordFrontendTelemetryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingsService_ListFrontendTelemetry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFrontendTelemetryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).ListFrontendTelemetry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_ListFrontendTelemetry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).ListFrontendTelemetry(ctx, req.(*ListFrontendTelemetryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingsService_DeleteFrontendTelemetry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFrontendTelemetryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).DeleteFrontendTelemetry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_DeleteFrontendTelemetry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).DeleteFrontendTelemetry(ctx, req.(*DeleteFrontendTelemetryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SettingsService_ServiceDesc is the grpc.ServiceDesc for SettingsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1765,19 +2019,33 @@ var SettingsService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "TestProvider",
 			Handler:    _SettingsService_TestProvider_Handler,
 		},
+		{
+			MethodName: "RecordFrontendTelemetry",
+			Handler:    _SettingsService_RecordFrontendTelemetry_Handler,
+		},
+		{
+			MethodName: "ListFrontendTelemetry",
+			Handler:    _SettingsService_ListFrontendTelemetry_Handler,
+		},
+		{
+			MethodName: "DeleteFrontendTelemetry",
+			Handler:    _SettingsService_DeleteFrontendTelemetry_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "codeflux/v1/product_api.proto",
 }
 
 const (
-	SessionService_SubscribeSession_FullMethodName = "/codeflux.v1.SessionService/SubscribeSession"
+	SessionService_GetSessionSnapshot_FullMethodName = "/codeflux.v1.SessionService/GetSessionSnapshot"
+	SessionService_SubscribeSession_FullMethodName   = "/codeflux.v1.SessionService/SubscribeSession"
 )
 
 // SessionServiceClient is the client API for SessionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SessionServiceClient interface {
+	GetSessionSnapshot(ctx context.Context, in *GetSessionSnapshotRequest, opts ...grpc.CallOption) (*GetSessionSnapshotResponse, error)
 	SubscribeSession(ctx context.Context, in *SubscribeSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeSessionResponse], error)
 }
 
@@ -1787,6 +2055,16 @@ type sessionServiceClient struct {
 
 func NewSessionServiceClient(cc grpc.ClientConnInterface) SessionServiceClient {
 	return &sessionServiceClient{cc}
+}
+
+func (c *sessionServiceClient) GetSessionSnapshot(ctx context.Context, in *GetSessionSnapshotRequest, opts ...grpc.CallOption) (*GetSessionSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSessionSnapshotResponse)
+	err := c.cc.Invoke(ctx, SessionService_GetSessionSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *sessionServiceClient) SubscribeSession(ctx context.Context, in *SubscribeSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeSessionResponse], error) {
@@ -1812,6 +2090,7 @@ type SessionService_SubscribeSessionClient = grpc.ServerStreamingClient[Subscrib
 // All implementations must embed UnimplementedSessionServiceServer
 // for forward compatibility.
 type SessionServiceServer interface {
+	GetSessionSnapshot(context.Context, *GetSessionSnapshotRequest) (*GetSessionSnapshotResponse, error)
 	SubscribeSession(*SubscribeSessionRequest, grpc.ServerStreamingServer[SubscribeSessionResponse]) error
 	mustEmbedUnimplementedSessionServiceServer()
 }
@@ -1823,6 +2102,9 @@ type SessionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSessionServiceServer struct{}
 
+func (UnimplementedSessionServiceServer) GetSessionSnapshot(context.Context, *GetSessionSnapshotRequest) (*GetSessionSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSessionSnapshot not implemented")
+}
 func (UnimplementedSessionServiceServer) SubscribeSession(*SubscribeSessionRequest, grpc.ServerStreamingServer[SubscribeSessionResponse]) error {
 	return status.Error(codes.Unimplemented, "method SubscribeSession not implemented")
 }
@@ -1847,6 +2129,24 @@ func RegisterSessionServiceServer(s grpc.ServiceRegistrar, srv SessionServiceSer
 	s.RegisterService(&SessionService_ServiceDesc, srv)
 }
 
+func _SessionService_GetSessionSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSessionSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).GetSessionSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_GetSessionSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).GetSessionSnapshot(ctx, req.(*GetSessionSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SessionService_SubscribeSession_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SubscribeSessionRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -1864,7 +2164,12 @@ type SessionService_SubscribeSessionServer = grpc.ServerStreamingServer[Subscrib
 var SessionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "codeflux.v1.SessionService",
 	HandlerType: (*SessionServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetSessionSnapshot",
+			Handler:    _SessionService_GetSessionSnapshot_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "SubscribeSession",

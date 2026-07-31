@@ -24,30 +24,32 @@ const (
 type SessionEventKind int32
 
 const (
-	SessionEventKind_SESSION_EVENT_KIND_UNSPECIFIED        SessionEventKind = 0
-	SessionEventKind_SESSION_EVENT_KIND_MESSAGE_DELTA      SessionEventKind = 1
-	SessionEventKind_SESSION_EVENT_KIND_MESSAGE_FINAL      SessionEventKind = 2
-	SessionEventKind_SESSION_EVENT_KIND_PLAN_CREATED       SessionEventKind = 3
-	SessionEventKind_SESSION_EVENT_KIND_PLAN_CHANGED       SessionEventKind = 4
-	SessionEventKind_SESSION_EVENT_KIND_TOOL_STARTED       SessionEventKind = 5
-	SessionEventKind_SESSION_EVENT_KIND_TOOL_PROGRESS      SessionEventKind = 6
-	SessionEventKind_SESSION_EVENT_KIND_TOOL_COMPLETED     SessionEventKind = 7
-	SessionEventKind_SESSION_EVENT_KIND_APPROVAL_REQUESTED SessionEventKind = 8
-	SessionEventKind_SESSION_EVENT_KIND_APPROVAL_RESOLVED  SessionEventKind = 9
-	SessionEventKind_SESSION_EVENT_KIND_TASK_STATE_CHANGED SessionEventKind = 10
-	SessionEventKind_SESSION_EVENT_KIND_FORECAST_UPDATED   SessionEventKind = 11
-	SessionEventKind_SESSION_EVENT_KIND_USAGE_UPDATED      SessionEventKind = 12
-	SessionEventKind_SESSION_EVENT_KIND_COST_UPDATED       SessionEventKind = 13
-	SessionEventKind_SESSION_EVENT_KIND_BUDGET_UPDATED     SessionEventKind = 14
-	SessionEventKind_SESSION_EVENT_KIND_VALIDATION_UPDATED SessionEventKind = 15
-	SessionEventKind_SESSION_EVENT_KIND_GRAPH_SNAPSHOT     SessionEventKind = 16
-	SessionEventKind_SESSION_EVENT_KIND_GRAPH_PATCH        SessionEventKind = 17
-	SessionEventKind_SESSION_EVENT_KIND_CHECKPOINT_CREATED SessionEventKind = 18
-	SessionEventKind_SESSION_EVENT_KIND_RECOVERY_REQUIRED  SessionEventKind = 19
-	SessionEventKind_SESSION_EVENT_KIND_ERROR              SessionEventKind = 20
-	SessionEventKind_SESSION_EVENT_KIND_THREAD_CREATED     SessionEventKind = 21
-	SessionEventKind_SESSION_EVENT_KIND_THREAD_RENAMED     SessionEventKind = 22
-	SessionEventKind_SESSION_EVENT_KIND_THREAD_ARCHIVED    SessionEventKind = 23
+	SessionEventKind_SESSION_EVENT_KIND_UNSPECIFIED                 SessionEventKind = 0
+	SessionEventKind_SESSION_EVENT_KIND_MESSAGE_DELTA               SessionEventKind = 1
+	SessionEventKind_SESSION_EVENT_KIND_MESSAGE_FINAL               SessionEventKind = 2
+	SessionEventKind_SESSION_EVENT_KIND_PLAN_CREATED                SessionEventKind = 3
+	SessionEventKind_SESSION_EVENT_KIND_PLAN_CHANGED                SessionEventKind = 4
+	SessionEventKind_SESSION_EVENT_KIND_TOOL_STARTED                SessionEventKind = 5
+	SessionEventKind_SESSION_EVENT_KIND_TOOL_PROGRESS               SessionEventKind = 6
+	SessionEventKind_SESSION_EVENT_KIND_TOOL_COMPLETED              SessionEventKind = 7
+	SessionEventKind_SESSION_EVENT_KIND_APPROVAL_REQUESTED          SessionEventKind = 8
+	SessionEventKind_SESSION_EVENT_KIND_APPROVAL_RESOLVED           SessionEventKind = 9
+	SessionEventKind_SESSION_EVENT_KIND_TASK_STATE_CHANGED          SessionEventKind = 10
+	SessionEventKind_SESSION_EVENT_KIND_FORECAST_UPDATED            SessionEventKind = 11
+	SessionEventKind_SESSION_EVENT_KIND_USAGE_UPDATED               SessionEventKind = 12
+	SessionEventKind_SESSION_EVENT_KIND_COST_UPDATED                SessionEventKind = 13
+	SessionEventKind_SESSION_EVENT_KIND_BUDGET_UPDATED              SessionEventKind = 14
+	SessionEventKind_SESSION_EVENT_KIND_VALIDATION_UPDATED          SessionEventKind = 15
+	SessionEventKind_SESSION_EVENT_KIND_GRAPH_SNAPSHOT              SessionEventKind = 16
+	SessionEventKind_SESSION_EVENT_KIND_GRAPH_PATCH                 SessionEventKind = 17
+	SessionEventKind_SESSION_EVENT_KIND_CHECKPOINT_CREATED          SessionEventKind = 18
+	SessionEventKind_SESSION_EVENT_KIND_RECOVERY_REQUIRED           SessionEventKind = 19
+	SessionEventKind_SESSION_EVENT_KIND_ERROR                       SessionEventKind = 20
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_CREATED              SessionEventKind = 21
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_RENAMED              SessionEventKind = 22
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_ARCHIVED             SessionEventKind = 23
+	SessionEventKind_SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED   SessionEventKind = 24
+	SessionEventKind_SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED SessionEventKind = 25
 )
 
 // Enum value maps for SessionEventKind.
@@ -77,32 +79,36 @@ var (
 		21: "SESSION_EVENT_KIND_THREAD_CREATED",
 		22: "SESSION_EVENT_KIND_THREAD_RENAMED",
 		23: "SESSION_EVENT_KIND_THREAD_ARCHIVED",
+		24: "SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED",
+		25: "SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED",
 	}
 	SessionEventKind_value = map[string]int32{
-		"SESSION_EVENT_KIND_UNSPECIFIED":        0,
-		"SESSION_EVENT_KIND_MESSAGE_DELTA":      1,
-		"SESSION_EVENT_KIND_MESSAGE_FINAL":      2,
-		"SESSION_EVENT_KIND_PLAN_CREATED":       3,
-		"SESSION_EVENT_KIND_PLAN_CHANGED":       4,
-		"SESSION_EVENT_KIND_TOOL_STARTED":       5,
-		"SESSION_EVENT_KIND_TOOL_PROGRESS":      6,
-		"SESSION_EVENT_KIND_TOOL_COMPLETED":     7,
-		"SESSION_EVENT_KIND_APPROVAL_REQUESTED": 8,
-		"SESSION_EVENT_KIND_APPROVAL_RESOLVED":  9,
-		"SESSION_EVENT_KIND_TASK_STATE_CHANGED": 10,
-		"SESSION_EVENT_KIND_FORECAST_UPDATED":   11,
-		"SESSION_EVENT_KIND_USAGE_UPDATED":      12,
-		"SESSION_EVENT_KIND_COST_UPDATED":       13,
-		"SESSION_EVENT_KIND_BUDGET_UPDATED":     14,
-		"SESSION_EVENT_KIND_VALIDATION_UPDATED": 15,
-		"SESSION_EVENT_KIND_GRAPH_SNAPSHOT":     16,
-		"SESSION_EVENT_KIND_GRAPH_PATCH":        17,
-		"SESSION_EVENT_KIND_CHECKPOINT_CREATED": 18,
-		"SESSION_EVENT_KIND_RECOVERY_REQUIRED":  19,
-		"SESSION_EVENT_KIND_ERROR":              20,
-		"SESSION_EVENT_KIND_THREAD_CREATED":     21,
-		"SESSION_EVENT_KIND_THREAD_RENAMED":     22,
-		"SESSION_EVENT_KIND_THREAD_ARCHIVED":    23,
+		"SESSION_EVENT_KIND_UNSPECIFIED":                 0,
+		"SESSION_EVENT_KIND_MESSAGE_DELTA":               1,
+		"SESSION_EVENT_KIND_MESSAGE_FINAL":               2,
+		"SESSION_EVENT_KIND_PLAN_CREATED":                3,
+		"SESSION_EVENT_KIND_PLAN_CHANGED":                4,
+		"SESSION_EVENT_KIND_TOOL_STARTED":                5,
+		"SESSION_EVENT_KIND_TOOL_PROGRESS":               6,
+		"SESSION_EVENT_KIND_TOOL_COMPLETED":              7,
+		"SESSION_EVENT_KIND_APPROVAL_REQUESTED":          8,
+		"SESSION_EVENT_KIND_APPROVAL_RESOLVED":           9,
+		"SESSION_EVENT_KIND_TASK_STATE_CHANGED":          10,
+		"SESSION_EVENT_KIND_FORECAST_UPDATED":            11,
+		"SESSION_EVENT_KIND_USAGE_UPDATED":               12,
+		"SESSION_EVENT_KIND_COST_UPDATED":                13,
+		"SESSION_EVENT_KIND_BUDGET_UPDATED":              14,
+		"SESSION_EVENT_KIND_VALIDATION_UPDATED":          15,
+		"SESSION_EVENT_KIND_GRAPH_SNAPSHOT":              16,
+		"SESSION_EVENT_KIND_GRAPH_PATCH":                 17,
+		"SESSION_EVENT_KIND_CHECKPOINT_CREATED":          18,
+		"SESSION_EVENT_KIND_RECOVERY_REQUIRED":           19,
+		"SESSION_EVENT_KIND_ERROR":                       20,
+		"SESSION_EVENT_KIND_THREAD_CREATED":              21,
+		"SESSION_EVENT_KIND_THREAD_RENAMED":              22,
+		"SESSION_EVENT_KIND_THREAD_ARCHIVED":             23,
+		"SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED":   24,
+		"SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED": 25,
 	}
 )
 
@@ -165,6 +171,8 @@ type SessionEvent struct {
 	//	*SessionEvent_ThreadCreated
 	//	*SessionEvent_ThreadRenamed
 	//	*SessionEvent_ThreadArchived
+	//	*SessionEvent_ChangeAcceptance
+	//	*SessionEvent_TaskProjectionInvalidated
 	Payload       isSessionEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -439,6 +447,24 @@ func (x *SessionEvent) GetThreadArchived() *ThreadArchivedEvent {
 	return nil
 }
 
+func (x *SessionEvent) GetChangeAcceptance() *ChangeAcceptanceEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*SessionEvent_ChangeAcceptance); ok {
+			return x.ChangeAcceptance
+		}
+	}
+	return nil
+}
+
+func (x *SessionEvent) GetTaskProjectionInvalidated() *TaskProjectionInvalidatedEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*SessionEvent_TaskProjectionInvalidated); ok {
+			return x.TaskProjectionInvalidated
+		}
+	}
+	return nil
+}
+
 type isSessionEvent_Payload interface {
 	isSessionEvent_Payload()
 }
@@ -515,6 +541,14 @@ type SessionEvent_ThreadArchived struct {
 	ThreadArchived *ThreadArchivedEvent `protobuf:"bytes,37,opt,name=thread_archived,json=threadArchived,proto3,oneof"`
 }
 
+type SessionEvent_ChangeAcceptance struct {
+	ChangeAcceptance *ChangeAcceptanceEvent `protobuf:"bytes,38,opt,name=change_acceptance,json=changeAcceptance,proto3,oneof"`
+}
+
+type SessionEvent_TaskProjectionInvalidated struct {
+	TaskProjectionInvalidated *TaskProjectionInvalidatedEvent `protobuf:"bytes,39,opt,name=task_projection_invalidated,json=taskProjectionInvalidated,proto3,oneof"`
+}
+
 func (*SessionEvent_MessageDelta) isSessionEvent_Payload() {}
 
 func (*SessionEvent_MessageFinal) isSessionEvent_Payload() {}
@@ -551,6 +585,62 @@ func (*SessionEvent_ThreadRenamed) isSessionEvent_Payload() {}
 
 func (*SessionEvent_ThreadArchived) isSessionEvent_Payload() {}
 
+func (*SessionEvent_ChangeAcceptance) isSessionEvent_Payload() {}
+
+func (*SessionEvent_TaskProjectionInvalidated) isSessionEvent_Payload() {}
+
+type TaskProjectionInvalidatedEvent struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Entity         string                 `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"`
+	EntityRevision uint64                 `protobuf:"varint,2,opt,name=entity_revision,json=entityRevision,proto3" json:"entity_revision,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TaskProjectionInvalidatedEvent) Reset() {
+	*x = TaskProjectionInvalidatedEvent{}
+	mi := &file_codeflux_v1_session_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskProjectionInvalidatedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskProjectionInvalidatedEvent) ProtoMessage() {}
+
+func (x *TaskProjectionInvalidatedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_session_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskProjectionInvalidatedEvent.ProtoReflect.Descriptor instead.
+func (*TaskProjectionInvalidatedEvent) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TaskProjectionInvalidatedEvent) GetEntity() string {
+	if x != nil {
+		return x.Entity
+	}
+	return ""
+}
+
+func (x *TaskProjectionInvalidatedEvent) GetEntityRevision() uint64 {
+	if x != nil {
+		return x.EntityRevision
+	}
+	return 0
+}
+
 type MessageDeltaEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MessageId     *StableIdentity        `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
@@ -561,7 +651,7 @@ type MessageDeltaEvent struct {
 
 func (x *MessageDeltaEvent) Reset() {
 	*x = MessageDeltaEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[1]
+	mi := &file_codeflux_v1_session_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -573,7 +663,7 @@ func (x *MessageDeltaEvent) String() string {
 func (*MessageDeltaEvent) ProtoMessage() {}
 
 func (x *MessageDeltaEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[1]
+	mi := &file_codeflux_v1_session_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -586,7 +676,7 @@ func (x *MessageDeltaEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageDeltaEvent.ProtoReflect.Descriptor instead.
 func (*MessageDeltaEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{1}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MessageDeltaEvent) GetMessageId() *StableIdentity {
@@ -614,7 +704,7 @@ type MessageFinalEvent struct {
 
 func (x *MessageFinalEvent) Reset() {
 	*x = MessageFinalEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[2]
+	mi := &file_codeflux_v1_session_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -626,7 +716,7 @@ func (x *MessageFinalEvent) String() string {
 func (*MessageFinalEvent) ProtoMessage() {}
 
 func (x *MessageFinalEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[2]
+	mi := &file_codeflux_v1_session_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -639,7 +729,7 @@ func (x *MessageFinalEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageFinalEvent.ProtoReflect.Descriptor instead.
 func (*MessageFinalEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{2}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *MessageFinalEvent) GetMessageId() *StableIdentity {
@@ -674,7 +764,7 @@ type ThreadCreatedEvent struct {
 
 func (x *ThreadCreatedEvent) Reset() {
 	*x = ThreadCreatedEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	mi := &file_codeflux_v1_session_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -686,7 +776,7 @@ func (x *ThreadCreatedEvent) String() string {
 func (*ThreadCreatedEvent) ProtoMessage() {}
 
 func (x *ThreadCreatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	mi := &file_codeflux_v1_session_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -699,7 +789,7 @@ func (x *ThreadCreatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadCreatedEvent.ProtoReflect.Descriptor instead.
 func (*ThreadCreatedEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ThreadCreatedEvent) GetWorkspaceId() *StableIdentity {
@@ -733,7 +823,7 @@ type ThreadRenamedEvent struct {
 
 func (x *ThreadRenamedEvent) Reset() {
 	*x = ThreadRenamedEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	mi := &file_codeflux_v1_session_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -745,7 +835,7 @@ func (x *ThreadRenamedEvent) String() string {
 func (*ThreadRenamedEvent) ProtoMessage() {}
 
 func (x *ThreadRenamedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	mi := &file_codeflux_v1_session_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -758,7 +848,7 @@ func (x *ThreadRenamedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadRenamedEvent.ProtoReflect.Descriptor instead.
 func (*ThreadRenamedEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{4}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ThreadRenamedEvent) GetPreviousTitle() string {
@@ -784,7 +874,7 @@ type ThreadArchivedEvent struct {
 
 func (x *ThreadArchivedEvent) Reset() {
 	*x = ThreadArchivedEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	mi := &file_codeflux_v1_session_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +886,7 @@ func (x *ThreadArchivedEvent) String() string {
 func (*ThreadArchivedEvent) ProtoMessage() {}
 
 func (x *ThreadArchivedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	mi := &file_codeflux_v1_session_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -809,7 +899,7 @@ func (x *ThreadArchivedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThreadArchivedEvent.ProtoReflect.Descriptor instead.
 func (*ThreadArchivedEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{5}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ThreadArchivedEvent) GetArchived() bool {
@@ -829,7 +919,7 @@ type PlanEvent struct {
 
 func (x *PlanEvent) Reset() {
 	*x = PlanEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[6]
+	mi := &file_codeflux_v1_session_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -841,7 +931,7 @@ func (x *PlanEvent) String() string {
 func (*PlanEvent) ProtoMessage() {}
 
 func (x *PlanEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[6]
+	mi := &file_codeflux_v1_session_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -854,7 +944,7 @@ func (x *PlanEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanEvent.ProtoReflect.Descriptor instead.
 func (*PlanEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{6}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PlanEvent) GetPlanRevision() uint64 {
@@ -883,7 +973,7 @@ type ToolEvent struct {
 
 func (x *ToolEvent) Reset() {
 	*x = ToolEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[7]
+	mi := &file_codeflux_v1_session_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -895,7 +985,7 @@ func (x *ToolEvent) String() string {
 func (*ToolEvent) ProtoMessage() {}
 
 func (x *ToolEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[7]
+	mi := &file_codeflux_v1_session_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -908,7 +998,7 @@ func (x *ToolEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolEvent.ProtoReflect.Descriptor instead.
 func (*ToolEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{7}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ToolEvent) GetExecutionId() string {
@@ -951,7 +1041,7 @@ type ApprovalEvent struct {
 
 func (x *ApprovalEvent) Reset() {
 	*x = ApprovalEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[8]
+	mi := &file_codeflux_v1_session_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -963,7 +1053,7 @@ func (x *ApprovalEvent) String() string {
 func (*ApprovalEvent) ProtoMessage() {}
 
 func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[8]
+	mi := &file_codeflux_v1_session_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -976,7 +1066,7 @@ func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalEvent.ProtoReflect.Descriptor instead.
 func (*ApprovalEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{8}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ApprovalEvent) GetApprovalId() *StableIdentity {
@@ -1018,7 +1108,7 @@ type TaskStateChangedEvent struct {
 
 func (x *TaskStateChangedEvent) Reset() {
 	*x = TaskStateChangedEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[9]
+	mi := &file_codeflux_v1_session_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1030,7 +1120,7 @@ func (x *TaskStateChangedEvent) String() string {
 func (*TaskStateChangedEvent) ProtoMessage() {}
 
 func (x *TaskStateChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[9]
+	mi := &file_codeflux_v1_session_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1043,7 +1133,7 @@ func (x *TaskStateChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskStateChangedEvent.ProtoReflect.Descriptor instead.
 func (*TaskStateChangedEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{9}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TaskStateChangedEvent) GetFrom() string {
@@ -1085,7 +1175,7 @@ type ForecastEvent struct {
 
 func (x *ForecastEvent) Reset() {
 	*x = ForecastEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[10]
+	mi := &file_codeflux_v1_session_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +1187,7 @@ func (x *ForecastEvent) String() string {
 func (*ForecastEvent) ProtoMessage() {}
 
 func (x *ForecastEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[10]
+	mi := &file_codeflux_v1_session_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1200,7 @@ func (x *ForecastEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForecastEvent.ProtoReflect.Descriptor instead.
 func (*ForecastEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{10}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ForecastEvent) GetCostKnown() bool {
@@ -1196,7 +1286,7 @@ type UsageEvent struct {
 
 func (x *UsageEvent) Reset() {
 	*x = UsageEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[11]
+	mi := &file_codeflux_v1_session_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1208,7 +1298,7 @@ func (x *UsageEvent) String() string {
 func (*UsageEvent) ProtoMessage() {}
 
 func (x *UsageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[11]
+	mi := &file_codeflux_v1_session_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1221,7 +1311,7 @@ func (x *UsageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageEvent.ProtoReflect.Descriptor instead.
 func (*UsageEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{11}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UsageEvent) GetKnown() bool {
@@ -1270,7 +1360,7 @@ type CostEvent struct {
 
 func (x *CostEvent) Reset() {
 	*x = CostEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[12]
+	mi := &file_codeflux_v1_session_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1282,7 +1372,7 @@ func (x *CostEvent) String() string {
 func (*CostEvent) ProtoMessage() {}
 
 func (x *CostEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[12]
+	mi := &file_codeflux_v1_session_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1295,7 +1385,7 @@ func (x *CostEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CostEvent.ProtoReflect.Descriptor instead.
 func (*CostEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{12}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CostEvent) GetKnown() bool {
@@ -1331,7 +1421,7 @@ type BudgetEvent struct {
 
 func (x *BudgetEvent) Reset() {
 	*x = BudgetEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[13]
+	mi := &file_codeflux_v1_session_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1343,7 +1433,7 @@ func (x *BudgetEvent) String() string {
 func (*BudgetEvent) ProtoMessage() {}
 
 func (x *BudgetEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[13]
+	mi := &file_codeflux_v1_session_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1356,7 +1446,7 @@ func (x *BudgetEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BudgetEvent.ProtoReflect.Descriptor instead.
 func (*BudgetEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{13}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *BudgetEvent) GetHardLimitMinor() int64 {
@@ -1392,13 +1482,16 @@ type ValidationEvent struct {
 	ValidationId    *StableIdentity        `protobuf:"bytes,1,opt,name=validation_id,json=validationId,proto3" json:"validation_id,omitempty"`
 	State           string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
 	RedactedSummary string                 `protobuf:"bytes,3,opt,name=redacted_summary,json=redactedSummary,proto3" json:"redacted_summary,omitempty"`
+	Required        bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
+	Acknowledged    bool                   `protobuf:"varint,5,opt,name=acknowledged,proto3" json:"acknowledged,omitempty"`
+	DiffRevision    uint64                 `protobuf:"varint,6,opt,name=diff_revision,json=diffRevision,proto3" json:"diff_revision,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ValidationEvent) Reset() {
 	*x = ValidationEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[14]
+	mi := &file_codeflux_v1_session_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1503,7 @@ func (x *ValidationEvent) String() string {
 func (*ValidationEvent) ProtoMessage() {}
 
 func (x *ValidationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[14]
+	mi := &file_codeflux_v1_session_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1516,7 @@ func (x *ValidationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationEvent.ProtoReflect.Descriptor instead.
 func (*ValidationEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{14}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ValidationEvent) GetValidationId() *StableIdentity {
@@ -1447,6 +1540,27 @@ func (x *ValidationEvent) GetRedactedSummary() string {
 	return ""
 }
 
+func (x *ValidationEvent) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *ValidationEvent) GetAcknowledged() bool {
+	if x != nil {
+		return x.Acknowledged
+	}
+	return false
+}
+
+func (x *ValidationEvent) GetDiffRevision() uint64 {
+	if x != nil {
+		return x.DiffRevision
+	}
+	return 0
+}
+
 type GraphEvent struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	GraphRevisionId *StableIdentity        `protobuf:"bytes,1,opt,name=graph_revision_id,json=graphRevisionId,proto3" json:"graph_revision_id,omitempty"`
@@ -1457,7 +1571,7 @@ type GraphEvent struct {
 
 func (x *GraphEvent) Reset() {
 	*x = GraphEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[15]
+	mi := &file_codeflux_v1_session_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1469,7 +1583,7 @@ func (x *GraphEvent) String() string {
 func (*GraphEvent) ProtoMessage() {}
 
 func (x *GraphEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[15]
+	mi := &file_codeflux_v1_session_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1482,7 +1596,7 @@ func (x *GraphEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GraphEvent.ProtoReflect.Descriptor instead.
 func (*GraphEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{15}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GraphEvent) GetGraphRevisionId() *StableIdentity {
@@ -1503,13 +1617,14 @@ type CheckpointEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CheckpointId  *StableIdentity        `protobuf:"bytes,1,opt,name=checkpoint_id,json=checkpointId,proto3" json:"checkpoint_id,omitempty"`
 	TaskRevision  uint64                 `protobuf:"varint,2,opt,name=task_revision,json=taskRevision,proto3" json:"task_revision,omitempty"`
+	PlanStep      string                 `protobuf:"bytes,3,opt,name=plan_step,json=planStep,proto3" json:"plan_step,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CheckpointEvent) Reset() {
 	*x = CheckpointEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[16]
+	mi := &file_codeflux_v1_session_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1521,7 +1636,7 @@ func (x *CheckpointEvent) String() string {
 func (*CheckpointEvent) ProtoMessage() {}
 
 func (x *CheckpointEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[16]
+	mi := &file_codeflux_v1_session_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1534,7 +1649,7 @@ func (x *CheckpointEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckpointEvent.ProtoReflect.Descriptor instead.
 func (*CheckpointEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{16}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CheckpointEvent) GetCheckpointId() *StableIdentity {
@@ -1551,17 +1666,121 @@ func (x *CheckpointEvent) GetTaskRevision() uint64 {
 	return 0
 }
 
+func (x *CheckpointEvent) GetPlanStep() string {
+	if x != nil {
+		return x.PlanStep
+	}
+	return ""
+}
+
+type ChangeAcceptanceEvent struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	State              string                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
+	DiffRevision       uint64                 `protobuf:"varint,2,opt,name=diff_revision,json=diffRevision,proto3" json:"diff_revision,omitempty"`
+	PlanRevision       uint64                 `protobuf:"varint,3,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
+	ValidationRevision uint64                 `protobuf:"varint,4,opt,name=validation_revision,json=validationRevision,proto3" json:"validation_revision,omitempty"`
+	EvidenceRevision   uint64                 `protobuf:"varint,5,opt,name=evidence_revision,json=evidenceRevision,proto3" json:"evidence_revision,omitempty"`
+	GraphRevision      uint64                 `protobuf:"varint,6,opt,name=graph_revision,json=graphRevision,proto3" json:"graph_revision,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ChangeAcceptanceEvent) Reset() {
+	*x = ChangeAcceptanceEvent{}
+	mi := &file_codeflux_v1_session_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeAcceptanceEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeAcceptanceEvent) ProtoMessage() {}
+
+func (x *ChangeAcceptanceEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_session_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeAcceptanceEvent.ProtoReflect.Descriptor instead.
+func (*ChangeAcceptanceEvent) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ChangeAcceptanceEvent) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ChangeAcceptanceEvent) GetDiffRevision() uint64 {
+	if x != nil {
+		return x.DiffRevision
+	}
+	return 0
+}
+
+func (x *ChangeAcceptanceEvent) GetPlanRevision() uint64 {
+	if x != nil {
+		return x.PlanRevision
+	}
+	return 0
+}
+
+func (x *ChangeAcceptanceEvent) GetValidationRevision() uint64 {
+	if x != nil {
+		return x.ValidationRevision
+	}
+	return 0
+}
+
+func (x *ChangeAcceptanceEvent) GetEvidenceRevision() uint64 {
+	if x != nil {
+		return x.EvidenceRevision
+	}
+	return 0
+}
+
+func (x *ChangeAcceptanceEvent) GetGraphRevision() uint64 {
+	if x != nil {
+		return x.GraphRevision
+	}
+	return 0
+}
+
 type RecoveryRequiredEvent struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	CheckpointId   *StableIdentity        `protobuf:"bytes,1,opt,name=checkpoint_id,json=checkpointId,proto3" json:"checkpoint_id,omitempty"`
-	RedactedReason string                 `protobuf:"bytes,2,opt,name=redacted_reason,json=redactedReason,proto3" json:"redacted_reason,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	CheckpointId             *StableIdentity        `protobuf:"bytes,1,opt,name=checkpoint_id,json=checkpointId,proto3" json:"checkpoint_id,omitempty"`
+	RedactedReason           string                 `protobuf:"bytes,2,opt,name=redacted_reason,json=redactedReason,proto3" json:"redacted_reason,omitempty"`
+	Classification           string                 `protobuf:"bytes,3,opt,name=classification,proto3" json:"classification,omitempty"`
+	DivergenceSummary        string                 `protobuf:"bytes,4,opt,name=divergence_summary,json=divergenceSummary,proto3" json:"divergence_summary,omitempty"`
+	ExternalOutcomeAmbiguous bool                   `protobuf:"varint,5,opt,name=external_outcome_ambiguous,json=externalOutcomeAmbiguous,proto3" json:"external_outcome_ambiguous,omitempty"`
+	SafeResumeVerified       bool                   `protobuf:"varint,6,opt,name=safe_resume_verified,json=safeResumeVerified,proto3" json:"safe_resume_verified,omitempty"`
+	ReconcileAvailable       bool                   `protobuf:"varint,7,opt,name=reconcile_available,json=reconcileAvailable,proto3" json:"reconcile_available,omitempty"`
+	PreservePatchAvailable   bool                   `protobuf:"varint,8,opt,name=preserve_patch_available,json=preservePatchAvailable,proto3" json:"preserve_patch_available,omitempty"`
+	DiffRevision             uint64                 `protobuf:"varint,9,opt,name=diff_revision,json=diffRevision,proto3" json:"diff_revision,omitempty"`
+	PlanRevision             uint64                 `protobuf:"varint,10,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
+	ValidationRevision       uint64                 `protobuf:"varint,11,opt,name=validation_revision,json=validationRevision,proto3" json:"validation_revision,omitempty"`
+	EvidenceRevision         uint64                 `protobuf:"varint,12,opt,name=evidence_revision,json=evidenceRevision,proto3" json:"evidence_revision,omitempty"`
+	GraphRevision            uint64                 `protobuf:"varint,13,opt,name=graph_revision,json=graphRevision,proto3" json:"graph_revision,omitempty"`
+	RelatedEventIds          []*StableIdentity      `protobuf:"bytes,14,rep,name=related_event_ids,json=relatedEventIds,proto3" json:"related_event_ids,omitempty"`
+	RelatedFiles             []string               `protobuf:"bytes,15,rep,name=related_files,json=relatedFiles,proto3" json:"related_files,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *RecoveryRequiredEvent) Reset() {
 	*x = RecoveryRequiredEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[17]
+	mi := &file_codeflux_v1_session_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1573,7 +1792,7 @@ func (x *RecoveryRequiredEvent) String() string {
 func (*RecoveryRequiredEvent) ProtoMessage() {}
 
 func (x *RecoveryRequiredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[17]
+	mi := &file_codeflux_v1_session_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1586,7 +1805,7 @@ func (x *RecoveryRequiredEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryRequiredEvent.ProtoReflect.Descriptor instead.
 func (*RecoveryRequiredEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{17}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RecoveryRequiredEvent) GetCheckpointId() *StableIdentity {
@@ -1603,6 +1822,97 @@ func (x *RecoveryRequiredEvent) GetRedactedReason() string {
 	return ""
 }
 
+func (x *RecoveryRequiredEvent) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *RecoveryRequiredEvent) GetDivergenceSummary() string {
+	if x != nil {
+		return x.DivergenceSummary
+	}
+	return ""
+}
+
+func (x *RecoveryRequiredEvent) GetExternalOutcomeAmbiguous() bool {
+	if x != nil {
+		return x.ExternalOutcomeAmbiguous
+	}
+	return false
+}
+
+func (x *RecoveryRequiredEvent) GetSafeResumeVerified() bool {
+	if x != nil {
+		return x.SafeResumeVerified
+	}
+	return false
+}
+
+func (x *RecoveryRequiredEvent) GetReconcileAvailable() bool {
+	if x != nil {
+		return x.ReconcileAvailable
+	}
+	return false
+}
+
+func (x *RecoveryRequiredEvent) GetPreservePatchAvailable() bool {
+	if x != nil {
+		return x.PreservePatchAvailable
+	}
+	return false
+}
+
+func (x *RecoveryRequiredEvent) GetDiffRevision() uint64 {
+	if x != nil {
+		return x.DiffRevision
+	}
+	return 0
+}
+
+func (x *RecoveryRequiredEvent) GetPlanRevision() uint64 {
+	if x != nil {
+		return x.PlanRevision
+	}
+	return 0
+}
+
+func (x *RecoveryRequiredEvent) GetValidationRevision() uint64 {
+	if x != nil {
+		return x.ValidationRevision
+	}
+	return 0
+}
+
+func (x *RecoveryRequiredEvent) GetEvidenceRevision() uint64 {
+	if x != nil {
+		return x.EvidenceRevision
+	}
+	return 0
+}
+
+func (x *RecoveryRequiredEvent) GetGraphRevision() uint64 {
+	if x != nil {
+		return x.GraphRevision
+	}
+	return 0
+}
+
+func (x *RecoveryRequiredEvent) GetRelatedEventIds() []*StableIdentity {
+	if x != nil {
+		return x.RelatedEventIds
+	}
+	return nil
+}
+
+func (x *RecoveryRequiredEvent) GetRelatedFiles() []string {
+	if x != nil {
+		return x.RelatedFiles
+	}
+	return nil
+}
+
 type UserErrorEvent struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Code            string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
@@ -1614,7 +1924,7 @@ type UserErrorEvent struct {
 
 func (x *UserErrorEvent) Reset() {
 	*x = UserErrorEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[18]
+	mi := &file_codeflux_v1_session_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1626,7 +1936,7 @@ func (x *UserErrorEvent) String() string {
 func (*UserErrorEvent) ProtoMessage() {}
 
 func (x *UserErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[18]
+	mi := &file_codeflux_v1_session_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1639,7 +1949,7 @@ func (x *UserErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserErrorEvent.ProtoReflect.Descriptor instead.
 func (*UserErrorEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{18}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UserErrorEvent) GetCode() string {
@@ -1667,7 +1977,7 @@ var File_codeflux_v1_session_proto protoreflect.FileDescriptor
 
 const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x19codeflux/v1/session.proto\x12\vcodeflux.v1\x1a\x1acodeflux/v1/identity.proto\"\xf0\f\n" +
+	"\x19codeflux/v1/session.proto\x12\vcodeflux.v1\x1a\x1acodeflux/v1/identity.proto\"\xb2\x0e\n" +
 	"\fSessionEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12:\n" +
 	"\n" +
@@ -1702,8 +2012,13 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\x05error\x18\" \x01(\v2\x1b.codeflux.v1.UserErrorEventH\x00R\x05error\x12H\n" +
 	"\x0ethread_created\x18# \x01(\v2\x1f.codeflux.v1.ThreadCreatedEventH\x00R\rthreadCreated\x12H\n" +
 	"\x0ethread_renamed\x18$ \x01(\v2\x1f.codeflux.v1.ThreadRenamedEventH\x00R\rthreadRenamed\x12K\n" +
-	"\x0fthread_archived\x18% \x01(\v2 .codeflux.v1.ThreadArchivedEventH\x00R\x0ethreadArchivedB\t\n" +
-	"\apayload\"v\n" +
+	"\x0fthread_archived\x18% \x01(\v2 .codeflux.v1.ThreadArchivedEventH\x00R\x0ethreadArchived\x12Q\n" +
+	"\x11change_acceptance\x18& \x01(\v2\".codeflux.v1.ChangeAcceptanceEventH\x00R\x10changeAcceptance\x12m\n" +
+	"\x1btask_projection_invalidated\x18' \x01(\v2+.codeflux.v1.TaskProjectionInvalidatedEventH\x00R\x19taskProjectionInvalidatedB\t\n" +
+	"\apayload\"a\n" +
+	"\x1eTaskProjectionInvalidatedEvent\x12\x16\n" +
+	"\x06entity\x18\x01 \x01(\tR\x06entity\x12'\n" +
+	"\x0fentity_revision\x18\x02 \x01(\x04R\x0eentityRevision\"v\n" +
 	"\x11MessageDeltaEvent\x12:\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\tmessageId\x12%\n" +
@@ -1771,25 +2086,50 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\x10hard_limit_minor\x18\x01 \x01(\x03R\x0ehardLimitMinor\x12%\n" +
 	"\x0ereserved_minor\x18\x02 \x01(\x03R\rreservedMinor\x12!\n" +
 	"\factual_minor\x18\x03 \x01(\x03R\vactualMinor\x12\x1a\n" +
-	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\x94\x01\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\xf9\x01\n" +
 	"\x0fValidationEvent\x12@\n" +
 	"\rvalidation_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\fvalidationId\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\x12)\n" +
-	"\x10redacted_summary\x18\x03 \x01(\tR\x0fredactedSummary\"|\n" +
+	"\x10redacted_summary\x18\x03 \x01(\tR\x0fredactedSummary\x12\x1a\n" +
+	"\brequired\x18\x04 \x01(\bR\brequired\x12\"\n" +
+	"\facknowledged\x18\x05 \x01(\bR\facknowledged\x12#\n" +
+	"\rdiff_revision\x18\x06 \x01(\x04R\fdiffRevision\"|\n" +
 	"\n" +
 	"GraphEvent\x12G\n" +
 	"\x11graph_revision_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x0fgraphRevisionId\x12%\n" +
-	"\x0eencoded_change\x18\x02 \x01(\fR\rencodedChange\"x\n" +
+	"\x0eencoded_change\x18\x02 \x01(\fR\rencodedChange\"\x95\x01\n" +
 	"\x0fCheckpointEvent\x12@\n" +
 	"\rcheckpoint_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\fcheckpointId\x12#\n" +
-	"\rtask_revision\x18\x02 \x01(\x04R\ftaskRevision\"\x82\x01\n" +
+	"\rtask_revision\x18\x02 \x01(\x04R\ftaskRevision\x12\x1b\n" +
+	"\tplan_step\x18\x03 \x01(\tR\bplanStep\"\xfc\x01\n" +
+	"\x15ChangeAcceptanceEvent\x12\x14\n" +
+	"\x05state\x18\x01 \x01(\tR\x05state\x12#\n" +
+	"\rdiff_revision\x18\x02 \x01(\x04R\fdiffRevision\x12#\n" +
+	"\rplan_revision\x18\x03 \x01(\x04R\fplanRevision\x12/\n" +
+	"\x13validation_revision\x18\x04 \x01(\x04R\x12validationRevision\x12+\n" +
+	"\x11evidence_revision\x18\x05 \x01(\x04R\x10evidenceRevision\x12%\n" +
+	"\x0egraph_revision\x18\x06 \x01(\x04R\rgraphRevision\"\xf1\x05\n" +
 	"\x15RecoveryRequiredEvent\x12@\n" +
 	"\rcheckpoint_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\fcheckpointId\x12'\n" +
-	"\x0fredacted_reason\x18\x02 \x01(\tR\x0eredactedReason\"m\n" +
+	"\x0fredacted_reason\x18\x02 \x01(\tR\x0eredactedReason\x12&\n" +
+	"\x0eclassification\x18\x03 \x01(\tR\x0eclassification\x12-\n" +
+	"\x12divergence_summary\x18\x04 \x01(\tR\x11divergenceSummary\x12<\n" +
+	"\x1aexternal_outcome_ambiguous\x18\x05 \x01(\bR\x18externalOutcomeAmbiguous\x120\n" +
+	"\x14safe_resume_verified\x18\x06 \x01(\bR\x12safeResumeVerified\x12/\n" +
+	"\x13reconcile_available\x18\a \x01(\bR\x12reconcileAvailable\x128\n" +
+	"\x18preserve_patch_available\x18\b \x01(\bR\x16preservePatchAvailable\x12#\n" +
+	"\rdiff_revision\x18\t \x01(\x04R\fdiffRevision\x12#\n" +
+	"\rplan_revision\x18\n" +
+	" \x01(\x04R\fplanRevision\x12/\n" +
+	"\x13validation_revision\x18\v \x01(\x04R\x12validationRevision\x12+\n" +
+	"\x11evidence_revision\x18\f \x01(\x04R\x10evidenceRevision\x12%\n" +
+	"\x0egraph_revision\x18\r \x01(\x04R\rgraphRevision\x12G\n" +
+	"\x11related_event_ids\x18\x0e \x03(\v2\x1b.codeflux.v1.StableIdentityR\x0frelatedEventIds\x12#\n" +
+	"\rrelated_files\x18\x0f \x03(\tR\frelatedFiles\"m\n" +
 	"\x0eUserErrorEvent\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12)\n" +
 	"\x10redacted_message\x18\x02 \x01(\tR\x0fredactedMessage\x12\x1c\n" +
-	"\tretryable\x18\x03 \x01(\bR\tretryable*\xb8\a\n" +
+	"\tretryable\x18\x03 \x01(\bR\tretryable*\x9e\b\n" +
 	"\x10SessionEventKind\x12\"\n" +
 	"\x1eSESSION_EVENT_KIND_UNSPECIFIED\x10\x00\x12$\n" +
 	" SESSION_EVENT_KIND_MESSAGE_DELTA\x10\x01\x12$\n" +
@@ -1815,7 +2155,9 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\x18SESSION_EVENT_KIND_ERROR\x10\x14\x12%\n" +
 	"!SESSION_EVENT_KIND_THREAD_CREATED\x10\x15\x12%\n" +
 	"!SESSION_EVENT_KIND_THREAD_RENAMED\x10\x16\x12&\n" +
-	"\"SESSION_EVENT_KIND_THREAD_ARCHIVED\x10\x17B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
+	"\"SESSION_EVENT_KIND_THREAD_ARCHIVED\x10\x17\x120\n" +
+	",SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED\x10\x18\x122\n" +
+	".SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED\x10\x19B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
 
 var (
 	file_codeflux_v1_session_proto_rawDescOnce sync.Once
@@ -1830,68 +2172,73 @@ func file_codeflux_v1_session_proto_rawDescGZIP() []byte {
 }
 
 var file_codeflux_v1_session_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codeflux_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_codeflux_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_codeflux_v1_session_proto_goTypes = []any{
-	(SessionEventKind)(0),         // 0: codeflux.v1.SessionEventKind
-	(*SessionEvent)(nil),          // 1: codeflux.v1.SessionEvent
-	(*MessageDeltaEvent)(nil),     // 2: codeflux.v1.MessageDeltaEvent
-	(*MessageFinalEvent)(nil),     // 3: codeflux.v1.MessageFinalEvent
-	(*ThreadCreatedEvent)(nil),    // 4: codeflux.v1.ThreadCreatedEvent
-	(*ThreadRenamedEvent)(nil),    // 5: codeflux.v1.ThreadRenamedEvent
-	(*ThreadArchivedEvent)(nil),   // 6: codeflux.v1.ThreadArchivedEvent
-	(*PlanEvent)(nil),             // 7: codeflux.v1.PlanEvent
-	(*ToolEvent)(nil),             // 8: codeflux.v1.ToolEvent
-	(*ApprovalEvent)(nil),         // 9: codeflux.v1.ApprovalEvent
-	(*TaskStateChangedEvent)(nil), // 10: codeflux.v1.TaskStateChangedEvent
-	(*ForecastEvent)(nil),         // 11: codeflux.v1.ForecastEvent
-	(*UsageEvent)(nil),            // 12: codeflux.v1.UsageEvent
-	(*CostEvent)(nil),             // 13: codeflux.v1.CostEvent
-	(*BudgetEvent)(nil),           // 14: codeflux.v1.BudgetEvent
-	(*ValidationEvent)(nil),       // 15: codeflux.v1.ValidationEvent
-	(*GraphEvent)(nil),            // 16: codeflux.v1.GraphEvent
-	(*CheckpointEvent)(nil),       // 17: codeflux.v1.CheckpointEvent
-	(*RecoveryRequiredEvent)(nil), // 18: codeflux.v1.RecoveryRequiredEvent
-	(*UserErrorEvent)(nil),        // 19: codeflux.v1.UserErrorEvent
-	(*StableIdentity)(nil),        // 20: codeflux.v1.StableIdentity
+	(SessionEventKind)(0),                  // 0: codeflux.v1.SessionEventKind
+	(*SessionEvent)(nil),                   // 1: codeflux.v1.SessionEvent
+	(*TaskProjectionInvalidatedEvent)(nil), // 2: codeflux.v1.TaskProjectionInvalidatedEvent
+	(*MessageDeltaEvent)(nil),              // 3: codeflux.v1.MessageDeltaEvent
+	(*MessageFinalEvent)(nil),              // 4: codeflux.v1.MessageFinalEvent
+	(*ThreadCreatedEvent)(nil),             // 5: codeflux.v1.ThreadCreatedEvent
+	(*ThreadRenamedEvent)(nil),             // 6: codeflux.v1.ThreadRenamedEvent
+	(*ThreadArchivedEvent)(nil),            // 7: codeflux.v1.ThreadArchivedEvent
+	(*PlanEvent)(nil),                      // 8: codeflux.v1.PlanEvent
+	(*ToolEvent)(nil),                      // 9: codeflux.v1.ToolEvent
+	(*ApprovalEvent)(nil),                  // 10: codeflux.v1.ApprovalEvent
+	(*TaskStateChangedEvent)(nil),          // 11: codeflux.v1.TaskStateChangedEvent
+	(*ForecastEvent)(nil),                  // 12: codeflux.v1.ForecastEvent
+	(*UsageEvent)(nil),                     // 13: codeflux.v1.UsageEvent
+	(*CostEvent)(nil),                      // 14: codeflux.v1.CostEvent
+	(*BudgetEvent)(nil),                    // 15: codeflux.v1.BudgetEvent
+	(*ValidationEvent)(nil),                // 16: codeflux.v1.ValidationEvent
+	(*GraphEvent)(nil),                     // 17: codeflux.v1.GraphEvent
+	(*CheckpointEvent)(nil),                // 18: codeflux.v1.CheckpointEvent
+	(*ChangeAcceptanceEvent)(nil),          // 19: codeflux.v1.ChangeAcceptanceEvent
+	(*RecoveryRequiredEvent)(nil),          // 20: codeflux.v1.RecoveryRequiredEvent
+	(*UserErrorEvent)(nil),                 // 21: codeflux.v1.UserErrorEvent
+	(*StableIdentity)(nil),                 // 22: codeflux.v1.StableIdentity
 }
 var file_codeflux_v1_session_proto_depIdxs = []int32{
-	20, // 0: codeflux.v1.SessionEvent.session_id:type_name -> codeflux.v1.StableIdentity
-	20, // 1: codeflux.v1.SessionEvent.thread_id:type_name -> codeflux.v1.StableIdentity
-	20, // 2: codeflux.v1.SessionEvent.task_id:type_name -> codeflux.v1.StableIdentity
+	22, // 0: codeflux.v1.SessionEvent.session_id:type_name -> codeflux.v1.StableIdentity
+	22, // 1: codeflux.v1.SessionEvent.thread_id:type_name -> codeflux.v1.StableIdentity
+	22, // 2: codeflux.v1.SessionEvent.task_id:type_name -> codeflux.v1.StableIdentity
 	0,  // 3: codeflux.v1.SessionEvent.kind:type_name -> codeflux.v1.SessionEventKind
-	20, // 4: codeflux.v1.SessionEvent.causation_id:type_name -> codeflux.v1.StableIdentity
-	20, // 5: codeflux.v1.SessionEvent.correlation_id:type_name -> codeflux.v1.StableIdentity
-	2,  // 6: codeflux.v1.SessionEvent.message_delta:type_name -> codeflux.v1.MessageDeltaEvent
-	3,  // 7: codeflux.v1.SessionEvent.message_final:type_name -> codeflux.v1.MessageFinalEvent
-	7,  // 8: codeflux.v1.SessionEvent.plan:type_name -> codeflux.v1.PlanEvent
-	8,  // 9: codeflux.v1.SessionEvent.tool:type_name -> codeflux.v1.ToolEvent
-	9,  // 10: codeflux.v1.SessionEvent.approval:type_name -> codeflux.v1.ApprovalEvent
-	10, // 11: codeflux.v1.SessionEvent.task_state_changed:type_name -> codeflux.v1.TaskStateChangedEvent
-	11, // 12: codeflux.v1.SessionEvent.forecast:type_name -> codeflux.v1.ForecastEvent
-	12, // 13: codeflux.v1.SessionEvent.usage:type_name -> codeflux.v1.UsageEvent
-	13, // 14: codeflux.v1.SessionEvent.cost:type_name -> codeflux.v1.CostEvent
-	14, // 15: codeflux.v1.SessionEvent.budget:type_name -> codeflux.v1.BudgetEvent
-	15, // 16: codeflux.v1.SessionEvent.validation:type_name -> codeflux.v1.ValidationEvent
-	16, // 17: codeflux.v1.SessionEvent.graph:type_name -> codeflux.v1.GraphEvent
-	17, // 18: codeflux.v1.SessionEvent.checkpoint:type_name -> codeflux.v1.CheckpointEvent
-	18, // 19: codeflux.v1.SessionEvent.recovery_required:type_name -> codeflux.v1.RecoveryRequiredEvent
-	19, // 20: codeflux.v1.SessionEvent.error:type_name -> codeflux.v1.UserErrorEvent
-	4,  // 21: codeflux.v1.SessionEvent.thread_created:type_name -> codeflux.v1.ThreadCreatedEvent
-	5,  // 22: codeflux.v1.SessionEvent.thread_renamed:type_name -> codeflux.v1.ThreadRenamedEvent
-	6,  // 23: codeflux.v1.SessionEvent.thread_archived:type_name -> codeflux.v1.ThreadArchivedEvent
-	20, // 24: codeflux.v1.MessageDeltaEvent.message_id:type_name -> codeflux.v1.StableIdentity
-	20, // 25: codeflux.v1.MessageFinalEvent.message_id:type_name -> codeflux.v1.StableIdentity
-	20, // 26: codeflux.v1.ThreadCreatedEvent.workspace_id:type_name -> codeflux.v1.StableIdentity
-	20, // 27: codeflux.v1.ApprovalEvent.approval_id:type_name -> codeflux.v1.StableIdentity
-	20, // 28: codeflux.v1.ValidationEvent.validation_id:type_name -> codeflux.v1.StableIdentity
-	20, // 29: codeflux.v1.GraphEvent.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	20, // 30: codeflux.v1.CheckpointEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	20, // 31: codeflux.v1.RecoveryRequiredEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	22, // 4: codeflux.v1.SessionEvent.causation_id:type_name -> codeflux.v1.StableIdentity
+	22, // 5: codeflux.v1.SessionEvent.correlation_id:type_name -> codeflux.v1.StableIdentity
+	3,  // 6: codeflux.v1.SessionEvent.message_delta:type_name -> codeflux.v1.MessageDeltaEvent
+	4,  // 7: codeflux.v1.SessionEvent.message_final:type_name -> codeflux.v1.MessageFinalEvent
+	8,  // 8: codeflux.v1.SessionEvent.plan:type_name -> codeflux.v1.PlanEvent
+	9,  // 9: codeflux.v1.SessionEvent.tool:type_name -> codeflux.v1.ToolEvent
+	10, // 10: codeflux.v1.SessionEvent.approval:type_name -> codeflux.v1.ApprovalEvent
+	11, // 11: codeflux.v1.SessionEvent.task_state_changed:type_name -> codeflux.v1.TaskStateChangedEvent
+	12, // 12: codeflux.v1.SessionEvent.forecast:type_name -> codeflux.v1.ForecastEvent
+	13, // 13: codeflux.v1.SessionEvent.usage:type_name -> codeflux.v1.UsageEvent
+	14, // 14: codeflux.v1.SessionEvent.cost:type_name -> codeflux.v1.CostEvent
+	15, // 15: codeflux.v1.SessionEvent.budget:type_name -> codeflux.v1.BudgetEvent
+	16, // 16: codeflux.v1.SessionEvent.validation:type_name -> codeflux.v1.ValidationEvent
+	17, // 17: codeflux.v1.SessionEvent.graph:type_name -> codeflux.v1.GraphEvent
+	18, // 18: codeflux.v1.SessionEvent.checkpoint:type_name -> codeflux.v1.CheckpointEvent
+	20, // 19: codeflux.v1.SessionEvent.recovery_required:type_name -> codeflux.v1.RecoveryRequiredEvent
+	21, // 20: codeflux.v1.SessionEvent.error:type_name -> codeflux.v1.UserErrorEvent
+	5,  // 21: codeflux.v1.SessionEvent.thread_created:type_name -> codeflux.v1.ThreadCreatedEvent
+	6,  // 22: codeflux.v1.SessionEvent.thread_renamed:type_name -> codeflux.v1.ThreadRenamedEvent
+	7,  // 23: codeflux.v1.SessionEvent.thread_archived:type_name -> codeflux.v1.ThreadArchivedEvent
+	19, // 24: codeflux.v1.SessionEvent.change_acceptance:type_name -> codeflux.v1.ChangeAcceptanceEvent
+	2,  // 25: codeflux.v1.SessionEvent.task_projection_invalidated:type_name -> codeflux.v1.TaskProjectionInvalidatedEvent
+	22, // 26: codeflux.v1.MessageDeltaEvent.message_id:type_name -> codeflux.v1.StableIdentity
+	22, // 27: codeflux.v1.MessageFinalEvent.message_id:type_name -> codeflux.v1.StableIdentity
+	22, // 28: codeflux.v1.ThreadCreatedEvent.workspace_id:type_name -> codeflux.v1.StableIdentity
+	22, // 29: codeflux.v1.ApprovalEvent.approval_id:type_name -> codeflux.v1.StableIdentity
+	22, // 30: codeflux.v1.ValidationEvent.validation_id:type_name -> codeflux.v1.StableIdentity
+	22, // 31: codeflux.v1.GraphEvent.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	22, // 32: codeflux.v1.CheckpointEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	22, // 33: codeflux.v1.RecoveryRequiredEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	22, // 34: codeflux.v1.RecoveryRequiredEvent.related_event_ids:type_name -> codeflux.v1.StableIdentity
+	35, // [35:35] is the sub-list for method output_type
+	35, // [35:35] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_session_proto_init() }
@@ -1919,6 +2266,8 @@ func file_codeflux_v1_session_proto_init() {
 		(*SessionEvent_ThreadCreated)(nil),
 		(*SessionEvent_ThreadRenamed)(nil),
 		(*SessionEvent_ThreadArchived)(nil),
+		(*SessionEvent_ChangeAcceptance)(nil),
+		(*SessionEvent_TaskProjectionInvalidated)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1926,7 +2275,7 @@ func file_codeflux_v1_session_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codeflux_v1_session_proto_rawDesc), len(file_codeflux_v1_session_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

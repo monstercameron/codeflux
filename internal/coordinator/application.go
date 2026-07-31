@@ -70,6 +70,7 @@ type Application struct {
 	workspace           WorkspaceDependencies
 	preflight           *TaskPreflightService
 	events              *events.Hub
+	graphProjection     *GraphProjectionService
 	transport           *transport.Boundary
 	scheduler           *DurableScheduler
 	runtime             *WorkerRuntime
@@ -235,6 +236,13 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	application.graphProjection, err = NewGraphProjectionService(
+		repositories,
+		application.events,
+	)
+	if err != nil {
+		return nil, err
+	}
 	application.transport, err = transport.NewBoundary(transport.BoundaryOptions{
 		SessionToken:         application.secret,
 		TrustBridgeRequestID: options.FrontendAssetsDirectory != "",
@@ -251,6 +259,43 @@ func StartApplication(
 		return nil, err
 	}
 	application.checkpointClose = checkpointing.close
+	application.recoveryDecisions, err = NewRecoveryDecisionService(
+		repositories,
+		checkpointing.worktrees,
+	)
+	if err != nil {
+		return nil, err
+	}
+	compatibility, err := NewDurableRecoveryCompatibilitySource(repositories)
+	if err != nil {
+		return nil, err
+	}
+	actions, err := NewDurableRecoveryActionSource(repositories)
+	if err != nil {
+		return nil, err
+	}
+	observations, err := NewDurableRecoveryObservationSource(
+		repositories,
+		checkpointing.worktrees,
+		compatibility,
+		actions,
+		workspace.ExecRunner{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	reconciler, err := NewRecoveryReconciliationService(
+		repositories,
+		observations,
+		checkpointing.checkpoints,
+		workspace.ExecRunner{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := application.recoveryDecisions.ConfigureReconciliation(reconciler); err != nil {
+		return nil, err
+	}
 	taskControls := options.TaskControls
 	if application.workers == nil {
 		application.supervisor, err = NewSupervisor(repositories, application.gateway)
@@ -295,6 +340,17 @@ func StartApplication(
 			"task control service is required with a custom worker controller",
 		)
 	}
+	if safeResumeExecutor, available := taskControls.(recoverySafeResumeExecutor); available {
+		safeResume, safeResumeErr := NewRecoverySafeResumeService(
+			repositories, observations, safeResumeExecutor,
+		)
+		if safeResumeErr != nil {
+			return nil, safeResumeErr
+		}
+		if safeResumeErr = application.recoveryDecisions.ConfigureSafeResume(safeResume); safeResumeErr != nil {
+			return nil, safeResumeErr
+		}
+	}
 	taskAddress := options.TaskListenAddress
 	if taskAddress == "" {
 		taskAddress = "127.0.0.1:0"
@@ -303,19 +359,62 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	taskService, err := transport.NewTaskService(taskControls)
+	taskQueries, err := NewTaskQueryService(repositories)
 	if err != nil {
+		return nil, err
+	}
+	taskBudgets, err := NewTaskBudgetService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	taskService, err := transport.NewTaskServiceWithRecovery(
+		taskControls, taskQueries, taskBudgets, application.recoveryDecisions,
+	)
+	if err != nil {
+		return nil, err
+	}
+	projectionInvalidations, err := NewTaskProjectionInvalidationService(repositories, application.events)
+	if err != nil {
+		return nil, err
+	}
+	if err := projectionInvalidations.ReconcileStartup(ctx); err != nil {
+		return nil, err
+	}
+	if err := taskService.ConfigureProjectionInvalidations(projectionInvalidations); err != nil {
 		return nil, err
 	}
 	threadApplication, err := NewThreadApplication(repositories, application.secret, application.events)
 	if err != nil {
 		return nil, err
 	}
+	if err := threadApplication.ConfigureGraphProjection(application.graphProjection); err != nil {
+		return nil, err
+	}
 	threadService, err := transport.NewThreadService(threadApplication)
 	if err != nil {
 		return nil, err
 	}
-	sessionService, err := transport.NewSessionService(application.events)
+	sessionSnapshots, err := NewSessionProjectionSnapshotService(repositories, application.events)
+	if err != nil {
+		return nil, err
+	}
+	sessionService, err := transport.NewSessionService(application.events, sessionSnapshots)
+	if err != nil {
+		return nil, err
+	}
+	frontendTelemetry, err := NewFrontendTelemetryService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	settingsService, err := transport.NewSettingsService(frontendTelemetry)
+	if err != nil {
+		return nil, err
+	}
+	graphQueries, err := NewGraphQueryService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	graphService, err := transport.NewGraphService(graphQueries)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +432,8 @@ func StartApplication(
 	)
 	codefluxv1.RegisterThreadServiceServer(application.taskServer, threadService)
 	codefluxv1.RegisterSessionServiceServer(application.taskServer, sessionService)
+	codefluxv1.RegisterSettingsServiceServer(application.taskServer, settingsService)
+	codefluxv1.RegisterGraphServiceServer(application.taskServer, graphService)
 	application.taskServeDone = make(chan error, 1)
 	go func() {
 		application.taskServeDone <- application.taskServer.Serve(
@@ -368,24 +469,6 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	compatibility, err := NewDurableRecoveryCompatibilitySource(repositories)
-	if err != nil {
-		return nil, err
-	}
-	actions, err := NewDurableRecoveryActionSource(repositories)
-	if err != nil {
-		return nil, err
-	}
-	observations, err := NewDurableRecoveryObservationSource(
-		repositories,
-		checkpointing.worktrees,
-		compatibility,
-		actions,
-		workspace.ExecRunner{},
-	)
-	if err != nil {
-		return nil, err
-	}
 	patches, err := NewDurableRecoveryPatchLocator(
 		repositories,
 		workspace.ExecRunner{},
@@ -406,13 +489,6 @@ func StartApplication(
 			ctx,
 			maximumRecoveryCandidates,
 		)
-	if err != nil {
-		return nil, err
-	}
-	application.recoveryDecisions, err = NewRecoveryDecisionService(
-		repositories,
-		checkpointing.worktrees,
-	)
 	if err != nil {
 		return nil, err
 	}
@@ -522,6 +598,12 @@ func (application *Application) WorkerGateway() *WorkerGateway {
 
 func (application *Application) EventHub() *events.Hub {
 	return application.events
+}
+
+// GraphProjectionService exposes the durable task-event projection hook to
+// coordinator task producers. The service publishes only after SQLite commit.
+func (application *Application) GraphProjectionService() *GraphProjectionService {
+	return application.graphProjection
 }
 
 func (application *Application) ProviderDependencies() ProviderDependencies {

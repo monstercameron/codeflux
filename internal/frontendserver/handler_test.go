@@ -225,6 +225,28 @@ func TestHandlerRejectsUnknownRoutesAndUnauthenticatedBridge(t *testing.T) {
 	}
 }
 
+func TestBridgeRequestIdentityIsServerGenerated(t *testing.T) {
+	seen := ""
+	handler := withBridgeRequestIdentity(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		seen = request.Header.Get("X-Request-Id")
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	request := httptest.NewRequest(http.MethodGet, "/grpc", nil)
+	request.Header.Set("X-Request-Id", "client-controlled")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("bridge identity response = %d", response.Code)
+	}
+	if !strings.HasPrefix(seen, "bridge-") || len(seen) != len("bridge-")+32 ||
+		seen == "client-controlled" {
+		t.Fatalf("server bridge request identity = %q", seen)
+	}
+}
+
 func TestSameOriginIsExact(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/grpc", nil)
 	request.Host = "127.0.0.1:8080"

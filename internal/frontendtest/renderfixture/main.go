@@ -7,11 +7,23 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"time"
 
+	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/events"
+	"codeflux.dev/codeflux/web/frontend/composer"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/routes"
+	"codeflux.dev/codeflux/web/frontend/sessionclient"
+	"codeflux.dev/codeflux/web/frontend/sessionprojection"
 	"codeflux.dev/codeflux/web/frontend/shell"
 	"codeflux.dev/codeflux/web/frontend/state"
+	"codeflux.dev/codeflux/web/frontend/taskactionview"
+	"codeflux.dev/codeflux/web/frontend/taskcontrols"
+	"codeflux.dev/codeflux/web/frontend/taskprojection"
+	"codeflux.dev/codeflux/web/frontend/timelinecard"
+	"codeflux.dev/codeflux/web/frontend/timelineview"
 	"github.com/monstercameron/GoWebComponents/v5/fetch"
 	"github.com/monstercameron/GoWebComponents/v5/html"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
@@ -46,6 +58,75 @@ func renderFixture() ui.Node {
 		ui.CreateElement(threadBoundary, boundaryProps{Mode: mode, Probe: probe}),
 		ui.CreateElement(messageBoundary, boundaryProps{Mode: mode, Probe: probe}),
 		ui.CreateElement(graphBoundary, boundaryProps{Mode: mode, Probe: probe}),
+		ui.CreateElement(m18SessionBoundary, boundaryProps{Mode: mode, Probe: probe}),
+		ui.CreateElement(m18JourneyBoundary, boundaryProps{Mode: mode, Probe: probe}),
+		ui.CreateElement(m18TaskMatrixBoundary, boundaryProps{Mode: mode, Probe: probe}),
+	)
+}
+
+func renderIsolationBoundaries(props boundaryProps) ui.Node {
+	costRevision := ui.UseState(uint64(1))
+	messages := ui.UseState([]state.MessageView{
+		{ID: "message-1", Role: "requirement", Body: "Keep render ownership local.", Sequence: 1},
+	})
+	selectedGraph := ui.UseState("node-1")
+	updateCost := ui.UseEvent(func() {
+		costRevision.Update(func(current uint64) uint64 { return current + 1 })
+	})
+	appendMessage := ui.UseEvent(func(event ui.ChangeEvent) {
+		if event.GetValue() != "append" {
+			return
+		}
+		messages.Update(func(current []state.MessageView) []state.MessageView {
+			next := append([]state.MessageView(nil), current...)
+			sequence := uint64(len(next) + 1)
+			return append(next, state.MessageView{
+				ID: "message-" + strconv.FormatUint(sequence, 10), Role: "execution",
+				Body: "Mounted GWC append " + strconv.FormatUint(sequence, 10), Sequence: sequence,
+			})
+		})
+	})
+	costLabel := "$" + strconv.FormatUint(costRevision.Get(), 10) + ".00"
+	graphRevision := uint64(1)
+	if selectedGraph.Get() == "node-2" {
+		graphRevision = 2
+	}
+	return html.Section(html.Props{Data: map[string]string{"component": "render-isolation-boundaries"}},
+		html.Button(html.Props{
+			Type: "button", Text: "Update cost", OnClick: updateCost,
+			DataAttr: html.DataAttribute{Name: "testid", Value: "update-cost"},
+		}),
+		ui.CreateElement(shell.ApplicationBar, shell.ApplicationBarProps{
+			Session:   state.SessionView{Bootstrap: state.BootstrapReady, Connection: state.ConnectionLive},
+			Workspace: state.WorkspaceView{RepositoryName: "codeflux", Branch: "main"},
+			View: state.TopBarView{
+				Repository: "codeflux", Branch: "main", TaskState: "running", Connection: state.ConnectionLive,
+				Model: "gpt-5", Effort: "high", ForecastCost: costLabel, ActualCost: costLabel, HardBudget: "$4.00",
+			},
+			CostLabel: costLabel, Revision: costRevision.Get(), Mode: props.Mode,
+			Viewport: state.ViewportWide, Probe: props.Probe,
+		}),
+		ui.CreateElement(shell.ThreadRail, shell.ThreadRailProps{
+			State: state.DataReady, Threads: []state.ThreadView{{ID: "thread-1", Title: "Render isolation", Status: "active"}},
+			SelectedID: "thread-1", Revision: 1, Mode: props.Mode, Probe: props.Probe,
+		}),
+		html.Button(html.Props{
+			Type: "button", Text: "Append message", OnClick: appendMessage,
+			DataAttr: html.DataAttribute{Name: "testid", Value: "append-message"},
+		}),
+		ui.CreateElement(shell.ConversationPane, shell.ConversationPaneProps{
+			State: state.DataReady, Messages: messages.Get(), Revision: uint64(len(messages.Get())),
+			Mode: props.Mode, Probe: props.Probe,
+		}),
+		ui.CreateElement(shell.GraphPane, shell.GraphPaneProps{
+			State: state.DataReady,
+			Nodes: []state.GraphNodeView{
+				{ID: "node-1", Title: "First node", Status: "complete"},
+				{ID: "node-2", Title: "Second node", Status: "active"},
+			},
+			SelectedID: selectedGraph.Get(), Revision: graphRevision, Mode: props.Mode,
+			Probe: props.Probe, OnSelect: selectedGraph.Set,
+		}),
 	)
 }
 
@@ -56,13 +137,15 @@ type boundaryProps struct {
 
 func costBoundary(props boundaryProps) ui.Node {
 	revision := ui.UseState(uint64(1))
-	update := func() { revision.Update(func(current uint64) uint64 { return current + 1 }) }
+	update := ui.UseEvent(func() {
+		revision.Update(func(current uint64) uint64 { return current + 1 })
+	})
 	label := "$" + strconv.FormatUint(revision.Get(), 10) + ".00"
 	return html.Section(html.Props{},
 		html.Button(html.Props{
 			Type: "button", Text: "Update cost",
 			DataAttr: html.DataAttribute{Name: "testid", Value: "update-cost"},
-			OnClick:  ui.WrapHandler(update),
+			OnClick:  update,
 		}),
 		ui.CreateElement(shell.ApplicationBar, shell.ApplicationBarProps{
 			Session: state.SessionView{
@@ -103,7 +186,7 @@ func messageBoundary(props boundaryProps) ui.Node {
 	messages := ui.UseState([]state.MessageView{
 		{ID: "message-1", Role: "requirement", Body: "Keep render ownership local.", Sequence: 1},
 	})
-	appendMessage := func() {
+	appendMessage := ui.UseEvent(func() {
 		messages.Update(func(current []state.MessageView) []state.MessageView {
 			next := append([]state.MessageView(nil), current...)
 			sequence := uint64(len(next) + 1)
@@ -114,13 +197,15 @@ func messageBoundary(props boundaryProps) ui.Node {
 				Sequence: sequence,
 			})
 		})
-	}
+	})
+	appendProps := html.PropsOf(html.OnChange(appendMessage))
+	appendProps.Aria = map[string]string{"label": "Conversation fixture action"}
+	appendProps.DataAttr = html.DataAttribute{Name: "testid", Value: "append-message"}
 	return html.Section(html.Props{},
-		html.Button(html.Props{
-			Type: "button", Text: "Append message",
-			DataAttr: html.DataAttribute{Name: "testid", Value: "append-message"},
-			OnClick:  ui.WrapHandler(appendMessage),
-		}),
+		html.Select(appendProps,
+			html.Option(html.Props{Value: "", Text: "Choose conversation action"}),
+			html.Option(html.Props{Value: "append", Text: "Append message"}),
+		),
 		ui.CreateElement(shell.ConversationPane, shell.ConversationPaneProps{
 			State:    state.DataReady,
 			Messages: messages.Get(),
@@ -150,4 +235,711 @@ func graphBoundary(props boundaryProps) ui.Node {
 		Probe:      props.Probe,
 		OnSelect:   selected.Set,
 	})
+}
+
+type m18FixtureIDs struct {
+	session domain.SessionID
+	thread  domain.ThreadID
+	task    domain.TaskID
+	message domain.MessageID
+}
+
+var m18IDs = mustM18FixtureIDs()
+
+func mustM18FixtureIDs() m18FixtureIDs {
+	sessionID, err := domain.ParseSessionID("ses_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	threadID, err := domain.ParseThreadID("thr_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	taskID, err := domain.ParseTaskID("tsk_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	messageID, err := domain.ParseMessageID("msg_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	return m18FixtureIDs{session: sessionID, thread: threadID, task: taskID, message: messageID}
+}
+
+func m18SessionBoundary(props boundaryProps) ui.Node {
+	projection := ui.UseState(initialM18Projection())
+	threadOpen := ui.UseState(false)
+	commandCount := ui.UseState(0)
+	handleAction := ui.UseEvent(func(event ui.MouseEvent) {
+		current := projection.Get()
+		switch event.GetValue() {
+		case "open-thread":
+			threadOpen.Set(true)
+		case "disconnect":
+			projection.Set(sessionprojection.ProjectConnection(current, sessionclient.Status{
+				State: sessionclient.StateStopped, LastSequence: current.LastAppliedSequence(),
+			}, m18RetryPolicy()))
+		case "reconnect":
+			projection.Set(sessionprojection.ProjectConnection(current, sessionclient.Status{
+				State: sessionclient.StateReconnecting, LastSequence: current.LastAppliedSequence(),
+				ReconnectCount: 1, Failure: sessionclient.FailureUnavailable,
+			}, m18RetryPolicy()))
+		case "replay":
+			projection.Set(sessionprojection.ProjectConnection(current, sessionclient.Status{
+				State: sessionclient.StateReplaying, LastSequence: current.LastAppliedSequence(),
+			}, m18RetryPolicy()))
+		case "apply-event", "apply-duplicate":
+			next, _ := sessionprojection.ApplySessionEvent(current, m18MessageEvent(1))
+			projection.Set(next)
+		case "apply-gap":
+			next, _ := sessionprojection.ApplySessionEvent(current, m18MessageEvent(3))
+			projection.Set(next)
+		case "repair":
+			through := current.LastAppliedSequence()
+			if repair := current.Diagnostics().Repair; repair != nil {
+				through = repair.ReceivedSequence
+			}
+			next, _ := sessionprojection.ApplySessionSnapshot(current, m18Snapshot(through))
+			projection.Set(next)
+		case "live":
+			projection.Set(sessionprojection.ProjectConnection(current, sessionclient.Status{
+				State: sessionclient.StateLive, LastSequence: current.LastAppliedSequence(),
+				ControlsAllowed: true,
+			}, m18RetryPolicy()))
+		}
+	})
+	current := projection.Get()
+	diagnostics := current.Diagnostics()
+	connection := current.Connection()
+	return html.Section(html.Props{
+		Aria: map[string]string{"label": "M18 session connection acceptance fixture"},
+		Data: map[string]string{
+			"component":         "m18-session-fixture",
+			"connection-state":  string(connection.State),
+			"mutations-allowed": strconv.FormatBool(connection.MutationsAllowed),
+			"last-sequence":     strconv.FormatUint(diagnostics.LastAppliedSequence, 10),
+			"duplicates":        strconv.FormatUint(diagnostics.DuplicateEvents, 10),
+			"gaps":              strconv.FormatUint(diagnostics.SequenceGaps, 10),
+			"repair-required":   strconv.FormatBool(diagnostics.Repair != nil),
+			"draft":             current.Draft(m18IDs.thread),
+			"command-count":     strconv.Itoa(commandCount.Get()),
+			"retry-disposition": string(connection.Retry.Disposition),
+			"retry-attempt":     strconv.Itoa(connection.Retry.Attempt),
+			"retry-delay-ms":    strconv.FormatInt(connection.Retry.Delay.Milliseconds(), 10),
+		},
+	},
+		html.H2(html.Props{Text: "M18 ordered session fixture"}),
+		shell.DiagnosticsSequenceView(m18MountedDiagnosticsView(diagnostics, connection)),
+		m18FixtureButton("m18-open-thread", "Open first durable thread", "open-thread", false, handleAction),
+		m18FixtureButton("m18-disconnect", "Disconnect session", "disconnect", false, handleAction),
+		m18FixtureButton("m18-reconnect", "Begin bounded reconnect", "reconnect", false, handleAction),
+		m18FixtureButton("m18-replay", "Begin replay", "replay", false, handleAction),
+		m18FixtureButton("m18-apply-event", "Apply durable event", "apply-event", false, handleAction),
+		m18FixtureButton("m18-apply-duplicate", "Apply duplicate event", "apply-duplicate", false, handleAction),
+		m18FixtureButton("m18-apply-gap", "Apply gapped event", "apply-gap", false, handleAction),
+		m18FixtureButton("m18-repair", "Apply repair snapshot", "repair", diagnostics.Repair == nil, handleAction),
+		m18FixtureButton("m18-live", "Mark replay live", "live", false, handleAction),
+		m18DurableThread(threadOpen.Get(), diagnostics),
+		ui.CreateElement(taskcontrols.TaskControlPanel, m18TaskControlProps(
+			props.Mode,
+			connection,
+			func() { commandCount.Set(commandCount.Get() + 1) },
+		)),
+	)
+}
+
+func m18MountedDiagnosticsView(
+	diagnostics sessionprojection.Diagnostics,
+	connection sessionprojection.ConnectionProjection,
+) state.DiagnosticsView {
+	view := state.DiagnosticsView{
+		State: state.DataReady, LastAppliedSequenceKnown: true,
+		LastAppliedSequence:      diagnostics.LastAppliedSequence,
+		SessionGapRepairRequired: diagnostics.Repair != nil,
+	}
+	if !view.SessionGapRepairRequired {
+		view.SessionReplayActive = connection.State == sessionprojection.ConnectionReplaying
+		view.SessionLive = connection.State == sessionprojection.ConnectionLive
+	}
+	return view
+}
+
+type matrixInvocation struct {
+	Action composer.TaskAction
+	Count  int
+}
+
+var m18MatrixStates = []domain.TaskState{
+	domain.TaskStateDraft,
+	domain.TaskStateForecasting,
+	domain.TaskStateAwaitingPlanApproval,
+	domain.TaskStateReady,
+	domain.TaskStateRunning,
+	domain.TaskStateAwaitingAuthority,
+	domain.TaskStatePaused,
+	domain.TaskStateValidating,
+	domain.TaskStateAwaitingReview,
+	domain.TaskStateRecoveryRequired,
+	domain.TaskStateCompleted,
+	domain.TaskStateFailed,
+	domain.TaskStateCancelled,
+	domain.TaskStateRolledBack,
+}
+
+func m18TaskMatrixBoundary(props boundaryProps) ui.Node {
+	selected := ui.UseState(domain.TaskStateDraft)
+	invocation := ui.UseState(matrixInvocation{})
+	selectState := ui.UseEvent(func(event ui.ChangeEvent) {
+		next := domain.TaskState(event.GetValue())
+		if next.IsValid() {
+			selected.Set(next)
+		}
+	})
+	record := func(action composer.TaskAction) {
+		invocation.Update(func(current matrixInvocation) matrixInvocation {
+			return matrixInvocation{Action: action, Count: current.Count + 1}
+		})
+	}
+	task := m18AuthoritativeMatrixProjection(selected.Get())
+	controls := &taskcontrols.Props{
+		OnPause:         func() { record(composer.ActionPause) },
+		OnResume:        func() { record(composer.ActionResume) },
+		OnStop:          func() { record(composer.ActionStop) },
+		OnBudgetAdjust:  func() { record(composer.ActionChangeBudget) },
+		OnSafeResume:    func() { record(composer.ActionSafeResume) },
+		OnReconcile:     func() { record(composer.ActionReconcile) },
+		OnPreservePatch: func() { record(composer.ActionPreservePatch) },
+	}
+	model, err := composer.NewModel(composer.ThreadBinding{
+		ThreadID: m18IDs.thread, RepositoryID: m18RepositoryID(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	model, err = composer.Reduce(model, composer.DraftTextChanged{
+		ThreadID: m18IDs.thread, Text: "Authoritative matrix requirement",
+	})
+	if err != nil {
+		panic(err)
+	}
+	composerProps := composer.Props{
+		View: composer.View(model, m18IDs.thread, selected.Get()), Mode: props.Mode,
+		OnTextChange:      func(string) {},
+		OnSubmitRequested: func() { record(composer.ActionSend) },
+		OnPolicyChange:    func(domain.PolicyPreset, bool) { record(composer.ActionChangePolicy) },
+	}
+	composerProps = taskactionview.Bind(
+		composerProps, task, taskprojection.ConnectionLive, controls,
+		taskactionview.Callbacks{
+			InspectGraph: func() { record(composer.ActionInspectGraph) },
+			Review:       func() { record(composer.ActionReview) },
+		},
+	)
+	options := make([]ui.Node, 0, len(m18MatrixStates))
+	for _, taskState := range m18MatrixStates {
+		options = append(options, html.Option(html.Props{Value: string(taskState), Text: string(taskState)}))
+	}
+	selectProps := html.PropsOf(html.OnChange(selectState))
+	selectProps.Value = string(selected.Get())
+	selectProps.Aria = map[string]string{"label": "Authoritative task state row"}
+	selectProps.DataAttr = html.DataAttribute{Name: "testid", Value: "m18-matrix-state"}
+	return html.Section(html.Props{
+		Aria: map[string]string{"label": "M18 authoritative task action matrix"},
+		Data: map[string]string{
+			"component": "m18-task-action-matrix", "task-state": string(selected.Get()),
+			"invoked-action":   string(invocation.Get().Action),
+			"invocation-count": strconv.Itoa(invocation.Get().Count),
+		},
+	},
+		html.H2(html.Props{Text: "Authoritative task action matrix"}),
+		html.Select(selectProps, options...),
+		ui.CreateElement(composer.Composer, composerProps),
+	)
+}
+
+func m18AuthoritativeMatrixProjection(taskState domain.TaskState) taskprojection.TaskProjection {
+	bindings := taskprojection.RevisionBindings{Diff: 1, Plan: 1, Validation: 1, Evidence: 1, Graph: 1}
+	approvalID, err := domain.ParseApprovalID("apr_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	validationID, err := domain.ParseValidationID("val_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	projection, err := taskprojection.ApplySnapshot(taskprojection.Snapshot{Projection: taskprojection.TaskProjection{
+		TaskID: m18IDs.task, State: taskState, Revision: 1, Recovery: taskprojection.RecoveryNeedsReconcile,
+		Plan: taskprojection.PlanProjection{
+			Present: true, Revision: 1, RedactedSummary: "Authoritative plan",
+			Approval: map[bool]domain.ApprovalRequestState{
+				true: domain.ApprovalRequestStateGranted, false: domain.ApprovalRequestStatePending,
+			}[taskState == domain.TaskStateReady],
+		},
+		Approval: taskprojection.ApprovalProjection{
+			Present: true, ID: approvalID, State: domain.ApprovalRequestStatePending, Revision: 1,
+		},
+		Validation: taskprojection.ValidationProjection{
+			Present: true, ID: validationID, State: domain.ValidationStatePassed,
+			Required: true, Revision: 1, DiffRevision: 1,
+		},
+		Review:     taskprojection.ReviewProjection{Present: true, Revision: 1, Bindings: bindings},
+		Acceptance: taskprojection.AcceptanceProjection{Present: true, State: domain.ChangeAcceptanceStatePending, Revision: 1, Bindings: bindings},
+	}})
+	if err != nil {
+		panic(err)
+	}
+	return projection
+}
+
+func m18RepositoryID() domain.RepositoryID {
+	value, err := domain.ParseRepositoryID("repo_018f0123-4567-789a-8bcd-ef0123456789")
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+func initialM18Projection() sessionprojection.Projection {
+	projection, err := sessionprojection.ApplySessionSnapshot(
+		sessionprojection.New().WithDraft(m18IDs.thread, "retained offline draft"),
+		m18Snapshot(0),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return projection
+}
+
+func m18Snapshot(sequence uint64) sessionprojection.SessionSnapshot {
+	taskID := m18IDs.task
+	return sessionprojection.SessionSnapshot{Session: events.SessionSnapshot{
+		SessionID: m18IDs.session, ThreadID: m18IDs.thread, ThroughSequence: sequence,
+		TaskID: &taskID, TaskState: domain.TaskStateRunning, TaskRevision: 7,
+		SnapshotVersion: 1, CreatedAt: time.UnixMicro(1).UTC(),
+	}}
+}
+
+func m18MessageEvent(sequence uint64) events.SessionEvent {
+	taskID := m18IDs.task
+	return events.SessionEvent{
+		Sequence: sequence, SessionID: m18IDs.session, ThreadID: m18IDs.thread,
+		TaskID: &taskID, Timestamp: time.UnixMicro(int64(sequence + 1)).UTC(),
+		Kind: events.KindMessageFinal, Revision: sequence, PayloadVersion: 1,
+		Payload: events.Payload{MessageFinal: &events.MessageFinal{
+			MessageID: m18IDs.message, Role: "assistant", RedactedBody: "Durable response",
+		}},
+	}
+}
+
+func m18RetryPolicy() sessionclient.RetryPolicy {
+	return sessionclient.RetryPolicy{
+		MaxAttempts: 3, InitialDelay: 10 * time.Millisecond,
+		MaxDelay: 20 * time.Millisecond, Multiplier: 2,
+	}
+}
+
+func m18FixtureButton(testID, label, value string, disabled bool, onClick ui.Handler) ui.Node {
+	return html.Button(html.Props{
+		Type: "button", Text: label, Value: value, Disabled: disabled, OnClick: onClick,
+		DataAttr: html.DataAttribute{Name: "testid", Value: testID},
+	})
+}
+
+func m18DurableThread(open bool, diagnostics sessionprojection.Diagnostics) ui.Node {
+	if !open {
+		return html.Div(html.Props{Hidden: true})
+	}
+	children := []ui.Node{
+		html.H3(html.Props{Text: "First durable thread"}),
+		html.P(html.Props{Text: "Draft: retained offline draft"}),
+	}
+	if diagnostics.AppliedEvents > 0 {
+		children = append(children, ui.CreateElement(timelineview.Renderer, timelineview.Props{
+			Card: timelinecard.Card{
+				Kind: timelinecard.KindMessage, Sequence: 1, StableKey: "message:durable-1",
+				OccurredAt: time.UnixMicro(2).UTC(),
+				Message: &timelinecard.Message{
+					ID: "message-durable-1", Role: "assistant", Body: "Durable response",
+					Status: timelinecard.MessageComplete, OccurredAt: time.UnixMicro(2).UTC(),
+				},
+			},
+		}))
+	}
+	return html.Article(html.Props{
+		Aria: map[string]string{"label": "First durable thread"},
+		Data: map[string]string{
+			"component": "m18-durable-thread", "thread-id": m18IDs.thread.String(),
+			"card-count": strconv.FormatUint(min(diagnostics.AppliedEvents, 1), 10),
+		},
+	}, children...)
+}
+
+func m18TaskControlProps(
+	mode primitives.Mode,
+	connection sessionprojection.ConnectionProjection,
+	onCommand func(),
+) taskcontrols.Props {
+	usd, err := domain.ParseCurrencyCode("USD")
+	if err != nil {
+		panic(err)
+	}
+	limit, err := domain.NewMoney(usd, 400)
+	if err != nil {
+		panic(err)
+	}
+	reason := ""
+	if !connection.MutationsAllowed {
+		reason = "Delivery certainty is unknown until replay is live."
+	}
+	delivery := taskcontrols.DeliveryDegraded
+	if connection.State == sessionprojection.ConnectionLive {
+		delivery = taskcontrols.DeliveryLive
+	} else if connection.State == sessionprojection.ConnectionDisconnected {
+		delivery = taskcontrols.DeliveryDisconnected
+	}
+	return taskcontrols.Props{
+		Mode: mode, TaskState: domain.TaskStateRunning, Phase: taskcontrols.PhaseEditing,
+		Delivery: taskcontrols.DeliveryView{
+			State: delivery, SequenceCertain: connection.MutationsAllowed,
+			TimelineReadable: true, Explanation: "Backend task state remains running.",
+		},
+		Selection: taskcontrols.SelectionView{Provider: "fixture", Model: "fixture", Effort: "strict"},
+		Forecast:  taskcontrols.ForecastView{Range: domain.ForecastRange{}, Assumptions: "Fixture only."},
+		Usage:     taskcontrols.UsageView{Cost: taskcontrols.ActualCostView{UnknownReason: "No priced request."}},
+		Budget: taskcontrols.BudgetView{
+			HardLimitKnown: true, HardLimit: limit,
+			WarningThresholdKnown: true, WarningThreshold: limit,
+		},
+		Controls: taskcontrols.ControlState{
+			Pause:        taskcontrols.CommandState{DisabledReason: reason},
+			Stop:         taskcontrols.CommandState{DisabledReason: reason},
+			AdjustBudget: taskcontrols.CommandState{DisabledReason: reason},
+		},
+		OnPause: onCommand, OnStop: onCommand, OnBudgetAdjust: onCommand,
+	}
+}
+
+type m18JourneyStage struct {
+	ID          string
+	State       string
+	Cost        string
+	Authority   string
+	Evidence    string
+	Uncertainty string
+	NextAction  string
+}
+
+var m18JourneyStages = []m18JourneyStage{
+	{ID: "first-run", State: "Local setup", Cost: "No task cost yet", Authority: "No repository authority yet", Evidence: "Coordinator readiness", Uncertainty: "Provider and repository not selected", NextAction: "Review local promise"},
+	{ID: "new-task", State: "Draft requirement", Cost: "Forecast pending", Authority: "Requirement can be corrected before approval", Evidence: "No execution evidence yet", Uncertainty: "Scope assumptions need review", NextAction: "Review requirement"},
+	{ID: "plan-review", State: "Awaiting plan approval", Cost: "Estimated range, not a promise", Authority: "Plan approval required", Evidence: "Planned checks only", Uncertainty: "Files and validation may change", NextAction: "Approve or request change"},
+	{ID: "live-work", State: "Running", Cost: "Actual usage remains attributable", Authority: "Repository-scoped execution", Evidence: "Current tool outcome", Uncertainty: "Work is not yet validated", NextAction: "Inspect progress or stop"},
+	{ID: "approval", State: "Awaiting authority", Cost: "No hidden cost substitution", Authority: "Exact scoped approval pending", Evidence: "Attributable approval record", Uncertainty: "External action has not been authorized", NextAction: "Allow once, allow for task, or deny"},
+	{ID: "review", State: "Awaiting review", Cost: "Actual cost remains visible", Authority: "Acceptance remains with the user", Evidence: "Diff and required validation", Uncertainty: "Review binding must remain current", NextAction: "Open review"},
+	{ID: "repair", State: "Repairing", Cost: "Prior actual remains historical", Authority: "New plan approval is required", Evidence: "Previous evidence is stale", Uncertainty: "Changed revisions need validation", NextAction: "Review the new plan revision"},
+	{ID: "reconnect", State: "Backend running; UI disconnected", Cost: "Last known actual remains visible", Authority: "Mutations disabled while sequence is uncertain", Evidence: "Timeline remains readable", Uncertainty: "Missing durable events may be replayed", NextAction: "Reconnect and replay"},
+	{ID: "recovery", State: "Needs recovery", Cost: "No automatic paid work resumes", Authority: "Only classified safe choices are enabled", Evidence: "Last valid checkpoint", Uncertainty: "External outcome and worktree divergence", NextAction: "Reconcile before continuing"},
+	{ID: "graph", State: "Inspecting execution graph", Cost: "Inspection is read-only", Authority: "Graph cannot authorize changes", Evidence: "Selected node and revision", Uncertainty: "Graph is explanatory, not proof", NextAction: "Inspect the selected node"},
+	{ID: "budget", State: "Hard budget reached", Cost: "Unknown actual price remains Unknown", Authority: "No new paid work starts", Evidence: "Checkpointed task state", Uncertainty: "In-flight request may still settle", NextAction: "Raise exact limit, finish, or stop"},
+}
+
+func m18JourneyBoundary(props boundaryProps) ui.Node {
+	// Keep the large first-run shell out of the initial render-isolation frame;
+	// the mounted journey test activates it explicitly after ownership checks.
+	stageID := ui.UseState("new-task")
+	approvalState := ui.UseState("pending")
+	recoveryActions := ui.UseState(0)
+	recoveryDetail := ui.UseState("")
+	recoveryLocation := ui.UseState("")
+	selectedGraph := ui.UseState("journey-node-1")
+	focus := ui.UseFocusManager()
+	showStage := ui.UseEvent(func(event ui.ChangeEvent) {
+		stageID.Set(event.GetValue())
+	})
+	stage := m18JourneyStages[0]
+	for _, candidate := range m18JourneyStages {
+		if candidate.ID == stageID.Get() {
+			stage = candidate
+			break
+		}
+	}
+	options := make([]ui.Node, 0, len(m18JourneyStages))
+	for _, candidate := range m18JourneyStages {
+		options = append(options, html.Option(html.Props{
+			Value: candidate.ID, Text: "Show " + candidate.ID + " flow",
+		}))
+	}
+	selectProps := html.PropsOf(html.OnChange(showStage))
+	selectProps.Value = stage.ID
+	selectProps.Aria = map[string]string{"label": "Task journey stage"}
+	selectProps.DataAttr = html.DataAttribute{Name: "testid", Value: "m18-stage-select"}
+	return html.Section(html.Props{
+		Aria: map[string]string{"label": "M18 complete task journey acceptance fixture"},
+		Data: map[string]string{
+			"component": "m18-journey-fixture", "stage": stage.ID,
+			"approval-state":    approvalState.Get(),
+			"recovery-actions":  strconv.Itoa(recoveryActions.Get()),
+			"recovery-detail":   recoveryDetail.Get(),
+			"recovery-location": recoveryLocation.Get(),
+		},
+	},
+		html.H2(html.Props{Text: "M18 complete task journey"}),
+		html.Nav(html.Props{Aria: map[string]string{"label": "Task journey stages"}},
+			html.Select(selectProps, options...),
+		),
+		m18DecisionFacts(stage),
+		m18JourneyStageContent(
+			stage.ID,
+			props.Mode,
+			approvalState,
+			recoveryActions,
+			recoveryDetail,
+			recoveryLocation,
+			selectedGraph,
+			focus,
+		),
+	)
+}
+
+func m18DecisionFacts(stage m18JourneyStage) ui.Node {
+	values := []struct{ name, value, field string }{
+		{name: "Current state", value: stage.State, field: "state"},
+		{name: "Cost", value: stage.Cost, field: "cost"},
+		{name: "Authority", value: stage.Authority, field: "authority"},
+		{name: "Evidence", value: stage.Evidence, field: "evidence"},
+		{name: "Uncertainty", value: stage.Uncertainty, field: "uncertainty"},
+		{name: "Next safe action", value: stage.NextAction, field: "next-action"},
+	}
+	children := make([]ui.Node, 0, len(values)*2)
+	for _, value := range values {
+		children = append(children,
+			html.Tag("dt", html.Props{Text: value.name}),
+			html.Tag("dd", html.Props{Data: map[string]string{"fact": value.field}, Text: value.value}),
+		)
+	}
+	return html.Section(html.Props{
+		Aria: map[string]string{"label": "Current decision facts"},
+		Data: map[string]string{"component": "m18-decision-facts"},
+	}, html.Tag("dl", html.Props{}, children...))
+}
+
+func m18JourneyStageContent(
+	stage string,
+	mode primitives.Mode,
+	approvalState ui.State[string],
+	recoveryActions ui.State[int],
+	recoveryDetail ui.State[string],
+	recoveryLocation ui.State[string],
+	selectedGraph ui.State[string],
+	focus ui.FocusManager,
+) ui.Node {
+	switch stage {
+	case "first-run":
+		return ui.CreateElement(shell.FirstRunInteractiveShell, shell.FirstRunProps{
+			Title: "Welcome to CodeFlux", State: state.DataReady, Mode: mode,
+			OnNavigatePath: func(string) {},
+		})
+	case "new-task":
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindRequirement, StableKey: "m18:requirement",
+			Requirement: &timelinecard.Requirement{
+				Goal:                  "Complete the typed frontend journey",
+				Constraints:           []string{"Keep authority explicit", "Preserve durable state"},
+				Assumptions:           []string{"The local coordinator is healthy"},
+				UnresolvedAmbiguities: []string{"Exact review scope is not approved"},
+			},
+		}, timelineview.Actions{})
+	case "plan-review":
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindPlan, StableKey: "m18:plan",
+			Plan: &timelinecard.Plan{
+				Revision: 2, Summary: "Implement the requested flow and verify every boundary",
+				Scope:         []string{"frontend journey"},
+				Steps:         []timelinecard.PlanStep{{Ordinal: 1, Title: "Implement", Status: timelinecard.PlanStepComplete}, {Ordinal: 2, Title: "Verify", Status: timelinecard.PlanStepActive}},
+				PlannedChecks: []string{"Go tests", "Mounted browser assertions"},
+				Risks:         []string{"Stale review"}, Assumptions: []string{"No schema facts are inferred"},
+				AuthorityNeeds: []string{"User plan approval"}, CompletionCriteria: []string{"Every named flow is exercised"}, ApprovalPending: true,
+			},
+		}, timelineview.Actions{OnApprovePlan: func(uint64) {}, OnRequestPlanChange: func(uint64) {}})
+	case "live-work":
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindTool, StableKey: "m18:tool",
+			Tool: &timelinecard.ToolActivity{
+				ExecutionID: "exec-m18", Tool: "go test", Purpose: "verify task flow",
+				Scope: "frontend contracts", State: "running", Summary: "Focused checks are running",
+			},
+		}, timelineview.Actions{})
+	case "approval":
+		resolved := approvalState.Get() != "pending"
+		approval := &timelinecard.Approval{
+			ID: "approval-m18", Action: "write scoped frontend tests", SafeArguments: "internal/frontendtest",
+			Scope: "repository tests", Reason: "capture acceptance evidence", Consequences: "test source changes",
+			State: approvalState.Get(),
+		}
+		if resolved {
+			approval.ResolvedBy = "local user"
+			approval.ResolvedAt = time.Unix(1, 0).UTC()
+		}
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindApproval, StableKey: "m18:approval", Approval: approval,
+		}, timelineview.Actions{OnApproval: func(_ string, _ timelinecard.ApprovalAction) {
+			approvalState.Set("granted")
+			ui.PostAsync(func() { focus.FocusByID(timelineview.ApprovalFocusTargetID("approval-m18")) })
+		}})
+	case "review":
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindDiff, StableKey: "m18:diff",
+			Diff: &timelinecard.DiffSummary{
+				Files:     []timelinecard.ChangedFile{{Path: "web/client/main.go", Category: "source", Added: 12}, {Path: "web/client/main_test.go", Category: "test", Added: 20}},
+				Additions: 32, ReviewID: "review-m18",
+			},
+		}, timelineview.Actions{OnOpenReview: func(string) {}})
+	case "repair":
+		return m18JourneyCard(mode, timelinecard.Card{
+			Kind: timelinecard.KindPlanRevision, StableKey: "m18:repair",
+			PlanRevision: &timelinecard.PlanRevision{
+				PreviousRevision: 2, CurrentRevision: 3, Summary: "Repair stale validation evidence",
+				Added: []string{"Re-run browser contract"}, ApprovalReset: true, PriorHistory: []uint64{1, 2},
+			},
+		}, timelineview.Actions{OnComparePlanRevision: func(uint64) {}})
+	case "reconnect":
+		controls := m18JourneyTaskControls(mode)
+		controls.Delivery = taskcontrols.DeliveryView{
+			State: taskcontrols.DeliveryDisconnected, SequenceCertain: false, TimelineReadable: true,
+			Explanation: "The backend task remains running while the UI reconnects.",
+		}
+		controls.Controls.Pause.DisabledReason = "Sequence certainty is unknown"
+		controls.Controls.Stop.DisabledReason = "Sequence certainty is unknown"
+		return ui.CreateElement(taskcontrols.TaskControlPanel, controls)
+	case "recovery":
+		repositoryID, _ := domain.ParseRepositoryID("repo_01890f3c-4a00-7abc-8def-0123456789ab")
+		threadID, _ := domain.ParseThreadID("thr_01890f3c-4a00-7abc-8def-0123456789ab")
+		relatedEventID, _ := domain.ParseEventID("evt_01890f3c-4a00-7abc-8def-0123456789ab")
+		missingEventID, _ := domain.ParseEventID("evt_01890f3c-4a00-7abc-8def-1123456789ab")
+		taskRoute := routes.Route{Name: routes.ThreadWorkspace, RepositoryID: repositoryID, ThreadID: threadID}
+		controls := m18JourneyTaskControls(mode)
+		controls.TaskState = domain.TaskStateRecoveryRequired
+		controls.Phase = taskcontrols.PhaseRepairing
+		controls.Recovery = taskcontrols.RecoveryView{
+			Required: true, KnownState: "checkpoint cp-m18 is durable at task revision 12",
+			LastCheckpointAt: time.Date(2026, 7, 31, 18, 30, 0, 0, time.UTC), LastCheckpointPlanStep: "verify mounted journey",
+			DivergenceSummary: "one user-edited file differs from the task worktree",
+			Ambiguity:         "external publish outcome is not attributable", ExternalOutcomeAmbiguous: true,
+			SafestRecommendation: "Reconcile the external outcome before continuing.",
+			ReconcileRequired:    true, PatchPreservable: true,
+			Details: []taskcontrols.RecoveryDetail{
+				{Kind: taskcontrols.RecoveryDetailEvent, Identity: relatedEventID.String(), Label: "Related recovery event"},
+				{Kind: taskcontrols.RecoveryDetailEvent, Identity: missingEventID.String(), Label: "Missing recovery event"},
+				{Kind: taskcontrols.RecoveryDetailFile, Identity: "web/client/main.go", Label: "web/client/main.go"},
+				{Kind: taskcontrols.RecoveryDetailFile, Identity: "../outside", Label: "../outside", DisabledReason: "Unsafe workspace-relative path."},
+			},
+		}
+		controls.OnReconcile = func() { recoveryActions.Set(recoveryActions.Get() + 1) }
+		controls.OnPreservePatch = func() { recoveryActions.Set(recoveryActions.Get() + 1) }
+		controls.OnOpenDetail = func(detail taskcontrols.RecoveryDetail) {
+			switch detail.Kind {
+			case taskcontrols.RecoveryDetailEvent:
+				eventID, err := domain.ParseEventID(detail.Identity)
+				if err != nil {
+					return
+				}
+				path, err := routes.TaskEventSelectionPath(taskRoute, eventID)
+				if err != nil {
+					return
+				}
+				recoveryLocation.Set(path)
+				if eventID == relatedEventID {
+					recoveryDetail.Set("event")
+					ui.PostAsync(func() { focus.FocusByID(timelineview.CardFocusTargetID("m18:related-event")) })
+				} else {
+					recoveryDetail.Set("missing-event")
+				}
+			case taskcontrols.RecoveryDetailFile:
+				path, err := routes.TaskFileSelectionPath(taskRoute, detail.Identity)
+				if err != nil {
+					return
+				}
+				recoveryLocation.Set(path)
+				recoveryDetail.Set("file")
+			}
+		}
+		selectedEvent := recoveryDetail.Get() == "event"
+		recoveryChildren := []ui.Node{
+			ui.CreateElement(taskcontrols.TaskControlPanel, controls),
+			ui.CreateElement(timelineview.Renderer, timelineview.Props{
+				Card: timelinecard.Card{
+					Kind: timelinecard.KindRecovery, Sequence: 18, StableKey: "m18:related-event",
+					Recovery: &timelinecard.Recovery{CheckpointID: "cp-m18", Reason: "Related authoritative recovery evidence", Known: []string{"accepted event identity"}},
+				},
+				Mode: mode, Selected: selectedEvent,
+			}),
+		}
+		if recoveryDetail.Get() == "missing-event" {
+			recoveryChildren = append(recoveryChildren, html.P(html.Props{
+				Role: "status", Data: map[string]string{"component": "timeline-selection-notice"},
+				Text: "The related recovery event is not present in the loaded authoritative timeline.",
+			}))
+		}
+		if recoveryDetail.Get() == "file" {
+			recoveryChildren = append(recoveryChildren, ui.CreateElement(shell.TimelineControls, shell.TimelineControlProps{
+				Mode: mode, Enabled: true, ReviewOpen: true, ReviewFile: "web/client/main.go",
+				OnCloseReview: func() {
+					path, err := routes.TaskSelectionPath(taskRoute)
+					if err == nil {
+						recoveryLocation.Set(path)
+						recoveryDetail.Set("")
+					}
+				},
+			}))
+		}
+		return html.Div(html.Props{Data: map[string]string{"component": "m18-recovery-detail-fixture"}}, recoveryChildren...)
+	case "graph":
+		return ui.CreateElement(shell.GraphPane, shell.GraphPaneProps{
+			State: state.DataReady, Mode: mode, Revision: 8, SelectedID: selectedGraph.Get(),
+			Nodes:    []state.GraphNodeView{{ID: "journey-node-1", Title: "Requirement", Status: "complete"}, {ID: "journey-node-2", Title: "Validation", Status: "running"}},
+			OnSelect: selectedGraph.Set,
+		})
+	case "budget":
+		controls := m18JourneyTaskControls(mode)
+		controls.Budget.HardCapReached = true
+		controls.Budget.SettlingInFlight = true
+		controls.Budget.CheckpointedState = "checkpoint cp-m18 at task revision 12"
+		controls.Usage.Cost = taskcontrols.ActualCostView{UnknownReason: "provider price has not arrived"}
+		return ui.CreateElement(taskcontrols.TaskControlPanel, controls)
+	default:
+		return html.P(html.Props{Role: "alert", Text: "Unknown journey stage"})
+	}
+}
+
+func m18JourneyCard(mode primitives.Mode, card timelinecard.Card, actions timelineview.Actions) ui.Node {
+	return ui.CreateElement(timelineview.Renderer, timelineview.Props{Card: card, Mode: mode, Actions: actions})
+}
+
+func m18JourneyTaskControls(mode primitives.Mode) taskcontrols.Props {
+	usd, err := domain.ParseCurrencyCode("USD")
+	if err != nil {
+		panic(err)
+	}
+	limit, err := domain.NewMoney(usd, 400)
+	if err != nil {
+		panic(err)
+	}
+	remaining, err := domain.NewMoney(usd, 150)
+	if err != nil {
+		panic(err)
+	}
+	return taskcontrols.Props{
+		Mode: mode, TaskID: m18IDs.task, TaskRevision: 12,
+		TaskState: domain.TaskStateRunning, Phase: taskcontrols.PhaseEditing,
+		Delivery:  taskcontrols.DeliveryView{State: taskcontrols.DeliveryLive, SequenceCertain: true, TimelineReadable: true},
+		Selection: taskcontrols.SelectionView{Provider: "OpenAI", Model: "gpt-5.6-sol", Effort: "high"},
+		Forecast:  taskcontrols.ForecastView{Range: domain.ForecastRange{}, Assumptions: "No estimate is treated as a promise."},
+		Usage:     taskcontrols.UsageView{Cost: taskcontrols.ActualCostView{UnknownReason: "price has not arrived"}},
+		Budget: taskcontrols.BudgetView{
+			HardLimitKnown: true, HardLimit: limit, RemainingKnown: true, Remaining: remaining,
+			WarningThresholdKnown: true, WarningThreshold: limit,
+		},
+		Controls: taskcontrols.ControlState{},
+		OnPause:  func() {}, OnStop: func() {},
+	}
 }

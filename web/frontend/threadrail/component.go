@@ -414,7 +414,7 @@ func compactRailActivity(value time.Time) string {
 	return value.UTC().Format("Jan 2")
 }
 
-func compactTaskState(value TaskState) string {
+func compactTaskState(value RailTaskState) string {
 	switch value {
 	case TaskStateNone:
 		return "No task"

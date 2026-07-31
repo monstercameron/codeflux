@@ -4,28 +4,105 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type sessionEventSource interface {
 	Subscribe(context.Context, events.SubscriptionQuery) (*events.Subscription, error)
 }
 
+// SessionProjectionSnapshotView is the transport-independent complete client
+// reducer base observed through one committed session sequence.
+type SessionProjectionSnapshotView struct {
+	SessionID              domain.SessionID
+	ThreadID               domain.ThreadID
+	ThroughSequence        uint64
+	ObservedAt             time.Time
+	TaskID                 *domain.TaskID
+	TaskState              domain.TaskState
+	TaskRevision           uint64
+	Plan                   *events.Plan
+	PlanApproval           domain.ApprovalRequestState
+	PendingApproval        *events.Approval
+	ApprovalRevision       uint64
+	Budget                 *events.Budget
+	BudgetRevision         uint64
+	Tool                   *events.Tool
+	ToolRevision           uint64
+	Validation             *events.Validation
+	ValidationRevision     uint64
+	Checkpoint             *events.Checkpoint
+	CheckpointRevision     uint64
+	CheckpointAt           time.Time
+	Recovery               *events.RecoveryRequired
+	RecoveryRevision       uint64
+	Acceptance             *events.ChangeAcceptance
+	AcceptanceRevision     uint64
+	ReviewBindings         *events.RevisionBindings
+	ReviewRevision         uint64
+	GraphRevision          uint64
+	DeniedTaskActions      []string
+	TaskActionPolicyReason string
+}
+
+type sessionProjectionSnapshotApplication interface {
+	GetSessionProjectionSnapshot(context.Context, domain.SessionID) (SessionProjectionSnapshotView, error)
+}
+
 // SessionService exposes committed replay joined to bounded live delivery.
 // Authentication and request validation remain owned by the stream boundary.
 type SessionService struct {
 	codefluxv1.UnimplementedSessionServiceServer
-	source sessionEventSource
+	source    sessionEventSource
+	snapshots sessionProjectionSnapshotApplication
 }
 
-func NewSessionService(source sessionEventSource) (*SessionService, error) {
+func NewSessionService(
+	source sessionEventSource,
+	snapshotApplications ...sessionProjectionSnapshotApplication,
+) (*SessionService, error) {
 	if source == nil {
 		return nil, errors.New("session event source is required")
 	}
-	return &SessionService{source: source}, nil
+	if len(snapshotApplications) > 1 {
+		return nil, errors.New("at most one session snapshot application is permitted")
+	}
+	var snapshots sessionProjectionSnapshotApplication
+	if len(snapshotApplications) == 1 {
+		if snapshotApplications[0] == nil {
+			return nil, errors.New("session snapshot application must not be nil")
+		}
+		snapshots = snapshotApplications[0]
+	}
+	return &SessionService{source: source, snapshots: snapshots}, nil
+}
+
+func (service *SessionService) GetSessionSnapshot(
+	ctx context.Context,
+	request *codefluxv1.GetSessionSnapshotRequest,
+) (*codefluxv1.GetSessionSnapshotResponse, error) {
+	if service.snapshots == nil {
+		return nil, errors.New("session snapshot application is unavailable")
+	}
+	sessionID, err := SessionIDFromProto(request.GetSessionId())
+	if err != nil {
+		return nil, requestIdentityError("session_id", err)
+	}
+	view, err := service.snapshots.GetSessionProjectionSnapshot(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := sessionProjectionSnapshotToProto(view)
+	if err != nil {
+		return nil, err
+	}
+	return &codefluxv1.GetSessionSnapshotResponse{Snapshot: snapshot}, nil
 }
 
 func (service *SessionService) SubscribeSession(
@@ -43,6 +120,25 @@ func (service *SessionService) SubscribeSession(
 		return err
 	}
 	defer subscription.Close()
+	replayBoundary := subscription.ReplayBoundary()
+	replayComplete := false
+	sendReplayBoundary := func() error {
+		if replayComplete {
+			return nil
+		}
+		if err := stream.Send(&codefluxv1.SubscribeSessionResponse{
+			ReplayBoundary: &codefluxv1.SessionReplayBoundary{ThroughSequence: replayBoundary},
+		}); err != nil {
+			return err
+		}
+		replayComplete = true
+		return nil
+	}
+	if request.GetAfterSequence() == replayBoundary {
+		if err := sendReplayBoundary(); err != nil {
+			return err
+		}
+	}
 	for {
 		event, nextErr := subscription.Next(stream.Context())
 		if errors.Is(nextErr, io.EOF) {
@@ -58,7 +154,168 @@ func (service *SessionService) SubscribeSession(
 		if sendErr := stream.Send(&codefluxv1.SubscribeSessionResponse{Event: converted}); sendErr != nil {
 			return sendErr
 		}
+		if event.Sequence == replayBoundary {
+			if err := sendReplayBoundary(); err != nil {
+				return err
+			}
+		}
 	}
+}
+
+func sessionProjectionSnapshotToProto(
+	view SessionProjectionSnapshotView,
+) (*codefluxv1.SessionProjectionSnapshot, error) {
+	sessionID, err := SessionIDToProto(view.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	threadID, err := ThreadIDToProto(view.ThreadID)
+	if err != nil {
+		return nil, err
+	}
+	observedAt := timestamppb.New(view.ObservedAt.UTC())
+	if err := observedAt.CheckValid(); err != nil {
+		return nil, err
+	}
+	result := &codefluxv1.SessionProjectionSnapshot{
+		SessionId: sessionID, ThreadId: threadID,
+		ThroughSequence: view.ThroughSequence, ObservedAt: observedAt,
+	}
+	if view.TaskID == nil {
+		if view.TaskState != "" || view.TaskRevision != 0 || view.Plan != nil ||
+			view.PendingApproval != nil || view.Budget != nil || view.Validation != nil ||
+			view.Checkpoint != nil || view.Recovery != nil || view.Acceptance != nil ||
+			view.Tool != nil || view.ReviewBindings != nil || view.ReviewRevision != 0 ||
+			view.GraphRevision != 0 || len(view.DeniedTaskActions) != 0 ||
+			view.TaskActionPolicyReason != "" {
+			return nil, errors.New("session snapshot task projections require a task identity")
+		}
+		return result, nil
+	}
+	result.TaskId, err = TaskIDToProto(*view.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	if !view.TaskState.IsValid() || view.TaskRevision == 0 && view.TaskState != domain.TaskStateDraft {
+		return nil, errors.New("session snapshot task state or revision is invalid")
+	}
+	result.TaskState, result.TaskRevision = string(view.TaskState), view.TaskRevision
+	if view.Plan != nil {
+		result.Plan = &codefluxv1.PlanEvent{PlanRevision: view.Plan.Revision, RedactedSummary: view.Plan.RedactedSummary}
+		result.PlanApprovalState = string(view.PlanApproval)
+	}
+	if view.PendingApproval != nil {
+		identity, identityErr := ApprovalIDToProto(view.PendingApproval.ApprovalID)
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		result.PendingApproval = &codefluxv1.ApprovalEvent{
+			ApprovalId: identity, State: string(view.PendingApproval.State), Scope: view.PendingApproval.Scope,
+			RedactedReason: view.PendingApproval.RedactedReason,
+		}
+		result.ApprovalRevision = view.ApprovalRevision
+	}
+	if view.Budget != nil {
+		result.Budget = &codefluxv1.BudgetEvent{
+			HardLimitMinor: view.Budget.HardLimit.MinorUnits,
+			ReservedMinor:  view.Budget.Reserved.MinorUnits,
+			ActualMinor:    view.Budget.Actual.MinorUnits,
+			Currency:       string(view.Budget.HardLimit.Currency),
+		}
+		result.BudgetRevision = view.BudgetRevision
+	}
+	if view.Tool != nil {
+		result.Tool = &codefluxv1.ToolEvent{
+			ExecutionId: view.Tool.ExecutionID, CommandName: view.Tool.CommandName,
+			State: view.Tool.State, RedactedSummary: view.Tool.RedactedSummary,
+		}
+		result.ToolRevision = view.ToolRevision
+	}
+	if view.Validation != nil {
+		identity, identityErr := ValidationIDToProto(view.Validation.ValidationID)
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		result.Validation = &codefluxv1.ValidationEvent{
+			ValidationId: identity, State: string(view.Validation.State),
+			RedactedSummary: view.Validation.RedactedSummary, Required: view.Validation.Required,
+			Acknowledged: view.Validation.Acknowledged, DiffRevision: view.Validation.DiffRevision,
+		}
+		result.ValidationRevision = view.ValidationRevision
+	}
+	if view.Checkpoint != nil {
+		identity, identityErr := CheckpointIDToProto(view.Checkpoint.CheckpointID)
+		if identityErr != nil {
+			return nil, identityErr
+		}
+		result.Checkpoint = &codefluxv1.CheckpointEvent{
+			CheckpointId: identity, TaskRevision: view.Checkpoint.TaskRevision,
+			PlanStep: view.Checkpoint.PlanStep,
+		}
+		result.CheckpointRevision = view.CheckpointRevision
+		result.CheckpointCreatedAt = timestamppb.New(view.CheckpointAt.UTC())
+		if err := result.CheckpointCreatedAt.CheckValid(); err != nil {
+			return nil, err
+		}
+	}
+	if view.Recovery != nil {
+		value := view.Recovery
+		result.Recovery = &codefluxv1.RecoveryRequiredEvent{
+			RedactedReason: value.RedactedReason, Classification: string(value.Classification),
+			DivergenceSummary: value.DivergenceSummary, ExternalOutcomeAmbiguous: value.ExternalOutcomeAmbiguous,
+			SafeResumeVerified: value.SafeResumeVerified, ReconcileAvailable: value.ReconcileAvailable,
+			PreservePatchAvailable: value.PreservePatchAvailable,
+			DiffRevision:           value.Bindings.Diff, PlanRevision: value.Bindings.Plan,
+			ValidationRevision: value.Bindings.Validation, EvidenceRevision: value.Bindings.Evidence,
+			GraphRevision: value.Bindings.Graph, RelatedFiles: append([]string(nil), value.RelatedFiles...),
+		}
+		if value.CheckpointID != nil {
+			result.Recovery.CheckpointId, err = CheckpointIDToProto(*value.CheckpointID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, eventID := range value.RelatedEventIDs {
+			identity, identityErr := EventIDToProto(eventID)
+			if identityErr != nil {
+				return nil, identityErr
+			}
+			result.Recovery.RelatedEventIds = append(result.Recovery.RelatedEventIds, identity)
+		}
+		result.RecoveryRevision = view.RecoveryRevision
+	}
+	if view.Acceptance != nil {
+		value := view.Acceptance
+		result.ChangeAcceptance = &codefluxv1.ChangeAcceptanceEvent{
+			State: string(value.State), DiffRevision: value.Bindings.Diff,
+			PlanRevision: value.Bindings.Plan, ValidationRevision: value.Bindings.Validation,
+			EvidenceRevision: value.Bindings.Evidence, GraphRevision: value.Bindings.Graph,
+		}
+		result.ChangeAcceptanceRevision = view.AcceptanceRevision
+	}
+	if view.ReviewBindings != nil {
+		if view.ReviewRevision == 0 || !view.ReviewBindings.Complete() {
+			return nil, errors.New("session snapshot review bindings are incomplete")
+		}
+		result.ReviewBindings = &codefluxv1.SessionRevisionBindings{
+			DiffRevision:       view.ReviewBindings.Diff,
+			PlanRevision:       view.ReviewBindings.Plan,
+			ValidationRevision: view.ReviewBindings.Validation,
+			EvidenceRevision:   view.ReviewBindings.Evidence,
+			GraphRevision:      view.ReviewBindings.Graph,
+		}
+		result.ReviewRevision = view.ReviewRevision
+	} else if view.ReviewRevision != 0 {
+		return nil, errors.New("session snapshot review revision has no bindings")
+	}
+	result.GraphRevision = view.GraphRevision
+	if len(view.DeniedTaskActions) > 0 && view.TaskActionPolicyReason == "" ||
+		len(view.DeniedTaskActions) == 0 && view.TaskActionPolicyReason != "" {
+		return nil, errors.New("session snapshot task-action policy is incomplete")
+	}
+	result.DeniedTaskActions = append([]string(nil), view.DeniedTaskActions...)
+	result.TaskActionPolicyReason = view.TaskActionPolicyReason
+	return result, nil
 }
 
 func sessionEventToProto(event events.SessionEvent) (*codefluxv1.SessionEvent, error) {
@@ -208,7 +465,10 @@ func setSessionEventPayload(result *codefluxv1.SessionEvent, event events.Sessio
 			return err
 		}
 		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_VALIDATION_UPDATED
-		result.Payload = &codefluxv1.SessionEvent_Validation{Validation: &codefluxv1.ValidationEvent{ValidationId: identity, State: string(value.State), RedactedSummary: value.RedactedSummary}}
+		result.Payload = &codefluxv1.SessionEvent_Validation{Validation: &codefluxv1.ValidationEvent{
+			ValidationId: identity, State: string(value.State), RedactedSummary: value.RedactedSummary,
+			Required: value.Required, Acknowledged: value.Acknowledged, DiffRevision: value.DiffRevision,
+		}}
 	case events.KindGraphSnapshot, events.KindGraphPatch:
 		value := event.Payload.Graph
 		identity, err := GraphRevisionIDToProto(value.RevisionID)
@@ -228,10 +488,21 @@ func setSessionEventPayload(result *codefluxv1.SessionEvent, event events.Sessio
 			return err
 		}
 		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_CHECKPOINT_CREATED
-		result.Payload = &codefluxv1.SessionEvent_Checkpoint{Checkpoint: &codefluxv1.CheckpointEvent{CheckpointId: identity, TaskRevision: value.TaskRevision}}
+		result.Payload = &codefluxv1.SessionEvent_Checkpoint{Checkpoint: &codefluxv1.CheckpointEvent{
+			CheckpointId: identity, TaskRevision: value.TaskRevision, PlanStep: value.PlanStep,
+		}}
 	case events.KindRecoveryRequired:
 		value := event.Payload.RecoveryRequired
-		payload := &codefluxv1.RecoveryRequiredEvent{RedactedReason: value.RedactedReason}
+		payload := &codefluxv1.RecoveryRequiredEvent{
+			RedactedReason: value.RedactedReason, Classification: string(value.Classification),
+			DivergenceSummary:        value.DivergenceSummary,
+			ExternalOutcomeAmbiguous: value.ExternalOutcomeAmbiguous,
+			SafeResumeVerified:       value.SafeResumeVerified, ReconcileAvailable: value.ReconcileAvailable,
+			PreservePatchAvailable: value.PreservePatchAvailable,
+			DiffRevision:           value.Bindings.Diff, PlanRevision: value.Bindings.Plan,
+			ValidationRevision: value.Bindings.Validation, EvidenceRevision: value.Bindings.Evidence,
+			GraphRevision: value.Bindings.Graph, RelatedFiles: append([]string(nil), value.RelatedFiles...),
+		}
 		if value.CheckpointID != nil {
 			identity, err := CheckpointIDToProto(*value.CheckpointID)
 			if err != nil {
@@ -239,8 +510,31 @@ func setSessionEventPayload(result *codefluxv1.SessionEvent, event events.Sessio
 			}
 			payload.CheckpointId = identity
 		}
+		for _, eventID := range value.RelatedEventIDs {
+			identity, err := EventIDToProto(eventID)
+			if err != nil {
+				return err
+			}
+			payload.RelatedEventIds = append(payload.RelatedEventIds, identity)
+		}
 		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_RECOVERY_REQUIRED
 		result.Payload = &codefluxv1.SessionEvent_RecoveryRequired{RecoveryRequired: payload}
+	case events.KindChangeAcceptanceUpdated:
+		value := event.Payload.ChangeAcceptance
+		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED
+		result.Payload = &codefluxv1.SessionEvent_ChangeAcceptance{ChangeAcceptance: &codefluxv1.ChangeAcceptanceEvent{
+			State: string(value.State), DiffRevision: value.Bindings.Diff,
+			PlanRevision: value.Bindings.Plan, ValidationRevision: value.Bindings.Validation,
+			EvidenceRevision: value.Bindings.Evidence, GraphRevision: value.Bindings.Graph,
+		}}
+	case events.KindTaskProjectionInvalidated:
+		value := event.Payload.TaskProjectionInvalidated
+		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED
+		result.Payload = &codefluxv1.SessionEvent_TaskProjectionInvalidated{
+			TaskProjectionInvalidated: &codefluxv1.TaskProjectionInvalidatedEvent{
+				Entity: value.Entity, EntityRevision: value.Revision,
+			},
+		}
 	case events.KindError:
 		value := event.Payload.Error
 		result.Kind = codefluxv1.SessionEventKind_SESSION_EVENT_KIND_ERROR

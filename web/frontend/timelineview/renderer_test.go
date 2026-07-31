@@ -51,6 +51,25 @@ func TestRendererExhaustivelyRendersEveryTypedCard(t *testing.T) {
 	}
 }
 
+func TestSelectedRendererIsAddressableAndVisiblySelected(t *testing.T) {
+	card := fixedCards(t)[0]
+	markup, err := ui.RenderToString(ui.CreateElement(Renderer, Props{
+		Card: card, Mode: testMode(), Selected: true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`id="` + CardFocusTargetID(card.StableKey) + `"`,
+		`tabIndex="-1"`,
+		`data-selected="true"`,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Fatalf("selected card missing %q: %s", want, markup)
+		}
+	}
+}
+
 func TestRendererKeepsUnsafeMarkdownInertAndSafeLinksHardened(t *testing.T) {
 	card := fixedCards(t)[0]
 	card.Message.Body = `<script>alert(1)</script> [unsafe](javascript:alert(1)) [safe](https://example.com/docs)`
@@ -448,7 +467,7 @@ func TestPresentationStatusMatrixIsTextuallyDistinct(t *testing.T) {
 		{card: timelinecard.Card{Kind: timelinecard.KindApproval, Approval: &timelinecard.Approval{State: "pending"}}, want: "Pending"},
 		{card: timelinecard.Card{Kind: timelinecard.KindApproval, Approval: &timelinecard.Approval{State: "denied"}}, want: "Denied"},
 		{card: timelinecard.Card{Kind: timelinecard.KindPlan, Plan: &timelinecard.Plan{Superseded: true}}, want: "Superseded"},
-		{card: timelinecard.Card{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskState{To: "paused"}}, want: "Paused"},
+		{card: timelinecard.Card{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskTransition{To: "paused"}}, want: "Paused"},
 	}
 	seen := map[string]bool{}
 	for _, fixture := range fixtures {
@@ -462,7 +481,7 @@ func TestPresentationStatusMatrixIsTextuallyDistinct(t *testing.T) {
 		t.Fatalf("status matrix collapsed distinct variants: %#v", seen)
 	}
 	for _, taskState := range domain.AllTaskStates() {
-		card := timelinecard.Card{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskState{To: string(taskState)}}
+		card := timelinecard.Card{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskTransition{To: string(taskState)}}
 		if got, want := PresentationFor(card).StatusLabel, humanize(string(taskState)); got != want {
 			t.Errorf("task state %s status = %q, want %q", taskState, got, want)
 		}
@@ -509,7 +528,7 @@ func fixedCards(t *testing.T) []timelinecard.Card {
 		{Kind: timelinecard.KindRecovery, Recovery: &timelinecard.Recovery{CheckpointID: "checkpoint-1", Reason: "worktree divergence", Known: []string{"checkpoint exists"}, Ambiguous: []string{"external edit"}, Choices: []timelinecard.RecoveryChoice{{Kind: "safe-resume", Label: "Safe resume", Explanation: "Resume from verified state"}, {Kind: "abandon", Label: "Abandon", Explanation: "Discard task state", Destructive: true}}}},
 		{Kind: timelinecard.KindError, Error: &timelinecard.Error{Code: "conflict", Message: "state changed", AffectedAction: "save", Retryable: true, NextSteps: []string{"Refresh"}}},
 		{Kind: timelinecard.KindCompletion, Completion: &timelinecard.Completion{Status: timelinecard.CompletionValidated, Files: []string{"renderer.go"}, Validation: []timelinecard.Validation{{ID: "validation-1", Status: timelinecard.ValidationPassed}}, Evidence: []string{"unit tests"}, Cost: &money}},
-		{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskState{From: "running", To: "validating", Approval: "granted"}},
+		{Kind: timelinecard.KindTaskState, TaskState: &timelinecard.TaskTransition{From: "running", To: "validating", Approval: "granted"}},
 		{Kind: timelinecard.KindUsage, Usage: &timelinecard.Usage{Tokens: domain.TokenUsage{Known: true, Input: 100, Output: 20}}},
 		{Kind: timelinecard.KindGraphChange, GraphChange: &timelinecard.GraphChange{RevisionID: "graph-1", Patch: true, ByteCount: 128}},
 		{Kind: timelinecard.KindUnknown, Unknown: &timelinecard.Unknown{EventKind: "future-event", OccurredAt: viewFixtureTime, Sequence: 19, SafeDetails: "unsupported but safe", DiagnosticsPath: "/diagnostics"}},

@@ -169,7 +169,7 @@ func runGraphCanvasInteractionCheck(
 		err = fit.Click()
 	}
 	if err == nil {
-		err = waitForNumericAttributeNear(
+		err = waitForNumericAttributeChange(
 			canvas, "data-zoom", initial.Zoom, graphTransformTolerance,
 		)
 	}
@@ -348,6 +348,36 @@ func numericAttribute(locator playwright.Locator, name string) (float64, error) 
 		return 0, fmt.Errorf("parse %s=%q: %w", name, raw, err)
 	}
 	return value, nil
+}
+
+func waitForNumericAttributeChange(
+	locator playwright.Locator,
+	name string,
+	previous float64,
+	tolerance float64,
+) error {
+	deadline := time.Now().Add(browserAssertionTimeout)
+	for time.Now().Before(deadline) {
+		value, err := numericAttribute(locator, name)
+		if err != nil {
+			return err
+		}
+		if math.Abs(value-previous) > tolerance {
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	value, err := numericAttribute(locator, name)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf(
+		"%s did not change from %f within tolerance %f: got=%f",
+		name,
+		previous,
+		tolerance,
+		value,
+	)
 }
 
 func waitForNumericAttributeNear(

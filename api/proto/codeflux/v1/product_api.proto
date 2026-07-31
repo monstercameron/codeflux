@@ -8,6 +8,8 @@ import "codeflux/v1/conventions.proto";
 import "codeflux/v1/identity.proto";
 import "codeflux/v1/resources.proto";
 import "codeflux/v1/session.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 service WorkspaceService {
   rpc OpenWorkspace(OpenWorkspaceRequest) returns (OpenWorkspaceResponse);
@@ -139,6 +141,9 @@ service TaskService {
   rpc SetBudget(SetBudgetRequest) returns (SetBudgetResponse);
   rpc RequestRepair(RequestRepairRequest) returns (RequestRepairResponse);
   rpc RollbackTask(RollbackTaskRequest) returns (RollbackTaskResponse);
+  rpc PreserveRecoveryPatch(PreserveRecoveryPatchRequest) returns (PreserveRecoveryPatchResponse);
+  rpc ReconcileRecovery(ReconcileRecoveryRequest) returns (ReconcileRecoveryResponse);
+  rpc SafeResumeRecovery(SafeResumeRecoveryRequest) returns (SafeResumeRecoveryResponse);
 }
 
 message CreateTaskRequest {
@@ -244,10 +249,51 @@ message RollbackTaskResponse {
   TaskView task = 1;
 }
 
+message PreserveRecoveryPatchRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+}
+
+message PreserveRecoveryPatchResponse {
+  StableIdentity task_id = 1;
+  string assessment_id = 2;
+  string patch_path = 3;
+}
+
+message ReconcileRecoveryRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+}
+
+message ReconcileRecoveryResponse {
+  StableIdentity task_id = 1;
+  string assessment_id = 2;
+  StableIdentity checkpoint_id = 3;
+  string state = 4;
+  uint64 revision = 5;
+}
+
+message SafeResumeRecoveryRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+  string reason = 3;
+}
+
+message SafeResumeRecoveryResponse {
+  StableIdentity task_id = 1;
+  string assessment_id = 2;
+  StableIdentity checkpoint_id = 3;
+  string state = 4;
+  uint64 revision = 5;
+}
+
 service GraphService {
   rpc GetGraphSlice(GetGraphSliceRequest) returns (GetGraphSliceResponse);
   rpc ExpandGraph(ExpandGraphRequest) returns (ExpandGraphResponse);
   rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+  rpc SearchGraph(SearchGraphRequest) returns (SearchGraphResponse);
   rpc ExplainNode(ExplainNodeRequest) returns (ExplainNodeResponse);
   rpc CompareGraphRevisions(CompareGraphRevisionsRequest) returns (CompareGraphRevisionsResponse);
 }
@@ -257,6 +303,11 @@ message GetGraphSliceRequest {
   string mode = 2;
   uint32 max_nodes = 3;
   uint32 max_edges = 4;
+  StableIdentity project_id = 5;
+  StableIdentity expected_graph_revision_id = 6;
+  string continuation_cursor = 7;
+  string layout_algorithm = 8;
+  uint64 layout_algorithm_version = 9;
 }
 
 message GetGraphSliceResponse {
@@ -269,6 +320,13 @@ message ExpandGraphRequest {
   string continuation_cursor = 3;
   uint32 max_nodes = 4;
   uint32 max_edges = 5;
+  StableIdentity project_id = 6;
+  StableIdentity task_id = 7;
+  string mode = 8;
+  string traversal = 9;
+  uint32 max_hops = 10;
+  string layout_algorithm = 11;
+  uint64 layout_algorithm_version = 12;
 }
 
 message ExpandGraphResponse {
@@ -278,6 +336,10 @@ message ExpandGraphResponse {
 message GetNodeRequest {
   StableIdentity graph_revision_id = 1;
   StableIdentity node_id = 2;
+  StableIdentity project_id = 3;
+  StableIdentity task_id = 4;
+  string layout_algorithm = 5;
+  uint64 layout_algorithm_version = 6;
 }
 
 message GetNodeResponse {
@@ -286,9 +348,29 @@ message GetNodeResponse {
   repeated StableIdentity evidence_ids = 3;
 }
 
+message SearchGraphRequest {
+  StableIdentity project_id = 1;
+  StableIdentity task_id = 2;
+  StableIdentity graph_revision_id = 3;
+  string mode = 4;
+  string query = 5;
+  uint32 max_results = 6;
+  string continuation_cursor = 7;
+  string layout_algorithm = 8;
+  uint64 layout_algorithm_version = 9;
+}
+
+message SearchGraphResponse {
+  GraphSliceView graph = 1;
+}
+
 message ExplainNodeRequest {
   StableIdentity graph_revision_id = 1;
   StableIdentity node_id = 2;
+  StableIdentity project_id = 3;
+  StableIdentity task_id = 4;
+  string layout_algorithm = 5;
+  uint64 layout_algorithm_version = 6;
 }
 
 message ExplainNodeResponse {
@@ -301,6 +383,8 @@ message CompareGraphRevisionsRequest {
   StableIdentity to_graph_revision_id = 2;
   uint32 max_changes = 3;
   string continuation_cursor = 4;
+  StableIdentity project_id = 5;
+  StableIdentity task_id = 6;
 }
 
 message CompareGraphRevisionsResponse {
@@ -309,6 +393,11 @@ message CompareGraphRevisionsResponse {
   repeated StableIdentity removed_node_ids = 3;
   string continuation_cursor = 4;
   bool truncated = 5;
+  repeated GraphRevisionChangeView changes = 6;
+  StableIdentity from_graph_id = 7;
+  uint64 from_revision = 8;
+  StableIdentity to_graph_id = 9;
+  uint64 to_revision = 10;
 }
 
 service ReviewService {
@@ -378,6 +467,9 @@ service SettingsService {
   rpc SetBudgetDefaults(SetBudgetDefaultsRequest) returns (SetBudgetDefaultsResponse);
   rpc ConfigureProvider(ConfigureProviderRequest) returns (ConfigureProviderResponse);
   rpc TestProvider(TestProviderRequest) returns (TestProviderResponse);
+  rpc RecordFrontendTelemetry(RecordFrontendTelemetryRequest) returns (RecordFrontendTelemetryResponse);
+  rpc ListFrontendTelemetry(ListFrontendTelemetryRequest) returns (ListFrontendTelemetryResponse);
+  rpc DeleteFrontendTelemetry(DeleteFrontendTelemetryRequest) returns (DeleteFrontendTelemetryResponse);
 }
 
 message GetModelsRequest {
@@ -438,8 +530,209 @@ message TestProviderResponse {
   RedactedText summary = 2;
 }
 
+// Frontend telemetry is deliberately content-free. The closed enums and
+// numeric metadata below prohibit keystrokes, prompts, source, tool output,
+// hidden reasoning, and arbitrary labels from crossing this boundary.
+enum FrontendTelemetryKind {
+  FRONTEND_TELEMETRY_KIND_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_KIND_FIRST_RUN_STEP = 1;
+  FRONTEND_TELEMETRY_KIND_TIME_TO_THREAD = 2;
+  FRONTEND_TELEMETRY_KIND_TIME_TO_MESSAGE = 3;
+  FRONTEND_TELEMETRY_KIND_TIME_TO_PLAN = 4;
+  FRONTEND_TELEMETRY_KIND_TIME_TO_DIFF = 5;
+  FRONTEND_TELEMETRY_KIND_PLAN_DECISION = 6;
+  FRONTEND_TELEMETRY_KIND_APPROVAL_DECISION = 7;
+  FRONTEND_TELEMETRY_KIND_TASK_CONTROL = 8;
+  FRONTEND_TELEMETRY_KIND_REVIEW_DECISION = 9;
+  FRONTEND_TELEMETRY_KIND_GRAPH_INTERACTION = 10;
+  FRONTEND_TELEMETRY_KIND_MEMORY_INTERACTION = 11;
+  FRONTEND_TELEMETRY_KIND_RECONNECT = 12;
+  FRONTEND_TELEMETRY_KIND_RECOVERY_ACTION = 13;
+  FRONTEND_TELEMETRY_KIND_FRONTEND_ERROR = 14;
+  FRONTEND_TELEMETRY_KIND_LONG_TASK = 15;
+  FRONTEND_TELEMETRY_KIND_SLOW_RENDER = 16;
+}
+
+enum FrontendTelemetryOutcome {
+  FRONTEND_TELEMETRY_OUTCOME_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_OUTCOME_SUCCEEDED = 1;
+  FRONTEND_TELEMETRY_OUTCOME_FAILED = 2;
+  FRONTEND_TELEMETRY_OUTCOME_CANCELLED = 3;
+  FRONTEND_TELEMETRY_OUTCOME_APPROVED = 4;
+  FRONTEND_TELEMETRY_OUTCOME_DENIED = 5;
+  FRONTEND_TELEMETRY_OUTCOME_EXPIRED = 6;
+  FRONTEND_TELEMETRY_OUTCOME_REVISION_REQUESTED = 7;
+  FRONTEND_TELEMETRY_OUTCOME_PAUSED = 8;
+  FRONTEND_TELEMETRY_OUTCOME_STOPPED = 9;
+  FRONTEND_TELEMETRY_OUTCOME_OPENED = 10;
+  FRONTEND_TELEMETRY_OUTCOME_NAVIGATED = 11;
+  FRONTEND_TELEMETRY_OUTCOME_INSPECTED = 12;
+  FRONTEND_TELEMETRY_OUTCOME_CORRECTED = 13;
+  FRONTEND_TELEMETRY_OUTCOME_ACCEPTED = 14;
+  FRONTEND_TELEMETRY_OUTCOME_REPAIR_REQUESTED = 15;
+  FRONTEND_TELEMETRY_OUTCOME_REJECTED = 16;
+  FRONTEND_TELEMETRY_OUTCOME_ROLLED_BACK = 17;
+  FRONTEND_TELEMETRY_OUTCOME_RECONNECTED = 18;
+  FRONTEND_TELEMETRY_OUTCOME_SAFE_RESUMED = 19;
+  FRONTEND_TELEMETRY_OUTCOME_RECONCILED = 20;
+  FRONTEND_TELEMETRY_OUTCOME_PATCH_PRESERVED = 21;
+  FRONTEND_TELEMETRY_OUTCOME_ABANDONED = 22;
+}
+
+enum FrontendTelemetryComponent {
+  FRONTEND_TELEMETRY_COMPONENT_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_COMPONENT_FIRST_RUN = 1;
+  FRONTEND_TELEMETRY_COMPONENT_THREAD = 2;
+  FRONTEND_TELEMETRY_COMPONENT_COMPOSER = 3;
+  FRONTEND_TELEMETRY_COMPONENT_PLAN = 4;
+  FRONTEND_TELEMETRY_COMPONENT_DIFF = 5;
+  FRONTEND_TELEMETRY_COMPONENT_APPROVAL = 6;
+  FRONTEND_TELEMETRY_COMPONENT_TOP_BAR = 7;
+  FRONTEND_TELEMETRY_COMPONENT_REVIEW = 8;
+  FRONTEND_TELEMETRY_COMPONENT_GRAPH = 9;
+  FRONTEND_TELEMETRY_COMPONENT_MEMORY = 10;
+  FRONTEND_TELEMETRY_COMPONENT_SESSION = 11;
+  FRONTEND_TELEMETRY_COMPONENT_RECOVERY = 12;
+  FRONTEND_TELEMETRY_COMPONENT_TIMELINE = 13;
+}
+
+enum FrontendTelemetryGraphMode {
+  FRONTEND_TELEMETRY_GRAPH_MODE_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_GRAPH_MODE_PROGRAM = 1;
+  FRONTEND_TELEMETRY_GRAPH_MODE_EXECUTION = 2;
+  FRONTEND_TELEMETRY_GRAPH_MODE_EVIDENCE = 3;
+}
+
+enum FrontendTelemetryFailureClass {
+  FRONTEND_TELEMETRY_FAILURE_CLASS_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_NONE = 1;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_INPUT = 2;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_CONFIGURATION = 3;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_DATABASE = 4;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_NETWORK = 5;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_AUTHORIZATION = 6;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_INCOMPATIBLE = 7;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_PROJECTION = 8;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_RENDER = 9;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_TIMEOUT = 10;
+  FRONTEND_TELEMETRY_FAILURE_CLASS_UNKNOWN = 11;
+}
+
+message FrontendTelemetryEvent {
+  uint64 local_id = 1;
+  FrontendTelemetryKind kind = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+  google.protobuf.Duration duration = 4;
+  FrontendTelemetryOutcome outcome = 5;
+  FrontendTelemetryComponent component = 6;
+  FrontendTelemetryGraphMode graph_mode = 7;
+  FrontendTelemetryFailureClass failure_class = 8;
+  StableIdentity task_id = 9;
+  StableIdentity thread_id = 10;
+  StableIdentity session_id = 11;
+  uint64 sequence = 12;
+  uint64 revision = 13;
+}
+
+message RecordFrontendTelemetryRequest {
+  MutationControl control = 1;
+  FrontendTelemetryEvent event = 2;
+}
+
+message RecordFrontendTelemetryResponse {
+  FrontendTelemetryEvent event = 1;
+}
+
+message ListFrontendTelemetryRequest {
+  PageRequest page = 1;
+  repeated FrontendTelemetryKind kinds = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp until = 4;
+}
+
+message ListFrontendTelemetryResponse {
+  repeated FrontendTelemetryEvent events = 1;
+  PageInfo page = 2;
+}
+
+enum FrontendTelemetryDeleteScope {
+  FRONTEND_TELEMETRY_DELETE_SCOPE_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_DELETE_SCOPE_ALL = 1;
+  FRONTEND_TELEMETRY_DELETE_SCOPE_BEFORE = 2;
+}
+
+enum FrontendTelemetryDeleteConfirmation {
+  FRONTEND_TELEMETRY_DELETE_CONFIRMATION_UNSPECIFIED = 0;
+  FRONTEND_TELEMETRY_DELETE_CONFIRMATION_CONFIRMED = 1;
+}
+
+message DeleteFrontendTelemetryRequest {
+  MutationControl control = 1;
+  FrontendTelemetryDeleteScope scope = 2;
+  google.protobuf.Timestamp before = 3;
+  FrontendTelemetryDeleteConfirmation confirmation = 4;
+}
+
+message DeleteFrontendTelemetryResponse {
+  uint64 deleted = 1;
+  uint64 remaining = 2;
+}
+
 service SessionService {
+  rpc GetSessionSnapshot(GetSessionSnapshotRequest) returns (GetSessionSnapshotResponse);
   rpc SubscribeSession(SubscribeSessionRequest) returns (stream SubscribeSessionResponse);
+}
+
+message GetSessionSnapshotRequest {
+  StableIdentity session_id = 1;
+}
+
+message GetSessionSnapshotResponse {
+  SessionProjectionSnapshot snapshot = 1;
+}
+
+// SessionProjectionSnapshot is the complete correctness-bearing frontend base
+// atomically observed through one committed session sequence. Query-only task
+// metadata such as provider/model selection, forecasts, and pricing identities
+// deliberately does not appear here.
+message SessionProjectionSnapshot {
+  StableIdentity session_id = 1;
+  StableIdentity thread_id = 2;
+  StableIdentity task_id = 3;
+  uint64 through_sequence = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  string task_state = 6;
+  uint64 task_revision = 7;
+  PlanEvent plan = 8;
+  string plan_approval_state = 9;
+  ApprovalEvent pending_approval = 10;
+  uint64 approval_revision = 11;
+  BudgetEvent budget = 12;
+  uint64 budget_revision = 13;
+  ValidationEvent validation = 14;
+  uint64 validation_revision = 15;
+  CheckpointEvent checkpoint = 16;
+  uint64 checkpoint_revision = 17;
+  google.protobuf.Timestamp checkpoint_created_at = 18;
+  RecoveryRequiredEvent recovery = 19;
+  uint64 recovery_revision = 20;
+  ChangeAcceptanceEvent change_acceptance = 21;
+  uint64 change_acceptance_revision = 22;
+  ToolEvent tool = 23;
+  uint64 tool_revision = 24;
+  SessionRevisionBindings review_bindings = 25;
+  uint64 review_revision = 26;
+  uint64 graph_revision = 27;
+  repeated string denied_task_actions = 28;
+  string task_action_policy_reason = 29;
+}
+
+message SessionRevisionBindings {
+  uint64 diff_revision = 1;
+  uint64 plan_revision = 2;
+  uint64 validation_revision = 3;
+  uint64 evidence_revision = 4;
+  uint64 graph_revision = 5;
 }
 
 message SubscribeSessionRequest {
@@ -449,4 +742,11 @@ message SubscribeSessionRequest {
 
 message SubscribeSessionResponse {
   SessionEvent event = 1;
+  SessionReplayBoundary replay_boundary = 2;
+}
+
+// SessionReplayBoundary is emitted exactly once after every event committed at
+// subscription time has been delivered. Events after this boundary are live.
+message SessionReplayBoundary {
+  uint64 through_sequence = 1;
 }

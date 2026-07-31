@@ -252,7 +252,7 @@ func previewUnread(value int) uint32 {
 	return uint32(value)
 }
 
-func previewRailStatus(raw string) (threadrail.TaskState, threadrail.Attention) {
+func previewRailStatus(raw string) (threadrail.RailTaskState, threadrail.Attention) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "active", "running", "in progress":
 		return threadrail.TaskStateRunning, threadrail.AttentionNone

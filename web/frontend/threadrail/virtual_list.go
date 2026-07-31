@@ -18,7 +18,7 @@ const (
 // task state, last activity, attention, association, and unread status.
 type RowView struct {
 	Title          string
-	TaskState      TaskState
+	TaskState      RailTaskState
 	LastActivity   string
 	Attention      Attention
 	RepositoryID   string

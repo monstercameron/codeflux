@@ -66,7 +66,7 @@ func Project(event events.SessionEvent) (Card, error) {
 	case events.KindTaskStateChanged:
 		value := event.Payload.TaskStateChanged
 		card.Kind = KindTaskState
-		card.TaskState = &TaskState{From: string(value.From), To: string(value.To), Approval: string(value.Approval)}
+		card.TaskState = &TaskTransition{From: string(value.From), To: string(value.To), Approval: string(value.Approval)}
 	case events.KindForecastUpdated:
 		card.Kind = KindForecast
 		card.StableKey = "forecast:current"
@@ -99,7 +99,7 @@ func Project(event events.SessionEvent) (Card, error) {
 		value := event.Payload.Checkpoint
 		card.Kind = KindCheckpoint
 		card.StableKey = "checkpoint:" + value.CheckpointID.String()
-		card.Checkpoint = &Checkpoint{ID: value.CheckpointID.String(), TaskRevision: value.TaskRevision}
+		card.Checkpoint = &Checkpoint{ID: value.CheckpointID.String(), TaskRevision: value.TaskRevision, PlanStep: value.PlanStep}
 	case events.KindRecoveryRequired:
 		value := event.Payload.RecoveryRequired
 		checkpointID := ""
@@ -108,6 +108,11 @@ func Project(event events.SessionEvent) (Card, error) {
 		}
 		card.Kind = KindRecovery
 		card.Recovery = &Recovery{CheckpointID: checkpointID, Reason: value.RedactedReason}
+	case events.KindTaskProjectionInvalidated:
+		return UnknownFallback(
+			string(event.Kind), event.Sequence, event.Timestamp,
+			"Authoritative task state changed; refreshing from a server snapshot.",
+		), nil
 	case events.KindError:
 		value := event.Payload.Error
 		card.Kind = KindError

@@ -138,7 +138,7 @@ func TestConversationDisablesMountedComposerWhenRemoteStateIsUncertain(t *testin
 func TestWorkspaceDisablesMountedComposerWhenSessionIsNotLive(t *testing.T) {
 	store := state.NewStore(readySnapshot()).ReduceRemote(state.SessionChanged{
 		Session: state.SessionView{
-			Bootstrap: state.BootstrapReady, Connection: state.ConnectionRecovering,
+			Bootstrap: state.BootstrapReady, Connection: state.ConnectionDegraded,
 		},
 	})
 	markup := render(t, ui.CreateElement(shell.TaskWorkspaceShell, shell.TaskWorkspaceProps{
@@ -148,7 +148,7 @@ func TestWorkspaceDisablesMountedComposerWhenSessionIsNotLive(t *testing.T) {
 		`data-component="composer"`,
 		`data-disabled="false"`,
 		`data-mutation-disabled="true"`,
-		`data-mutation-disabled-reason="Live session connection is unavailable"`,
+		`data-mutation-disabled-reason="Connection certainty is degraded; this draft is preserved"`,
 	} {
 		if !strings.Contains(markup, want) {
 			t.Errorf("recovering workspace composer missing %q: %s", want, markup)
@@ -159,7 +159,7 @@ func TestWorkspaceDisablesMountedComposerWhenSessionIsNotLive(t *testing.T) {
 func TestWorkspaceGatesLocalPreviewTransportWhenSessionIsOffline(t *testing.T) {
 	store := state.NewStore(readySnapshot()).ReduceRemote(state.SessionChanged{
 		Session: state.SessionView{
-			Bootstrap: state.BootstrapReady, Connection: state.ConnectionOffline,
+			Bootstrap: state.BootstrapReady, Connection: state.ConnectionDisconnected,
 		},
 	})
 	composerProps := mountedComposerProps(t)
@@ -171,7 +171,7 @@ func TestWorkspaceGatesLocalPreviewTransportWhenSessionIsOffline(t *testing.T) {
 		`data-component="composer"`,
 		`data-disabled="false"`,
 		`data-mutation-disabled="true"`,
-		`data-mutation-disabled-reason="Local Offline: reconnect to send this draft"`,
+		`data-mutation-disabled-reason="Local Disconnected: reconnect to send this draft"`,
 		`id="composer-mutation-disabled-reason"`,
 		`role="status"`,
 		`aria-describedby="composer-mutation-disabled-reason"`,

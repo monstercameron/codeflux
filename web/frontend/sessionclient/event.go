@@ -222,7 +222,11 @@ func decodePayload(value *codefluxv1.SessionEvent) (events.Kind, events.Payload,
 		if err != nil {
 			return "", events.Payload{}, err
 		}
-		return events.KindValidationUpdated, events.Payload{Validation: &events.Validation{ValidationID: id, State: domain.ValidationState(payload.GetState()), RedactedSummary: payload.GetRedactedSummary()}}, nil
+		return events.KindValidationUpdated, events.Payload{Validation: &events.Validation{
+			ValidationID: id, State: domain.ValidationState(payload.GetState()),
+			RedactedSummary: payload.GetRedactedSummary(), Required: payload.GetRequired(),
+			Acknowledged: payload.GetAcknowledged(), DiffRevision: payload.GetDiffRevision(),
+		}}, nil
 	case codefluxv1.SessionEventKind_SESSION_EVENT_KIND_GRAPH_SNAPSHOT, codefluxv1.SessionEventKind_SESSION_EVENT_KIND_GRAPH_PATCH:
 		payload := value.GetGraph()
 		if payload == nil {
@@ -246,7 +250,9 @@ func decodePayload(value *codefluxv1.SessionEvent) (events.Kind, events.Payload,
 		if err != nil {
 			return "", events.Payload{}, err
 		}
-		return events.KindCheckpointCreated, events.Payload{Checkpoint: &events.Checkpoint{CheckpointID: id, TaskRevision: payload.GetTaskRevision()}}, nil
+		return events.KindCheckpointCreated, events.Payload{Checkpoint: &events.Checkpoint{
+			CheckpointID: id, TaskRevision: payload.GetTaskRevision(), PlanStep: payload.GetPlanStep(),
+		}}, nil
 	case codefluxv1.SessionEventKind_SESSION_EVENT_KIND_RECOVERY_REQUIRED:
 		payload := value.GetRecoveryRequired()
 		if payload == nil {
@@ -260,7 +266,51 @@ func decodePayload(value *codefluxv1.SessionEvent) (events.Kind, events.Payload,
 			}
 			checkpointID = &parsed
 		}
-		return events.KindRecoveryRequired, events.Payload{RecoveryRequired: &events.RecoveryRequired{CheckpointID: checkpointID, RedactedReason: payload.GetRedactedReason()}}, nil
+		relatedEventIDs := make([]domain.EventID, 0, len(payload.GetRelatedEventIds()))
+		for _, identity := range payload.GetRelatedEventIds() {
+			parsed, err := parseEventIdentity(identity)
+			if err != nil {
+				return "", events.Payload{}, err
+			}
+			relatedEventIDs = append(relatedEventIDs, parsed)
+		}
+		return events.KindRecoveryRequired, events.Payload{RecoveryRequired: &events.RecoveryRequired{
+			CheckpointID: checkpointID, RedactedReason: payload.GetRedactedReason(),
+			Classification:           events.RecoveryClassification(payload.GetClassification()),
+			DivergenceSummary:        payload.GetDivergenceSummary(),
+			ExternalOutcomeAmbiguous: payload.GetExternalOutcomeAmbiguous(),
+			SafeResumeVerified:       payload.GetSafeResumeVerified(), ReconcileAvailable: payload.GetReconcileAvailable(),
+			PreservePatchAvailable: payload.GetPreservePatchAvailable(),
+			Bindings: events.RevisionBindings{
+				Diff: payload.GetDiffRevision(), Plan: payload.GetPlanRevision(),
+				Validation: payload.GetValidationRevision(), Evidence: payload.GetEvidenceRevision(),
+				Graph: payload.GetGraphRevision(),
+			},
+			RelatedEventIDs: relatedEventIDs, RelatedFiles: append([]string(nil), payload.GetRelatedFiles()...),
+		}}, nil
+	case codefluxv1.SessionEventKind_SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED:
+		payload := value.GetChangeAcceptance()
+		if payload == nil {
+			break
+		}
+		return events.KindChangeAcceptanceUpdated, events.Payload{ChangeAcceptance: &events.ChangeAcceptance{
+			State: domain.ChangeAcceptanceState(payload.GetState()),
+			Bindings: events.RevisionBindings{
+				Diff: payload.GetDiffRevision(), Plan: payload.GetPlanRevision(),
+				Validation: payload.GetValidationRevision(), Evidence: payload.GetEvidenceRevision(),
+				Graph: payload.GetGraphRevision(),
+			},
+		}}, nil
+	case codefluxv1.SessionEventKind_SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED:
+		payload := value.GetTaskProjectionInvalidated()
+		if payload == nil {
+			break
+		}
+		return events.KindTaskProjectionInvalidated, events.Payload{
+			TaskProjectionInvalidated: &events.TaskProjectionInvalidated{
+				Entity: payload.GetEntity(), Revision: payload.GetEntityRevision(),
+			},
+		}, nil
 	case codefluxv1.SessionEventKind_SESSION_EVENT_KIND_ERROR:
 		payload := value.GetError()
 		if payload == nil {

@@ -149,7 +149,7 @@ func (b Bootstrapper) Start(parent context.Context) (BootstrapResult, error) {
 	if err != nil {
 		return BootstrapResult{
 			Session: state.SessionView{
-				Bootstrap: state.BootstrapReady, Connection: state.ConnectionRecovering,
+				Bootstrap: state.BootstrapReady, Connection: state.ConnectionDegraded,
 				Message: "Live updates are reconnecting",
 			},
 			Route: restoration, Layout: preferences.Layout,
@@ -164,7 +164,7 @@ func (b Bootstrapper) Start(parent context.Context) (BootstrapResult, error) {
 func failure(kind state.BootstrapState, message string) BootstrapResult {
 	return BootstrapResult{
 		Session: state.SessionView{
-			Bootstrap: kind, Connection: state.ConnectionOffline, Message: message,
+			Bootstrap: kind, Connection: state.ConnectionDisconnected, Message: message,
 		},
 		Route:  routes.Restoration{Route: routes.Route{Name: routes.Diagnostics}},
 		Layout: state.DefaultLayoutPreferences(),

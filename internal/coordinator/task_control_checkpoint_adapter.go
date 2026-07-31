@@ -2,7 +2,9 @@ package coordinator
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"time"
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
@@ -113,6 +115,44 @@ func (adapter *LaneACheckpointAdapter) CapturePauseCheckpoint(
 		checkpoint.TriggerAttribution{},
 		idempotencyKey,
 	)
+}
+
+// CaptureReconciliationCheckpoint establishes a stable pause-equivalent
+// checkpoint identity for a retriable recovery reconciliation. The stable ID
+// is required because checkpoint capture includes the checkpoint ID in its
+// idempotency request identity.
+func (adapter *LaneACheckpointAdapter) CaptureReconciliationCheckpoint(
+	ctx context.Context,
+	control storage.TaskControlSnapshot,
+	idempotencyKey string,
+) (domain.CheckpointID, error) {
+	if adapter == nil || adapter.CaptureService == nil || adapter.Plans == nil {
+		return domain.CheckpointID{}, errors.New("checkpoint adapter is unavailable")
+	}
+	planRevision, err := adapter.Plans.CurrentCheckpointPlanRevision(
+		ctx, control.TaskID, control.RunID,
+	)
+	if err != nil {
+		return domain.CheckpointID{}, err
+	}
+	digest := sha256.Sum256([]byte("recovery-reconcile\x00" + idempotencyKey))
+	identity := fmt.Sprintf(
+		"ckp_%x-%x-%x-%x-%x",
+		digest[0:4], digest[4:6], digest[6:8], digest[8:10], digest[10:16],
+	)
+	checkpointID, err := domain.ParseCheckpointID(identity)
+	if err != nil {
+		return domain.CheckpointID{}, err
+	}
+	result, err := adapter.CaptureService.Capture(ctx, checkpoint.CaptureCommand{
+		CheckpointID: checkpointID, TaskID: control.TaskID, RunID: control.RunID,
+		ExpectedPlanRevision: planRevision, Trigger: checkpoint.TriggerUserPaused,
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		return domain.CheckpointID{}, err
+	}
+	return result.Checkpoint.ID, nil
 }
 
 // CreateCheckpoint adapts material-edit and before-risky-action triggers from

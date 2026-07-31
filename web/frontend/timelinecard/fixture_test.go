@@ -51,11 +51,23 @@ func fixedEventFixture(t *testing.T) []events.SessionEvent {
 		{events.KindUsageUpdated, events.Payload{Usage: &events.Usage{Tokens: domain.TokenUsage{Known: true, Input: 100, Output: 20}}}},
 		{events.KindCostUpdated, events.Payload{Cost: &events.Cost{Known: true, Value: money(42)}}},
 		{events.KindBudgetUpdated, events.Payload{Budget: &events.Budget{HardLimit: money(1000), Reserved: money(100), Actual: money(200)}}},
-		{events.KindValidationUpdated, events.Payload{Validation: &events.Validation{ValidationID: validationID, State: domain.ValidationStatePassed, RedactedSummary: "all checks passed"}}},
+		{events.KindValidationUpdated, events.Payload{Validation: &events.Validation{ValidationID: validationID, State: domain.ValidationStatePassed, RedactedSummary: "all checks passed", Required: true, DiffRevision: 1}}},
 		{events.KindGraphSnapshot, events.Payload{Graph: &events.Graph{RevisionID: graphID, EncodedChange: []byte{1}}}},
 		{events.KindGraphPatch, events.Payload{Graph: &events.Graph{RevisionID: graphID, EncodedChange: []byte{2}}}},
-		{events.KindCheckpointCreated, events.Payload{Checkpoint: &events.Checkpoint{CheckpointID: checkpointID, TaskRevision: 3}}},
-		{events.KindRecoveryRequired, events.Payload{RecoveryRequired: &events.RecoveryRequired{CheckpointID: &checkpointID, RedactedReason: "worktree changed"}}},
+		{events.KindCheckpointCreated, events.Payload{Checkpoint: &events.Checkpoint{CheckpointID: checkpointID, TaskRevision: 3, PlanStep: "validate"}}},
+		{events.KindChangeAcceptanceUpdated, events.Payload{ChangeAcceptance: &events.ChangeAcceptance{
+			State:    domain.ChangeAcceptanceStatePending,
+			Bindings: events.RevisionBindings{Diff: 1, Plan: 1, Validation: 1, Evidence: 1, Graph: 1},
+		}}},
+		{events.KindRecoveryRequired, events.Payload{RecoveryRequired: &events.RecoveryRequired{
+			CheckpointID: &checkpointID, RedactedReason: "worktree changed",
+			Classification: events.RecoveryAmbiguousOutcome, DivergenceSummary: "worktree differs",
+			ExternalOutcomeAmbiguous: true, PreservePatchAvailable: true,
+			Bindings: events.RevisionBindings{Diff: 1, Plan: 1, Validation: 1, Evidence: 1, Graph: 1},
+		}}},
+		{events.KindTaskProjectionInvalidated, events.Payload{TaskProjectionInvalidated: &events.TaskProjectionInvalidated{
+			Entity: "budget", Revision: 2,
+		}}},
 		{events.KindError, events.Payload{Error: &events.UserError{Code: events.ErrorCodeConflict, RedactedMessage: "state changed", Retryable: true}}},
 	}
 	result := make([]events.SessionEvent, len(payloads))

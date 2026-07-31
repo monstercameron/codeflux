@@ -65,20 +65,22 @@ func validAttention(value Attention) bool {
 	}
 }
 
-// TaskState is compact task state shown in one thread row.
-type TaskState string
+// RailTaskState is the compact presentation state shown in one thread row.
+// It is deliberately not an alternative definition of the authoritative
+// domain task state.
+type RailTaskState string
 
 const (
-	TaskStateNone     TaskState = "none"
-	TaskStateDraft    TaskState = "draft"
-	TaskStateRunning  TaskState = "running"
-	TaskStatePaused   TaskState = "paused"
-	TaskStateComplete TaskState = "complete"
-	TaskStateFailed   TaskState = "failed"
-	TaskStateStopped  TaskState = "cancelled"
+	TaskStateNone     RailTaskState = "none"
+	TaskStateDraft    RailTaskState = "draft"
+	TaskStateRunning  RailTaskState = "running"
+	TaskStatePaused   RailTaskState = "paused"
+	TaskStateComplete RailTaskState = "complete"
+	TaskStateFailed   RailTaskState = "failed"
+	TaskStateStopped  RailTaskState = "cancelled"
 )
 
-func validTaskState(value TaskState) bool {
+func validTaskState(value RailTaskState) bool {
 	switch value {
 	case TaskStateNone, TaskStateDraft, TaskStateRunning, TaskStatePaused,
 		TaskStateComplete, TaskStateFailed, TaskStateStopped:
@@ -92,12 +94,13 @@ func validTaskState(value TaskState) bool {
 // and validates it before it can enter State.
 type ThreadInput struct {
 	ID           domain.ThreadID
+	ProjectID    domain.ProjectID
 	SessionID    domain.SessionID
 	RepositoryID domain.RepositoryID
 	WorkspaceID  domain.WorkspaceID
 	TaskID       domain.TaskID
 	Title        string
-	TaskState    TaskState
+	TaskState    RailTaskState
 	Attention    Attention
 	Unread       uint32
 	Archived     bool
@@ -109,12 +112,13 @@ type ThreadInput struct {
 // cannot mutate rail state through a value returned by State.Rows.
 type Thread struct {
 	id           domain.ThreadID
+	projectID    domain.ProjectID
 	sessionID    domain.SessionID
 	repositoryID domain.RepositoryID
 	workspaceID  domain.WorkspaceID
 	taskID       domain.TaskID
 	title        string
-	taskState    TaskState
+	taskState    RailTaskState
 	attention    Attention
 	unread       uint32
 	archived     bool
@@ -126,13 +130,13 @@ type Thread struct {
 func NewThread(input ThreadInput) (Thread, error) {
 	title := strings.TrimSpace(input.Title)
 	if input.ID.IsZero() || input.RepositoryID.IsZero() || input.WorkspaceID.IsZero() ||
-		title == "" || len(title) > maximumTitleBytes || input.Revision == 0 ||
+		title == "" || len(title) > maximumTitleBytes ||
 		input.UpdatedAt.IsZero() || !validTaskState(input.TaskState) ||
 		!validAttention(input.Attention) {
 		return Thread{}, fmt.Errorf("%w: thread", ErrInvalidModel)
 	}
 	return Thread{
-		id: input.ID, sessionID: input.SessionID, repositoryID: input.RepositoryID, workspaceID: input.WorkspaceID,
+		id: input.ID, projectID: input.ProjectID, sessionID: input.SessionID, repositoryID: input.RepositoryID, workspaceID: input.WorkspaceID,
 		taskID: input.TaskID, title: title, taskState: input.TaskState,
 		attention: input.Attention, unread: input.Unread, archived: input.Archived,
 		revision: input.Revision, updatedAt: input.UpdatedAt.UTC(),
@@ -140,12 +144,13 @@ func NewThread(input ThreadInput) (Thread, error) {
 }
 
 func (t Thread) ID() domain.ThreadID               { return t.id }
+func (t Thread) ProjectID() domain.ProjectID       { return t.projectID }
 func (t Thread) SessionID() domain.SessionID       { return t.sessionID }
 func (t Thread) RepositoryID() domain.RepositoryID { return t.repositoryID }
 func (t Thread) WorkspaceID() domain.WorkspaceID   { return t.workspaceID }
 func (t Thread) TaskID() domain.TaskID             { return t.taskID }
 func (t Thread) Title() string                     { return t.title }
-func (t Thread) TaskState() TaskState              { return t.taskState }
+func (t Thread) TaskState() RailTaskState          { return t.taskState }
 func (t Thread) Attention() Attention              { return t.attention }
 func (t Thread) Unread() uint32                    { return t.unread }
 func (t Thread) Archived() bool                    { return t.archived }
@@ -191,7 +196,7 @@ func (r Row) Attention() Attention {
 	}
 	return r.thread.Attention()
 }
-func (r Row) TaskState() TaskState {
+func (r Row) TaskState() RailTaskState {
 	if r.pending {
 		return TaskStateDraft
 	}

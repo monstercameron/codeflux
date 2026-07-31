@@ -36,7 +36,7 @@ func (f railFixture) state(t *testing.T) State {
 	return state
 }
 
-func (f railFixture) thread(t *testing.T, title string, updated time.Time, taskState TaskState, attention Attention, revision uint64, archived bool) Thread {
+func (f railFixture) thread(t *testing.T, title string, updated time.Time, taskState RailTaskState, attention Attention, revision uint64, archived bool) Thread {
 	t.Helper()
 	id, err := domain.NewThreadID()
 	if err != nil {

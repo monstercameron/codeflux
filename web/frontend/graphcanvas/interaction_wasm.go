@@ -55,3 +55,16 @@ func releasePointer(event ui.Event) {
 		target.Call("releasePointerCapture", pointerID)
 	}
 }
+
+func focusGraphNode(nodeID string) {
+	document := js.Global().Get("document")
+	if !document.Truthy() {
+		return
+	}
+	element := document.Call("getElementById", graphNodeElementIDFromString(nodeID))
+	if element.Truthy() && element.Get("focus").Type() == js.TypeFunction {
+		element.Call("focus")
+	}
+}
+
+func graphNodeElementIDFromString(nodeID string) string { return "graph-svg-node-" + nodeID }

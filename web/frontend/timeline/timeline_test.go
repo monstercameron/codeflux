@@ -156,10 +156,10 @@ func TestGroupEventsUsesStableKeysForReplaceableProjections(t *testing.T) {
 		timelineEvent(t, 1, events.KindForecastUpdated, events.Payload{Forecast: &events.Forecast{}}),
 		timelineEvent(t, 2, events.KindForecastUpdated, events.Payload{Forecast: &events.Forecast{}}),
 		timelineEvent(t, 3, events.KindValidationUpdated, events.Payload{Validation: &events.Validation{
-			ValidationID: validationID, State: domain.ValidationStateRunning, RedactedSummary: "running",
+			ValidationID: validationID, State: domain.ValidationStateRunning, RedactedSummary: "running", Required: true, DiffRevision: 1,
 		}}),
 		timelineEvent(t, 4, events.KindValidationUpdated, events.Payload{Validation: &events.Validation{
-			ValidationID: validationID, State: domain.ValidationStatePassed, RedactedSummary: "passed",
+			ValidationID: validationID, State: domain.ValidationStatePassed, RedactedSummary: "passed", Required: true, DiffRevision: 1,
 		}}),
 	}
 	items, err := GroupEvents(eventsFixture)

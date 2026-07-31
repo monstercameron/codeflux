@@ -163,6 +163,23 @@ type RecordRecoveryDecision struct {
 	IdempotencyKey string
 }
 
+// BeginRecoveryReconciliation atomically binds a user's reconcile authority
+// and the started-attempt fact to the exact recovery-required task revision.
+// Neither record is committed when the assessment or task control changed.
+type BeginRecoveryReconciliation struct {
+	ExpectedTaskRevision uint64
+	ExpectedRunRevision  uint64
+	Decision             RecordRecoveryDecision
+	Started              RecordRecoveryAttempt
+}
+
+// RecoveryReconciliationStart is the durable authority established before
+// checkpoint/Git preservation begins.
+type RecoveryReconciliationStart struct {
+	Decision RecoveryDecisionRecord
+	Started  RecoveryAttemptRecord
+}
+
 // RecoveryOperations groups latest-checkpoint discovery with immutable
 // assessments, attempts, and decisions.
 type RecoveryOperations interface {
@@ -186,12 +203,209 @@ type RecoveryOperations interface {
 		context.Context,
 		string,
 	) (RecoveryAssessmentRecord, error)
+	GetCurrentRecoveryAssessment(
+		context.Context,
+		domain.TaskID,
+		uint64,
+	) (RecoveryAssessmentRecord, error)
 	ReadRecoveryActionObservation(
 		context.Context,
 		domain.TaskID,
 		domain.RunID,
 		uint64,
 	) (RecoveryActionObservation, error)
+	BeginRecoveryReconciliation(
+		context.Context,
+		BeginRecoveryReconciliation,
+	) (RecoveryReconciliationStart, error)
+}
+
+// BeginRecoveryReconciliation records authority and its started attempt in
+// one transaction after verifying the exact recovery-required task/run and
+// reconcile-required assessment. This is intentionally stricter than the
+// general immutable decision writers because reconciliation can preserve a
+// new Git checkpoint as an external effect.
+func (repositories *Repositories) BeginRecoveryReconciliation(
+	ctx context.Context,
+	input BeginRecoveryReconciliation,
+) (RecoveryReconciliationStart, error) {
+	if input.ExpectedTaskRevision == 0 || input.ExpectedRunRevision == 0 {
+		return RecoveryReconciliationStart{}, errors.New(
+			"recovery reconciliation revisions are required",
+		)
+	}
+	if err := validateRecordRecoveryDecision(input.Decision); err != nil {
+		return RecoveryReconciliationStart{}, err
+	}
+	if err := validateRecordRecoveryAttempt(input.Started); err != nil {
+		return RecoveryReconciliationStart{}, err
+	}
+	if input.Decision.Action != RecoveryActionReconcile ||
+		input.Started.Action != RecoveryActionReconcile ||
+		input.Started.Outcome != RecoveryAttemptStarted ||
+		input.Decision.AssessmentID != input.Started.AssessmentID ||
+		input.Decision.TaskID != input.Started.TaskID ||
+		input.Decision.RunID != input.Started.RunID ||
+		!sameRecoveryCheckpointID(
+			input.Decision.CheckpointID,
+			input.Started.CheckpointID,
+		) {
+		return RecoveryReconciliationStart{}, errors.New(
+			"recovery reconciliation authority identities are inconsistent",
+		)
+	}
+	_, micros := repositories.timestamp()
+	decision := recoveryDecisionRecord(input.Decision, micros)
+	started := recoveryAttemptRecord(input.Started, micros)
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		current, err := scanTaskControl(
+			transaction.sql.QueryRowContext(
+				ctx,
+				taskControlSelect+` WHERE task.id = ? AND run.id = ?`,
+				input.Decision.TaskID,
+				input.Decision.RunID,
+			),
+			"begin recovery reconciliation",
+		)
+		if err != nil {
+			return err
+		}
+		if current.TaskRevision != input.ExpectedTaskRevision ||
+			current.RunRevision != input.ExpectedRunRevision {
+			return typedError(
+				ErrStaleRevision,
+				"begin recovery reconciliation",
+				errors.New("task or run revision changed"),
+			)
+		}
+		if current.TaskState != domain.TaskStateRecoveryRequired ||
+			current.RunState != domain.RunStateRecoveryRequired {
+			return typedError(
+				ErrConflict,
+				"begin recovery reconciliation",
+				errors.New("task and run are not recovery-required"),
+			)
+		}
+		assessment, err := scanRecoveryAssessment(transaction.sql.QueryRowContext(
+			ctx,
+			`SELECT id, task_id, run_id, checkpoint_id, classification,
+			        findings_redacted_json, divergences_redacted_json,
+			        observation_sha256, patch_available, patch_locator,
+			        patch_path, idempotency_key, created_at_unix_micros
+			 FROM checkpoint_recovery_assessments WHERE id = ?`,
+			input.Decision.AssessmentID,
+		))
+		if err != nil {
+			return err
+		}
+		if assessment.TaskID != input.Decision.TaskID ||
+			assessment.RunID != input.Decision.RunID ||
+			!sameRecoveryCheckpointID(assessment.CheckpointID, input.Decision.CheckpointID) ||
+			assessment.Classification != RecoveryClassificationReconcile {
+			return typedError(
+				ErrConflict,
+				"begin recovery reconciliation",
+				errors.New("assessment is not the exact reconcile-required recovery assessment"),
+			)
+		}
+		existingDecision, decisionFound, err := findRecoveryDecisionByIdempotency(
+			ctx, transaction.sql, input.Decision.TaskID, input.Decision.IdempotencyKey,
+		)
+		if err != nil {
+			return err
+		}
+		existingStarted, startedFound, err := findRecoveryAttemptByIdempotency(
+			ctx, transaction.sql, input.Started.TaskID, input.Started.IdempotencyKey,
+		)
+		if err != nil {
+			return err
+		}
+		if decisionFound || startedFound {
+			if !decisionFound || !startedFound ||
+				!sameRecoveryDecision(existingDecision, decision) ||
+				!sameRecoveryAttempt(existingStarted, started) {
+				return typedError(
+					ErrConflict,
+					"begin recovery reconciliation",
+					errors.New("reconciliation idempotency identity was reused"),
+				)
+			}
+			decision, started = existingDecision, existingStarted
+			return nil
+		}
+		if err := insertRecoveryDecision(ctx, transaction.sql, input.Decision, micros); err != nil {
+			return err
+		}
+		return insertRecoveryAttempt(ctx, transaction.sql, input.Started, micros)
+	})
+	return RecoveryReconciliationStart{Decision: decision, Started: started}, err
+}
+
+// GetCurrentRecoveryAssessment resolves the newest immutable assessment only
+// while the task remains recovery-required at the caller's exact revision.
+func (repositories *Repositories) GetCurrentRecoveryAssessment(
+	ctx context.Context,
+	taskID domain.TaskID,
+	expectedTaskRevision uint64,
+) (RecoveryAssessmentRecord, error) {
+	if taskID.IsZero() || expectedTaskRevision == 0 {
+		return RecoveryAssessmentRecord{}, errors.New("recovery task and expected revision are required")
+	}
+	record, err := scanRecoveryAssessment(repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT assessment.id, assessment.task_id, assessment.run_id,
+		        assessment.checkpoint_id, assessment.classification,
+		        assessment.findings_redacted_json, assessment.divergences_redacted_json,
+		        assessment.observation_sha256, assessment.patch_available,
+		        assessment.patch_locator, assessment.patch_path,
+		        assessment.idempotency_key, assessment.created_at_unix_micros
+		 FROM checkpoint_recovery_assessments AS assessment
+		 JOIN tasks AS task ON task.id = assessment.task_id
+		 WHERE assessment.task_id = ?
+		   AND task.state = 'recovery-required'
+		   AND task.revision = ?
+		 ORDER BY assessment.created_at_unix_micros DESC, assessment.id DESC
+		 LIMIT 1`,
+		taskID,
+		expectedTaskRevision,
+	))
+	if err == nil {
+		return record, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return RecoveryAssessmentRecord{}, err
+	}
+	var state string
+	var revision uint64
+	if taskErr := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT state, revision FROM tasks WHERE id = ?`,
+		taskID,
+	).Scan(&state, &revision); taskErr != nil {
+		if errors.Is(taskErr, sql.ErrNoRows) {
+			return RecoveryAssessmentRecord{}, typedError(ErrNotFound, "get current recovery assessment", taskErr)
+		}
+		return RecoveryAssessmentRecord{}, classify("read recovery task", taskErr)
+	}
+	if revision != expectedTaskRevision {
+		return RecoveryAssessmentRecord{}, typedError(
+			ErrStaleRevision,
+			"get current recovery assessment",
+			errors.New("task revision changed"),
+		)
+	}
+	if state != string(domain.TaskStateRecoveryRequired) {
+		return RecoveryAssessmentRecord{}, typedError(
+			ErrConflict,
+			"get current recovery assessment",
+			errors.New("task is not recovery-required"),
+		)
+	}
+	return RecoveryAssessmentRecord{}, typedError(
+		ErrNotFound,
+		"get current recovery assessment",
+		sql.ErrNoRows,
+	)
 }
 
 // GetRecoveryAssessment loads one immutable assessment by its exact identity.
@@ -633,14 +847,7 @@ func (repositories *Repositories) RecordRecoveryAttempt(
 		return RecoveryAttemptRecord{}, err
 	}
 	_, micros := repositories.timestamp()
-	now := repositoryTime(micros)
-	record := RecoveryAttemptRecord{
-		ID: input.ID, AssessmentID: input.AssessmentID,
-		TaskID: input.TaskID, RunID: input.RunID,
-		CheckpointID: input.CheckpointID, Action: input.Action,
-		Outcome: input.Outcome, ReasonRedacted: input.ReasonRedacted,
-		IdempotencyKey: input.IdempotencyKey, CreatedAt: now,
-	}
+	record := recoveryAttemptRecord(input, micros)
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
 		existing, found, err := findRecoveryAttemptByIdempotency(
 			ctx,
@@ -672,25 +879,7 @@ func (repositories *Repositories) RecordRecoveryAttempt(
 		); err != nil {
 			return err
 		}
-		_, err = transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO checkpoint_recovery_attempts (
-				id, assessment_id, task_id, run_id, checkpoint_id,
-				action, outcome, reason_redacted, idempotency_key,
-				created_at_unix_micros
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			input.ID,
-			input.AssessmentID,
-			input.TaskID,
-			input.RunID,
-			nullableRecoveryCheckpointID(input.CheckpointID),
-			input.Action,
-			input.Outcome,
-			input.ReasonRedacted,
-			input.IdempotencyKey,
-			micros,
-		)
-		return repositoryWriteError("record recovery attempt", err)
+		return insertRecoveryAttempt(ctx, transaction.sql, input, micros)
 	})
 	return record, err
 }
@@ -704,14 +893,7 @@ func (repositories *Repositories) RecordRecoveryDecision(
 		return RecoveryDecisionRecord{}, err
 	}
 	_, micros := repositories.timestamp()
-	now := repositoryTime(micros)
-	record := RecoveryDecisionRecord{
-		ID: input.ID, AssessmentID: input.AssessmentID,
-		TaskID: input.TaskID, RunID: input.RunID,
-		CheckpointID: input.CheckpointID, Actor: input.Actor,
-		Action: input.Action, ReasonRedacted: input.ReasonRedacted,
-		IdempotencyKey: input.IdempotencyKey, CreatedAt: now,
-	}
+	record := recoveryDecisionRecord(input, micros)
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
 		existing, found, err := findRecoveryDecisionByIdempotency(
 			ctx,
@@ -743,27 +925,75 @@ func (repositories *Repositories) RecordRecoveryDecision(
 		); err != nil {
 			return err
 		}
-		_, err = transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO checkpoint_recovery_decisions (
-				id, assessment_id, task_id, run_id, checkpoint_id,
-				actor, action, reason_redacted, idempotency_key,
-				created_at_unix_micros
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			input.ID,
-			input.AssessmentID,
-			input.TaskID,
-			input.RunID,
-			nullableRecoveryCheckpointID(input.CheckpointID),
-			input.Actor,
-			input.Action,
-			input.ReasonRedacted,
-			input.IdempotencyKey,
-			micros,
-		)
-		return repositoryWriteError("record recovery decision", err)
+		return insertRecoveryDecision(ctx, transaction.sql, input, micros)
 	})
 	return record, err
+}
+
+func recoveryAttemptRecord(input RecordRecoveryAttempt, micros int64) RecoveryAttemptRecord {
+	return RecoveryAttemptRecord{
+		ID: input.ID, AssessmentID: input.AssessmentID,
+		TaskID: input.TaskID, RunID: input.RunID,
+		CheckpointID: input.CheckpointID, Action: input.Action,
+		Outcome: input.Outcome, ReasonRedacted: input.ReasonRedacted,
+		IdempotencyKey: input.IdempotencyKey, CreatedAt: repositoryTime(micros),
+	}
+}
+
+func recoveryDecisionRecord(input RecordRecoveryDecision, micros int64) RecoveryDecisionRecord {
+	return RecoveryDecisionRecord{
+		ID: input.ID, AssessmentID: input.AssessmentID,
+		TaskID: input.TaskID, RunID: input.RunID,
+		CheckpointID: input.CheckpointID, Actor: input.Actor,
+		Action: input.Action, ReasonRedacted: input.ReasonRedacted,
+		IdempotencyKey: input.IdempotencyKey, CreatedAt: repositoryTime(micros),
+	}
+}
+
+type recoveryExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func insertRecoveryAttempt(
+	ctx context.Context,
+	queries recoveryExecer,
+	input RecordRecoveryAttempt,
+	micros int64,
+) error {
+	_, err := queries.ExecContext(
+		ctx,
+		`INSERT INTO checkpoint_recovery_attempts (
+			id, assessment_id, task_id, run_id, checkpoint_id,
+			action, outcome, reason_redacted, idempotency_key,
+			created_at_unix_micros
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.ID, input.AssessmentID, input.TaskID, input.RunID,
+		nullableRecoveryCheckpointID(input.CheckpointID),
+		input.Action, input.Outcome, input.ReasonRedacted,
+		input.IdempotencyKey, micros,
+	)
+	return repositoryWriteError("record recovery attempt", err)
+}
+
+func insertRecoveryDecision(
+	ctx context.Context,
+	queries recoveryExecer,
+	input RecordRecoveryDecision,
+	micros int64,
+) error {
+	_, err := queries.ExecContext(
+		ctx,
+		`INSERT INTO checkpoint_recovery_decisions (
+			id, assessment_id, task_id, run_id, checkpoint_id,
+			actor, action, reason_redacted, idempotency_key,
+			created_at_unix_micros
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.ID, input.AssessmentID, input.TaskID, input.RunID,
+		nullableRecoveryCheckpointID(input.CheckpointID),
+		input.Actor, input.Action, input.ReasonRedacted,
+		input.IdempotencyKey, micros,
+	)
+	return repositoryWriteError("record recovery decision", err)
 }
 
 func validateRecordRecoveryAssessment(input RecordRecoveryAssessment) error {

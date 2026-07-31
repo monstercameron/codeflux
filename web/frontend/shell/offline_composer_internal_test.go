@@ -18,11 +18,11 @@ func TestOfflineConnectionSeversDurableComposerCallbacksButKeepsDraftEditing(t *
 		OnRetryRequested:  func(composer.IdempotencyKey) { retries++ },
 	}
 
-	gated := composerPropsForConnection(props, state.ConnectionOffline)
+	gated := composerPropsForConnection(props, state.ConnectionDisconnected)
 	if !gated.MutationDisabled {
 		t.Fatal("offline connection did not mark the composer mutation-disabled")
 	}
-	if gated.MutationDisabledReason != "Local Offline: reconnect to send this draft" {
+	if gated.MutationDisabledReason != "Local Disconnected: reconnect to send this draft" {
 		t.Fatalf("offline reason = %q", gated.MutationDisabledReason)
 	}
 	if gated.OnSubmitRequested != nil || gated.OnRetryRequested != nil {

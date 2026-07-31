@@ -73,8 +73,15 @@ const (
 )
 
 type TaskActionSet struct {
-	PrimaryMessage string
-	Actions        []TaskAction
+	PrimaryMessage  string
+	Actions         []TaskAction
+	DisabledReasons map[TaskAction]string
+}
+
+// DisabledReason returns the authoritative explanation for an action that is
+// visible in the task-action matrix but cannot currently be invoked.
+func (set TaskActionSet) DisabledReason(action TaskAction) string {
+	return set.DisabledReasons[action]
 }
 
 // AvailableTaskActions is the exhaustive presentation projection of the

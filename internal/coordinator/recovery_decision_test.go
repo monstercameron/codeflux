@@ -95,6 +95,28 @@ func TestRecoveryDecisionServiceRecordsFailedPatchAttempt(t *testing.T) {
 	}
 }
 
+func TestRecoveryDecisionServicePreservesCurrentTaskPatch(t *testing.T) {
+	t.Parallel()
+	assessment := recoveryDecisionAssessmentFixture(t)
+	store := newRecoveryDecisionStoreStub(assessment)
+	exporter := &recoveryPatchExporterStub{path: `C:\codeflux\patches\current.patch`, available: true}
+	service, err := NewRecoveryDecisionService(store, exporter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.PreserveTaskPatch(t.Context(), PreserveTaskRecoveryPatchInput{
+		TaskID: assessment.TaskID, ExpectedRevision: 7,
+		ReasonRedacted: "preserve current recovery patch", IdempotencyKey: "preserve-current-recovery-patch",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Assessment.ID != assessment.ID || result.PatchPath != exporter.path ||
+		result.Terminal.Outcome != storage.RecoveryAttemptSucceeded {
+		t.Fatalf("current task preservation = %#v", result)
+	}
+}
+
 func TestRecoveryDecisionServiceRejectsAssessmentWithoutPatchBeforeDecision(
 	t *testing.T,
 ) {
@@ -170,6 +192,17 @@ func (stub *recoveryDecisionStoreStub) GetRecoveryAssessment(
 ) (storage.RecoveryAssessmentRecord, error) {
 	if id != stub.assessment.ID {
 		return storage.RecoveryAssessmentRecord{}, storage.ErrNotFound
+	}
+	return stub.assessment, nil
+}
+
+func (stub *recoveryDecisionStoreStub) GetCurrentRecoveryAssessment(
+	_ context.Context,
+	taskID domain.TaskID,
+	expectedRevision uint64,
+) (storage.RecoveryAssessmentRecord, error) {
+	if taskID != stub.assessment.TaskID || expectedRevision == 0 {
+		return storage.RecoveryAssessmentRecord{}, storage.ErrStaleRevision
 	}
 	return stub.assessment, nil
 }

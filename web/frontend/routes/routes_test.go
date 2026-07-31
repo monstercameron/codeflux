@@ -82,6 +82,73 @@ func TestTaskSelectionQueryRoundTripsOnlyTypedThreadRoutes(t *testing.T) {
 	}
 }
 
+func TestTaskDetailSelectionRoundTripsTypedEventAndFile(t *testing.T) {
+	repositoryID, _ := domain.NewRepositoryID()
+	threadID, _ := domain.NewThreadID()
+	eventID, _ := domain.NewEventID()
+	route := routes.Route{Name: routes.ThreadWorkspace, RepositoryID: repositoryID, ThreadID: threadID}
+
+	eventPath, err := routes.TaskEventSelectionPath(route, eventID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventSelection, err := routes.ParseTaskDetailSelection(strings.TrimPrefix(eventPath, "/tasks?"))
+	if err != nil || eventSelection.Route != route || eventSelection.EventID == nil || *eventSelection.EventID != eventID || eventSelection.ReviewFile != "" {
+		t.Fatalf("event selection = %+v, %v", eventSelection, err)
+	}
+
+	filePath, err := routes.TaskFileSelectionPath(route, "web/frontend/routes/routes.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileSelection, err := routes.ParseTaskDetailSelection(strings.TrimPrefix(filePath, "/tasks?"))
+	if err != nil || fileSelection.Route != route || fileSelection.EventID != nil || fileSelection.ReviewFile != "web/frontend/routes/routes.go" {
+		t.Fatalf("file selection = %+v, %v", fileSelection, err)
+	}
+	if strings.Contains(eventPath, " ") || strings.Contains(filePath, " ") {
+		t.Fatalf("detail paths were not URL encoded: %q %q", eventPath, filePath)
+	}
+}
+
+func TestTaskDetailSelectionRejectsMissingMalformedAndAmbiguousTargets(t *testing.T) {
+	repositoryID, _ := domain.NewRepositoryID()
+	threadID, _ := domain.NewThreadID()
+	eventID, _ := domain.NewEventID()
+	route := routes.Route{Name: routes.ThreadWorkspace, RepositoryID: repositoryID, ThreadID: threadID}
+	base, _ := routes.TaskSelectionPath(route)
+	query := strings.TrimPrefix(base, "/tasks?")
+
+	for _, suffix := range []string{
+		"&event=not-an-event",
+		"&event=" + eventID.String() + "&file=README.md",
+		"&file=..%2Fsecret",
+	} {
+		if _, err := routes.ParseTaskDetailSelection(query + suffix); err == nil {
+			t.Fatalf("unsafe detail query accepted: %q", suffix)
+		}
+	}
+}
+
+func TestWorkspaceRelativePathRejectsEscapesAndNonCanonicalAliases(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{
+		"", ".", "..", "../secret", "web/../secret", "/etc/passwd",
+		`C:\\Windows\\system.ini`, `web\\client\\main.go`, "web//client/main.go",
+		" web/client/main.go", "web/client/main.go ", "web/client\x00/main.go",
+		"scheme:value",
+	} {
+		if _, err := routes.ValidateWorkspaceRelativePath(raw); err == nil {
+			t.Fatalf("unsafe workspace path accepted: %q", raw)
+		}
+	}
+	for _, raw := range []string{"README.md", "web/client/main.go", ".github/workflows/check.yml"} {
+		got, err := routes.ValidateWorkspaceRelativePath(raw)
+		if err != nil || got != raw {
+			t.Fatalf("safe workspace path = %q, %v; want %q", got, err, raw)
+		}
+	}
+}
+
 func TestRestoreRefusesUnauthorizedOrArchivedDestinations(t *testing.T) {
 	repositoryID, _ := domain.NewRepositoryID()
 	threadID, _ := domain.NewThreadID()

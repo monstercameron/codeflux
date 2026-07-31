@@ -9,62 +9,74 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/web/frontend/composer"
+	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 )
 
 const previewComposerUUID = "01890f3c-4a00-7abc-8def-0123456789ab"
-const previewThreadRevision uint64 = 0
 
-// livePreviewComposer owns the local-first controlled composer state used by
-// the generated browser shell. Durable transport remains behind the typed
-// callbacks; the preview completes sends locally so every state is testable
-// without inventing a remote session.
-func livePreviewComposer(selectedGraph ui.State[string]) composer.Props {
-	repositoryID, repositoryErr := domain.ParseRepositoryID("repo_" + previewComposerUUID)
-	threadID, threadErr := domain.ParseThreadID("thr_" + previewComposerUUID)
-	initial, modelErr := composer.NewModel(composer.ThreadBinding{
-		ThreadID: threadID, RepositoryID: repositoryID,
-	})
+// livePreviewComposer owns browser-local drafts while every send is bound to
+// the selected server-issued thread identity and exact authoritative revision.
+func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _ ui.State[string]) composer.Props {
+	threadID := thread.ID()
+	repositoryID := thread.RepositoryID()
+	initial, modelErr := composer.NewModel()
 	modelState := ui.UseState(initial)
-	taskState := ui.UseState(domain.TaskStateRunning)
-	transportMode := ui.UseState("authoritative-bridge-with-local-preview-fallback")
-	attachmentPickerOpen := ui.UseState(false)
+	latestEvent := ui.UseRef(latest)
+	latestEvent.Set(latest)
+	transportMode := ui.UseState(composerTransportAuthoritative)
 	usd, currencyErr := domain.ParseCurrencyCode("USD")
 	providerID, providerErr := domain.ParseProviderID("prv_" + previewComposerUUID)
 	modelOptions, modelOptionsErr := previewModelOptions(providerID)
-	artifactID, artifactErr := domain.ParseArtifactID("art_" + previewComposerUUID)
-	fileAttachment, attachmentErr := composer.NewFileAttachment(
-		repositoryID,
-		artifactID,
-		"web/frontend/shell/shell.go",
-	)
-	atomID, atomErr := domain.ParseAtomID("atm_" + previewComposerUUID)
-	symbolAttachment, symbolAttachmentErr := composer.NewSymbolAttachment(
-		repositoryID,
-		atomID,
-		"shell.AppRouter",
-	)
 	initErr := firstComposerError(
-		repositoryErr,
-		threadErr,
 		modelErr,
 		currencyErr,
 		providerErr,
 		modelOptionsErr,
-		artifactErr,
-		attachmentErr,
-		atomErr,
-		symbolAttachmentErr,
 	)
 	apply := func(action composer.Action) bool {
-		next, err := composer.Reduce(modelState.Get(), action)
-		if err != nil {
-			return false
-		}
-		modelState.Set(next)
-		return true
+		applied := false
+		modelState.Update(func(current composer.Model) composer.Model {
+			next, err := composer.Reduce(current, action)
+			if err != nil {
+				return current
+			}
+			applied = true
+			return next
+		})
+		return applied
 	}
+	bindingDependency := threadID.String() + "|" + repositoryID.String()
+	settlementAttempt, settlementAttemptPresent := modelState.Get().Attempt(threadID)
+	settlementDependency := composerSettlementDependency(
+		threadID, latest, settlementAttempt, settlementAttemptPresent,
+	)
+	ui.UseEffectOf(func() func() {
+		if threadID.IsZero() || repositoryID.IsZero() {
+			return nil
+		}
+		apply(composer.ThreadBound{ThreadID: threadID, RepositoryID: repositoryID})
+		return nil
+	}, bindingDependency)
+	ui.UseEffectOf(func() func() {
+		if latest.Sequence == 0 || latest.ThreadID != threadID {
+			return nil
+		}
+		confirmation, err := composer.NewTimelineCommitConfirmation(latest)
+		if err != nil {
+			return nil
+		}
+		attempt, ok := modelState.Get().Attempt(threadID)
+		if !ok {
+			return nil
+		}
+		apply(composer.SendCommitConfirmed{
+			ThreadID: threadID, Key: attempt.Key(), Confirmation: confirmation,
+		})
+		return nil
+	}, settlementDependency)
 	complete := func(command composerSendCommand) {
 		ui.SafeGo("send mounted composer message", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -72,13 +84,22 @@ func livePreviewComposer(selectedGraph ui.State[string]) composer.Props {
 			cancel()
 			next, mode, err := settleComposerCommand(modelState.Get(), command, messageID, sendErr)
 			if err == nil {
-				modelState.Set(next)
-				transportMode.Set(mode)
+				if committed := latestEvent.Get(); sendErr == nil && committed.ThreadID == command.ThreadID {
+					if confirmation, confirmationErr := composer.NewTimelineCommitConfirmation(committed); confirmationErr == nil {
+						next, _ = composer.Reduce(next, composer.SendCommitConfirmed{
+							ThreadID: command.ThreadID, Key: command.Key, Confirmation: confirmation,
+						})
+					}
+				}
+				ui.PostAsync(func() {
+					modelState.Set(next)
+					transportMode.Set(mode)
+				})
 			}
 		})
 	}
 	props := composer.Props{
-		View:           composer.View(modelState.Get(), threadID, taskState.Get()),
+		View:           composer.View(modelState.Get(), threadID, ""),
 		BudgetCurrency: usd,
 		TransportMode:  transportMode.Get(),
 		ModelOptions:   modelOptions,
@@ -95,7 +116,7 @@ func livePreviewComposer(selectedGraph ui.State[string]) composer.Props {
 				return
 			}
 			complete(composerSendCommand{
-				ThreadID: threadID, ExpectedRevision: previewThreadRevision,
+				ThreadID: threadID, ExpectedRevision: thread.Revision(),
 				Key: key, Draft: draft,
 			})
 		},
@@ -104,7 +125,7 @@ func livePreviewComposer(selectedGraph ui.State[string]) composer.Props {
 				attempt, ok := modelState.Get().Attempt(threadID)
 				if ok {
 					complete(composerSendCommand{
-						ThreadID: threadID, ExpectedRevision: previewThreadRevision,
+						ThreadID: threadID, ExpectedRevision: thread.Revision(),
 						Key: key, Draft: attempt.Request(),
 					})
 				}
@@ -141,42 +162,10 @@ func livePreviewComposer(selectedGraph ui.State[string]) composer.Props {
 				ThreadID: threadID, Value: value, Clear: clear,
 			})
 		},
-		AttachmentPickerOpen: attachmentPickerOpen.Get(),
-		AttachmentOptions: []composer.RepositoryAttachment{
-			fileAttachment,
-			symbolAttachment,
-		},
-		OnOpenAttachmentPicker: func() {
-			attachmentPickerOpen.Set(true)
-		},
-		OnAttachmentSelected: func(attachment composer.RepositoryAttachment) {
-			apply(composer.AttachmentAdded{
-				ThreadID: threadID, Attachment: attachment,
-			})
-			attachmentPickerOpen.Set(false)
-		},
-		OnAttachmentPickerDismiss: func() { attachmentPickerOpen.Set(false) },
-		OnRemoveAttachment: func(key string) {
-			apply(composer.AttachmentRemoved{
-				ThreadID: threadID, AttachmentKey: key,
-			})
-		},
-		OnTaskAction: func(action composer.TaskAction) {
-			switch action {
-			case composer.ActionStop:
-				taskState.Set(domain.TaskStateCancelled)
-			case composer.ActionPause:
-				taskState.Set(domain.TaskStatePaused)
-			case composer.ActionResume:
-				taskState.Set(domain.TaskStateRunning)
-			case composer.ActionInspectGraph:
-				selectedGraph.Set("implementation")
-			}
-		},
 	}
-	if initErr != nil {
+	if initErr != nil || threadID.IsZero() || repositoryID.IsZero() {
 		props.Disabled = true
-		props.DisabledReason = "Composer identities are unavailable"
+		props.DisabledReason = "Select an authoritative thread to compose a message"
 	}
 	return props
 }

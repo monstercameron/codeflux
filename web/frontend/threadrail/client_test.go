@@ -184,6 +184,39 @@ func TestGRPCClientMapsBoundedQueriesMutationsAndTypedIdentities(t *testing.T) {
 	}
 }
 
+func TestGRPCClientAcceptsInitialAuthoritativeRevisionZero(t *testing.T) {
+	fixture := newRailFixture(t)
+	threadID, err := domain.NewThreadID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionID, err := domain.NewSessionID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := &fakeGeneratedThreadClient{view: &codefluxv1.ThreadView{
+		ThreadId:    stableIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD, threadID.String()),
+		SessionId:   stableIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION, sessionID.String()),
+		WorkspaceId: stableIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE, fixture.workspace.String()),
+		Title:       &codefluxv1.RedactedText{Value: "Initial thread"},
+		Revision:    0,
+		UpdatedAt:   timestamppb.New(time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)),
+	}}
+	client, err := NewGRPCClient(fixture.repository, fixture.workspace, generated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := client.ListThreads(context.Background(), PageQuery{
+		RepositoryID: fixture.repository, WorkspaceID: fixture.workspace, Limit: 50,
+	})
+	if err != nil {
+		t.Fatalf("decode initial authoritative thread: %v", err)
+	}
+	if len(page.Threads) != 1 || page.Threads[0].Revision() != 0 {
+		t.Fatalf("decoded page = %#v, want one revision-zero thread", page)
+	}
+}
+
 func TestGRPCClientRejectsMalformedOrCrossScopeResponses(t *testing.T) {
 	fixture := newRailFixture(t)
 	generated := &fakeGeneratedThreadClient{view: &codefluxv1.ThreadView{}}

@@ -4,13 +4,18 @@ package main
 
 import (
 	"context"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
+	"codeflux.dev/codeflux/web/frontend/sessionprojection"
 	"codeflux.dev/codeflux/web/frontend/shell"
+	"codeflux.dev/codeflux/web/frontend/taskprojection"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"codeflux.dev/codeflux/web/frontend/timeline"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
@@ -18,23 +23,45 @@ import (
 
 const mountedTimelineTimeout = 5 * time.Second
 
+type mountedTimelineSource struct {
+	Props              shell.TimelineControlProps
+	Task               taskprojection.TaskProjection
+	TaskReady          bool
+	SessionReady       bool
+	SessionConnection  sessionprojection.ConnectionProjection
+	SessionDiagnostics sessionprojection.Diagnostics
+}
+
 func mountedAuthoritativeTimeline(
 	thread threadrail.Thread,
 	fallback shell.TimelineControlProps,
+	reconnectVersion uint64,
+	requestedEventID *domain.EventID,
 	onEvent func(events.SessionEvent),
-) shell.TimelineControlProps {
+	onStatus func(sessionclient.Status),
+) mountedTimelineSource {
 	feedState := ui.UseState(timeline.MessageFeed{})
 	eventState := ui.UseState(timeline.State{})
 	pageBusy := ui.UseState(false)
+	reviewOpen := ui.UseState(false)
 	streamStatus := ui.UseState(sessionclient.Status{})
+	projectionState := ui.UseState(sessionprojection.New())
 
-	dependency := thread.ID().String() + "|" + thread.SessionID().String()
+	dependency := thread.ID().String() + "|" + thread.SessionID().String() + "|" +
+		strconv.FormatUint(reconnectVersion, 10)
 	ui.UseEffectOf(func() func() {
 		if thread.ID().IsZero() || thread.SessionID().IsZero() {
 			return nil
 		}
-		feedState.Set(timeline.MessageFeed{})
-		eventState.Set(timeline.State{})
+		base := projectionState.Get()
+		trusted := base.Snapshot().Session
+		if trusted.SessionID != thread.SessionID() || trusted.ThreadID != thread.ID() {
+			feedState.Set(timeline.MessageFeed{})
+			eventState.Set(timeline.State{})
+			reviewOpen.Set(false)
+			base = sessionprojection.New()
+		}
+		projectionState.Set(base)
 		ctx, cancel := context.WithCancel(context.Background())
 		var mounted atomic.Bool
 		mounted.Store(true)
@@ -47,59 +74,143 @@ func mountedAuthoritativeTimeline(
 			}
 			feed, err := fetchNewestTimelinePage(pageCtx, lease)
 			if err == nil && mounted.Load() {
-				feedState.Set(feed)
+				ui.PostAsync(func() { feedState.Set(feed) })
 			}
 		})
-		identity := &codefluxv1.StableIdentity{
-			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION,
-			Value: thread.SessionID().String(),
+		retryPolicy := sessionclient.NormalizedRetryPolicy(sessionclient.RetryPolicy{})
+		localProjection := base
+		localEvents := eventState.Get()
+		refreshProjection := func(parent context.Context) (uint64, error) {
+			repairContext, repairCancel := context.WithTimeout(parent, mountedTimelineTimeout)
+			defer repairCancel()
+			lease, repairErr := openBrowserSessionProjectionSnapshotClient(repairContext)
+			if repairErr != nil {
+				return 0, repairErr
+			}
+			defer lease.close()
+			snapshot, repairErr := fetchSessionProjectionSnapshot(
+				repairContext, lease.client, thread.SessionID(), thread.ID(), thread.TaskID(),
+			)
+			if repairErr != nil {
+				return 0, repairErr
+			}
+			repaired, repairErr := sessionprojection.ApplySessionSnapshot(localProjection, snapshot)
+			if repairErr != nil {
+				return 0, repairErr
+			}
+			localProjection = repaired
+			if mounted.Load() {
+				projection := repaired
+				ui.PostAsync(func() { projectionState.Set(projection) })
+			}
+			return repaired.SubscriptionAfterSequence(), nil
 		}
-		client, err := sessionclient.New(sessionclient.Config{
-			Connector: sessionclient.BrowserConnector{}, SessionID: identity,
-			Observe: func(status sessionclient.Status) {
-				if mounted.Load() {
-					streamStatus.Set(status)
-				}
-			},
-			Apply: func(_ context.Context, value *codefluxv1.SessionEvent) error {
-				event, decodeErr := sessionclient.DecodeEvent(value)
-				if decodeErr != nil {
-					return decodeErr
-				}
-				if event.ThreadID != thread.ID() || event.SessionID != thread.SessionID() {
-					return sessionclient.ErrSessionEventIdentityMismatch
-				}
-				next, mergeErr := timeline.MergeThreadPage(eventState.Get(), timeline.Page{Events: []events.SessionEvent{event}})
-				if mergeErr != nil {
-					return mergeErr
-				}
-				if mounted.Load() {
-					eventState.Set(next)
-					if onEvent != nil {
-						onEvent(event)
+		publishFailure := func(kind sessionclient.FailureKind) {
+			failed := sessionclient.Status{State: sessionclient.StateFailed, Failure: kind}
+			localProjection = sessionprojection.ProjectConnection(localProjection, failed, retryPolicy)
+			if mounted.Load() {
+				projection := localProjection
+				ui.PostAsync(func() {
+					streamStatus.Set(failed)
+					projectionState.Set(projection)
+					if onStatus != nil {
+						onStatus(failed)
 					}
-				}
-				return nil
-			},
-		})
-		if err == nil {
-			if err = client.Start(ctx); err != nil {
-				streamStatus.Set(sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureProtocol})
+				})
 			}
-		} else {
-			streamStatus.Set(sessionclient.Status{State: sessionclient.StateFailed, Failure: sessionclient.FailureProtocol})
 		}
+		var clientMu sync.Mutex
+		var client *sessionclient.Client
+		ui.SafeGo("bootstrap authoritative session snapshot", func() {
+			if _, err := refreshProjection(ctx); err != nil {
+				publishFailure(sessionclient.FailureApplication)
+				return
+			}
+			identity := &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION,
+				Value: thread.SessionID().String(),
+			}
+			created, err := sessionclient.New(sessionclient.Config{
+				Connector: sessionclient.BrowserConnector{}, SessionID: identity,
+				AfterSequence: localProjection.SubscriptionAfterSequence(), Retry: retryPolicy,
+				Repair: refreshProjection,
+				Observe: func(status sessionclient.Status) {
+					localProjection = sessionprojection.ProjectConnection(localProjection, status, retryPolicy)
+					if mounted.Load() {
+						projection := localProjection
+						ui.PostAsync(func() {
+							streamStatus.Set(status)
+							projectionState.Set(projection)
+							if onStatus != nil {
+								onStatus(status)
+							}
+						})
+					}
+				},
+				Apply: func(_ context.Context, value *codefluxv1.SessionEvent) error {
+					event, decodeErr := sessionclient.DecodeEvent(value)
+					if decodeErr != nil {
+						return decodeErr
+					}
+					if event.ThreadID != thread.ID() || event.SessionID != thread.SessionID() {
+						return sessionclient.ErrSessionEventIdentityMismatch
+					}
+					nextProjection, projectionErr := sessionprojection.ApplySessionEvent(localProjection, event)
+					localProjection = nextProjection
+					if projectionErr != nil {
+						if mounted.Load() {
+							projection := localProjection
+							ui.PostAsync(func() { projectionState.Set(projection) })
+						}
+						return projectionErr
+					}
+					next, mergeErr := timeline.MergeThreadPage(localEvents, timeline.Page{Events: []events.SessionEvent{event}})
+					if mergeErr != nil {
+						return mergeErr
+					}
+					localEvents = next
+					if mounted.Load() {
+						projection := localProjection
+						ui.PostAsync(func() {
+							eventState.Set(next)
+							projectionState.Set(projection)
+							if onEvent != nil {
+								onEvent(event)
+							}
+						})
+					}
+					return nil
+				},
+			})
+			if err != nil {
+				publishFailure(sessionclient.FailureProtocol)
+				return
+			}
+			clientMu.Lock()
+			if !mounted.Load() {
+				clientMu.Unlock()
+				return
+			}
+			client = created
+			clientMu.Unlock()
+			if err = created.Start(ctx); err != nil {
+				publishFailure(sessionclient.FailureProtocol)
+			}
+		})
 		return func() {
 			mounted.Store(false)
 			cancel()
-			if client != nil {
-				_ = client.Close()
+			clientMu.Lock()
+			active := client
+			clientMu.Unlock()
+			if active != nil {
+				_ = active.Close()
 			}
 		}
 	}, dependency)
 
 	if thread.ID().IsZero() || thread.SessionID().IsZero() {
-		return fallback
+		return mountedTimelineSource{Props: fallback}
 	}
 	feed := feedState.Get()
 	stream := eventState.Get()
@@ -114,6 +225,17 @@ func mountedAuthoritativeTimeline(
 	props.Actions = fallback.Actions
 	props.Actions.OnApproval = nil
 	props.Actions.ApprovalCommand = nil
+	props.OnOpenReview = nil
+	props.OnCloseReview = nil
+	props.SelectedStableKey = ""
+	props.SelectionNotice = ""
+	if requestedEventID != nil {
+		if stableKey, ok := relatedTimelineStableKey(stream, *requestedEventID); ok {
+			props.SelectedStableKey = stableKey
+		} else {
+			props.SelectionNotice = "The related recovery event is not present in the loaded authoritative timeline."
+		}
+	}
 	props.OnLoadOlder = func() {
 		if pageBusy.Get() || feed.ThreadID != thread.ID() || !feed.HasOlder {
 			return
@@ -134,5 +256,20 @@ func mountedAuthoritativeTimeline(
 	}
 	props.OnRetryOlder = props.OnLoadOlder
 	_ = streamStatus.Get()
-	return props
+	projection := projectionState.Get()
+	task, taskReady := projection.TaskProjection()
+	if taskReady {
+		props = bindAuthoritativeTimelineActions(
+			props, task, taskprojection.ConnectionProjection(projection.Connection().State),
+			func() { reviewOpen.Set(true) }, func() { reviewOpen.Set(false) },
+		)
+		props.ReviewOpen = reviewOpen.Get()
+	}
+	trusted := projection.Snapshot().Session
+	sessionReady := trusted.SessionID == thread.SessionID() && trusted.ThreadID == thread.ID()
+	return mountedTimelineSource{
+		Props: props, Task: task, TaskReady: taskReady,
+		SessionReady: sessionReady, SessionConnection: projection.Connection(),
+		SessionDiagnostics: projection.Diagnostics(),
+	}
 }

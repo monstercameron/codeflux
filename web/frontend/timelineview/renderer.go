@@ -27,18 +27,34 @@ type Actions struct {
 	OnRecoveryChoice      func(string)
 	OnRetry               func()
 	ApprovalCommand       func(string) ApprovalCommandState
+	ApprovalActionCommand func(string, timelinecard.ApprovalAction) ApprovalCommandState
+	ApprovePlanCommand    func(uint64) ActionCommandState
+	PlanChangeCommand     func(uint64) ActionCommandState
 }
 
-type ApprovalCommandState struct {
+type ActionCommandState struct {
 	Busy           bool
 	IdempotencyKey string
 	TransportMode  string
+	DisabledReason string
 }
 
+type ApprovalCommandState = ActionCommandState
+
 func ApprovalFocusTargetID(approvalID string) string {
+	return focusTargetID("timeline-approval-", approvalID)
+}
+
+// CardFocusTargetID maps a stable timeline key to a deterministic DOM focus
+// target without allowing the key to become markup.
+func CardFocusTargetID(stableKey string) string {
+	return focusTargetID("timeline-card-", stableKey)
+}
+
+func focusTargetID(prefix, identity string) string {
 	var builder strings.Builder
-	builder.WriteString("timeline-approval-")
-	for _, value := range approvalID {
+	builder.WriteString(prefix)
+	for _, value := range identity {
 		if value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' ||
 			value >= '0' && value <= '9' || value == '-' || value == '_' {
 			builder.WriteRune(value)
@@ -50,9 +66,10 @@ func ApprovalFocusTargetID(approvalID string) string {
 }
 
 type Props struct {
-	Card    timelinecard.Card
-	Mode    primitives.Mode
-	Actions Actions
+	Card     timelinecard.Card
+	Mode     primitives.Mode
+	Actions  Actions
+	Selected bool
 }
 
 // Renderer is the exhaustive GWC card renderer. Unsupported or malformed
@@ -66,6 +83,7 @@ func Renderer(props Props) ui.Node {
 	attention := cardNeedsAttention(props.Card, presentation)
 	body := renderBody(props)
 	return html.Article(html.Props{
+		ID: CardFocusTargetID(props.Card.StableKey), TabIndex: -1,
 		Aria: map[string]string{"label": presentation.Title},
 		Data: map[string]string{
 			"component":  "timeline-card",
@@ -76,8 +94,9 @@ func Renderer(props Props) ui.Node {
 			"sequence":   strconv.FormatUint(props.Card.Sequence, 10),
 			"stable-key": props.Card.StableKey,
 			"status":     presentation.StatusLabel,
+			"selected":   strconv.FormatBool(props.Selected),
 		},
-		Class: cardClass(tokens, presentation.Tone, attention),
+		Class: cardClass(tokens, presentation.Tone, attention, props.Selected),
 	},
 		html.Header(html.Props{Class: headerClass(tokens)},
 			html.Div(html.Props{Class: headerLabelClass(tokens)},
@@ -212,7 +231,7 @@ func invalidCard(mode primitives.Mode, err error) ui.Node {
 	return html.Article(html.Props{
 		Role:  "status",
 		Data:  map[string]string{"component": "timeline-card", "card-kind": "invalid", "status": "invalid"},
-		Class: cardClass(mode.Tokens(), design.StatusWarning, true),
+		Class: cardClass(mode.Tokens(), design.StatusWarning, true, false),
 	},
 		html.H2(html.Props{}, html.Text("Timeline item unavailable")),
 		html.P(html.Props{}, html.Text("This item could not be presented safely.")),
@@ -270,7 +289,7 @@ func cardNeedsAttention(card timelinecard.Card, presentation Presentation) bool 
 	}
 }
 
-func cardClass(tokens design.Tokens, tone design.Status, attention bool) string {
+func cardClass(tokens design.Tokens, tone design.Status, attention, selected bool) string {
 	presentation, err := design.StatusPresentationFor(tone, tokens)
 	if err != nil {
 		presentation, _ = design.StatusPresentationFor(design.StatusNeutral, tokens)
@@ -294,6 +313,12 @@ func cardClass(tokens design.Tokens, tone design.Status, attention bool) string 
 		rules = append(rules,
 			css.BorderLeft(css.Px(4), css.Hex(string(presentation.Foreground))),
 			css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
+		)
+	}
+	if selected {
+		rules = append(rules,
+			css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+			css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
 		)
 	}
 	return css.New(rules...).String()

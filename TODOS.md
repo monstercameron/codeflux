@@ -2656,98 +2656,98 @@ Milestone output: reconnectable live session state, top-bar controls, cost/forec
 
 ## Session Connection State
 
-- [ ] `M18-001 BLOCKER` Define UI connection states: connecting, live, replaying, degraded, disconnected, incompatible, and unauthorized.
-- [ ] `M18-002` Display connection state in the top bar.
-- [ ] `M18-003` Begin subscription from the last applied durable sequence.
-- [ ] `M18-004` Apply replay events before live events.
-- [ ] `M18-005` Detect duplicate sequence delivery.
-- [ ] `M18-006` Detect sequence gaps.
-- [ ] `M18-007` Pause correctness-bearing UI mutations until a gap is repaired.
-- [ ] `M18-008` Retry transient disconnects with bounded exponential backoff.
-- [ ] `M18-009` Stop retrying on authentication or version mismatch.
-- [ ] `M18-010` Expose manual reconnect.
-- [ ] `M18-011` Preserve unsent drafts during reconnect.
-- [ ] `M18-012` Disable mutating controls when delivery certainty is unknown.
-- [ ] `M18-013` Re-enable controls after replay reaches live state.
-- [ ] `M18-014` Report last successfully applied sequence in diagnostics.
-- [ ] `M18-015 TEST` Inject disconnects before, during, and after each event category.
+- [x] `M18-001 BLOCKER` Define UI connection states: connecting, live, replaying, degraded, disconnected, incompatible, and unauthorized.
+- [x] `M18-002` Display connection state in the top bar.
+- [x] `M18-003` Begin subscription from the last applied durable sequence.
+- [x] `M18-004` Apply replay events before live events.
+- [x] `M18-005` Detect duplicate sequence delivery.
+- [x] `M18-006` Detect sequence gaps.
+- [x] `M18-007` Pause correctness-bearing UI mutations until a gap is repaired.
+- [x] `M18-008` Retry transient disconnects with bounded exponential backoff.
+- [x] `M18-009` Stop retrying on authentication or version mismatch.
+- [x] `M18-010` Expose manual reconnect.
+- [x] `M18-011` Preserve unsent drafts during reconnect.
+- [x] `M18-012` Disable mutating controls when delivery certainty is unknown.
+- [x] `M18-013` Re-enable controls after replay reaches live state.
+- [x] `M18-014` Report last successfully applied sequence in diagnostics.
+- [x] `M18-015 TEST` Inject disconnects before, during, and after each event category.
 
 ## Task State Projection
 
-- [ ] `M18-016 BLOCKER` Project task state from snapshot plus ordered events.
-- [ ] `M18-017` Project current plan revision.
-- [ ] `M18-018` Project active tool and model operation.
-- [ ] `M18-019` Project pending approval.
-- [ ] `M18-020` Project latest checkpoint.
-- [ ] `M18-021` Project validation state.
-- [ ] `M18-022` Project change-acceptance state.
-- [ ] `M18-023` Reject an event that attempts an impossible state transition.
-- [ ] `M18-024` Trigger a fresh snapshot after projection inconsistency.
-- [ ] `M18-025` Log a safe client diagnostic without raw task content.
-- [ ] `M18-026 TEST` Compare client projection with server projection over recorded event fixtures.
+- [x] `M18-016 BLOCKER` Project task state from snapshot plus ordered events.
+- [x] `M18-017` Project current plan revision.
+- [x] `M18-018` Project active tool and model operation.
+- [x] `M18-019` Project pending approval.
+- [x] `M18-020` Project latest checkpoint.
+- [x] `M18-021` Project validation state.
+- [x] `M18-022` Project change-acceptance state.
+- [x] `M18-023` Reject an event that attempts an impossible state transition.
+- [x] `M18-024` Trigger a fresh snapshot after projection inconsistency.
+- [x] `M18-025` Log a safe client diagnostic without raw task content.
+- [x] `M18-026 TEST` Compare client projection with server projection over recorded event fixtures.
 
 ## Top-Bar Task Controls
 
-- [ ] `M18-027 UX` Display task state with icon and text.
-- [ ] `M18-028 UX` Display current phase: planning, editing, validating, repairing, or reviewing.
-- [ ] `M18-029 UX` Display selected provider, model, and effort.
-- [ ] `M18-030 UX` Display forecast P50/P90 without implying certainty.
-- [ ] `M18-031 UX` Display actual token usage.
-- [ ] `M18-032 UX` Display actual cost using the task pricing snapshot.
-- [ ] `M18-033 UX` Display unknown cost honestly.
-- [ ] `M18-034 UX` Display remaining hard budget.
-- [ ] `M18-035 UX` Add warning styling at the configured threshold.
-- [ ] `M18-036 UX` Add pause control only in pausable states.
-- [ ] `M18-037 UX` Add resume control only in resumable states.
-- [ ] `M18-038 UX` Add stop control in every active state.
-- [ ] `M18-039 UX` Require confirmation only when stopping has a non-obvious consequence.
-- [ ] `M18-040 UX` Add budget-adjust action.
-- [ ] `M18-041 UX` Show exact old and new budget before confirmation.
-- [ ] `M18-042 UX` Prevent repeated clicks from producing duplicate commands.
+- [x] `M18-027 UX` Display task state with icon and text.
+- [x] `M18-028 UX` Display current phase: planning, editing, validating, repairing, or reviewing.
+- [x] `M18-029 UX` Display selected provider, model, and effort.
+- [x] `M18-030 UX` Display forecast P50/P90 without implying certainty.
+- [x] `M18-031 UX` Display actual token usage.
+- [x] `M18-032 UX` Display actual cost using the task pricing snapshot.
+- [x] `M18-033 UX` Display unknown cost honestly.
+- [x] `M18-034 UX` Display remaining hard budget.
+- [x] `M18-035 UX` Add warning styling at the configured threshold.
+- [x] `M18-036 UX` Add pause control only in pausable states.
+- [x] `M18-037 UX` Add resume control only in resumable states.
+- [x] `M18-038 UX` Add stop control in every active state.
+- [x] `M18-039 UX` Require confirmation only when stopping has a non-obvious consequence.
+- [x] `M18-040 UX` Add budget-adjust action.
+- [x] `M18-041 UX` Show exact old and new budget before confirmation.
+- [x] `M18-042 UX` Prevent repeated clicks from producing duplicate commands.
 
 ## Recovery Presentation
 
-- [ ] `M18-043 UX` Show recovery-required status at thread and top-bar level.
-- [ ] `M18-044 UX` Display last valid checkpoint time and plan step.
-- [ ] `M18-045 UX` Display repository/worktree divergence summary.
-- [ ] `M18-046 UX` Offer safe resume when verified.
-- [ ] `M18-047 UX` Offer reconcile when user edits require it.
-- [ ] `M18-048 UX` Offer patch preservation when direct resume is unsafe.
-- [ ] `M18-049 UX` Explain ambiguous external-action outcomes prominently.
-- [ ] `M18-050 UX` Never label unsafe auto-repeat as retry.
-- [ ] `M18-051 UX` Link recovery details to relevant events and files.
+- [x] `M18-043 UX` Show recovery-required status at thread and top-bar level.
+- [x] `M18-044 UX` Display last valid checkpoint time and plan step.
+- [x] `M18-045 UX` Display repository/worktree divergence summary.
+- [x] `M18-046 UX` Offer safe resume when verified.
+- [x] `M18-047 UX` Offer reconcile when user edits require it.
+- [x] `M18-048 UX` Offer patch preservation when direct resume is unsafe.
+- [x] `M18-049 UX` Explain ambiguous external-action outcomes prominently.
+- [x] `M18-050 UX` Never label unsafe auto-repeat as retry.
+- [x] `M18-051 UX` Link recovery details to relevant events and files.
 
 ## State, Command, and Flow UX
 
 Plan: §27C Command Functions; Task State and Available Action Matrix; Detailed Frontend Flows; Empty, Loading, Error, and Offline States; Frontend Telemetry.
 
-- [ ] `M18-052 BLOCKER` Implement `ApplySessionSnapshot` and `ApplySessionEvent` as the only authoritative remote-state entry points.
-- [ ] `M18-053` Implement pure reducers for task transition, budget, approval, validation, graph patch, and review revision.
-- [ ] `M18-054` Detect impossible task transitions, stale graph patches, and sequence gaps and request snapshot repair rather than ignoring them.
-- [ ] `M18-055` Implement `AvailableTaskActions` from task state, connection certainty, policy, pending command, approval, review staleness, and recovery classification.
-- [ ] `M18-056 UX` Implement the complete Draft through Rolled-back state/action matrix from §27C.
-- [ ] `M18-057 UX` Omit or explain unavailable actions before click rather than returning avoidable server errors.
-- [ ] `M18-058` Wrap every UI mutation in a command state that owns one idempotency key until commit or deliberate abandonment.
-- [ ] `M18-059` Implement stale-revision command handling that refreshes state and explains the changed entity.
-- [ ] `M18-060 UX` Distinguish disconnected UI, backend task state, and sequence uncertainty.
-- [ ] `M18-061 UX` Keep the timeline readable during disconnection while disabling only mutations whose delivery/state certainty is unsafe.
-- [ ] `M18-062 UX` Implement one non-spamming budget warning and hard-cap decision surface.
-- [ ] `M18-063 UX` Implement one calm recovery surface that leads with known state, ambiguity, and safest recommended action.
-- [ ] `M18-064 UX` Implement review staleness presentation when diff, plan, validation, evidence, or graph revision changes.
-- [ ] `M18-065 UX` Implement exact estimate-versus-actual labeling and never substitute missing price with zero.
-- [ ] `M18-066` Record local UX telemetry for first-run, time to plan/diff, approval, pause/stop, review, graph use, reconnect, recovery, and slow renders without keystrokes or hidden content.
-- [ ] `M18-067 UX` Add local telemetry inspection and deletion.
-- [ ] `M18-068 TEST` Exercise every row of the task state/action matrix.
-- [ ] `M18-069 TEST` Exercise first-run, new task, plan review, live work, approval, review, repair, reconnect, recovery, graph exploration, and budget flows.
-- [ ] `M18-070 TEST` Verify a user can always identify current state, cost, authority, evidence, uncertainty, and next safe action without raw logs.
+- [x] `M18-052 BLOCKER` Implement `ApplySessionSnapshot` and `ApplySessionEvent` as the only authoritative remote-state entry points.
+- [x] `M18-053` Implement pure reducers for task transition, budget, approval, validation, graph patch, and review revision.
+- [x] `M18-054` Detect impossible task transitions, stale graph patches, and sequence gaps and request snapshot repair rather than ignoring them.
+- [x] `M18-055` Implement `AvailableTaskActions` from task state, connection certainty, policy, pending command, approval, review staleness, and recovery classification.
+- [x] `M18-056 UX` Implement the complete Draft through Rolled-back state/action matrix from §27C.
+- [x] `M18-057 UX` Omit or explain unavailable actions before click rather than returning avoidable server errors.
+- [x] `M18-058` Wrap every UI mutation in a command state that owns one idempotency key until commit or deliberate abandonment.
+- [x] `M18-059` Implement stale-revision command handling that refreshes state and explains the changed entity.
+- [x] `M18-060 UX` Distinguish disconnected UI, backend task state, and sequence uncertainty.
+- [x] `M18-061 UX` Keep the timeline readable during disconnection while disabling only mutations whose delivery/state certainty is unsafe.
+- [x] `M18-062 UX` Implement one non-spamming budget warning and hard-cap decision surface.
+- [x] `M18-063 UX` Implement one calm recovery surface that leads with known state, ambiguity, and safest recommended action.
+- [x] `M18-064 UX` Implement review staleness presentation when diff, plan, validation, evidence, or graph revision changes.
+- [x] `M18-065 UX` Implement exact estimate-versus-actual labeling and never substitute missing price with zero.
+- [x] `M18-066` Record local UX telemetry for first-run, time to plan/diff, approval, pause/stop, review, graph use, reconnect, recovery, and slow renders without keystrokes or hidden content.
+- [x] `M18-067 UX` Add local telemetry inspection and deletion.
+- [x] `M18-068 TEST` Exercise every row of the task state/action matrix.
+- [x] `M18-069 TEST` Exercise first-run, new task, plan review, live work, approval, review, repair, reconnect, recovery, graph exploration, and budget flows.
+- [x] `M18-070 TEST` Verify a user can always identify current state, cost, authority, evidence, uncertainty, and next safe action without raw logs.
 
 ## Gate
 
-- [ ] `M18-G01 GATE` Refreshing or reconnecting during an active task yields the same task, budget, approval, and validation state.
-- [ ] `M18-G02 GATE` Pause, resume, stop, and budget change are idempotent from the UI.
-- [ ] `M18-G03 GATE` The interface never shows a stale approval as actionable.
-- [ ] `M18-G04 GATE` Unknown or delayed cost is never displayed as zero.
-- [ ] `M18-G05 GATE` Every task state and user command has explicit live, busy, committed, stale, denied, disconnected, recovery, and accessibility behavior.
+- [x] `M18-G01 GATE` Refreshing or reconnecting during an active task yields the same task, budget, approval, and validation state.
+- [x] `M18-G02 GATE` Pause, resume, stop, and budget change are idempotent from the UI.
+- [x] `M18-G03 GATE` The interface never shows a stale approval as actionable.
+- [x] `M18-G04 GATE` Unknown or delayed cost is never displayed as zero.
+- [x] `M18-G05 GATE` Every task state and user command has explicit live, busy, committed, stale, denied, disconnected, recovery, and accessibility behavior.
 
 ---
 

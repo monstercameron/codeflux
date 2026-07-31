@@ -34,3 +34,32 @@ func TestAuthoritativeTimelineCardsJoinPageAndSessionReplayByMessageIdentity(t *
 		t.Fatalf("authoritative cards = %#v", cards)
 	}
 }
+
+func TestRelatedTimelineStableKeyUsesOnlyAcceptedEventIdentities(t *testing.T) {
+	threadID, _ := domain.ParseThreadID("thr_01890f3c-4a00-7abc-8def-0123456789ab")
+	sessionID, _ := domain.ParseSessionID("ses_01890f3c-4a00-7abc-8def-0123456789ab")
+	messageID, _ := domain.ParseMessageID("msg_01890f3c-4a00-7abc-8def-0123456789ab")
+	relatedID, _ := domain.ParseEventID("evt_01890f3c-4a00-7abc-8def-0123456789ab")
+	missingID, _ := domain.ParseEventID("evt_01890f3c-4a00-7abc-8def-1123456789ab")
+	event, err := (events.NewSessionEvent{
+		SessionID: sessionID, ThreadID: threadID, Kind: events.KindMessageFinal,
+		CausationID: &relatedID, PayloadVersion: 1,
+		Payload: events.Payload{MessageFinal: &events.MessageFinal{
+			MessageID: messageID, Role: "assistant", RedactedBody: "recovered",
+		}},
+	}).Build(7, time.Unix(7, 0).UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := timeline.MergeThreadPage(timeline.State{}, timeline.Page{Events: []events.SessionEvent{event}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stableKey, ok := relatedTimelineStableKey(stream, relatedID)
+	if !ok || stableKey != "message:"+messageID.String() {
+		t.Fatalf("related stable key = %q, %t", stableKey, ok)
+	}
+	if stableKey, ok := relatedTimelineStableKey(stream, missingID); ok || stableKey != "" {
+		t.Fatalf("missing event guessed target %q", stableKey)
+	}
+}

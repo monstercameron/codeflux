@@ -25,6 +25,9 @@ func TestHubJoinsReplayAndLiveWithoutGapOrDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if boundary := subscription.ReplayBoundary(); boundary != 1 {
+		t.Fatalf("replay boundary = %d, want 1", boundary)
+	}
 	if err := hub.PublishCommitted(first); err != nil {
 		t.Fatal(err)
 	}

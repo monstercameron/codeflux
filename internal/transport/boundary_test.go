@@ -85,6 +85,7 @@ func TestGeneratedClientsExecuteSyntheticJourney(t *testing.T) {
 	threadID := fixtureIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD, "thr")
 	messageID := fixtureIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MESSAGE, "msg")
 	taskID := fixtureIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_TASK, "tsk")
+	projectID := fixtureIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_PROJECT, "prj")
 	sessionID := fixtureIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION, "ses")
 
 	workspace := codefluxv1.NewWorkspaceServiceClient(connection)
@@ -117,7 +118,7 @@ func TestGeneratedClientsExecuteSyntheticJourney(t *testing.T) {
 	}
 	graph := codefluxv1.NewGraphServiceClient(connection)
 	if _, err := graph.GetGraphSlice(ctx, &codefluxv1.GetGraphSliceRequest{
-		TaskId: taskID, Mode: "execution", MaxNodes: 300, MaxEdges: 600,
+		ProjectId: projectID, TaskId: taskID, Mode: "execution", MaxNodes: 300, MaxEdges: 600,
 	}); err != nil {
 		t.Fatal(err)
 	}

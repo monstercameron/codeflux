@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -17,6 +16,7 @@ import (
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
+	"github.com/monstercameron/GoWebComponents/v5/fetch"
 	"github.com/monstercameron/GoWebComponents/v5/html"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 	"google.golang.org/grpc/codes"
@@ -32,6 +32,45 @@ type mountedThreadRailProps struct {
 	Mode                     primitives.Mode
 	OnNavigate               func(routes.Route)
 	OnAuthoritativeSelection func(threadrail.Thread)
+	FirstPage                fetch.ResourceState[threadrail.State]
+}
+
+type mountedThreadRailFirstPageSource struct {
+	State  fetch.ResourceState[threadrail.State]
+	Reload func()
+}
+
+func useMountedThreadRailFirstPage(
+	envelope bootstrapEnvelope,
+	snapshot frontendstate.Snapshot,
+	route routes.Route,
+) mountedThreadRailFirstPageSource {
+	scope, scopeErr := authorizedThreadRailScope(envelope, snapshot, route)
+	dependency := "unavailable"
+	if scopeErr == nil {
+		dependency = scope.repositoryID.String() + "|" + scope.workspaceID.String()
+	}
+	resource := fetch.UseResource(func(parent context.Context) (threadrail.State, error) {
+		if scopeErr != nil {
+			return threadrail.State{}, scopeErr
+		}
+		ctx, cancel := context.WithTimeout(parent, mountedThreadRailTimeout)
+		defer cancel()
+		initial, err := threadrail.NewState(scope.repositoryID, scope.workspaceID)
+		if err != nil {
+			return threadrail.State{}, err
+		}
+		if route.Name == routes.ThreadWorkspace && route.RepositoryID == scope.repositoryID && !route.ThreadID.IsZero() {
+			initial, err = threadrail.RestoreSelection(initial, route)
+			if err != nil {
+				return threadrail.State{}, err
+			}
+		}
+		return withThreadRailClient(ctx, openBrowserThreadRailClient, scope, func(client threadrail.PageClient) (threadrail.State, error) {
+			return threadrail.LoadFirstPage(ctx, initial, client)
+		})
+	}, dependency)
+	return mountedThreadRailFirstPageSource{State: resource.Get(), Reload: resource.Reload}
 }
 
 // mountedThreadRail owns the product rail's generated-client lifecycle. It
@@ -64,66 +103,22 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 	archiveConfirmation := ui.UseState(domain.ThreadID{})
 	renameTarget := ui.UseState(domain.ThreadID{})
 	renameTitle := ui.UseState("")
-
-	connection := props.Snapshot.Session.Connection
-	loadDependency := scope.repositoryID.String() + "|" + scope.workspaceID.String() + "|" + string(connection)
-	ui.UseEffectOf(func() func() {
-		if scopeErr != nil || fallback.Get() {
-			return nil
-		}
-		if connection == frontendstate.ConnectionOffline {
-			railState.Set(threadrail.Disconnected(initial))
-			transportMessage.Set("Thread authority is disconnected; loaded rows may be stale.")
-			return nil
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), mountedThreadRailTimeout)
-		var mounted atomic.Bool
-		mounted.Store(true)
-		ui.SafeGo("load authoritative thread rail", func() {
-			next, err := withThreadRailClient(ctx, openBrowserThreadRailClient, scope, func(client threadrail.PageClient) (threadrail.State, error) {
-				return threadrail.LoadFirstPage(ctx, initial, client)
-			})
-			if !mounted.Load() {
-				return
-			}
-			if isThreadRailServiceUnavailable(err) {
-				fallbackReason.Set("ThreadService is unavailable on this coordinator.")
-				fallback.Set(true)
-				return
-			}
-			if !next.RepositoryID().IsZero() {
-				railState.Set(next)
-				notifyMountedThreadSelection(next, props.Route.ThreadID, props.OnAuthoritativeSelection)
-			}
-			if err != nil {
-				transportMessage.Set("Threads could not be loaded from the local coordinator. Retry when ready.")
-				return
-			}
-			transportMessage.Set("Threads are synchronized with the local coordinator.")
-		})
-		return func() {
-			mounted.Store(false)
-			cancel()
-		}
-	}, loadDependency)
-	routeDependency := props.Route.RepositoryID.String() + "|" + props.Route.ThreadID.String()
-	ui.UseEffectOf(func() func() {
-		if scopeErr != nil || fallback.Get() || props.Route.Name != routes.ThreadWorkspace ||
-			props.Route.RepositoryID != scope.repositoryID || props.Route.ThreadID.IsZero() {
-			return nil
-		}
-		next, err := threadrail.RestoreSelection(railState.Get(), props.Route)
-		if err == nil {
-			railState.Set(next)
-		}
-		return nil
-	}, routeDependency)
+	focusManager := ui.UseFocusManager()
 
 	if fallback.Get() {
 		return threadRailFallback(props, fallbackReason.Get())
 	}
 	if scopeErr != nil {
 		return threadRailFallback(props, threadRailFallbackReason(scopeErr))
+	}
+	resolvedRailState := func() threadrail.State {
+		current := railState.Get()
+		remote := props.FirstPage.Value
+		if !remote.RepositoryID().IsZero() &&
+			(current.LoadState() == threadrail.LoadNotRequested || current.LoadState() == threadrail.LoadLoading) {
+			return remote
+		}
+		return current
 	}
 
 	applyState := func(next threadrail.State, err error) bool {
@@ -144,31 +139,44 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 		ui.SafeGo(label, func() {
 			ctx, cancel := context.WithTimeout(context.Background(), mountedThreadRailTimeout)
 			defer cancel()
-			current := railState.Get()
+			current := resolvedRailState()
 			next, err := withThreadRailClient(ctx, openBrowserThreadRailClient, scope, func(client threadrail.PageClient) (threadrail.State, error) {
 				return operation(ctx, current, client)
 			})
-			if setBusy != nil {
-				setBusy(false)
-			}
-			if isThreadRailServiceUnavailable(err) {
-				fallbackReason.Set("ThreadService became unavailable; showing the local preview.")
-				fallback.Set(true)
-				return
-			}
-			if !next.RepositoryID().IsZero() {
-				railState.Set(next)
-				notifyMountedThreadSelection(next, next.SelectedThreadID(), props.OnAuthoritativeSelection)
-			}
-			if err != nil {
-				transportMessage.Set("The thread command was not confirmed. Its request identity remains retained.")
-				return
-			}
-			transportMessage.Set("Thread changes are synchronized with the local coordinator.")
+			ui.PostAsync(func() {
+				if setBusy != nil {
+					setBusy(false)
+				}
+				if isThreadRailServiceUnavailable(err) {
+					fallbackReason.Set("ThreadService became unavailable; showing the local preview.")
+					fallback.Set(true)
+					return
+				}
+				if !next.RepositoryID().IsZero() {
+					railState.Set(next)
+					notifyMountedThreadSelection(next, next.SelectedThreadID(), props.OnAuthoritativeSelection)
+				}
+				if err != nil {
+					transportMessage.Set("The thread command was not confirmed. Its request identity remains retained.")
+					return
+				}
+				transportMessage.Set("Thread changes are synchronized with the local coordinator.")
+			})
 		})
 	}
 
-	current := railState.Get()
+	current := resolvedRailState()
+	message := transportMessage.Get()
+	if message == "Loading threads from the local coordinator." {
+		switch {
+		case props.FirstPage.Loading:
+			message = "Connecting to ThreadService through the local bridge."
+		case props.FirstPage.Error != nil:
+			message = "Threads could not be loaded from the local coordinator. Retry when ready."
+		case props.FirstPage.Ready:
+			message = "Threads are synchronized with the local coordinator."
+		}
+	}
 	rail := ui.CreateElement(threadrail.ThreadRail, threadrail.ThreadRailProps{
 		State: current, Mode: props.Mode, Embedded: true, Height: 270,
 		NewThreadBusy: createBusy.Get(), RenameBusy: renameBusy.Get(), ArchiveBusy: archiveBusy.Get(),
@@ -194,13 +202,13 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 			})
 		},
 		OnFilterChange: func(filter threadrail.Filter) {
-			applyState(threadrail.SetFilter(railState.Get(), filter))
+			applyState(threadrail.SetFilter(resolvedRailState(), filter))
 		},
 		OnActiveChange: func(key threadrail.RowKey) {
-			applyState(threadrail.SetActiveRow(railState.Get(), key))
+			applyState(threadrail.SetActiveRow(resolvedRailState(), key))
 		},
 		OnSelect: func(key threadrail.RowKey) {
-			next, route, err := threadrail.SelectThread(railState.Get(), key)
+			next, route, err := threadrail.SelectThread(resolvedRailState(), key)
 			if applyState(next, err) && props.OnNavigate != nil {
 				notifyMountedThreadSelection(next, route.ThreadID, props.OnAuthoritativeSelection)
 				props.OnNavigate(route)
@@ -226,7 +234,7 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 				transportMessage.Set("Retry or resolve the retained rename before renaming another thread.")
 				return
 			}
-			if row, ok := mountedThreadRailRow(railState.Get(), threadID); ok {
+			if row, ok := mountedThreadRailRow(resolvedRailState(), threadID); ok {
 				renameTarget.Set(threadID)
 				if retained.Key != "" {
 					renameTitle.Set(retained.Title)
@@ -237,12 +245,17 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 		},
 		ArchiveConfirmation: archiveConfirmation.Get(),
 		OnArchiveRequest:    archiveConfirmation.Set,
-		OnArchiveCancel:     func() { archiveConfirmation.Set(domain.ThreadID{}) },
+		OnArchiveCancel: func() {
+			cancelMountedThreadArchive(
+				func() { archiveConfirmation.Set(domain.ThreadID{}) },
+				func() { ui.PostAsync(func() { focusManager.FocusByID("thread-rail-archive") }) },
+			)
+		},
 		OnArchive: func(threadID domain.ThreadID, archived bool) {
 			if archiveBusy.Get() {
 				return
 			}
-			row, ok := mountedThreadRailRow(railState.Get(), threadID)
+			row, ok := mountedThreadRailRow(resolvedRailState(), threadID)
 			if !ok {
 				return
 			}
@@ -274,7 +287,7 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 	})
 
 	children := []ui.Node{
-		threadRailTransportNotice("authoritative-bridge", transportMessage.Get(), props.Mode),
+		threadRailTransportNotice("authoritative-bridge", message, props.Mode),
 		rail,
 	}
 	if !renameTarget.Get().IsZero() {
@@ -289,7 +302,7 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 					return
 				}
 				title := strings.TrimSpace(renameTitle.Get())
-				row, ok := mountedThreadRailRow(railState.Get(), renameTarget.Get())
+				row, ok := mountedThreadRailRow(resolvedRailState(), renameTarget.Get())
 				if !ok || title == "" {
 					return
 				}
@@ -320,8 +333,14 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 					transportMessage.Set("The retained rename must be retried before this editor can close.")
 					return
 				}
-				renameTarget.Set(domain.ThreadID{})
-				renameTitle.Set("")
+				cancelMountedThreadRename(
+					resolvedRailState(), renameTarget.Get(), props.OnAuthoritativeSelection,
+					func() {
+						renameTarget.Set(domain.ThreadID{})
+						renameTitle.Set("")
+					},
+					func() { ui.PostAsync(func() { focusManager.FocusByID("thread-rail-rename") }) },
+				)
 			},
 		))
 	}
@@ -334,28 +353,11 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 	}, children...)
 }
 
-func notifyMountedThreadSelection(
-	state threadrail.State,
-	threadID domain.ThreadID,
-	notify func(threadrail.Thread),
-) {
-	if notify == nil || threadID.IsZero() {
-		return
-	}
-	if row, ok := mountedThreadRailRow(state, threadID); ok {
-		sessionID, err := threadRailSessionTarget(state, threadID)
-		if err != nil || sessionID != row.Thread().SessionID() {
-			return
-		}
-		notify(row.Thread())
-	}
-}
-
 func threadRailFallback(props mountedThreadRailProps, reason string) ui.Node {
 	if strings.TrimSpace(reason) == "" {
 		reason = "Authoritative thread state is unavailable."
 	}
-	if props.Snapshot.Session.Connection == frontendstate.ConnectionOffline {
+	if props.Snapshot.Session.Connection == frontendstate.ConnectionDisconnected {
 		reason = "The coordinator is disconnected. " + reason
 	}
 	return html.Section(html.Props{
@@ -391,15 +393,6 @@ func isThreadRailServiceUnavailable(err error) bool {
 	}
 	return errors.Is(err, errThreadRailBridgeUnavailable) ||
 		status.Code(err) == codes.Unimplemented || status.Code(err) == codes.Unavailable
-}
-
-func mountedThreadRailRow(state threadrail.State, threadID domain.ThreadID) (threadrail.Row, bool) {
-	for _, row := range state.AllRows() {
-		if !row.Pending() && row.ThreadID() == threadID {
-			return row, true
-		}
-	}
-	return threadrail.Row{}, false
 }
 
 func threadRailTransportNotice(mode, message string, primitiveMode primitives.Mode) ui.Node {

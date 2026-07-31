@@ -159,7 +159,7 @@ func TestSubscribeFailureKeepsReadyAppInRecoveringMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Session.Bootstrap != state.BootstrapReady || result.Session.Connection != state.ConnectionRecovering {
+	if result.Session.Bootstrap != state.BootstrapReady || result.Session.Connection != state.ConnectionDegraded {
 		t.Fatalf("result session = %+v", result.Session)
 	}
 }

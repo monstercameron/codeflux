@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	frontendcomposer "codeflux.dev/codeflux/web/frontend/composer"
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/graphcanvas"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/state"
+	"codeflux.dev/codeflux/web/frontend/taskcontrols"
+	"codeflux.dev/codeflux/web/frontend/telemetryview"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
 	"codeflux.dev/codeflux/web/frontend/timelineview"
 	"github.com/monstercameron/GoWebComponents/v5/css"
@@ -22,22 +24,27 @@ import (
 )
 
 type RootProps struct {
-	Snapshot         state.Snapshot
-	Composer         frontendcomposer.Props
-	Timeline         TimelineControlProps
-	ThreadRail       ui.Node
-	Route            routes.Route
-	Tokens           design.Tokens
-	Translator       frontendi18n.Translator
-	Probe            RenderProbe
-	OnLayoutChange   func(state.LayoutPreferences)
-	OnGraphSelect    func(string)
-	OnThreadNavigate func(routes.Route)
-	OnNavigatePath   func(string)
-	OnThemeChange    func()
-	OnRetry          func()
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Snapshot             state.Snapshot
+	Composer             frontendcomposer.Props
+	Timeline             TimelineControlProps
+	TaskControls         *taskcontrols.Props
+	Telemetry            telemetryview.Props
+	ThreadRail           ui.Node
+	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
+	GraphInspector       ui.Node
+	Route                routes.Route
+	Tokens               design.Tokens
+	Translator           frontendi18n.Translator
+	Probe                RenderProbe
+	OnLayoutChange       func(state.LayoutPreferences)
+	OnGraphSelect        func(string)
+	OnThreadNavigate     func(routes.Route)
+	OnNavigatePath       func(string)
+	OnThemeChange        func()
+	OnReconnectRequested func()
+	OnRetry              func()
+	OnPauseRequested     func()
+	OnStopRequested      func()
 }
 
 // AppRoot keeps bootstrap failure states outside authenticated route shells.
@@ -75,13 +82,17 @@ func AppRoot(props RootProps) ui.Node {
 			UI:    state.NewUIStore(props.Snapshot.Layout, nil),
 			Child: ui.CreateElement(AppShell, AppShellProps{
 				Snapshot: props.Snapshot, Route: props.Route, Tokens: props.Tokens,
-				Composer: props.Composer, Timeline: props.Timeline, ThreadRail: props.ThreadRail,
+				Composer: props.Composer, Timeline: props.Timeline,
+				TaskControls: props.TaskControls, ThreadRail: props.ThreadRail,
+				AuthoritativeGraph: props.AuthoritativeGraph, GraphInspector: props.GraphInspector,
+				Telemetry:  props.Telemetry,
 				Translator: props.Translator, Probe: props.Probe,
 				OnLayoutChange: props.OnLayoutChange, OnGraphSelect: props.OnGraphSelect,
-				OnThreadNavigate: props.OnThreadNavigate,
-				OnNavigatePath:   props.OnNavigatePath,
-				OnThemeChange:    props.OnThemeChange,
-				OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+				OnThreadNavigate:     props.OnThreadNavigate,
+				OnNavigatePath:       props.OnNavigatePath,
+				OnThemeChange:        props.OnThemeChange,
+				OnReconnectRequested: props.OnReconnectRequested,
+				OnPauseRequested:     props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 			}),
 		})
 	default:
@@ -92,21 +103,26 @@ func AppRoot(props RootProps) ui.Node {
 }
 
 type AppShellProps struct {
-	Snapshot         state.Snapshot
-	Composer         frontendcomposer.Props
-	Timeline         TimelineControlProps
-	ThreadRail       ui.Node
-	Route            routes.Route
-	Tokens           design.Tokens
-	Translator       frontendi18n.Translator
-	Probe            RenderProbe
-	OnLayoutChange   func(state.LayoutPreferences)
-	OnGraphSelect    func(string)
-	OnThreadNavigate func(routes.Route)
-	OnNavigatePath   func(string)
-	OnThemeChange    func()
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Snapshot             state.Snapshot
+	Composer             frontendcomposer.Props
+	Timeline             TimelineControlProps
+	TaskControls         *taskcontrols.Props
+	Telemetry            telemetryview.Props
+	ThreadRail           ui.Node
+	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
+	GraphInspector       ui.Node
+	Route                routes.Route
+	Tokens               design.Tokens
+	Translator           frontendi18n.Translator
+	Probe                RenderProbe
+	OnLayoutChange       func(state.LayoutPreferences)
+	OnGraphSelect        func(string)
+	OnThreadNavigate     func(routes.Route)
+	OnNavigatePath       func(string)
+	OnThemeChange        func()
+	OnReconnectRequested func()
+	OnPauseRequested     func()
+	OnStopRequested      func()
 }
 
 // AppShell composes independent render boundaries for chrome and route content.
@@ -148,10 +164,10 @@ func AppShell(props AppShellProps) ui.Node {
 		emitShellLayout(next)
 		focusManager.FocusByID("thread-rail-toggle")
 	}
-	resizeRail := func(delta int) func() {
+	resizeRail := func(direction int) func() {
 		return func() {
 			next := layout
-			next.RailWidth += delta
+			next.RailWidth = nextRailWidth(layout.RailWidth, direction)
 			emitShellLayout(next)
 		}
 	}
@@ -173,21 +189,7 @@ func AppShell(props AppShellProps) ui.Node {
 	}
 	pauseEnabled := props.Snapshot.TopBar.CanPause && props.OnPauseRequested != nil
 	stopEnabled := props.Snapshot.TopBar.CanStop && props.OnStopRequested != nil
-	announcerPolicy := ui.UseState(state.AnnouncerState{MinimumInterval: 5 * time.Second})
-	announcerMessage := ui.UseState("")
 	candidate := announcementCandidate(props.Snapshot)
-	ui.UseEffectOf(func() func() {
-		if candidate.Kind == "" || candidate.Message == "" {
-			return nil
-		}
-		candidate.At = time.Now()
-		next, accepted := announcerPolicy.Get().Accept(candidate)
-		announcerPolicy.Set(next)
-		if accepted {
-			announcerMessage.Set(candidate.Message)
-		}
-		return nil
-	}, string(candidate.Kind)+"|"+candidate.Message)
 	skipProps := html.PropsOf(
 		html.OnClick(focusMain),
 		html.OnKeyDown(func(event ui.KeyboardEvent) {
@@ -228,17 +230,18 @@ func AppShell(props AppShellProps) ui.Node {
 					Revision: props.Snapshot.TopBarRevision(), Mode: primitiveMode(props.Tokens),
 					Viewport: props.Snapshot.Layout.Viewport,
 					Probe:    props.Probe, OnThemeChange: props.OnThemeChange,
-					OnShortcutHelp:      openShortcutHelp,
-					SearchOpen:          searchOpen.Get(),
-					SearchQuery:         searchQuery.Get(),
-					RailOpen:            railOpen,
-					OnSearchOpen:        openSearch,
-					OnSearchDismiss:     closeSearch,
-					OnSearchQueryChange: searchQuery.Set,
-					OnRailToggle:        toggleRail,
-					OnInspectorToggle:   toggleInspector,
-					OnNavigatePath:      props.OnNavigatePath,
-					OnPauseRequested:    props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+					OnShortcutHelp:       openShortcutHelp,
+					SearchOpen:           searchOpen.Get(),
+					SearchQuery:          searchQuery.Get(),
+					RailOpen:             railOpen,
+					OnSearchOpen:         openSearch,
+					OnSearchDismiss:      closeSearch,
+					OnSearchQueryChange:  searchQuery.Set,
+					OnRailToggle:         toggleRail,
+					OnInspectorToggle:    toggleInspector,
+					OnNavigatePath:       props.OnNavigatePath,
+					OnReconnectRequested: props.OnReconnectRequested,
+					OnPauseRequested:     props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 				}),
 				html.Div(html.Props{Class: applicationFrameClass(
 					props.Snapshot.Layout, props.Tokens, inspectorCollapsed.Get(),
@@ -260,17 +263,21 @@ func AppShell(props AppShellProps) ui.Node {
 						Class:    routeFrameClass(layout),
 					},
 						ui.CreateElement(AppRouter, RouteShellProps{
-							Snapshot:         props.Snapshot,
-							Composer:         props.Composer,
-							Timeline:         props.Timeline,
-							Route:            props.Route,
-							Tokens:           props.Tokens,
-							Probe:            props.Probe,
-							OnLayoutChange:   props.OnLayoutChange,
-							OnGraphSelect:    props.OnGraphSelect,
-							OnNavigatePath:   props.OnNavigatePath,
-							OnPauseRequested: props.OnPauseRequested,
-							OnStopRequested:  props.OnStopRequested,
+							Snapshot:           props.Snapshot,
+							Composer:           props.Composer,
+							Timeline:           props.Timeline,
+							TaskControls:       props.TaskControls,
+							AuthoritativeGraph: props.AuthoritativeGraph,
+							GraphInspector:     props.GraphInspector,
+							Telemetry:          props.Telemetry,
+							Route:              props.Route,
+							Tokens:             props.Tokens,
+							Probe:              props.Probe,
+							OnLayoutChange:     props.OnLayoutChange,
+							OnGraphSelect:      props.OnGraphSelect,
+							OnNavigatePath:     props.OnNavigatePath,
+							OnPauseRequested:   props.OnPauseRequested,
+							OnStopRequested:    props.OnStopRequested,
 						}),
 					),
 					ui.CreateElement(AssuranceRail, AssuranceRailProps{
@@ -284,9 +291,35 @@ func AppShell(props AppShellProps) ui.Node {
 		ui.CreateElement(DialogHost, HostProps{}),
 		ui.CreateElement(ToastHost, HostProps{}),
 		ui.CreateElement(AccessibilityAnnouncer, AnnouncerProps{
-			Message: announcerMessage.Get(),
+			Message: candidate.Message,
 		}),
 	)
+}
+
+var railWidthStops = [...]int{224, 240, 272, 304, 336, 368, 400, 432, 464, 480}
+
+// nextRailWidth walks stable width stops instead of applying a delta that
+// clamps asymmetrically around the 240px default. A narrower/wider pair is
+// therefore reversible, while either boundary is an intentional no-op.
+func nextRailWidth(width int, direction int) int {
+	width = (state.LayoutPreferences{RailWidth: width}).Normalize().RailWidth
+	if direction < 0 {
+		for index := len(railWidthStops) - 1; index >= 0; index-- {
+			if railWidthStops[index] < width {
+				return railWidthStops[index]
+			}
+		}
+		return railWidthStops[0]
+	}
+	if direction > 0 {
+		for _, stop := range railWidthStops {
+			if stop > width {
+				return stop
+			}
+		}
+		return railWidthStops[len(railWidthStops)-1]
+	}
+	return width
 }
 
 func translatorOrEnglish(translator frontendi18n.Translator) frontendi18n.Translator {
@@ -342,27 +375,28 @@ func shellClass(tokens design.Tokens) string {
 }
 
 type ApplicationBarProps struct {
-	Session             state.SessionView
-	Workspace           state.WorkspaceView
-	View                state.TopBarView
-	CostLabel           string
-	Revision            uint64
-	Mode                primitives.Mode
-	Viewport            state.ViewportClass
-	Probe               RenderProbe
-	OnThemeChange       func()
-	OnShortcutHelp      func()
-	SearchOpen          bool
-	SearchQuery         string
-	RailOpen            bool
-	OnSearchOpen        func()
-	OnSearchDismiss     func()
-	OnSearchQueryChange func(string)
-	OnRailToggle        func()
-	OnInspectorToggle   func()
-	OnNavigatePath      func(string)
-	OnPauseRequested    func()
-	OnStopRequested     func()
+	Session              state.SessionView
+	Workspace            state.WorkspaceView
+	View                 state.TopBarView
+	CostLabel            string
+	Revision             uint64
+	Mode                 primitives.Mode
+	Viewport             state.ViewportClass
+	Probe                RenderProbe
+	OnThemeChange        func()
+	OnReconnectRequested func()
+	OnShortcutHelp       func()
+	SearchOpen           bool
+	SearchQuery          string
+	RailOpen             bool
+	OnSearchOpen         func()
+	OnSearchDismiss      func()
+	OnSearchQueryChange  func(string)
+	OnRailToggle         func()
+	OnInspectorToggle    func()
+	OnNavigatePath       func(string)
+	OnPauseRequested     func()
+	OnStopRequested      func()
 }
 
 var _ = legacyApplicationBar
@@ -463,13 +497,18 @@ func legacyApplicationBar(props ApplicationBarProps) ui.Node {
 				).String(),
 				Text: "Connection · " + humanize(connection),
 			}),
+			field("provider", props.View.Provider, tokens),
 			field("model", props.View.Model, tokens),
 			field("effort", props.View.Effort, tokens),
 			field("forecast-cost", props.View.ForecastCost, tokens),
+			field("actual-tokens", props.View.ActualTokens, tokens),
 			field("actual-cost", fallback(props.View.ActualCost, props.CostLabel), tokens),
+			field("pricing-snapshot", props.View.PricingSnapshot, tokens),
 			field("hard-budget", props.View.HardBudget, tokens),
+			field("remaining-budget", props.View.RemainingBudget, tokens),
+			field("budget-warning", props.View.BudgetWarning, tokens),
 			primitives.Button(primitives.ButtonProps{
-				Label: "Pause", AccessibleLabel: "Pause task",
+				Label: taskControlLabel(props.View.TaskState), AccessibleLabel: taskControlLabel(props.View.TaskState) + " task",
 				Disabled: !props.View.CanPause || props.OnPauseRequested == nil, Mode: props.Mode,
 				OnClick: props.OnPauseRequested,
 			}),
@@ -495,14 +534,19 @@ func field(name, value string, tokens design.Tokens) ui.Node {
 		label = humanize(value)
 	} else {
 		label = map[string]string{
-			"branch":        "Branch pending",
-			"worktree":      "Worktree pending",
-			"task-state":    "Task · Draft",
-			"model":         "Model pending",
-			"effort":        "Effort pending",
-			"forecast-cost": "Forecast pending",
-			"actual-cost":   "Cost pending",
-			"hard-budget":   "Budget pending",
+			"branch":           "Branch pending",
+			"worktree":         "Worktree pending",
+			"task-state":       "Task · Draft",
+			"provider":         "Provider pending",
+			"model":            "Model pending",
+			"effort":           "Effort pending",
+			"forecast-cost":    "Forecast pending",
+			"actual-tokens":    "Usage pending",
+			"actual-cost":      "Cost pending",
+			"pricing-snapshot": "Pricing snapshot pending",
+			"hard-budget":      "Budget pending",
+			"remaining-budget": "Remaining budget pending",
+			"budget-warning":   "Budget threshold pending",
 		}[name]
 		if label == "" {
 			label = "Pending"
@@ -524,18 +568,29 @@ func field(name, value string, tokens design.Tokens) ui.Node {
 	})
 }
 
+func taskControlLabel(taskState string) string {
+	if strings.EqualFold(strings.TrimSpace(taskState), "paused") {
+		return "Resume"
+	}
+	return "Pause"
+}
+
 type RouteShellProps struct {
-	Snapshot         state.Snapshot
-	Composer         frontendcomposer.Props
-	Timeline         TimelineControlProps
-	Route            routes.Route
-	Tokens           design.Tokens
-	Probe            RenderProbe
-	OnLayoutChange   func(state.LayoutPreferences)
-	OnGraphSelect    func(string)
-	OnNavigatePath   func(string)
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Snapshot           state.Snapshot
+	Composer           frontendcomposer.Props
+	Timeline           TimelineControlProps
+	TaskControls       *taskcontrols.Props
+	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	GraphInspector     ui.Node
+	Telemetry          telemetryview.Props
+	Route              routes.Route
+	Tokens             design.Tokens
+	Probe              RenderProbe
+	OnLayoutChange     func(state.LayoutPreferences)
+	OnGraphSelect      func(string)
+	OnNavigatePath     func(string)
+	OnPauseRequested   func()
+	OnStopRequested    func()
 }
 
 func RouteShell(props RouteShellProps) ui.Node {
@@ -548,34 +603,44 @@ func RouteShell(props RouteShellProps) ui.Node {
 	case routes.ThreadWorkspace:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
-			Composer:         props.Composer,
-			Timeline:         props.Timeline,
-			OnLayoutChange:   props.OnLayoutChange,
-			OnGraphSelect:    props.OnGraphSelect,
-			OnNavigatePath:   props.OnNavigatePath,
-			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			Composer:           props.Composer,
+			Timeline:           props.Timeline,
+			TaskControls:       props.TaskControls,
+			AuthoritativeGraph: props.AuthoritativeGraph,
+			GraphInspector:     props.GraphInspector,
+			OnLayoutChange:     props.OnLayoutChange,
+			OnGraphSelect:      props.OnGraphSelect,
+			OnNavigatePath:     props.OnNavigatePath,
+			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 		})
 	case routes.Graphs:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
-			Composer:         props.Composer,
-			Timeline:         props.Timeline,
-			OnLayoutChange:   props.OnLayoutChange,
-			OnGraphSelect:    props.OnGraphSelect,
-			OnNavigatePath:   props.OnNavigatePath,
-			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			Composer:           props.Composer,
+			Timeline:           props.Timeline,
+			TaskControls:       props.TaskControls,
+			AuthoritativeGraph: props.AuthoritativeGraph,
+			GraphInspector:     props.GraphInspector,
+			OnLayoutChange:     props.OnLayoutChange,
+			OnGraphSelect:      props.OnGraphSelect,
+			OnNavigatePath:     props.OnNavigatePath,
+			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 		})
 	case routes.Memory:
 		return ui.CreateElement(MemoryShell, SimpleRouteProps{
 			Title: "Memory", State: props.Snapshot.Memory.State, Mode: mode,
 		})
 	case routes.Settings:
-		return ui.CreateElement(SettingsShell, SimpleRouteProps{
-			Title: "Settings", State: props.Snapshot.Settings.State, Mode: mode,
+		return ui.CreateElement(SettingsInteractiveShell, SettingsProps{
+			SimpleRouteProps: SimpleRouteProps{Title: "Settings", State: props.Snapshot.Settings.State, Mode: mode},
+			Telemetry:        props.Telemetry,
 		})
 	case routes.Diagnostics:
-		return ui.CreateElement(DiagnosticsShell, SimpleRouteProps{
-			Title: "Diagnostics", State: props.Snapshot.Diagnostics.State, Mode: mode,
+		return ui.CreateElement(DiagnosticsInteractiveShell, DiagnosticsProps{
+			SimpleRouteProps: SimpleRouteProps{
+				Title: "Diagnostics", State: props.Snapshot.Diagnostics.State, Mode: mode,
+			},
+			Diagnostics: props.Snapshot.Diagnostics,
 		})
 	case routes.FirstRun:
 		return ui.CreateElement(FirstRunInteractiveShell, FirstRunProps{
@@ -590,16 +655,19 @@ func RouteShell(props RouteShellProps) ui.Node {
 }
 
 type TaskWorkspaceProps struct {
-	Snapshot         state.Snapshot
-	Composer         frontendcomposer.Props
-	Timeline         TimelineControlProps
-	Tokens           design.Tokens
-	Probe            RenderProbe
-	OnLayoutChange   func(state.LayoutPreferences)
-	OnGraphSelect    func(string)
-	OnNavigatePath   func(string)
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Snapshot           state.Snapshot
+	Composer           frontendcomposer.Props
+	Timeline           TimelineControlProps
+	TaskControls       *taskcontrols.Props
+	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	GraphInspector     ui.Node
+	Tokens             design.Tokens
+	Probe              RenderProbe
+	OnLayoutChange     func(state.LayoutPreferences)
+	OnGraphSelect      func(string)
+	OnNavigatePath     func(string)
+	OnPauseRequested   func()
+	OnStopRequested    func()
 }
 
 func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
@@ -637,7 +705,8 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 		State: props.Snapshot.GraphState, Nodes: props.Snapshot.GraphNodes(),
 		SelectedID: props.Snapshot.SelectedGraphID, Revision: props.Snapshot.GraphRevision(),
 		Collapsed: layout.GraphCollapsed, Viewport: layout.Viewport, Mode: mode, Probe: props.Probe,
-		OnSelect: props.OnGraphSelect,
+		OnSelect:      props.OnGraphSelect,
+		Authoritative: props.AuthoritativeGraph, Inspector: props.GraphInspector,
 	})
 	split := primitives.ResizableSplit(primitives.ResizableSplitProps{
 		ID: "workspace-split", AccessibleLabel: "Resize conversation and task graph",
@@ -661,6 +730,25 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 	workspace := responsiveWorkspace(
 		layout, rail, conversation, graph, split, mode, props.OnLayoutChange,
 	)
+	headerChildren := []ui.Node{ui.CreateElement(TaskWorkspaceHeader, TaskWorkspaceHeaderProps{
+		Snapshot: props.Snapshot, Mode: mode,
+		TaskActionsOpen: taskActionsOpen.Get(),
+		OnTaskActionsOpen: func() {
+			taskActionsOpen.Set(true)
+		},
+		OnTaskActionsDismiss: func() {
+			taskActionsOpen.Set(false)
+		},
+		OnNavigatePath:    props.OnNavigatePath,
+		OnPauseRequested:  props.OnPauseRequested,
+		OnStopRequested:   props.OnStopRequested,
+		OnReviewRequested: props.Timeline.OnOpenReview,
+	})}
+	if props.TaskControls != nil {
+		controlProps := *props.TaskControls
+		controlProps.Mode = mode
+		headerChildren = append(headerChildren, ui.CreateElement(taskcontrols.TaskControlDisclosure, controlProps))
+	}
 	return html.Div(html.Props{
 		Data: map[string]string{
 			"component":       "task-workspace-shell",
@@ -686,19 +774,10 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 			css.Bg(css.Hex(string(props.Tokens.Colors.Canvas))),
 		).String(),
 	},
-		ui.CreateElement(TaskWorkspaceHeader, TaskWorkspaceHeaderProps{
-			Snapshot: props.Snapshot, Mode: mode,
-			TaskActionsOpen: taskActionsOpen.Get(),
-			OnTaskActionsOpen: func() {
-				taskActionsOpen.Set(true)
-			},
-			OnTaskActionsDismiss: func() {
-				taskActionsOpen.Set(false)
-			},
-			OnNavigatePath:   props.OnNavigatePath,
-			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
-			OnReviewRequested: props.Timeline.OnOpenReview,
-		}),
+		html.Div(html.Props{
+			Data:  map[string]string{"component": "task-observability-region"},
+			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(props.Tokens.Spacing.SM))).String(),
+		}, headerChildren...),
 		workspace,
 	)
 }
@@ -712,9 +791,18 @@ func composerPropsForConnection(
 	}
 	composerProps.MutationDisabled = true
 	if composerProps.MutationDisabledReason == "" {
-		if connection == state.ConnectionOffline {
-			composerProps.MutationDisabledReason = "Local Offline: reconnect to send this draft"
-		} else {
+		switch connection {
+		case state.ConnectionDisconnected:
+			composerProps.MutationDisabledReason = "Local Disconnected: reconnect to send this draft"
+		case state.ConnectionUnauthorized:
+			composerProps.MutationDisabledReason = "Local Unauthorized: authenticate again to send this draft"
+		case state.ConnectionIncompatible:
+			composerProps.MutationDisabledReason = "Local Incompatible: update the client or coordinator to send"
+		case state.ConnectionReplaying:
+			composerProps.MutationDisabledReason = "Replaying durable updates before mutations resume"
+		case state.ConnectionDegraded:
+			composerProps.MutationDisabledReason = "Connection certainty is degraded; this draft is preserved"
+		default:
 			composerProps.MutationDisabledReason = "Live session connection is unavailable"
 		}
 	}
@@ -1032,6 +1120,14 @@ type ConversationPaneProps struct {
 
 func ConversationPane(props ConversationPaneProps) ui.Node {
 	recordRender(props.Probe, "conversation-pane", props.Revision)
+	focus := ui.UseFocusManager()
+	selectedStableKey := strings.TrimSpace(props.Timeline.SelectedStableKey)
+	ui.UseEffectOf(func() func() {
+		if selectedStableKey != "" {
+			focus.FocusByID(timelineview.CardFocusTargetID(selectedStableKey))
+		}
+		return nil
+	}, selectedStableKey)
 	tokens := props.Mode.Tokens()
 	timelineProps := props.Timeline
 	timelineProps.Mode = props.Mode
@@ -1053,9 +1149,17 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 		for _, card := range cards {
 			items = append(items, ui.CreateElement(timelineview.Renderer, timelineview.Props{
 				Card: card, Mode: props.Mode, Actions: actions,
+				Selected: selectedStableKey != "" && card.StableKey == selectedStableKey,
 			}))
 		}
-		timelineChildren := make([]ui.Node, 0, 2)
+		timelineChildren := make([]ui.Node, 0, 3)
+		if strings.TrimSpace(props.Timeline.SelectionNotice) != "" {
+			timelineChildren = append(timelineChildren, html.Div(html.Props{
+				Role: "status", Aria: map[string]string{"live": "polite"},
+				Data: map[string]string{"component": "timeline-selection-notice"},
+				Text: props.Timeline.SelectionNotice,
+			}))
+		}
 		if !props.Timeline.HasOlder {
 			timelineChildren = append(timelineChildren, html.Div(html.Props{
 				Role: "status", Aria: map[string]string{"live": "off"},
@@ -1168,15 +1272,17 @@ func composerPropsForConversation(props ConversationPaneProps) frontendcomposer.
 }
 
 type GraphPaneProps struct {
-	State      state.DataState
-	Nodes      []state.GraphNodeView
-	SelectedID string
-	Revision   uint64
-	Collapsed  bool
-	Viewport   state.ViewportClass
-	Mode       primitives.Mode
-	Probe      RenderProbe
-	OnSelect   func(string)
+	State         state.DataState
+	Nodes         []state.GraphNodeView
+	SelectedID    string
+	Revision      uint64
+	Collapsed     bool
+	Viewport      state.ViewportClass
+	Mode          primitives.Mode
+	Probe         RenderProbe
+	OnSelect      func(string)
+	Authoritative *graphcanvas.AuthoritativeProps
+	Inspector     ui.Node
 }
 
 var _ = legacyGraphPane
@@ -1394,38 +1500,105 @@ func MemoryShell(props SimpleRouteProps) ui.Node {
 }
 
 func SettingsShell(props SimpleRouteProps) ui.Node {
+	return SettingsInteractiveShell(SettingsProps{SimpleRouteProps: props})
+}
+
+type SettingsProps struct {
+	SimpleRouteProps
+	Telemetry telemetryview.Props
+}
+
+func SettingsInteractiveShell(props SettingsProps) ui.Node {
+	telemetry := props.Telemetry
+	telemetry.Mode = props.Mode
 	return routeMain("settings-shell", props.Title, props.Mode,
 		routeRegion(props.Mode, "providers", "Providers",
-			routeStateContent(props, "providers", html.P(html.Props{Text: "Provider connections and capabilities."}))),
+			routeStateContent(props.SimpleRouteProps, "providers", html.P(html.Props{Text: "Provider connections and capabilities."}))),
 		routeRegion(props.Mode, "models", "Models",
-			routeStateContent(props, "models", html.P(html.Props{Text: "Model and effort defaults."}))),
+			routeStateContent(props.SimpleRouteProps, "models", html.P(html.Props{Text: "Model and effort defaults."}))),
 		routeRegion(props.Mode, "policy", "Policy",
-			routeStateContent(props, "policy", html.P(html.Props{Text: "Approval, budget, and execution policy."}))),
+			routeStateContent(props.SimpleRouteProps, "policy", html.P(html.Props{Text: "Approval, budget, and execution policy."}))),
 		routeRegion(props.Mode, "appearance", "Appearance",
-			routeStateContent(props, "appearance preferences", html.P(html.Props{Text: "Theme, density, and motion preferences."}))),
+			routeStateContent(props.SimpleRouteProps, "appearance preferences", html.P(html.Props{Text: "Theme, density, and motion preferences."}))),
 		routeRegion(props.Mode, "data", "Data",
-			routeStateContent(props, "data controls", html.P(html.Props{Text: "Backup, retention, and local data controls."}))),
+			routeStateContent(props.SimpleRouteProps, "data controls", html.P(html.Props{Text: "Backup, retention, and local data controls."}))),
+		routeRegion(props.Mode, "telemetry", "Local telemetry",
+			routeStateContent(props.SimpleRouteProps, "local telemetry", ui.CreateElement(telemetryview.Component, telemetry))),
 	)
 }
 
 func DiagnosticsShell(props SimpleRouteProps) ui.Node {
+	return DiagnosticsInteractiveShell(DiagnosticsProps{SimpleRouteProps: props})
+}
+
+type DiagnosticsProps struct {
+	SimpleRouteProps
+	Diagnostics state.DiagnosticsView
+}
+
+func DiagnosticsInteractiveShell(props DiagnosticsProps) ui.Node {
 	return routeMain("diagnostics-shell", props.Title, props.Mode,
 		routeRegion(props.Mode, "health", "Health",
-			routeStateContent(props, "health", html.P(html.Props{Text: "Coordinator and database health."}))),
+			routeStateContent(props.SimpleRouteProps, "health", html.P(html.Props{Text: "Coordinator and database health."}))),
+		routeRegion(props.Mode, "durable-session-sequence", "Durable session sequence",
+			routeStateContent(props.SimpleRouteProps, "durable session sequence", DiagnosticsSequenceView(props.Diagnostics))),
 		routeRegion(props.Mode, "versions", "Versions",
-			routeStateContent(props, "versions", html.P(html.Props{Text: "Application, API, schema, and frontend versions."}))),
+			routeStateContent(props.SimpleRouteProps, "versions", html.P(html.Props{Text: "Application, API, schema, and frontend versions."}))),
 		routeRegion(props.Mode, "tasks", "Tasks",
-			routeStateContent(props, "tasks", html.P(html.Props{Text: "Active Task and Attempt summaries."}))),
+			routeStateContent(props.SimpleRouteProps, "tasks", html.P(html.Props{Text: "Active Task and Attempt summaries."}))),
 		routeRegion(props.Mode, "logs", "Logs",
-			routeStateContent(props, "logs", html.P(html.Props{Text: "Redacted local diagnostic logs."}))),
+			routeStateContent(props.SimpleRouteProps, "logs", html.P(html.Props{Text: "Redacted local diagnostic logs."}))),
 		routeRegion(props.Mode, "backup", "Backup",
-			routeStateContent(props, "backup status", html.P(html.Props{Text: "Local backup status and recovery guidance."}))),
+			routeStateContent(props.SimpleRouteProps, "backup status", html.P(html.Props{Text: "Local backup status and recovery guidance."}))),
 		routeRegion(props.Mode, "export", "Export",
-			routeStateContent(props, "exports", html.P(html.Props{Text: "Create a redacted support export."}))),
+			routeStateContent(props.SimpleRouteProps, "exports", html.P(html.Props{Text: "Create a redacted support export."}))),
 		routeRegion(props.Mode, "terminology", "Terminology",
-			routeStateContent(props, "terminology",
+			routeStateContent(props.SimpleRouteProps, "terminology",
 				html.P(html.Props{Text: "A Thread contains conversation. A Task is durable work. An Attempt is one execution. A Plan revision changes the approach. An Approval authorizes a gated action. A Checkpoint is restorable state. Recovery resumes safely."}),
 			),
+		),
+	)
+}
+
+// DiagnosticsSequenceView renders the content-free mounted session cursor used
+// by the diagnostics route and deterministic browser evidence.
+func DiagnosticsSequenceView(view state.DiagnosticsView) ui.Node {
+	sequence := "Unknown"
+	detail := "No mounted session projection is available."
+	if view.LastAppliedSequenceKnown {
+		sequence = strconv.FormatUint(view.LastAppliedSequence, 10)
+		detail = "This is the last durable session event applied successfully by the browser."
+		if view.LastAppliedSequence == 0 {
+			detail = "The authoritative snapshot cursor is zero; no later durable session event has been applied."
+		}
+	}
+	stream := "No replay, live delivery, or gap repair is active."
+	switch {
+	case view.SessionGapRepairRequired:
+		stream = "Gap repair required; the displayed sequence remains the last successfully applied cursor."
+	case view.SessionLive:
+		stream = "Live delivery is active."
+	case view.SessionReplayActive:
+		stream = "Replay is in progress."
+	}
+	return html.Section(html.Props{
+		Aria: map[string]string{"label": "Durable session sequence status"},
+		Data: map[string]string{
+			"component":           "durable-session-sequence",
+			"sequence":            sequence,
+			"sequence-known":      strconv.FormatBool(view.LastAppliedSequenceKnown),
+			"replay-active":       strconv.FormatBool(view.SessionReplayActive),
+			"live":                strconv.FormatBool(view.SessionLive),
+			"gap-repair-required": strconv.FormatBool(view.SessionGapRepairRequired),
+		},
+	},
+		html.Tag("dl", html.Props{},
+			html.Tag("dt", html.Props{Text: "Last successfully applied sequence"}),
+			html.Tag("dd", html.Props{Text: sequence}),
+			html.Tag("dt", html.Props{Text: "Meaning"}),
+			html.Tag("dd", html.Props{Text: detail}),
+			html.Tag("dt", html.Props{Text: "Session delivery"}),
+			html.Tag("dd", html.Props{Text: stream}),
 		),
 	)
 }
@@ -1726,13 +1899,25 @@ func announcementCandidate(snapshot state.Snapshot) state.Announcement {
 		return state.Announcement{
 			Kind: state.AnnouncementConnection, Message: "Connection restored",
 		}
-	case state.ConnectionRecovering:
+	case state.ConnectionReplaying:
+		return state.Announcement{
+			Kind: state.AnnouncementRecovery, Message: "Committed updates are replaying",
+		}
+	case state.ConnectionDegraded:
 		return state.Announcement{
 			Kind: state.AnnouncementRecovery, Message: "Live updates are reconnecting",
 		}
-	case state.ConnectionOffline:
+	case state.ConnectionDisconnected:
 		return state.Announcement{
-			Kind: state.AnnouncementConnection, Message: "CodeFlux is offline",
+			Kind: state.AnnouncementConnection, Message: "CodeFlux is disconnected",
+		}
+	case state.ConnectionIncompatible:
+		return state.Announcement{
+			Kind: state.AnnouncementConnection, Message: "Client and coordinator are incompatible",
+		}
+	case state.ConnectionUnauthorized:
+		return state.Announcement{
+			Kind: state.AnnouncementConnection, Message: "Local session is unauthorized",
 		}
 	default:
 		return state.Announcement{}

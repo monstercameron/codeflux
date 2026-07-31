@@ -30,8 +30,13 @@ type TimelineControlProps struct {
 	Gaps                     []timeline.SequenceGap
 	NewEvents                int
 	ReviewOpen               bool
+	ReviewFile               string
+	SelectedStableKey        string
+	SelectionNotice          string
 	ReturnToCurrentAvailable bool
 	Latency                  timelinecard.LatencyPresentation
+	ReviewBindings           ReviewBindingView
+	ReviewDecisions          ReviewDecisionProps
 	OnLoadOlder              func()
 	OnRetryOlder             func()
 	OnReturnLive             func()
@@ -39,6 +44,27 @@ type TimelineControlProps struct {
 	OnCloseReview            func()
 	OnReturnToCurrent        func()
 	OnStop                   func()
+}
+
+// ReviewBindingView identifies the exact authoritative revisions presented in
+// the drawer. Zero remains honestly unknown rather than an invented revision.
+type ReviewBindingView struct {
+	Task       uint64
+	Diff       uint64
+	Plan       uint64
+	Validation uint64
+	Evidence   uint64
+}
+
+type ReviewDecisionProps struct {
+	Accept     timelineview.ActionCommandState
+	Repair     timelineview.ActionCommandState
+	Reject     timelineview.ActionCommandState
+	Rollback   timelineview.ActionCommandState
+	OnAccept   func()
+	OnRepair   func()
+	OnReject   func()
+	OnRollback func()
 }
 
 // TimelineControls keeps correctness-bearing navigation inline with the
@@ -115,6 +141,10 @@ func TimelineControls(props TimelineControlProps) ui.Node {
 				focus.FocusByID("task-actions-trigger")
 			}
 		}
+		reviewDescription := "Thread anchor and graph position are preserved while review is open."
+		if strings.TrimSpace(props.ReviewFile) != "" {
+			reviewDescription = "Reviewing workspace-relative recovery file " + props.ReviewFile + ". Thread anchor and graph position are preserved."
+		}
 		children = append(children, primitives.Drawer(primitives.OverlayProps{
 			ID: "task-review-drawer", Open: true,
 			LabelledBy:           "task-review-title",
@@ -126,15 +156,18 @@ func TimelineControls(props TimelineControlProps) ui.Node {
 			Content: html.Aside(html.Props{
 				Aria: map[string]string{"label": "Task review"},
 				Data: map[string]string{
-					"component": "review-drawer",
-					"position":  "preserved",
+					"component":   "review-drawer",
+					"position":    "preserved",
+					"review-file": props.ReviewFile,
 				},
 			},
-				html.H2(html.Props{ID: "task-review-title", Text: "Review workspace"}),
+				html.H2(html.Props{ID: "task-review-title", Text: "Review file"}),
 				html.P(html.Props{
 					ID:   "task-review-description",
-					Text: "Thread anchor and graph position are preserved while review is open.",
+					Text: reviewDescription,
 				}),
+				reviewBindingSummary(props.ReviewBindings, props.Mode),
+				reviewDecisionControls(props.ReviewDecisions, props.Mode),
 				primitives.Button(primitives.ButtonProps{
 					ID: "task-review-close", Label: "Close review", Mode: props.Mode,
 					Disabled: props.OnCloseReview == nil, OnClick: dismissReview,
@@ -172,4 +205,62 @@ func TimelineControls(props TimelineControlProps) ui.Node {
 			css.PaddingY(css.Px(tokens.Spacing.XS)),
 		).String(),
 	}, children...)
+}
+
+func reviewBindingSummary(bindings ReviewBindingView, mode primitives.Mode) ui.Node {
+	knownRevision := func(value uint64) string {
+		if value == 0 {
+			return "Unknown"
+		}
+		return strconv.FormatUint(value, 10)
+	}
+	return html.Tag("dl", html.Props{
+		Aria:  map[string]string{"label": "Review revision bindings"},
+		Data:  map[string]string{"component": "review-revision-bindings"},
+		Class: css.New(u.Grid, css.Gap(css.Px(mode.Tokens().Spacing.XS))).String(),
+	},
+		html.Tag("dt", html.Props{Text: "Task revision"}), html.Tag("dd", html.Props{Text: knownRevision(bindings.Task)}),
+		html.Tag("dt", html.Props{Text: "Diff revision"}), html.Tag("dd", html.Props{Text: knownRevision(bindings.Diff)}),
+		html.Tag("dt", html.Props{Text: "Plan revision"}), html.Tag("dd", html.Props{Text: knownRevision(bindings.Plan)}),
+		html.Tag("dt", html.Props{Text: "Validation revision"}), html.Tag("dd", html.Props{Text: knownRevision(bindings.Validation)}),
+		html.Tag("dt", html.Props{Text: "Evidence revision"}), html.Tag("dd", html.Props{Text: knownRevision(bindings.Evidence)}),
+	)
+}
+
+func reviewDecisionControls(props ReviewDecisionProps, mode primitives.Mode) ui.Node {
+	return html.Div(html.Props{
+		Role: "group", Aria: map[string]string{"label": "Review decisions"},
+		Data: map[string]string{"component": "review-decision-controls"},
+	},
+		reviewDecisionButton("accept", "Accept", props.Accept, mode, props.OnAccept),
+		reviewDecisionButton("repair", "Request repair", props.Repair, mode, props.OnRepair),
+		reviewDecisionButton("reject", "Reject and preserve patch", props.Reject, mode, props.OnReject),
+		reviewDecisionButton("rollback", "Roll back", props.Rollback, mode, props.OnRollback),
+	)
+}
+
+func reviewDecisionButton(
+	id, label string,
+	command timelineview.ActionCommandState,
+	mode primitives.Mode,
+	onClick func(),
+) ui.Node {
+	reason := strings.TrimSpace(command.DisabledReason)
+	if onClick == nil && reason == "" {
+		reason = "This review command is not currently available."
+	}
+	reasonID := "review-command-" + id + "-reason"
+	children := []ui.Node{primitives.Button(primitives.ButtonProps{
+		ID: "review-command-" + id, Label: label, Busy: command.Busy,
+		Disabled:    command.Busy || reason != "" || onClick == nil,
+		DescribedBy: map[bool]string{true: reasonID}[reason != ""],
+		Mode:        mode, OnClick: onClick,
+	})}
+	if reason != "" {
+		children = append(children, html.P(html.Props{ID: reasonID, Text: reason}))
+	}
+	return html.Div(html.Props{Data: map[string]string{
+		"review-command": id, "command-key": command.IdempotencyKey,
+		"transport-mode": command.TransportMode, "disabled-reason": reason,
+	}}, children...)
 }

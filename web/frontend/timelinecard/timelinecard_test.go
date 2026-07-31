@@ -121,7 +121,7 @@ func TestEveryTypedCardModelHasAFixedFixture(t *testing.T) {
 		{Kind: KindRecovery, StableKey: "sequence:13", Recovery: &Recovery{Reason: "ambiguous state"}},
 		{Kind: KindError, StableKey: "sequence:14", Error: &Error{Code: "conflict", Message: "state changed"}},
 		{Kind: KindCompletion, StableKey: "sequence:15", Completion: &Completion{Status: CompletionValidated}},
-		{Kind: KindTaskState, StableKey: "sequence:16", TaskState: &TaskState{From: "running", To: "validating"}},
+		{Kind: KindTaskState, StableKey: "sequence:16", TaskState: &TaskTransition{From: "running", To: "validating"}},
 		{Kind: KindUsage, StableKey: "sequence:17", Usage: &Usage{}},
 		{Kind: KindGraphChange, StableKey: "sequence:18", GraphChange: &GraphChange{RevisionID: "graph-1"}},
 		{Kind: KindUnknown, StableKey: "sequence:19", Unknown: &Unknown{EventKind: "future", Sequence: 19}},

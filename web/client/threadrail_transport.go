@@ -149,6 +149,70 @@ func threadRailSessionTarget(state threadrail.State, threadID domain.ThreadID) (
 	return domain.SessionID{}, errThreadRailSessionUnavailable
 }
 
+// mountedThreadRailRow resolves only durable server-issued rows. Pending
+// optimistic rows cannot be used to restore a selected session.
+func mountedThreadRailRow(state threadrail.State, threadID domain.ThreadID) (threadrail.Row, bool) {
+	for _, row := range state.AllRows() {
+		if !row.Pending() && row.ThreadID() == threadID {
+			return row, true
+		}
+	}
+	return threadrail.Row{}, false
+}
+
+// notifyMountedThreadSelection re-emits the authoritative selected thread
+// after a temporary interaction surface closes. The session identity check
+// prevents a stale or synthetic row from replacing the live parent selection.
+func notifyMountedThreadSelection(
+	state threadrail.State,
+	threadID domain.ThreadID,
+	notify func(threadrail.Thread),
+) bool {
+	if notify == nil || threadID.IsZero() {
+		return false
+	}
+	row, ok := mountedThreadRailRow(state, threadID)
+	if !ok {
+		return false
+	}
+	sessionID, err := threadRailSessionTarget(state, threadID)
+	if err != nil || sessionID != row.Thread().SessionID() {
+		return false
+	}
+	notify(row.Thread())
+	return true
+}
+
+// cancelMountedThreadRename closes the temporary editor only after restoring
+// its durable selection, then invokes the caller-provided GWC focus return.
+func cancelMountedThreadRename(
+	state threadrail.State,
+	threadID domain.ThreadID,
+	notify func(threadrail.Thread),
+	closeEditor func(),
+	returnFocus func(),
+) bool {
+	restored := notifyMountedThreadSelection(state, threadID, notify)
+	if closeEditor != nil {
+		closeEditor()
+	}
+	if returnFocus != nil {
+		returnFocus()
+	}
+	return restored
+}
+
+// cancelMountedThreadArchive closes the confirmation without issuing an
+// archive mutation and returns focus to the invoking archive button.
+func cancelMountedThreadArchive(closeConfirmation func(), returnFocus func()) {
+	if closeConfirmation != nil {
+		closeConfirmation()
+	}
+	if returnFocus != nil {
+		returnFocus()
+	}
+}
+
 //lint:ignore U1000 Used by the js/wasm mounted rail; native tests exercise the injectable generator below.
 func newThreadRailCommandKey(operation string) (threadrail.CommandKey, error) {
 	return generateThreadRailCommandKey(rand.Reader, operation)

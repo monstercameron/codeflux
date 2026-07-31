@@ -44,9 +44,10 @@ type TaskControlSnapshot struct {
 type TaskControlReplayOperation string
 
 const (
-	TaskControlReplayPause  TaskControlReplayOperation = "pause"
-	TaskControlReplayResume TaskControlReplayOperation = "resume"
-	TaskControlReplayCancel TaskControlReplayOperation = "cancel"
+	TaskControlReplayPause              TaskControlReplayOperation = "pause"
+	TaskControlReplayResume             TaskControlReplayOperation = "resume"
+	TaskControlReplayCancel             TaskControlReplayOperation = "cancel"
+	TaskControlReplaySafeResumeRecovery TaskControlReplayOperation = "safe-resume-recovery"
 )
 
 // TaskControlReplayRequest is the canonical transport request identity used
@@ -62,9 +63,11 @@ type TaskControlReplayRequest struct {
 // TaskControlReplay is a durable completed RPC result. Blocked is set for a
 // resume that was durably classified as requiring reconciliation.
 type TaskControlReplay struct {
-	Found   bool
-	Blocked bool
-	Control TaskControlSnapshot
+	Found        bool
+	Blocked      bool
+	Control      TaskControlSnapshot
+	AssessmentID string
+	CheckpointID *domain.CheckpointID
 }
 
 // RequestTaskPause durably closes the new-action gate before in-flight work is
@@ -119,6 +122,41 @@ type ResumeControlledTask struct {
 	IdempotencyKey       string
 }
 
+// AuthorizeSafeResumeRecovery atomically binds a user recovery decision and
+// started attempt to the exact safe-resume assessment, transitions recovery
+// state to a paused execution boundary, and appends its durable event.
+type AuthorizeSafeResumeRecovery struct {
+	EventID              domain.EventID
+	TaskID               domain.TaskID
+	RunID                domain.RunID
+	ExpectedTaskRevision uint64
+	ExpectedRunRevision  uint64
+	AssessmentID         string
+	CheckpointID         domain.CheckpointID
+	ReasonRedacted       string
+	IdempotencyKey       string
+	Decision             RecordRecoveryDecision
+	Started              RecordRecoveryAttempt
+}
+
+// CommitRecoveryReconciliation atomically records the successful terminal
+// recovery attempt, transitions the exact recovery-required task/run to a
+// paused boundary, and appends the revision-bound recovery event.
+type CommitRecoveryReconciliation struct {
+	EventID                domain.EventID
+	TaskID                 domain.TaskID
+	RunID                  domain.RunID
+	ExpectedTaskRevision   uint64
+	ExpectedRunRevision    uint64
+	AssessmentID           string
+	PreviousCheckpointID   domain.CheckpointID
+	ReconciledCheckpointID domain.CheckpointID
+	ReasonRedacted         string
+	IdempotencyKey         string
+	TerminalAttemptID      string
+	TerminalIdempotencyKey string
+}
+
 // RecordTaskResumeBlocked persists why direct resume requires reconciliation
 // or a new plan revision while leaving the paused state unchanged.
 type RecordTaskResumeBlocked struct {
@@ -153,6 +191,7 @@ type TaskControlOperations interface {
 	CompleteTaskPause(context.Context, CompleteTaskPause) (TaskControlSnapshot, error)
 	CancelControlledTask(context.Context, CancelControlledTask) (TaskControlSnapshot, error)
 	ResumeControlledTask(context.Context, ResumeControlledTask) (TaskControlSnapshot, error)
+	AuthorizeSafeResumeRecovery(context.Context, AuthorizeSafeResumeRecovery) (TaskControlSnapshot, error)
 	RecordTaskResumeBlocked(context.Context, RecordTaskResumeBlocked) (TaskEvent, error)
 	MarkTaskControlRecoveryRequired(context.Context, MarkTaskControlRecoveryRequired) (TaskControlSnapshot, error)
 	ReadTaskControlReplay(context.Context, TaskControlReplayRequest) (TaskControlReplay, error)
@@ -178,6 +217,8 @@ func (repositories *Repositories) ReadTaskControlReplay(
 			"task.pause-requested"
 	case TaskControlReplayResume:
 		return repositories.readResumeControlReplay(ctx, input)
+	case TaskControlReplaySafeResumeRecovery:
+		return repositories.readSafeResumeRecoveryReplay(ctx, input)
 	case TaskControlReplayCancel:
 		key, eventType = input.IdempotencyKey, "task.cancelled"
 	default:
@@ -215,6 +256,64 @@ func (repositories *Repositories) ReadTaskControlReplay(
 		return TaskControlReplay{}, err
 	}
 	return TaskControlReplay{Found: true, Control: current}, nil
+}
+
+func (repositories *Repositories) readSafeResumeRecoveryReplay(
+	ctx context.Context,
+	input TaskControlReplayRequest,
+) (TaskControlReplay, error) {
+	payload, found, err := repositories.readControlReplayEvent(
+		ctx, input.TaskID, input.IdempotencyKey+"/authorized",
+		"task.recovery-safe-resume-authorized",
+	)
+	if err != nil || !found {
+		return TaskControlReplay{}, err
+	}
+	var value struct {
+		TaskRevision   uint64              `json:"task_revision"`
+		ReasonRedacted string              `json:"reason_redacted"`
+		AssessmentID   string              `json:"assessment_id"`
+		CheckpointID   domain.CheckpointID `json:"checkpoint_id"`
+	}
+	if err := json.Unmarshal([]byte(payload), &value); err != nil ||
+		value.TaskRevision != input.ExpectedTaskRevision ||
+		value.ReasonRedacted != input.ReasonRedacted ||
+		value.AssessmentID == "" || value.CheckpointID.IsZero() {
+		return TaskControlReplay{}, typedError(
+			ErrConflict, "read safe recovery resume replay",
+			errors.New("safe recovery resume idempotency key was reused"),
+		)
+	}
+	attempt, terminalFound, err := findRecoveryAttemptByIdempotency(
+		ctx, repositories.database.sql, input.TaskID,
+		input.IdempotencyKey+"/terminal",
+	)
+	if err != nil {
+		return TaskControlReplay{}, err
+	}
+	if !terminalFound {
+		return TaskControlReplay{}, typedError(
+			ErrConflict, "read safe recovery resume replay",
+			errors.New("safe recovery resume outcome is not yet durable"),
+		)
+	}
+	if attempt.Outcome != RecoveryAttemptSucceeded ||
+		attempt.AssessmentID != value.AssessmentID ||
+		attempt.CheckpointID == nil || *attempt.CheckpointID != value.CheckpointID {
+		return TaskControlReplay{}, typedError(
+			ErrConflict, "read safe recovery resume replay",
+			errors.New("safe recovery resume previously did not succeed"),
+		)
+	}
+	current, err := repositories.ReadTaskControl(ctx, input.TaskID)
+	if err != nil {
+		return TaskControlReplay{}, err
+	}
+	checkpointID := value.CheckpointID
+	return TaskControlReplay{
+		Found: true, Control: current, AssessmentID: value.AssessmentID,
+		CheckpointID: &checkpointID,
+	}, nil
 }
 
 func (repositories *Repositories) readResumeControlReplay(
@@ -585,6 +684,263 @@ func (repositories *Repositories) ResumeControlledTask(
 			},
 		},
 	)
+}
+
+// CommitRecoveryReconciliation never reports success unless the new
+// checkpoint, terminal attempt, state transition, and ordered task event all
+// commit in the same SQLite transaction.
+func (repositories *Repositories) CommitRecoveryReconciliation(
+	ctx context.Context,
+	input CommitRecoveryReconciliation,
+) (TaskControlSnapshot, error) {
+	if input.EventID.IsZero() || input.TaskID.IsZero() || input.RunID.IsZero() ||
+		input.PreviousCheckpointID.IsZero() || input.ReconciledCheckpointID.IsZero() {
+		return TaskControlSnapshot{}, errors.New("recovery reconciliation identities are required")
+	}
+	for label, value := range map[string]string{
+		"recovery reconciliation assessment":       input.AssessmentID,
+		"recovery reconciliation reason":           input.ReasonRedacted,
+		"recovery reconciliation idempotency key":  input.IdempotencyKey,
+		"recovery reconciliation terminal attempt": input.TerminalAttemptID,
+		"recovery reconciliation terminal key":     input.TerminalIdempotencyKey,
+	} {
+		if err := validateControlText(label, value, 2048); err != nil {
+			return TaskControlSnapshot{}, err
+		}
+	}
+	previous := input.PreviousCheckpointID
+	terminal := RecordRecoveryAttempt{
+		ID: input.TerminalAttemptID, AssessmentID: input.AssessmentID,
+		TaskID: input.TaskID, RunID: input.RunID, CheckpointID: &previous,
+		Action: RecoveryActionReconcile, Outcome: RecoveryAttemptSucceeded,
+		ReasonRedacted: input.ReasonRedacted,
+		IdempotencyKey: input.TerminalIdempotencyKey,
+	}
+	if err := validateRecordRecoveryAttempt(terminal); err != nil {
+		return TaskControlSnapshot{}, err
+	}
+	payload := mustControlJSON(map[string]any{
+		"assessment_id":            input.AssessmentID,
+		"previous_checkpoint_id":   input.PreviousCheckpointID,
+		"reconciled_checkpoint_id": input.ReconciledCheckpointID,
+		"reason_redacted":          input.ReasonRedacted,
+		"task_revision":            input.ExpectedTaskRevision,
+		"run_revision":             input.ExpectedRunRevision,
+	})
+	return repositories.mutateTaskControl(ctx, controlMutation{
+		eventID: input.EventID, taskID: input.TaskID, runID: input.RunID,
+		expectedTaskRevision: input.ExpectedTaskRevision,
+		expectedRunRevision:  input.ExpectedRunRevision,
+		eventType:            "task.recovery-reconciled", payloadJSON: payload,
+		idempotencyKey: input.IdempotencyKey,
+		apply: func(
+			ctx context.Context,
+			transaction *Transaction,
+			current TaskControlSnapshot,
+			micros int64,
+		) error {
+			if current.TaskState != domain.TaskStateRecoveryRequired ||
+				current.RunState != domain.RunStateRecoveryRequired {
+				return typedError(
+					ErrStaleRevision, "commit recovery reconciliation",
+					errors.New("task and run are not recovery-required"),
+				)
+			}
+			if err := verifyRecoveryCheckpointBinding(
+				ctx, transaction.sql, input.TaskID, input.RunID,
+				&input.ReconciledCheckpointID,
+			); err != nil {
+				return err
+			}
+			if err := verifyRecoveryAssessmentBinding(
+				ctx, transaction.sql, input.AssessmentID, input.TaskID,
+				input.RunID, &previous,
+			); err != nil {
+				return err
+			}
+			var decisionCount int
+			if err := transaction.sql.QueryRowContext(
+				ctx,
+				`SELECT count(*) FROM checkpoint_recovery_decisions
+				 WHERE assessment_id = ? AND task_id = ? AND run_id = ?
+				   AND checkpoint_id = ? AND actor = 'user' AND action = 'reconcile'`,
+				input.AssessmentID, input.TaskID, input.RunID,
+				input.PreviousCheckpointID,
+			).Scan(&decisionCount); err != nil {
+				return classify("verify recovery reconciliation authority", err)
+			}
+			if decisionCount != 1 {
+				return typedError(
+					ErrConstraint, "verify recovery reconciliation authority",
+					errors.New("durable reconcile decision is missing"),
+				)
+			}
+			existing, found, err := findRecoveryAttemptByIdempotency(
+				ctx, transaction.sql, input.TaskID, input.TerminalIdempotencyKey,
+			)
+			if err != nil {
+				return err
+			}
+			if found {
+				if !sameRecoveryAttempt(existing, recoveryAttemptRecord(terminal, micros)) {
+					return typedError(ErrConflict, "commit recovery reconciliation", errors.New("terminal attempt identity was reused"))
+				}
+			} else if err := insertRecoveryAttempt(ctx, transaction.sql, terminal, micros); err != nil {
+				return err
+			}
+			runResult, err := transaction.sql.ExecContext(
+				ctx,
+				`UPDATE runs SET state = 'paused', updated_at_unix_micros = ?, revision = revision + 1
+				 WHERE id = ? AND task_id = ? AND revision = ? AND state = 'recovery-required'`,
+				micros, input.RunID, input.TaskID, input.ExpectedRunRevision,
+			)
+			if err != nil {
+				return repositoryWriteError("pause reconciled run", err)
+			}
+			if err := requireControlAffected(runResult, "pause reconciled run"); err != nil {
+				return err
+			}
+			taskResult, err := transaction.sql.ExecContext(
+				ctx,
+				`UPDATE tasks SET state = 'paused', pause_reason = ?, invalidation_reason = NULL,
+				 updated_at_unix_micros = ?, revision = revision + 1
+				 WHERE id = ? AND revision = ? AND state = 'recovery-required'`,
+				domain.PauseReasonRecoveryUncertain, micros,
+				input.TaskID, input.ExpectedTaskRevision,
+			)
+			if err != nil {
+				return repositoryWriteError("pause reconciled task", err)
+			}
+			return requireControlAffected(taskResult, "pause reconciled task")
+		},
+	})
+}
+
+// AuthorizeSafeResumeRecovery commits the authority boundary before the
+// coordinator reacquires a worker. Its event is also the durable replay key
+// for a response lost after a later successful terminal attempt.
+func (repositories *Repositories) AuthorizeSafeResumeRecovery(
+	ctx context.Context,
+	input AuthorizeSafeResumeRecovery,
+) (TaskControlSnapshot, error) {
+	if input.EventID.IsZero() || input.TaskID.IsZero() || input.RunID.IsZero() ||
+		input.CheckpointID.IsZero() || input.AssessmentID == "" {
+		return TaskControlSnapshot{}, errors.New("safe recovery resume identities are required")
+	}
+	if input.Decision.Action != RecoveryActionResume ||
+		input.Started.Action != RecoveryActionResume ||
+		input.Started.Outcome != RecoveryAttemptStarted ||
+		input.Decision.AssessmentID != input.AssessmentID ||
+		input.Started.AssessmentID != input.AssessmentID ||
+		input.Decision.TaskID != input.TaskID || input.Started.TaskID != input.TaskID ||
+		input.Decision.RunID != input.RunID || input.Started.RunID != input.RunID ||
+		input.Decision.CheckpointID == nil || input.Started.CheckpointID == nil ||
+		*input.Decision.CheckpointID != input.CheckpointID ||
+		*input.Started.CheckpointID != input.CheckpointID {
+		return TaskControlSnapshot{}, errors.New("safe recovery resume authority is inconsistent")
+	}
+	if err := validateRecordRecoveryDecision(input.Decision); err != nil {
+		return TaskControlSnapshot{}, err
+	}
+	if err := validateRecordRecoveryAttempt(input.Started); err != nil {
+		return TaskControlSnapshot{}, err
+	}
+	if err := validateControlText("safe recovery resume reason", input.ReasonRedacted, 2048); err != nil {
+		return TaskControlSnapshot{}, err
+	}
+	payload := mustControlJSON(map[string]any{
+		"assessment_id":   input.AssessmentID,
+		"checkpoint_id":   input.CheckpointID,
+		"reason_redacted": input.ReasonRedacted,
+		"task_revision":   input.ExpectedTaskRevision,
+		"run_revision":    input.ExpectedRunRevision,
+	})
+	return repositories.mutateTaskControl(ctx, controlMutation{
+		eventID: input.EventID, taskID: input.TaskID, runID: input.RunID,
+		expectedTaskRevision: input.ExpectedTaskRevision,
+		expectedRunRevision:  input.ExpectedRunRevision,
+		eventType:            "task.recovery-safe-resume-authorized", payloadJSON: payload,
+		idempotencyKey: input.IdempotencyKey + "/authorized",
+		apply: func(
+			ctx context.Context,
+			transaction *Transaction,
+			current TaskControlSnapshot,
+			micros int64,
+		) error {
+			if current.TaskState != domain.TaskStateRecoveryRequired ||
+				current.RunState != domain.RunStateRecoveryRequired {
+				return typedError(ErrStaleRevision, "authorize safe recovery resume", errors.New("task and run are not recovery-required"))
+			}
+			assessment, err := scanRecoveryAssessment(transaction.sql.QueryRowContext(
+				ctx,
+				`SELECT id, task_id, run_id, checkpoint_id, classification,
+				        findings_redacted_json, divergences_redacted_json,
+				        observation_sha256, patch_available, patch_locator,
+				        patch_path, idempotency_key, created_at_unix_micros
+				 FROM checkpoint_recovery_assessments WHERE id = ?`,
+				input.AssessmentID,
+			))
+			if err != nil {
+				return err
+			}
+			if assessment.TaskID != input.TaskID || assessment.RunID != input.RunID ||
+				assessment.CheckpointID == nil || *assessment.CheckpointID != input.CheckpointID ||
+				assessment.Classification != RecoveryClassificationSafeResume {
+				return typedError(ErrConflict, "authorize safe recovery resume", errors.New("assessment is not the exact safe-resume assessment"))
+			}
+			decisionRecord := recoveryDecisionRecord(input.Decision, micros)
+			existingDecision, decisionFound, err := findRecoveryDecisionByIdempotency(
+				ctx, transaction.sql, input.TaskID, input.Decision.IdempotencyKey,
+			)
+			if err != nil {
+				return err
+			}
+			startedRecord := recoveryAttemptRecord(input.Started, micros)
+			existingStarted, startedFound, err := findRecoveryAttemptByIdempotency(
+				ctx, transaction.sql, input.TaskID, input.Started.IdempotencyKey,
+			)
+			if err != nil {
+				return err
+			}
+			if decisionFound || startedFound {
+				if !decisionFound || !startedFound ||
+					!sameRecoveryDecision(existingDecision, decisionRecord) ||
+					!sameRecoveryAttempt(existingStarted, startedRecord) {
+					return typedError(ErrConflict, "authorize safe recovery resume", errors.New("safe recovery resume identity was reused"))
+				}
+			} else {
+				if err := insertRecoveryDecision(ctx, transaction.sql, input.Decision, micros); err != nil {
+					return err
+				}
+				if err := insertRecoveryAttempt(ctx, transaction.sql, input.Started, micros); err != nil {
+					return err
+				}
+			}
+			runResult, err := transaction.sql.ExecContext(
+				ctx,
+				`UPDATE runs SET state = 'paused', updated_at_unix_micros = ?, revision = revision + 1
+				 WHERE id = ? AND task_id = ? AND revision = ? AND state = 'recovery-required'`,
+				micros, input.RunID, input.TaskID, input.ExpectedRunRevision,
+			)
+			if err != nil {
+				return repositoryWriteError("authorize safe recovery run", err)
+			}
+			if err := requireControlAffected(runResult, "authorize safe recovery run"); err != nil {
+				return err
+			}
+			taskResult, err := transaction.sql.ExecContext(
+				ctx,
+				`UPDATE tasks SET state = 'paused', pause_reason = ?, invalidation_reason = NULL,
+				 updated_at_unix_micros = ?, revision = revision + 1
+				 WHERE id = ? AND revision = ? AND state = 'recovery-required'`,
+				domain.PauseReasonRecoveryUncertain, micros, input.TaskID, input.ExpectedTaskRevision,
+			)
+			if err != nil {
+				return repositoryWriteError("authorize safe recovery task", err)
+			}
+			return requireControlAffected(taskResult, "authorize safe recovery task")
+		},
+	})
 }
 
 func (repositories *Repositories) RecordTaskResumeBlocked(

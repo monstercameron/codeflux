@@ -31,6 +31,8 @@ enum SessionEventKind {
   SESSION_EVENT_KIND_THREAD_CREATED = 21;
   SESSION_EVENT_KIND_THREAD_RENAMED = 22;
   SESSION_EVENT_KIND_THREAD_ARCHIVED = 23;
+  SESSION_EVENT_KIND_CHANGE_ACCEPTANCE_UPDATED = 24;
+  SESSION_EVENT_KIND_TASK_PROJECTION_INVALIDATED = 25;
 }
 
 message SessionEvent {
@@ -63,7 +65,14 @@ message SessionEvent {
     ThreadCreatedEvent thread_created = 35;
     ThreadRenamedEvent thread_renamed = 36;
     ThreadArchivedEvent thread_archived = 37;
+    ChangeAcceptanceEvent change_acceptance = 38;
+    TaskProjectionInvalidatedEvent task_projection_invalidated = 39;
   }
+}
+
+message TaskProjectionInvalidatedEvent {
+  string entity = 1;
+  uint64 entity_revision = 2;
 }
 
 message MessageDeltaEvent {
@@ -155,6 +164,9 @@ message ValidationEvent {
   StableIdentity validation_id = 1;
   string state = 2;
   string redacted_summary = 3;
+  bool required = 4;
+  bool acknowledged = 5;
+  uint64 diff_revision = 6;
 }
 
 message GraphEvent {
@@ -165,11 +177,34 @@ message GraphEvent {
 message CheckpointEvent {
   StableIdentity checkpoint_id = 1;
   uint64 task_revision = 2;
+  string plan_step = 3;
+}
+
+message ChangeAcceptanceEvent {
+  string state = 1;
+  uint64 diff_revision = 2;
+  uint64 plan_revision = 3;
+  uint64 validation_revision = 4;
+  uint64 evidence_revision = 5;
+  uint64 graph_revision = 6;
 }
 
 message RecoveryRequiredEvent {
   StableIdentity checkpoint_id = 1;
   string redacted_reason = 2;
+  string classification = 3;
+  string divergence_summary = 4;
+  bool external_outcome_ambiguous = 5;
+  bool safe_resume_verified = 6;
+  bool reconcile_available = 7;
+  bool preserve_patch_available = 8;
+  uint64 diff_revision = 9;
+  uint64 plan_revision = 10;
+  uint64 validation_revision = 11;
+  uint64 evidence_revision = 12;
+  uint64 graph_revision = 13;
+  repeated StableIdentity related_event_ids = 14;
+  repeated string related_files = 15;
 }
 
 message UserErrorEvent {

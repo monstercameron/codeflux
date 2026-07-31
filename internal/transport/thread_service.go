@@ -21,6 +21,7 @@ var (
 
 type ThreadView struct {
 	ThreadID    domain.ThreadID
+	ProjectID   domain.ProjectID
 	WorkspaceID domain.WorkspaceID
 	SessionID   domain.SessionID
 	TaskID      domain.TaskID
@@ -316,10 +317,17 @@ func threadViewToProto(view ThreadView) (*codefluxv1.ThreadView, error) {
 			return nil, err
 		}
 	}
+	var projectID *codefluxv1.StableIdentity
+	if !view.ProjectID.IsZero() {
+		projectID, err = ProjectIDToProto(view.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &codefluxv1.ThreadView{ThreadId: threadID, WorkspaceId: workspaceID, SessionId: sessionID,
 		Title: redactedText(view.Title), Archived: view.Archived,
 		Revision: view.Revision, UpdatedAt: updated, TaskState: string(view.TaskState),
-		Attention: view.Attention, UnreadCount: view.Unread, TaskId: taskID}, nil
+		Attention: view.Attention, UnreadCount: view.Unread, TaskId: taskID, ProjectId: projectID}, nil
 }
 
 func messageViewToProto(view MessageView) (*codefluxv1.MessageView, error) {

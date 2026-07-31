@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"strings"
 	"testing"
 
 	"codeflux.dev/codeflux/web/frontend/design"
@@ -67,6 +68,59 @@ func TestApplicationBarSearchButtonInvokesOpenHandler(t *testing.T) {
 	handler()
 	if !opened {
 		t.Fatal("application bar search control did not invoke its open handler")
+	}
+}
+
+func TestApplicationBarExposesManualReconnectOnlyWhenDisconnected(t *testing.T) {
+	requested := false
+	root := ApplicationBar(ApplicationBarProps{
+		Session: state.SessionView{Connection: state.ConnectionDisconnected},
+		Mode:    primitives.Mode{}, OnReconnectRequested: func() { requested = true },
+	})
+	handler, found := findButtonHandler(root, "Reconnect live session")
+	if !found || handler == nil {
+		t.Fatal("disconnected application bar did not expose manual reconnect")
+	}
+	handler()
+	if !requested {
+		t.Fatal("manual reconnect did not invoke the session restart handler")
+	}
+	live := ApplicationBar(ApplicationBarProps{
+		Session: state.SessionView{Connection: state.ConnectionLive},
+		Mode:    primitives.Mode{}, OnReconnectRequested: func() {},
+	})
+	if _, found := findButtonHandler(live, "Reconnect live session"); found {
+		t.Fatal("live application bar exposed an unnecessary reconnect action")
+	}
+}
+
+func TestApplicationBarLabelsPausedTaskControlAsResumeAndShowsAuthoritativeFacts(t *testing.T) {
+	root := ApplicationBar(ApplicationBarProps{
+		Session: state.SessionView{Connection: state.ConnectionLive},
+		View: state.TopBarView{
+			TaskState: "paused", Provider: "openai", Model: "gpt-5.6-sol", Effort: "high",
+			ForecastCost: "USD 25-40 minor units", ActualTokens: "150 tokens",
+			ActualCost: "USD 18 minor units", PricingSnapshot: "price-17",
+			HardBudget: "USD 100 minor units", RemainingBudget: "USD 82 minor units",
+			BudgetWarning: "below threshold", CanPause: true,
+		},
+		Mode:             primitives.Mode{Theme: design.ThemeDark, Density: design.DensityComfortable},
+		OnPauseRequested: func() {},
+	})
+	markup, err := ui.RenderToString(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"openai · gpt-5.6-sol · high", "150 tokens", "price-17",
+		"USD 82 minor units", "below threshold",
+	} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("authoritative application bar missing %q: %s", want, markup)
+		}
+	}
+	if label, accessible := taskPausePresentation("paused", false); label != "▶  Resume" || accessible != "Resume task" {
+		t.Fatalf("paused task presentation = %q/%q", label, accessible)
 	}
 }
 
@@ -151,6 +205,32 @@ func TestShortcutHelpCloseButtonInvokesDismissHandler(t *testing.T) {
 	handler()
 	if !dismissed {
 		t.Fatal("shortcut-help close control did not invoke the dismiss handler")
+	}
+}
+
+func TestRailWidthStopsAreReversibleAndBounded(t *testing.T) {
+	for _, width := range railWidthStops {
+		if width != railWidthStops[0] {
+			narrower := nextRailWidth(width, -1)
+			if restored := nextRailWidth(narrower, 1); restored != width {
+				t.Fatalf("narrow/widen from %d restored %d via %d", width, restored, narrower)
+			}
+		}
+		if width != railWidthStops[len(railWidthStops)-1] {
+			wider := nextRailWidth(width, 1)
+			if restored := nextRailWidth(wider, -1); restored != width {
+				t.Fatalf("widen/narrow from %d restored %d via %d", width, restored, wider)
+			}
+		}
+	}
+	if got := nextRailWidth(224, -1); got != 224 {
+		t.Fatalf("minimum width narrowed to %d", got)
+	}
+	if got := nextRailWidth(480, 1); got != 480 {
+		t.Fatalf("maximum width widened to %d", got)
+	}
+	if got := nextRailWidth(240, -1); got != 224 || nextRailWidth(got, 1) != 240 {
+		t.Fatalf("default width pair is not reversible: narrow=%d restore=%d", got, nextRailWidth(got, 1))
 	}
 }
 

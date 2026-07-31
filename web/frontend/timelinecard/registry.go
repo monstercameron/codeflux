@@ -92,6 +92,8 @@ var descriptors = []Descriptor{
 	{events.KindGraphPatch, "session.graph.patch", KindGraphChange, "apply once by sequence and revision identity", true, true, AnnouncementNone},
 	{events.KindCheckpointCreated, "session.checkpoint.created", KindCheckpoint, "one item per checkpoint identity", true, false, AnnouncementPolite},
 	{events.KindRecoveryRequired, "session.recovery.required", KindRecovery, "one blocking recovery item per durable sequence", true, false, AnnouncementPolite},
+	{events.KindChangeAcceptanceUpdated, "session.change.acceptance.updated", KindUnknown, "retain the durable acceptance revision while task projection owns its bound decision state", true, false, AnnouncementPolite},
+	{events.KindTaskProjectionInvalidated, "session.task.projection.invalidated", KindUnknown, "one content-free refresh notice per invalidated authoritative entity revision", true, false, AnnouncementPolite},
 	{events.KindError, "session.error", KindError, "one safe error item per durable sequence", true, false, AnnouncementPolite},
 }
 

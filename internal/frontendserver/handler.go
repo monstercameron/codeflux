@@ -4,9 +4,11 @@ package frontendserver
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -112,7 +114,7 @@ func NewHandler(options Options) (http.Handler, error) {
 		grpctunnel.WithMaxUpgradesPerClientPerMinute(60),
 		grpctunnel.WithSessionMaxLifetime(30*time.Minute),
 	)
-	mux.Handle("GET "+bridgePath, bridge)
+	mux.Handle("GET "+bridgePath, withBridgeRequestIdentity(bridge))
 	mux.HandleFunc("GET /bootstrap", func(writer http.ResponseWriter, request *http.Request) {
 		setSessionCookie(writer, options.SessionToken)
 		writer.Header().Set("Content-Type", "application/json")
@@ -131,6 +133,25 @@ func NewHandler(options Options) (http.Handler, error) {
 		serveBytes(writer, assets.index, "text/html; charset=utf-8")
 	})
 	return securityHeaders(loopbackOnly(mux), assets.inlineScriptSources), nil
+}
+
+// withBridgeRequestIdentity creates the trusted request identity that the
+// product gRPC boundary accepts after the WebSocket handler has independently
+// authenticated the HttpOnly launch cookie. Browser WebSocket APIs cannot set
+// arbitrary handshake headers, so this identity must be server-generated and
+// must overwrite any client-supplied value.
+func withBridgeRequestIdentity(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var entropy [16]byte
+		if _, err := rand.Read(entropy[:]); err != nil {
+			http.Error(writer, "local bridge identity unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		forward := request.Clone(request.Context())
+		forward.Header = request.Header.Clone()
+		forward.Header.Set("X-Request-Id", "bridge-"+hex.EncodeToString(entropy[:]))
+		next.ServeHTTP(writer, forward)
+	})
 }
 
 func validateRouteAccess(access RouteAccess) error {

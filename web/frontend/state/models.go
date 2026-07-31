@@ -41,10 +41,13 @@ const (
 type ConnectionState string
 
 const (
-	ConnectionConnecting ConnectionState = "connecting"
-	ConnectionLive       ConnectionState = "live"
-	ConnectionRecovering ConnectionState = "recovering"
-	ConnectionOffline    ConnectionState = "offline"
+	ConnectionConnecting   ConnectionState = "connecting"
+	ConnectionLive         ConnectionState = "live"
+	ConnectionReplaying    ConnectionState = "replaying"
+	ConnectionDegraded     ConnectionState = "degraded"
+	ConnectionDisconnected ConnectionState = "disconnected"
+	ConnectionIncompatible ConnectionState = "incompatible"
+	ConnectionUnauthorized ConnectionState = "unauthorized"
 )
 
 // ViewportClass controls responsive shell composition without changing routes.

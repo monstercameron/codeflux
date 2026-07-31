@@ -71,6 +71,8 @@ type Props struct {
 	OnAttachmentPickerDismiss func()
 	OnRemoveAttachment        func(string)
 	OnTaskAction              func(TaskAction)
+	stableSubmit              ui.Handler
+	stableTaskAction          ui.Handler
 }
 
 // Composer renders a controlled multiline GWC composer. All durable effects
@@ -81,6 +83,24 @@ func Composer(props Props) ui.Node {
 	mutationDisabled := props.Disabled || props.MutationDisabled
 	composing := ui.UseRef(false)
 	focus := ui.UseFocusManager()
+	requestedSubmit := props.OnSubmitRequested
+	stableSubmit := ui.UseEvent(func() {
+		if requestedSubmit != nil {
+			requestedSubmit()
+		}
+	})
+	// This callback changes when the shell moves from its local preview to an
+	// authoritative thread. Keep one GWC listener identity while always
+	// invoking the latest transport-bound callback.
+	props.stableSubmit = stableSubmit
+	requestedTaskAction := props.OnTaskAction
+	taskActions := props.View.Task
+	props.stableTaskAction = ui.UseEvent(func(event ui.MouseEvent) {
+		action := TaskAction(event.GetValue())
+		if requestedTaskAction != nil && taskActions.Has(action) && taskActions.DisabledReason(action) == "" {
+			requestedTaskAction(action)
+		}
+	})
 	restoreAttachmentFocus := func() {
 		ui.SafeGo("restore composer attachment focus", func() {
 			// Let the overlay inert/background cleanup and controlled draft
@@ -482,7 +502,7 @@ func composerSendControls(props Props, busy bool) ui.Node {
 			}
 			return ""
 		}(),
-		OnClick: props.OnSubmitRequested,
+		OnClickHandler: props.stableSubmit, StableOnClick: true,
 	})}
 	if props.View.SendStatus == SendFailed {
 		controls = append(controls,
@@ -514,25 +534,34 @@ func composerSendControls(props Props, busy bool) ui.Node {
 func composerTaskActions(props Props, busy, disabled bool) ui.Node {
 	buttons := make([]ui.Node, 0, len(props.View.Task.Actions))
 	for _, action := range props.View.Task.Actions {
-		if action == ActionSend || action == ActionChangePolicy || action == ActionChangeBudget {
+		if action == ActionSend || action == ActionChangePolicy {
 			continue
 		}
 		action := action
+		reason := strings.TrimSpace(props.View.Task.DisabledReason(action))
+		if props.OnTaskAction == nil && reason == "" {
+			reason = "This action is not currently available."
+		}
+		reasonID := "composer-task-action-" + string(action) + "-reason"
+		children := []ui.Node{primitives.Button(primitives.ButtonProps{
+			ID: "composer-task-action-" + string(action), Label: taskActionLabel(action),
+			Value:       string(action),
+			Disabled:    disabled || reason != "" || props.OnTaskAction == nil || (busy && action != ActionStop),
+			DescribedBy: map[bool]string{true: reasonID}[reason != ""],
+			Mode:        props.Mode, OnClickHandler: props.stableTaskAction, StableOnClick: true,
+		})}
+		if reason != "" {
+			children = append(children, html.P(html.Props{
+				ID: reasonID, Text: reason,
+			}))
+		}
 		buttons = append(buttons, html.Span(html.Props{
 			Data: map[string]string{
 				"task-action":           string(action),
 				"immediately-reachable": strconv.FormatBool(action == ActionStop),
+				"disabled-reason":       reason,
 			},
-		}, primitives.Button(primitives.ButtonProps{
-			Label:    taskActionLabel(action),
-			Disabled: disabled || props.OnTaskAction == nil || (busy && action != ActionStop),
-			Mode:     props.Mode,
-			OnClick: func() {
-				if props.OnTaskAction != nil {
-					props.OnTaskAction(action)
-				}
-			},
-		})))
+		}, children...))
 	}
 	return html.Div(html.Props{
 		Role: "group", Aria: map[string]string{"label": "Task actions"},

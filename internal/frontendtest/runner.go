@@ -671,11 +671,15 @@ func runRouteContractChecks(
 			continue
 		}
 		level := 1
-		heading := page.GetByRole(*playwright.AriaRoleHeading, playwright.PageGetByRoleOptions{
-			Level: &level,
-			Name:  RouteHeadings[route],
-			Exact: playwright.Bool(true),
-		})
+		headingOptions := playwright.PageGetByRoleOptions{Level: &level}
+		if route != "/" {
+			headingOptions.Name = RouteHeadings[route]
+			headingOptions.Exact = playwright.Bool(true)
+		}
+		// Root is a stateful restoration entry: it can validly render first-run,
+		// repository selection, or the restored task route. Its contract is one
+		// visible H1; named identities remain exact on every explicit route.
+		heading := page.GetByRole(*playwright.AriaRoleHeading, headingOptions)
 		if !appendLocatorCount(result, "direct-route-heading", route, viewport.Name, heading, 1) {
 			captureLastFailure(
 				page,

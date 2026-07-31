@@ -39,11 +39,20 @@ func TestEveryInitialSessionEventKindHasTypedVersionedPayload(t *testing.T) {
 		{KindUsageUpdated, Payload{Usage: &Usage{Tokens: domain.TokenUsage{}}}, DeliveryMaterial},
 		{KindCostUpdated, Payload{Cost: &Cost{}}, DeliveryMaterial},
 		{KindBudgetUpdated, Payload{Budget: &Budget{HardLimit: money, Reserved: domain.Money{Currency: usd}, Actual: domain.Money{Currency: usd}}}, DeliveryMaterial},
-		{KindValidationUpdated, Payload{Validation: &Validation{ValidationID: ids.validation, State: domain.ValidationStateRunning}}, DeliveryMaterial},
+		{KindValidationUpdated, Payload{Validation: &Validation{ValidationID: ids.validation, State: domain.ValidationStateRunning, Required: true, DiffRevision: 1}}, DeliveryMaterial},
 		{KindGraphSnapshot, Payload{Graph: &Graph{RevisionID: ids.graphRevision, EncodedChange: []byte{1}}}, DeliveryMaterial},
 		{KindGraphPatch, Payload{Graph: &Graph{RevisionID: ids.graphRevision, EncodedChange: []byte{2}}}, DeliveryMaterial},
-		{KindCheckpointCreated, Payload{Checkpoint: &Checkpoint{CheckpointID: ids.checkpoint, TaskRevision: 1}}, DeliveryMaterial},
-		{KindRecoveryRequired, Payload{RecoveryRequired: &RecoveryRequired{CheckpointID: &ids.checkpoint, RedactedReason: "recovery required"}}, DeliveryMaterial},
+		{KindCheckpointCreated, Payload{Checkpoint: &Checkpoint{CheckpointID: ids.checkpoint, TaskRevision: 1, PlanStep: "test"}}, DeliveryMaterial},
+		{KindRecoveryRequired, Payload{RecoveryRequired: &RecoveryRequired{
+			CheckpointID: &ids.checkpoint, RedactedReason: "recovery required",
+			Classification: RecoveryAmbiguousOutcome, DivergenceSummary: "worktree differs",
+			ExternalOutcomeAmbiguous: true, PreservePatchAvailable: true,
+			Bindings: RevisionBindings{Diff: 1, Plan: 1, Validation: 1, Evidence: 1, Graph: 1},
+		}}, DeliveryMaterial},
+		{KindChangeAcceptanceUpdated, Payload{ChangeAcceptance: &ChangeAcceptance{
+			State:    domain.ChangeAcceptanceStatePending,
+			Bindings: RevisionBindings{Diff: 1, Plan: 1, Validation: 1, Evidence: 1, Graph: 1},
+		}}, DeliveryMaterial},
 		{KindError, Payload{Error: &UserError{Code: ErrorCodeProvider, RedactedMessage: "provider failed", Retryable: true}}, DeliveryMaterial},
 	}
 	for index, test := range tests {

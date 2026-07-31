@@ -11,3 +11,4 @@ func wheelDeltaY(ui.Event) float64                      { return 0 }
 func browserDevicePixelRatio() float64                  { return 1 }
 func capturePointer(ui.Event)                           {}
 func releasePointer(ui.Event)                           {}
+func focusGraphNode(string)                             {}

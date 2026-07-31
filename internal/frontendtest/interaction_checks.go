@@ -149,6 +149,9 @@ func runReducedVisualViewportComposerCheck(
 		Name: "Message", Exact: playwright.Bool(true),
 	})
 	if err == nil {
+		err = selectDurableSessionForComposer(page, composer)
+	}
+	if err == nil {
 		err = composer.Focus()
 	}
 	if err == nil {
@@ -498,6 +501,66 @@ func loadInteractionThread(
 		return route, root, err
 	}
 	return route, root, nil
+}
+
+// selectDurableSessionForComposer establishes the authority required for an
+// editable mounted composer. M18 deliberately disables mutations before a
+// session is selected, so browser checks select a coordinator-backed thread
+// instead of relying on the disconnected preview.
+func selectDurableSessionForComposer(page playwright.Page, composer playwright.Locator) error {
+	disabled, err := composer.IsDisabled()
+	if err != nil || !disabled {
+		return err
+	}
+	mode, modeErr := page.GetByTestId("app-root").GetAttribute("data-responsive-mode")
+	if modeErr != nil {
+		return modeErr
+	}
+	if mode == "compact" || mode == "minimum" {
+		toggle := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
+			Name: "Toggle thread rail", Exact: playwright.Bool(true),
+		})
+		if err := focusAndPress(toggle, "Enter"); err != nil {
+			return fmt.Errorf("open responsive thread rail: %w", err)
+		}
+	}
+	rows := page.Locator(`[data-component="thread-row"]`)
+	if err := rows.First().WaitFor(playwright.LocatorWaitForOptions{
+		State: playwright.WaitForSelectorStateVisible,
+	}); err != nil {
+		return fmt.Errorf("wait for durable session row: %w", err)
+	}
+	count, err := rows.Count()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("no durable session is available for composer acceptance")
+	}
+	if err := rows.First().Click(); err != nil {
+		return err
+	}
+	if mode == "compact" || mode == "minimum" {
+		collapse := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
+			Name: "Collapse thread rail", Exact: playwright.Bool(true),
+		})
+		if err := collapse.Click(); err != nil {
+			return fmt.Errorf("close responsive thread rail: %w", err)
+		}
+		if err := browserAssertions().Locator(
+			page.GetByRole(*playwright.AriaRoleNavigation, playwright.PageGetByRoleOptions{
+				Name: "Primary navigation", Exact: playwright.Bool(true),
+			}),
+		).ToBeHidden(); err != nil {
+			return fmt.Errorf("wait for responsive thread rail close: %w", err)
+		}
+	}
+	if err := composer.WaitFor(playwright.LocatorWaitForOptions{
+		State: playwright.WaitForSelectorStateVisible,
+	}); err != nil {
+		return fmt.Errorf("wait for selected-session composer: %w", err)
+	}
+	return browserAssertions().Locator(composer).ToBeEnabled()
 }
 
 func interactionTaskRoute() string {

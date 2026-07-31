@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/storage"
+	"codeflux.dev/codeflux/internal/transport"
 )
 
 const maximumRecoveryDecisionIdempotencyBytes = 220
@@ -17,6 +19,11 @@ type recoveryDecisionStore interface {
 	GetRecoveryAssessment(
 		context.Context,
 		string,
+	) (storage.RecoveryAssessmentRecord, error)
+	GetCurrentRecoveryAssessment(
+		context.Context,
+		domain.TaskID,
+		uint64,
 	) (storage.RecoveryAssessmentRecord, error)
 	RecordRecoveryDecision(
 		context.Context,
@@ -44,6 +51,15 @@ type PreserveRecoveryPatchInput struct {
 	IdempotencyKey string
 }
 
+// PreserveTaskRecoveryPatchInput resolves the current assessment through the
+// exact task revision carried by the transport mutation control.
+type PreserveTaskRecoveryPatchInput struct {
+	TaskID           domain.TaskID
+	ExpectedRevision uint64
+	ReasonRedacted   string
+	IdempotencyKey   string
+}
+
 // PreserveRecoveryPatchResult returns every immutable fact plus the exported
 // path. No worker or task state is changed.
 type PreserveRecoveryPatchResult struct {
@@ -56,8 +72,32 @@ type PreserveRecoveryPatchResult struct {
 
 // RecoveryDecisionService owns user-authorized recovery actions.
 type RecoveryDecisionService struct {
-	store    recoveryDecisionStore
-	exporter RecoveryPatchExporter
+	store      recoveryDecisionStore
+	exporter   RecoveryPatchExporter
+	reconciler *RecoveryReconciliationService
+	safeResume *RecoverySafeResumeService
+}
+
+func (service *RecoveryDecisionService) ConfigureSafeResume(
+	safeResume *RecoverySafeResumeService,
+) error {
+	if service == nil || safeResume == nil {
+		return errors.New("safe recovery resume service is required")
+	}
+	service.safeResume = safeResume
+	return nil
+}
+
+// ConfigureReconciliation attaches the separately constructed verifier and
+// reconciler before the transport server starts accepting requests.
+func (service *RecoveryDecisionService) ConfigureReconciliation(
+	reconciler *RecoveryReconciliationService,
+) error {
+	if service == nil || reconciler == nil {
+		return errors.New("recovery reconciliation service is required")
+	}
+	service.reconciler = reconciler
+	return nil
 }
 
 func NewRecoveryDecisionService(
@@ -173,6 +213,82 @@ func (service *RecoveryDecisionService) PreservePatch(
 		return result, errors.Join(exportErr, err)
 	}
 	return result, exportErr
+}
+
+// PreserveTaskPatch binds a user request to the newest assessment that is
+// still recovery-required at the exact caller-observed task revision.
+func (service *RecoveryDecisionService) PreserveTaskPatch(
+	ctx context.Context,
+	input PreserveTaskRecoveryPatchInput,
+) (PreserveRecoveryPatchResult, error) {
+	if service == nil {
+		return PreserveRecoveryPatchResult{}, errors.New("recovery decision service is unavailable")
+	}
+	if input.TaskID.IsZero() || input.ExpectedRevision == 0 {
+		return PreserveRecoveryPatchResult{}, errors.New("recovery task and expected revision are required")
+	}
+	assessment, err := service.store.GetCurrentRecoveryAssessment(
+		ctx,
+		input.TaskID,
+		input.ExpectedRevision,
+	)
+	if err != nil {
+		return PreserveRecoveryPatchResult{}, err
+	}
+	return service.PreservePatch(ctx, PreserveRecoveryPatchInput{
+		AssessmentID:   assessment.ID,
+		ReasonRedacted: input.ReasonRedacted,
+		IdempotencyKey: input.IdempotencyKey,
+	})
+}
+
+// PreserveTaskRecoveryPatch adapts the recovery decision service to the
+// transport application port without exposing storage identities to gRPC.
+func (service *RecoveryDecisionService) PreserveTaskRecoveryPatch(
+	ctx context.Context,
+	command transport.RecoveryPatchCommand,
+) (transport.RecoveryPatchView, error) {
+	result, err := service.PreserveTaskPatch(ctx, PreserveTaskRecoveryPatchInput{
+		TaskID: command.TaskID, ExpectedRevision: command.ExpectedRevision,
+		ReasonRedacted: command.ReasonRedacted, IdempotencyKey: command.IdempotencyKey,
+	})
+	if err != nil {
+		return transport.RecoveryPatchView{}, taskControlPortError(err)
+	}
+	return transport.RecoveryPatchView{
+		TaskID:       result.Assessment.TaskID,
+		AssessmentID: result.Assessment.ID,
+		PatchPath:    result.PatchPath,
+	}, nil
+}
+
+// ReconcileTaskRecovery adapts the safe reconciliation use case to the
+// product API without exposing storage records.
+func (service *RecoveryDecisionService) ReconcileTaskRecovery(
+	ctx context.Context,
+	command transport.RecoveryReconcileCommand,
+) (transport.RecoveryReconcileView, error) {
+	if service == nil || service.reconciler == nil {
+		return transport.RecoveryReconcileView{}, transport.ErrTaskControlConflict
+	}
+	result, err := service.reconciler.Reconcile(ctx, RecoveryReconcileInput{
+		TaskID: command.TaskID, ExpectedRevision: command.ExpectedRevision,
+		ReasonRedacted: command.ReasonRedacted, IdempotencyKey: command.IdempotencyKey,
+	})
+	if err != nil {
+		var refusal *RecoveryReconcileRefusal
+		if errors.As(err, &refusal) {
+			return transport.RecoveryReconcileView{}, fmt.Errorf(
+				"%s: %w", refusal.Reason, transport.ErrTaskControlConflict,
+			)
+		}
+		return transport.RecoveryReconcileView{}, taskControlPortError(err)
+	}
+	return transport.RecoveryReconcileView{
+		TaskID: result.Control.TaskID, AssessmentID: result.AssessmentID,
+		CheckpointID: result.CheckpointID, State: result.Control.TaskState,
+		Revision: result.Control.TaskRevision,
+	}, nil
 }
 
 func validatePreserveRecoveryPatchInput(

@@ -84,6 +84,12 @@ const KindRecoveryRequired Kind = "recovery-required"
 //codeflux:event session.error
 const KindError Kind = "error"
 
+//codeflux:event session.change.acceptance.updated
+const KindChangeAcceptanceUpdated Kind = "change-acceptance-updated"
+
+//codeflux:event session.task.projection.invalidated
+const KindTaskProjectionInvalidated Kind = "task-projection-invalidated"
+
 // DeliveryClass fixes backpressure behavior before subscriptions exist.
 type DeliveryClass string
 
@@ -123,24 +129,34 @@ type NewSessionEvent struct {
 
 // Payload is a typed one-of. Exactly the field selected by Kind must be set.
 type Payload struct {
-	MessageDelta     *MessageDelta     `json:"message_delta,omitempty"`
-	MessageFinal     *MessageFinal     `json:"message_final,omitempty"`
-	ThreadCreated    *ThreadCreated    `json:"thread_created,omitempty"`
-	ThreadRenamed    *ThreadRenamed    `json:"thread_renamed,omitempty"`
-	ThreadArchived   *ThreadArchived   `json:"thread_archived,omitempty"`
-	Plan             *Plan             `json:"plan,omitempty"`
-	Tool             *Tool             `json:"tool,omitempty"`
-	Approval         *Approval         `json:"approval,omitempty"`
-	TaskStateChanged *TaskStateChanged `json:"task_state_changed,omitempty"`
-	Forecast         *Forecast         `json:"forecast,omitempty"`
-	Usage            *Usage            `json:"usage,omitempty"`
-	Cost             *Cost             `json:"cost,omitempty"`
-	Budget           *Budget           `json:"budget,omitempty"`
-	Validation       *Validation       `json:"validation,omitempty"`
-	Graph            *Graph            `json:"graph,omitempty"`
-	Checkpoint       *Checkpoint       `json:"checkpoint,omitempty"`
-	RecoveryRequired *RecoveryRequired `json:"recovery_required,omitempty"`
-	Error            *UserError        `json:"error,omitempty"`
+	MessageDelta              *MessageDelta              `json:"message_delta,omitempty"`
+	MessageFinal              *MessageFinal              `json:"message_final,omitempty"`
+	ThreadCreated             *ThreadCreated             `json:"thread_created,omitempty"`
+	ThreadRenamed             *ThreadRenamed             `json:"thread_renamed,omitempty"`
+	ThreadArchived            *ThreadArchived            `json:"thread_archived,omitempty"`
+	Plan                      *Plan                      `json:"plan,omitempty"`
+	Tool                      *Tool                      `json:"tool,omitempty"`
+	Approval                  *Approval                  `json:"approval,omitempty"`
+	TaskStateChanged          *TaskStateChanged          `json:"task_state_changed,omitempty"`
+	Forecast                  *Forecast                  `json:"forecast,omitempty"`
+	Usage                     *Usage                     `json:"usage,omitempty"`
+	Cost                      *Cost                      `json:"cost,omitempty"`
+	Budget                    *Budget                    `json:"budget,omitempty"`
+	Validation                *Validation                `json:"validation,omitempty"`
+	Graph                     *Graph                     `json:"graph,omitempty"`
+	Checkpoint                *Checkpoint                `json:"checkpoint,omitempty"`
+	RecoveryRequired          *RecoveryRequired          `json:"recovery_required,omitempty"`
+	ChangeAcceptance          *ChangeAcceptance          `json:"change_acceptance,omitempty"`
+	TaskProjectionInvalidated *TaskProjectionInvalidated `json:"task_projection_invalidated,omitempty"`
+	Error                     *UserError                 `json:"error,omitempty"`
+}
+
+// TaskProjectionInvalidated identifies a committed normalized entity change
+// whose complete replacement must be loaded through GetSessionSnapshot. It
+// does not pretend to contain an independently reducible state transition.
+type TaskProjectionInvalidated struct {
+	Entity   string `json:"entity"`
+	Revision uint64 `json:"revision"`
 }
 
 type MessageDelta struct {
@@ -219,6 +235,9 @@ type Validation struct {
 	ValidationID    domain.ValidationID    `json:"validation_id"`
 	State           domain.ValidationState `json:"state"`
 	RedactedSummary string                 `json:"redacted_summary"`
+	Required        bool                   `json:"required"`
+	Acknowledged    bool                   `json:"acknowledged"`
+	DiffRevision    uint64                 `json:"diff_revision"`
 }
 
 type Graph struct {
@@ -229,11 +248,57 @@ type Graph struct {
 type Checkpoint struct {
 	CheckpointID domain.CheckpointID `json:"checkpoint_id"`
 	TaskRevision uint64              `json:"task_revision"`
+	PlanStep     string              `json:"plan_step"`
+}
+
+type RevisionBindings struct {
+	Diff       uint64 `json:"diff"`
+	Plan       uint64 `json:"plan"`
+	Validation uint64 `json:"validation"`
+	Evidence   uint64 `json:"evidence"`
+	Graph      uint64 `json:"graph"`
+}
+
+func (bindings RevisionBindings) Complete() bool {
+	return bindings.Diff > 0 && bindings.Plan > 0 && bindings.Validation > 0 &&
+		bindings.Evidence > 0 && bindings.Graph > 0
+}
+
+type ChangeAcceptance struct {
+	State    domain.ChangeAcceptanceState `json:"state"`
+	Bindings RevisionBindings             `json:"bindings"`
 }
 
 type RecoveryRequired struct {
-	CheckpointID   *domain.CheckpointID `json:"checkpoint_id,omitempty"`
-	RedactedReason string               `json:"redacted_reason"`
+	CheckpointID             *domain.CheckpointID   `json:"checkpoint_id,omitempty"`
+	RedactedReason           string                 `json:"redacted_reason"`
+	Classification           RecoveryClassification `json:"classification"`
+	DivergenceSummary        string                 `json:"divergence_summary"`
+	ExternalOutcomeAmbiguous bool                   `json:"external_outcome_ambiguous"`
+	SafeResumeVerified       bool                   `json:"safe_resume_verified"`
+	ReconcileAvailable       bool                   `json:"reconcile_available"`
+	PreservePatchAvailable   bool                   `json:"preserve_patch_available"`
+	Bindings                 RevisionBindings       `json:"bindings"`
+	RelatedEventIDs          []domain.EventID       `json:"related_event_ids,omitempty"`
+	RelatedFiles             []string               `json:"related_files,omitempty"`
+}
+
+type RecoveryClassification string
+
+const (
+	RecoverySafeResume       RecoveryClassification = "safe-resume"
+	RecoveryNeedsReconcile   RecoveryClassification = "needs-reconcile"
+	RecoveryPreserveOnly     RecoveryClassification = "preserve-only"
+	RecoveryAmbiguousOutcome RecoveryClassification = "ambiguous-outcome"
+)
+
+func (classification RecoveryClassification) IsValid() bool {
+	switch classification {
+	case RecoverySafeResume, RecoveryNeedsReconcile, RecoveryPreserveOnly, RecoveryAmbiguousOutcome:
+		return true
+	default:
+		return false
+	}
 }
 
 // ErrorCode is a stable user-presentable failure classification.
@@ -397,6 +462,8 @@ func (event SessionEvent) CorrectnessBearing() bool {
 		KindGraphPatch,
 		KindCheckpointCreated,
 		KindRecoveryRequired,
+		KindChangeAcceptanceUpdated,
+		KindTaskProjectionInvalidated,
 		KindError:
 		return true
 	default:
@@ -430,6 +497,8 @@ func (payload Payload) count() int {
 		payload.Graph != nil,
 		payload.Checkpoint != nil,
 		payload.RecoveryRequired != nil,
+		payload.ChangeAcceptance != nil,
+		payload.TaskProjectionInvalidated != nil,
 		payload.Error != nil,
 	} {
 		if present {
@@ -484,6 +553,14 @@ func (event SessionEvent) validatePayload() error {
 		return validateCheckpoint(event.Payload.Checkpoint)
 	case KindRecoveryRequired:
 		return validateRecovery(event.Payload.RecoveryRequired)
+	case KindChangeAcceptanceUpdated:
+		return validateChangeAcceptance(event.Payload.ChangeAcceptance)
+	case KindTaskProjectionInvalidated:
+		value := event.Payload.TaskProjectionInvalidated
+		if value == nil || strings.TrimSpace(value.Entity) == "" || value.Entity != strings.TrimSpace(value.Entity) {
+			return errors.New("task projection invalidation is incomplete")
+		}
+		return nil
 	case KindError:
 		return validateUserError(event.Payload.Error)
 	default:
@@ -592,7 +669,7 @@ func validateBudget(value *Budget) error {
 }
 
 func validateValidation(value *Validation) error {
-	if value == nil || value.ValidationID.IsZero() || !value.State.IsValid() {
+	if value == nil || value.ValidationID.IsZero() || !value.State.IsValid() || value.DiffRevision == 0 {
 		return errors.New("validation payload is incomplete")
 	}
 	return nil
@@ -606,16 +683,47 @@ func validateGraph(value *Graph) error {
 }
 
 func validateCheckpoint(value *Checkpoint) error {
-	if value == nil || value.CheckpointID.IsZero() {
+	if value == nil || value.CheckpointID.IsZero() || value.TaskRevision == 0 ||
+		strings.TrimSpace(value.PlanStep) == "" {
 		return errors.New("checkpoint payload is incomplete")
+	}
+	return nil
+}
+
+func validateChangeAcceptance(value *ChangeAcceptance) error {
+	if value == nil || !value.State.IsValid() || !value.Bindings.Complete() {
+		return errors.New("change acceptance payload is incomplete")
 	}
 	return nil
 }
 
 func validateRecovery(value *RecoveryRequired) error {
 	if value == nil || strings.TrimSpace(value.RedactedReason) == "" ||
-		value.CheckpointID != nil && value.CheckpointID.IsZero() {
+		value.CheckpointID != nil && value.CheckpointID.IsZero() ||
+		!value.Classification.IsValid() || strings.TrimSpace(value.DivergenceSummary) == "" ||
+		!value.Bindings.Complete() ||
+		value.ExternalOutcomeAmbiguous != (value.Classification == RecoveryAmbiguousOutcome) {
 		return errors.New("recovery payload is incomplete")
+	}
+	if value.Classification == RecoverySafeResume && !value.SafeResumeVerified {
+		return errors.New("safe-resume recovery is not verified")
+	}
+	if value.Classification == RecoveryNeedsReconcile && !value.ReconcileAvailable {
+		return errors.New("reconcile recovery has no reconcile action")
+	}
+	if (value.Classification == RecoveryPreserveOnly || value.Classification == RecoveryAmbiguousOutcome) &&
+		!value.PreservePatchAvailable {
+		return errors.New("unsafe recovery has no patch preservation action")
+	}
+	for _, eventID := range value.RelatedEventIDs {
+		if eventID.IsZero() {
+			return errors.New("recovery related event ID is empty")
+		}
+	}
+	for _, path := range value.RelatedFiles {
+		if strings.TrimSpace(path) == "" {
+			return errors.New("recovery related file is empty")
+		}
 	}
 	return nil
 }

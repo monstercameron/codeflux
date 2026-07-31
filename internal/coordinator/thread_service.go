@@ -9,11 +9,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
+	"codeflux.dev/codeflux/internal/graph"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
 )
@@ -29,11 +31,18 @@ type threadRepository interface {
 	ArchiveThreadCommit(context.Context, storage.ArchiveThread) (storage.ThreadCommit, error)
 }
 
+type threadGraphBootstrapRepository interface {
+	AppendTaskEvent(context.Context, storage.AppendTaskEvent) (storage.TaskEvent, error)
+	FindTaskEventByIdempotencyKey(context.Context, domain.TaskID, string) (storage.TaskEvent, bool, error)
+}
+
 type ThreadApplication struct {
 	repositories threadRepository
 	cursors      cipher.AEAD
 	random       io.Reader
 	publisher    storage.CommittedEventPublisher
+	graphEvents  threadGraphBootstrapRepository
+	graphs       *GraphProjectionService
 }
 
 func NewThreadApplication(repositories threadRepository, cursorSecret string, publishers ...storage.CommittedEventPublisher) (*ThreadApplication, error) {
@@ -50,10 +59,24 @@ func NewThreadApplication(repositories threadRepository, cursorSecret string, pu
 		return nil, err
 	}
 	application := &ThreadApplication{repositories: repositories, cursors: aead, random: rand.Reader}
+	if graphEvents, ok := repositories.(threadGraphBootstrapRepository); ok {
+		application.graphEvents = graphEvents
+	}
 	if len(publishers) > 0 {
 		application.publisher = publishers[0]
 	}
 	return application, nil
+}
+
+// ConfigureGraphProjection connects ordinary accepted draft-task activity to
+// the durable graph projector. Test repositories that do not implement the
+// durable task journal remain usable without this production integration.
+func (application *ThreadApplication) ConfigureGraphProjection(service *GraphProjectionService) error {
+	if service == nil || application.graphEvents == nil {
+		return errors.New("durable graph projection dependencies are unavailable")
+	}
+	application.graphs = service
+	return nil
 }
 
 func (application *ThreadApplication) CreateThread(ctx context.Context, command transport.CreateThreadCommand) (transport.ThreadView, error) {
@@ -190,12 +213,106 @@ func (application *ThreadApplication) SendMessage(ctx context.Context, command t
 	if err := application.publishCommitted(stored.Events); err != nil {
 		return transport.SendMessageResult{}, err
 	}
+	if stored.DraftTask != nil && application.graphs != nil {
+		if err := application.ensureDraftTaskRequirementGraph(ctx, thread.ProjectID, stored.Message, *stored.DraftTask, command.IdempotencyKey); err != nil {
+			return transport.SendMessageResult{}, err
+		}
+	}
 	result := transport.SendMessageResult{Message: storedMessageView(stored.Message)}
 	if stored.DraftTask != nil {
 		result.DraftTask = &transport.DraftTaskView{TaskID: stored.DraftTask.ID, ThreadID: stored.DraftTask.ThreadID,
 			State: stored.DraftTask.State, Revision: stored.DraftTask.Revision, UpdatedAt: stored.DraftTask.UpdatedAt}
 	}
 	return result, nil
+}
+
+type draftRequirementGraphIdentity struct {
+	GraphID    domain.GraphID         `json:"graph_id"`
+	NodeID     domain.NodeID          `json:"node_id"`
+	RevisionID domain.GraphRevisionID `json:"graph_revision_id"`
+	MessageID  domain.MessageID       `json:"message_id"`
+}
+
+func (application *ThreadApplication) ensureDraftTaskRequirementGraph(
+	ctx context.Context,
+	projectID domain.ProjectID,
+	message storage.Message,
+	task storage.Task,
+	commandKey string,
+) error {
+	digest := sha256.Sum256([]byte(commandKey))
+	eventKey := "graph-requirement:" + base64.RawURLEncoding.EncodeToString(digest[:])
+	durable, found, err := application.graphEvents.FindTaskEventByIdempotencyKey(ctx, task.ID, eventKey)
+	if err != nil {
+		return err
+	}
+	if !found {
+		identity, eventID, err := newDraftRequirementGraphIdentity(message.ID)
+		if err != nil {
+			return err
+		}
+		payload, err := json.Marshal(identity)
+		if err != nil {
+			return fmt.Errorf("encode draft requirement graph identity: %w", err)
+		}
+		durable, err = application.graphEvents.AppendTaskEvent(ctx, storage.AppendTaskEvent{
+			ID: eventID, TaskID: task.ID, EventType: "task.requirement-accepted",
+			PayloadJSON: string(payload), IdempotencyKey: eventKey,
+		})
+		if errors.Is(err, storage.ErrConflict) {
+			durable, found, err = application.graphEvents.FindTaskEventByIdempotencyKey(ctx, task.ID, eventKey)
+			if err == nil && !found {
+				err = errors.New("conflicting requirement graph event is unavailable")
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if durable.EventType != "task.requirement-accepted" {
+		return errors.New("requirement graph event key belongs to another event type")
+	}
+	var identity draftRequirementGraphIdentity
+	if err := json.Unmarshal([]byte(durable.PayloadJSON), &identity); err != nil {
+		return fmt.Errorf("decode draft requirement graph identity: %w", err)
+	}
+	if identity.GraphID.IsZero() || identity.NodeID.IsZero() || identity.RevisionID.IsZero() || identity.MessageID != message.ID {
+		return errors.New("draft requirement graph identity is incomplete or mismatched")
+	}
+	graphIdentity, err := graph.NewGraph(identity.GraphID, task.ID, durable.CreatedAt)
+	if err != nil {
+		return err
+	}
+	projection, err := graph.NewGraphProjection(graphIdentity, nil, 0)
+	if err != nil {
+		return err
+	}
+	_, err = application.graphs.ProjectCommittedTaskEvent(ctx,
+		storage.GraphQueryScope{ProjectID: projectID, TaskID: task.ID}, projection, durable,
+		graph.ProjectionEvent{Kind: graph.ProjectionRequirementAccepted,
+			Requirement: &graph.RequirementFact{NodeID: identity.NodeID, DisplayName: "Accepted task requirement"}},
+		identity.RevisionID)
+	return err
+}
+
+func newDraftRequirementGraphIdentity(messageID domain.MessageID) (draftRequirementGraphIdentity, domain.EventID, error) {
+	graphID, err := domain.NewGraphID()
+	if err != nil {
+		return draftRequirementGraphIdentity{}, domain.EventID{}, err
+	}
+	nodeID, err := domain.NewNodeID()
+	if err != nil {
+		return draftRequirementGraphIdentity{}, domain.EventID{}, err
+	}
+	revisionID, err := domain.NewGraphRevisionID()
+	if err != nil {
+		return draftRequirementGraphIdentity{}, domain.EventID{}, err
+	}
+	eventID, err := domain.NewEventID()
+	if err != nil {
+		return draftRequirementGraphIdentity{}, domain.EventID{}, err
+	}
+	return draftRequirementGraphIdentity{GraphID: graphID, NodeID: nodeID, RevisionID: revisionID, MessageID: messageID}, eventID, nil
 }
 
 func (application *ThreadApplication) RenameThread(ctx context.Context, command transport.RenameThreadCommand) (transport.ThreadView, error) {
@@ -239,7 +356,7 @@ func (application *ThreadApplication) publishCommitted(committed []events.Sessio
 }
 
 func storedThreadView(thread storage.Thread) transport.ThreadView {
-	return transport.ThreadView{ThreadID: thread.ID, WorkspaceID: thread.WorkspaceID,
+	return transport.ThreadView{ThreadID: thread.ID, ProjectID: thread.ProjectID, WorkspaceID: thread.WorkspaceID,
 		SessionID: thread.SessionID, TaskID: thread.TaskID, TaskState: thread.TaskState,
 		Attention: threadAttention(thread.TaskState),
 		Title:     thread.Title, Archived: thread.Archived, Revision: thread.Revision, UpdatedAt: thread.UpdatedAt}

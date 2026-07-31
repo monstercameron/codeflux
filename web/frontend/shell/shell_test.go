@@ -104,7 +104,7 @@ func TestTopLevelStatesDoNotRenderAuthenticatedShell(t *testing.T) {
 	snapshot := state.NewSnapshot(nil, nil, nil)
 	store := state.NewStore(snapshot).ReduceRemote(state.SessionChanged{
 		Session: state.SessionView{
-			Bootstrap: state.BootstrapUnauthorized, Connection: state.ConnectionOffline,
+			Bootstrap: state.BootstrapUnauthorized, Connection: state.ConnectionUnauthorized,
 			Message: "Sign in again",
 		},
 	})
@@ -213,7 +213,7 @@ func TestEveryRouteRendersInEveryBootstrapState(t *testing.T) {
 			t.Run(string(routeName)+"/"+string(bootstrapState), func(t *testing.T) {
 				store := state.NewStore(readySnapshot()).ReduceRemote(state.SessionChanged{
 					Session: state.SessionView{
-						Bootstrap: bootstrapState, Connection: state.ConnectionOffline,
+						Bootstrap: bootstrapState, Connection: state.ConnectionDisconnected,
 						Message: "Safe recovery guidance",
 					},
 				})
@@ -293,6 +293,67 @@ func TestDiagnosticsDistinguishesDurableTerminology(t *testing.T) {
 	} {
 		if !strings.Contains(markup, term) {
 			t.Errorf("diagnostics terminology missing %q: %s", term, markup)
+		}
+	}
+}
+
+func TestDiagnosticsReportsKnownZeroAndGapRepairWithoutTaskContent(t *testing.T) {
+	markup := render(t, ui.CreateElement(shell.DiagnosticsInteractiveShell, shell.DiagnosticsProps{
+		SimpleRouteProps: shell.SimpleRouteProps{Title: "Diagnostics", State: state.DataReady},
+		Diagnostics: state.DiagnosticsView{
+			State: state.DataReady, LastAppliedSequenceKnown: true,
+			SessionGapRepairRequired: true,
+		},
+	}))
+	for _, want := range []string{
+		`data-component="durable-session-sequence"`,
+		`data-sequence="0"`,
+		`data-sequence-known="true"`,
+		`data-replay-active="false"`,
+		`data-live="false"`,
+		`data-gap-repair-required="true"`,
+		"Last successfully applied sequence",
+		"Gap repair required",
+	} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("diagnostics sequence missing %q: %s", want, markup)
+		}
+	}
+	if strings.Contains(markup, "message body") || strings.Contains(markup, "task prompt") {
+		t.Fatalf("diagnostics leaked task content: %s", markup)
+	}
+}
+
+func TestDiagnosticsReportsUnknownSequenceDistinctFromZero(t *testing.T) {
+	markup := render(t, ui.CreateElement(shell.DiagnosticsInteractiveShell, shell.DiagnosticsProps{
+		SimpleRouteProps: shell.SimpleRouteProps{Title: "Diagnostics", State: state.DataReady},
+		Diagnostics:      state.DiagnosticsView{State: state.DataReady},
+	}))
+	if !strings.Contains(markup, `data-sequence="Unknown"`) ||
+		!strings.Contains(markup, `data-sequence-known="false"`) ||
+		strings.Contains(markup, `data-sequence="0"`) {
+		t.Fatalf("unknown diagnostics sequence = %s", markup)
+	}
+}
+
+func TestDiagnosticsRouteUsesSnapshotDurableSequence(t *testing.T) {
+	store := state.NewStore(readySnapshot()).ReduceRemote(state.DiagnosticsChanged{
+		Diagnostics: state.DiagnosticsView{
+			State: state.DataReady, LastAppliedSequenceKnown: true,
+			LastAppliedSequence: 27, SessionLive: true,
+		},
+	})
+	markup := render(t, ui.CreateElement(shell.RouteShell, shell.RouteShellProps{
+		Snapshot: store.Snapshot(), Route: routes.Route{Name: routes.Diagnostics}, Tokens: tokens(t),
+	}))
+	for _, want := range []string{
+		`data-component="diagnostics-shell"`,
+		`data-component="durable-session-sequence"`,
+		`data-sequence="27"`,
+		`data-live="true"`,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("diagnostics route missing %q: %s", want, markup)
 		}
 	}
 }

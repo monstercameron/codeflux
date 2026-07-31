@@ -22,4 +22,9 @@ var Catalog = []Descriptor{
 	{Number: 15, Name: "000015_checkpoint_pause_recovery.sql", SHA256: "3e0ca8932231e3f48c637aa7d60a761190b95b1bd7ba50a4df4190be28ce86e5"},
 	{Number: 16, Name: "000016_thread_service_state.sql", SHA256: "2f4a07dadbed134822901925f44a95c2a4465ac05c5068a2a8ba71fa409fc522"},
 	{Number: 17, Name: "000017_thread_session_lifecycle.sql", SHA256: "0b289fbb7bdeebd47afa17310acf62a081181d346c1ad9be2e5d0a4db24d8311"},
+	{Number: 18, Name: "000018_frontend_telemetry.sql", SHA256: "538093b6ec79c9769c5f3ae23c00ac096e825934bd7f35b1efc39f662f5e7e6a"},
+	{Number: 19, Name: "000019_session_projection_notifications.sql", SHA256: "a4292fb7fe63cc8a80185ebb2f1da830d789c62d192bb4108a42598fe3873d90"},
+	{Number: 20, Name: "000020_task_graph_storage.sql", SHA256: "4e09d6272987e6dd24c25e326abe38714701cb4b2e80e1b9c3b64f829f0f73ad"},
+	{Number: 21, Name: "000021_task_risk_classifications.sql", SHA256: "2c7b005120263d1a72efe96c6d2233beec2b9a35117a9971b77141ead39c888a"},
+	{Number: 22, Name: "000022_validation_run_records.sql", SHA256: "34ea1605194e95942f66f4a87b1629404eeb355d0d32fe5ac75b527b2ca55411"},
 }

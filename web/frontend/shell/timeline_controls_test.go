@@ -15,7 +15,7 @@ func TestTimelineControlsMountEveryCorrectnessBearingTransition(t *testing.T) {
 	markup, err := ui.RenderToString(ui.CreateElement(shell.TimelineControls, shell.TimelineControlProps{
 		Enabled: true, HasOlder: true, OlderError: "Older messages could not be loaded.",
 		Gaps: []timeline.SequenceGap{{After: 2, Before: 4}}, NewEvents: 3,
-		ReviewOpen: true, ReturnToCurrentAvailable: true,
+		ReviewOpen: true, ReviewFile: "web/client/main.go", ReturnToCurrentAvailable: true,
 		Latency:     timelinecard.LatencyPresentation{Phase: "Validating", ShowStop: true},
 		OnLoadOlder: func() {}, OnRetryOlder: func() {}, OnReturnLive: func() {},
 		OnOpenReview: func() {}, OnCloseReview: func() {}, OnReturnToCurrent: func() {}, OnStop: func() {},
@@ -38,6 +38,8 @@ func TestTimelineControlsMountEveryCorrectnessBearingTransition(t *testing.T) {
 		`aria-controls="task-review-drawer"`,
 		`id="task-review-close"`,
 		`position="preserved"`,
+		`data-review-file="web/client/main.go"`,
+		"Reviewing workspace-relative recovery file web/client/main.go.",
 		"Return to current graph node",
 		`data-component="first-message-latency"`,
 		"Stop delayed task",

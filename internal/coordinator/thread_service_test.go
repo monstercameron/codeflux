@@ -165,7 +165,7 @@ func TestApplicationHostsDurableAuthenticatedThreadService(t *testing.T) {
 	if !archived.GetThread().GetArchived() || archived.GetThread().GetRevision() != revision+1 {
 		t.Fatalf("archived thread = %#v", archived)
 	}
-	for index, kind := range []events.Kind{events.KindMessageFinal, events.KindThreadRenamed, events.KindThreadArchived} {
+	for index, kind := range []events.Kind{events.KindMessageFinal, events.KindGraphSnapshot, events.KindThreadRenamed, events.KindThreadArchived} {
 		event, err := subscription.Next(ctx)
 		if err != nil || event.Sequence != uint64(index+2) || event.Kind != kind {
 			t.Fatalf("live thread event %d = %#v, %v", index, event, err)
@@ -176,7 +176,7 @@ func TestApplicationHostsDurableAuthenticatedThreadService(t *testing.T) {
 		t.Fatal(err)
 	}
 	replayed, err := application.repos.ReplaySessionEvents(ctx, storage.ReplaySessionEvents{SessionID: session.ID, Limit: 10})
-	if err != nil || len(replayed) != 4 || replayed[0].Kind != events.KindThreadCreated {
+	if err != nil || len(replayed) != 5 || replayed[0].Kind != events.KindThreadCreated {
 		t.Fatalf("thread event replay = %#v, %v", replayed, err)
 	}
 }

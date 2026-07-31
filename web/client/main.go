@@ -5,12 +5,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"time"
 
-	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/buildinfo"
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/web/frontend/design"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
@@ -20,6 +21,7 @@ import (
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
 	"codeflux.dev/codeflux/web/frontend/shell"
 	frontendstate "codeflux.dev/codeflux/web/frontend/state"
+	"codeflux.dev/codeflux/web/frontend/taskcontrols"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"github.com/monstercameron/GoWebComponents/v5/fetch"
 	"github.com/monstercameron/GoWebComponents/v5/router"
@@ -53,17 +55,24 @@ func productPage(router.Attrs) ui.Node {
 }
 
 func productApplication() ui.Node {
+	renderStarted := time.Now()
+	focusManager := ui.UseFocusManager()
 	location := router.UseLocation()
 	navigator := router.UseNavigate()
 	bootstrap := fetch.UseResource(loadBootstrap)
 	streamStatus := ui.UseState(sessionclient.Status{State: sessionclient.StateIdle})
+	reconnectVersion := ui.UseState(uint64(0))
 	reducedMotion := ui.UsePrefersReducedMotion()
 	preferredScheme := ui.UsePrefersColorScheme()
 	activeTheme, setTheme := ui.UseTheme(string(preferredScheme))
 	layoutState := ui.UseState(frontendstate.DefaultLayoutPreferences())
 	selectedGraphID := ui.UseState("")
+	graphMessageStableKey := ui.UseState("")
+	graphMessageNotice := ui.UseState("")
 	selectedThread := ui.UseState(threadrail.Thread{})
 	latestThreadEvent := ui.UseState(events.SessionEvent{})
+	taskObservedAt := ui.UseRef(time.Now())
+	reconnectStartedAt := ui.UseRef(time.Time{})
 	previewTaskState := ui.UseState("in progress")
 	preferencesReady := ui.UseState(false)
 	resource := bootstrap.Get()
@@ -105,11 +114,6 @@ func productApplication() ui.Node {
 		Bootstrap:  frontendstate.BootstrapBooting,
 		Connection: frontendstate.ConnectionConnecting,
 	}
-	var selectedSession *codefluxv1.StableIdentity
-	if resource.Ready && resource.Error == nil && compatible(resource.Value) && restoreContextErr == nil {
-		selectedSession, _ = selectedSessionIdentity(resource.Value)
-	}
-	useAuthenticatedSession(selectedSession, resource.Value, streamStatus.Set)
 	switch {
 	case resource.Loading:
 		session = frontendstate.SessionView{
@@ -123,21 +127,15 @@ func productApplication() ui.Node {
 		if restoreContextErr != nil {
 			session = frontendstate.SessionView{
 				Bootstrap:  frontendstate.BootstrapIncompatible,
-				Connection: frontendstate.ConnectionOffline,
+				Connection: frontendstate.ConnectionIncompatible,
 				Message:    "The coordinator returned incompatible route access state.",
 			}
 		} else if compatible(resource.Value) {
-			if resource.Value.SelectedSessionID == nil {
+			if selectedThread.Get().SessionID().IsZero() {
 				session = frontendstate.SessionView{
 					Bootstrap:  frontendstate.BootstrapReady,
-					Connection: frontendstate.ConnectionOffline,
+					Connection: frontendstate.ConnectionDisconnected,
 					Message:    "Secure startup completed. Select a session to begin live updates.",
-				}
-			} else if selectedSession == nil {
-				session = frontendstate.SessionView{
-					Bootstrap:  frontendstate.BootstrapIncompatible,
-					Connection: frontendstate.ConnectionOffline,
-					Message:    "The selected session identity is incompatible.",
 				}
 			} else {
 				session = sessionViewForLifecycle(streamStatus.Get())
@@ -145,7 +143,7 @@ func productApplication() ui.Node {
 		} else {
 			session = frontendstate.SessionView{
 				Bootstrap:  frontendstate.BootstrapIncompatible,
-				Connection: frontendstate.ConnectionOffline,
+				Connection: frontendstate.ConnectionIncompatible,
 				Message:    "The frontend and coordinator versions do not match.",
 			}
 		}
@@ -184,6 +182,13 @@ func productApplication() ui.Node {
 		}
 	}
 	appRoute := routeFor(location.Path, location.Query)
+	taskDetailSelection := routes.TaskDetailSelection{}
+	if location.Path == "/tasks" {
+		if selection, err := routes.ParseTaskDetailSelection(location.Query); err == nil {
+			taskDetailSelection = selection
+		}
+	}
+	telemetryProps := useMountedFrontendTelemetry(appRoute.Name == routes.Settings)
 	if location.Path == "/" &&
 		strings.TrimSpace(location.Query) == "" &&
 		resource.Ready &&
@@ -194,14 +199,198 @@ func productApplication() ui.Node {
 		// expose a transient repository chooser for an unfinished installation.
 		appRoute = routes.Route{Name: routes.FirstRun}
 	}
+	threadRailSource := useMountedThreadRailFirstPage(resource.Value, store.Snapshot(), appRoute)
+	selectedRefreshRevision := uint64(0)
+	if row, ok := mountedThreadRailRow(threadRailSource.State.Value, selectedThread.Get().ID()); ok {
+		selectedRefreshRevision = row.Thread().Revision()
+	}
+	selectedRefreshDependency := selectedThread.Get().ID().String() + "|" + strconv.FormatUint(selectedRefreshRevision, 10)
+	ui.UseEffectOf(func() func() {
+		selected := selectedThread.Get()
+		if selected.ID().IsZero() || threadRailSource.State.Value.RepositoryID().IsZero() {
+			return nil
+		}
+		if row, ok := mountedThreadRailRow(threadRailSource.State.Value, selected.ID()); ok && row.Thread() != selected {
+			selectedThread.Set(row.Thread())
+		}
+		return nil
+	}, selectedRefreshDependency)
+	var authoritativeTaskControls *taskcontrols.Props
+	onPauseRequested := func() {
+		if previewTaskState.Get() == "paused" {
+			previewTaskState.Set("in progress")
+			return
+		}
+		previewTaskState.Set("paused")
+	}
+	onStopRequested := func() { previewTaskState.Set("stopped") }
+	var reloadTaskControls func()
+	var reloadGraph func()
 	previewTimeline := livePreviewTimeline()
-	timelineProps := mountedAuthoritativeTimeline(
-		selectedThread.Get(), previewTimeline, latestThreadEvent.Set,
+	timelineSource := mountedAuthoritativeTimeline(
+		selectedThread.Get(), previewTimeline, reconnectVersion.Get(), taskDetailSelection.EventID, func(event events.SessionEvent) {
+			latestThreadEvent.Set(event)
+			for _, telemetryEvent := range telemetryForSessionEvent(event, time.Since(taskObservedAt.Get())) {
+				emitBrowserFrontendTelemetry(telemetryEvent)
+			}
+			switch event.Kind {
+			case events.KindMessageFinal, events.KindThreadRenamed, events.KindThreadArchived,
+				events.KindTaskStateChanged, events.KindBudgetUpdated, events.KindValidationUpdated,
+				events.KindRecoveryRequired, events.KindChangeAcceptanceUpdated:
+				threadRailSource.Reload()
+			}
+			switch event.Kind {
+			case events.KindTaskStateChanged, events.KindForecastUpdated,
+				events.KindUsageUpdated, events.KindBudgetUpdated, events.KindRecoveryRequired:
+				if reloadTaskControls != nil {
+					reloadTaskControls()
+				}
+			}
+			switch event.Kind {
+			case events.KindGraphSnapshot, events.KindGraphPatch:
+				if reloadGraph != nil {
+					reloadGraph()
+				}
+			}
+		}, streamStatus.Set,
 	)
+	taskControlSource := useSelectedTaskControls(
+		selectedThread.Get(), session, timelineSource.Task, timelineSource.TaskReady,
+	)
+	reloadTaskControls = taskControlSource.Reload
+	if taskControlSource.State.Ready {
+		controls := taskControlSource.State.Value
+		authoritativeTaskControls = &controls
+	}
+	store = store.ReduceRemote(frontendstate.DiagnosticsChanged{Diagnostics: diagnosticsViewForSessionProjection(
+		timelineSource.SessionDiagnostics,
+		timelineSource.SessionConnection,
+		timelineSource.SessionReady,
+	)})
+	timelineProps := timelineSource.Props
+	if graphMessageStableKey.Get() != "" {
+		timelineProps.SelectedStableKey = graphMessageStableKey.Get()
+		timelineProps.SelectionNotice = graphMessageNotice.Get()
+	}
+	instrumentTimelineTelemetry(&timelineProps, selectedThread.Get().TaskID(), emitBrowserFrontendTelemetry)
+	if taskDetailSelection.ReviewFile != "" {
+		timelineProps.ReviewOpen = true
+		timelineProps.ReviewFile = taskDetailSelection.ReviewFile
+		timelineProps.OnCloseReview = func() {
+			if path, err := routes.TaskSelectionPath(taskDetailSelection.Route); err == nil {
+				navigator.Navigate(path)
+			}
+		}
+	}
+	if authoritativeTaskControls != nil && timelineSource.TaskReady {
+		decorateTaskControlsFromProjection(authoritativeTaskControls, timelineSource.Task)
+		if taskControlSource.DecorateRecovery != nil {
+			taskControlSource.DecorateRecovery(authoritativeTaskControls)
+		}
+		if taskDetailSelection.Route.Name == routes.ThreadWorkspace {
+			authoritativeTaskControls.OnOpenDetail = func(detail taskcontrols.RecoveryDetail) {
+				var path string
+				var err error
+				switch detail.Kind {
+				case taskcontrols.RecoveryDetailEvent:
+					eventID, parseErr := domain.ParseEventID(detail.Identity)
+					if parseErr != nil {
+						return
+					}
+					path, err = routes.TaskEventSelectionPath(taskDetailSelection.Route, eventID)
+				case taskcontrols.RecoveryDetailFile:
+					path, err = routes.TaskFileSelectionPath(taskDetailSelection.Route, detail.Identity)
+				default:
+					return
+				}
+				if err == nil {
+					navigator.Navigate(path)
+				}
+			}
+		}
+	}
+	if authoritativeTaskControls != nil {
+		instrumentTaskControlTelemetry(authoritativeTaskControls, emitBrowserFrontendTelemetry)
+		topBar := taskControlsTopBar(store.Snapshot().TopBar, *authoritativeTaskControls)
+		topBar.TaskTitle = selectedThread.Get().Title()
+		store = store.ReduceRemote(frontendstate.TopBarChanged{TopBar: topBar})
+		if authoritativeTaskControls.OnResume != nil {
+			onPauseRequested = authoritativeTaskControls.OnResume
+		} else {
+			onPauseRequested = authoritativeTaskControls.OnPause
+		}
+		onStopRequested = authoritativeTaskControls.OnStop
+	}
+	composerProps := livePreviewComposer(selectedThread.Get(), latestThreadEvent.Get(), selectedGraphID)
+	if timelineSource.TaskReady {
+		composerProps = bindAuthoritativeComposerTaskActionsWithCallbacks(
+			composerProps,
+			timelineSource.Task,
+			session.Connection,
+			authoritativeTaskControls,
+			authoritativeComposerCallbacks{
+				InspectGraph: func() { selectedGraphID.Set("implementation") },
+				Review:       timelineProps.OnOpenReview,
+			},
+		)
+	}
+	taskState := domain.TaskState("")
+	projectionGraphRevision := uint64(0)
+	if timelineSource.TaskReady {
+		taskState = timelineSource.Task.State
+		projectionGraphRevision = timelineSource.Task.Graph.Revision
+	}
+	graphSource := useMountedGraph(
+		selectedThread.Get(), taskState, projectionGraphRevision,
+		primitives.Mode{
+			Theme: tokens.Theme, Density: tokens.Density,
+			HighContrast: tokens.Theme == design.ThemeHighContrast, ReducedMotion: tokens.ReducedMotion,
+		},
+		func(explanation string) {
+			if composerProps.OnTextChange == nil {
+				return
+			}
+			composerProps.OnTextChange(graphExplanationDraft(composerProps.View.Draft.Text(), explanation))
+			focusManager.FocusByID("thread-composer")
+		},
+		func(messageIDs []domain.MessageID) {
+			if len(messageIDs) == 0 {
+				graphMessageStableKey.Set("")
+				graphMessageNotice.Set("The selected graph node has no linked conversation messages.")
+				return
+			}
+			graphMessageStableKey.Set("message:" + messageIDs[0].String())
+			graphMessageNotice.Set(fmt.Sprintf(
+				"Showing the first of %d conversation message(s) linked to the selected graph node.",
+				len(messageIDs),
+			))
+		},
+	)
+	reloadGraph = graphSource.Reload
+	var onReconnectRequested func()
+	if !selectedThread.Get().SessionID().IsZero() {
+		onReconnectRequested = func() {
+			reconnectStartedAt.Set(time.Now())
+			reconnectVersion.Set(reconnectVersion.Get() + 1)
+		}
+	}
+	useReconnectCompletionTelemetry(streamStatus.Get(), selectedThread.Get().SessionID(), reconnectStartedAt)
+	useSlowRenderTelemetry(renderStarted, location.Path+"|"+selectedThread.Get().ID().String()+"|"+strconv.FormatUint(selectedRefreshRevision, 10))
+	navigatePath := func(path string) {
+		if appRoute.Name == routes.FirstRun {
+			emitFirstRunCompletionTelemetry()
+		}
+		if path == "/graphs" {
+			emitGraphOpenedTelemetry(selectedThread.Get().TaskID())
+		}
+		navigator.Navigate(path)
+	}
 	root := shell.RootProps{
-		Snapshot: store.Snapshot(),
-		Composer: livePreviewComposer(selectedGraphID),
-		Timeline: timelineProps,
+		Snapshot:     store.Snapshot(),
+		Composer:     composerProps,
+		Timeline:     timelineProps,
+		TaskControls: authoritativeTaskControls,
+		Telemetry:    telemetryProps,
 		ThreadRail: ui.CreateElement(mountedThreadRail, mountedThreadRailProps{
 			Envelope: resource.Value, Snapshot: store.Snapshot(), Route: appRoute,
 			Mode: primitives.Mode{
@@ -217,15 +406,26 @@ func productApplication() ui.Node {
 					navigator.Navigate(path)
 				}
 			},
-			OnAuthoritativeSelection: selectedThread.Set,
+			OnAuthoritativeSelection: func(thread threadrail.Thread) {
+				if thread.TaskID() != selectedThread.Get().TaskID() {
+					taskObservedAt.Set(time.Now())
+				}
+				selectedThread.Set(thread)
+			},
+			FirstPage: threadRailSource.State,
 		}),
-		Route:  appRoute,
-		Tokens: tokens,
+		AuthoritativeGraph: graphSource.Authoritative,
+		GraphInspector:     graphSource.Inspector,
+		Route:              appRoute,
+		Tokens:             tokens,
 		Translator: frontendi18n.EnglishRegistry().Resolve(
 			string(frontendi18n.LocaleEnglishUnitedStates),
 		),
 		OnLayoutChange: layoutState.Set,
-		OnGraphSelect:  selectedGraphID.Set,
+		OnGraphSelect: func(id string) {
+			emitGraphNavigatedTelemetry(selectedThread.Get().TaskID())
+			selectedGraphID.Set(id)
+		},
 		OnThreadNavigate: func(route routes.Route) {
 			path, err := routes.Path(route)
 			if location.Path == "/tasks" {
@@ -235,18 +435,11 @@ func productApplication() ui.Node {
 				navigator.Navigate(path)
 			}
 		},
-		OnNavigatePath: navigator.Navigate,
-		OnRetry:        bootstrap.Reload,
-		OnPauseRequested: func() {
-			if previewTaskState.Get() == "paused" {
-				previewTaskState.Set("in progress")
-				return
-			}
-			previewTaskState.Set("paused")
-		},
-		OnStopRequested: func() {
-			previewTaskState.Set("stopped")
-		},
+		OnNavigatePath:       navigatePath,
+		OnReconnectRequested: onReconnectRequested,
+		OnRetry:              bootstrap.Reload,
+		OnPauseRequested:     onPauseRequested,
+		OnStopRequested:      onStopRequested,
 		OnThemeChange: func() {
 			switch theme {
 			case design.ThemeDark:
@@ -352,56 +545,12 @@ func isShellPreviewRoute(path string) bool {
 	}
 }
 
-func useAuthenticatedSession(
-	selected *codefluxv1.StableIdentity,
-	envelope bootstrapEnvelope,
-	setStatus func(sessionclient.Status),
-) {
-	dependency := ""
-	if selected != nil {
-		dependency = selected.GetValue()
-	}
-	ui.UseEffectOf(func() func() {
-		if dependency == "" {
-			return nil
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		var mounted atomic.Bool
-		mounted.Store(true)
-		client, err := startAuthenticatedSession(
-			ctx,
-			envelope,
-			sessionclient.BrowserConnector{},
-			func(status sessionclient.Status) {
-				if mounted.Load() {
-					setStatus(status)
-				}
-			},
-			func(context.Context, *codefluxv1.SessionEvent) error {
-				// M16 owns authenticated ordered delivery. Event-to-view reducers
-				// remain a separate milestone and must not mutate sample shell data.
-				return nil
-			},
-		)
-		if err != nil {
-			mounted.Store(false)
-			cancel()
-			setStatus(sessionclient.Status{
-				State:   sessionclient.StateFailed,
-				Failure: sessionclient.FailureProtocol,
-			})
-			return nil
-		}
-		return func() {
-			mounted.Store(false)
-			cancel()
-			_ = client.Close()
-		}
-	}, dependency)
-}
-
 func loadBootstrap(context context.Context) (bootstrapEnvelope, error) {
-	return loadBootstrapWith(context, defaultBootstrapTimeout, browserStartupRequest)
+	envelope, err := loadBootstrapWith(context, defaultBootstrapTimeout, browserStartupRequest)
+	if err != nil {
+		emitFirstRunFailureTelemetry(err)
+	}
+	return envelope, err
 }
 
 func browserStartupRequest(
@@ -534,6 +683,8 @@ func sampleStore() frontendstate.Store {
 			Repository:     "codeflux",
 			Branch:         "main",
 			WorktreeStatus: "uncommitted changes",
+			TaskTitle:      "Implement the Codeflux frontend shell",
+			TaskSummary:    "Build the local-first GWC workspace with explicit correctness and browser evidence.",
 			TaskState:      "in progress",
 			Model:          "gpt-5",
 			Effort:         "high",

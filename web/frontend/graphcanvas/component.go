@@ -16,6 +16,7 @@ import (
 )
 
 type Props struct {
+	Authoritative    *AuthoritativeProps
 	Nodes            []state.GraphNodeView
 	Edges            []Edge
 	SelectedID       string
@@ -30,6 +31,9 @@ type Props struct {
 // Renderer validates and lays out a bounded graph before mounting the browser
 // drawing component. Invalid graphs remain visible instead of partially drawing.
 func Renderer(props Props) ui.Node {
+	if props.Authoritative != nil {
+		return authoritativeRenderer(*props.Authoritative)
+	}
 	return ui.CreateElement(stableRenderer, props)
 }
 
@@ -155,6 +159,17 @@ func interactiveCanvas(props interactiveProps) ui.Node {
 	selected := ui.UseState(initialSelectedID(props.Props))
 	focused := ui.UseState(false)
 	drag := ui.UseRef(dragState{})
+	selectNode := ui.UseEvent(func(event ui.MouseEvent) {
+		nodeID := strings.TrimSpace(event.GetValue())
+		if _, ok := placementByID(props.Layout, nodeID); !ok {
+			return
+		}
+		selected.Set(nodeID)
+		if props.OnSelect != nil {
+			onSelect := props.OnSelect
+			ui.PostAsync(func() { onSelect(nodeID) })
+		}
+	})
 	ui.UseEffect(func() func() {
 		external := strings.TrimSpace(props.SelectedID)
 		if external != "" && external != selected.Get() {
@@ -255,7 +270,7 @@ func interactiveCanvas(props interactiveProps) ui.Node {
 		}),
 		domCompanion(
 			props, viewport.Get(), width, measuredHeight,
-			selected, hovered, drag, startPan, movePan, endPan,
+			selected, hovered, selectNode,
 		),
 		viewportToolbar(props, viewport.Get(), width, measuredHeight, setViewport, selected),
 		edgeTextAlternative(props.Layout.Edges, nodesByID, props.Mode),
@@ -282,24 +297,13 @@ func domCompanion(
 	viewport Viewport,
 	width, height float64,
 	selected, hovered ui.State[string],
-	drag ui.Ref[dragState],
-	startPan, movePan, endPan func(ui.Event),
+	selectNode ui.Handler,
 ) ui.Node {
 	buttons := make([]ui.Node, 0, len(props.Layout.Nodes))
 	for _, placement := range props.Layout.Nodes {
 		placement := placement
 		screen := ScreenRect(placement.Bounds, viewport)
 		buttonProps := html.PropsOf(
-			html.OnClick(func(ui.MouseEvent) {
-				if drag.Get().Moved {
-					drag.Set(dragState{})
-					return
-				}
-				selected.Set(placement.Node.ID)
-				if props.OnSelect != nil {
-					props.OnSelect(placement.Node.ID)
-				}
-			}),
 			html.OnMouseEnter(func(ui.Event) { hovered.Set(placement.Node.ID) }),
 			html.OnMouseLeave(func(ui.Event) {
 				if hovered.Get() == placement.Node.ID {
@@ -312,9 +316,10 @@ func domCompanion(
 					hovered.Set("")
 				}
 			}),
-			html.OnPointerDown(startPan), html.OnPointerMove(movePan), html.OnPointerUp(endPan),
 		)
+		buttonProps.OnClick = selectNode
 		buttonProps.Type = "button"
+		buttonProps.Value = placement.Node.ID
 		buttonProps.Aria = map[string]string{
 			"label":   placement.Node.Title + " - " + statusLabel(placement.Node.Status),
 			"pressed": strconv.FormatBool(selected.Get() == placement.Node.ID),
@@ -382,14 +387,14 @@ func returnToCurrentControl(
 		Label: "Return to current", AccessibleLabel: "Return to current graph node", Mode: props.Mode,
 		OnClick: func() {
 			if placement, ok := placementByID(props.Layout, currentID); ok {
+				if props.OnSelect != nil {
+					props.OnSelect(currentID)
+				}
 				selected.Set(currentID)
 				setViewport(Viewport{
 					Zoom: 1, PanX: width/2 - placement.Bounds.Center().X,
 					PanY: height/2 - placement.Bounds.Center().Y,
 				})
-				if props.OnSelect != nil {
-					props.OnSelect(currentID)
-				}
 			}
 		},
 	})

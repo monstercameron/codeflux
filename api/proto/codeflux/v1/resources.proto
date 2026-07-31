@@ -39,6 +39,9 @@ message ThreadView {
   string task_state = 9;
   string attention = 10;
   uint32 unread_count = 11;
+  // Project scope is required by task-owned resources such as GraphService.
+  // It is a typed identity only and does not expose repository content.
+  StableIdentity project_id = 12;
 }
 
 message MessageView {
@@ -67,6 +70,47 @@ message TaskView {
   TokenAmount actual_tokens = 10;
   google.protobuf.Duration elapsed = 11;
   google.protobuf.Timestamp updated_at = 12;
+  // Revision of the authoritative budget aggregate. It may legitimately be
+  // zero for a newly created budget; clients pair it with hard_budget
+  // presence and use it for SetBudget rather than the independent task
+  // revision.
+  uint64 budget_revision = 13;
+  string selected_provider = 14;
+  string selected_model = 15;
+  string selected_effort = 16;
+  TaskForecastView forecast = 17;
+  repeated string actual_pricing_snapshot_ids = 18;
+  Money remaining_hard_budget = 19;
+  Money warning_threshold = 20;
+  bool warning_reached = 21;
+  bool hard_cap_reached = 22;
+  // Presence distinguishes an authoritative false value from unavailable
+  // provider-settlement state.
+  optional bool settling_provider_request = 23;
+  StableIdentity latest_checkpoint_id = 24;
+  string latest_checkpoint_state = 25;
+  string latest_checkpoint_plan_step = 26;
+}
+
+// TaskForecastView is the latest immutable transparent forecast. Optional
+// Money values stay absent when their exact rational value is not representable
+// as integral currency minor units; servers must never round them.
+message TaskForecastView {
+  string algorithm_version = 1;
+  string estimate_notice = 2;
+  bool latency_known = 3;
+  int64 latency_p50_ms = 4;
+  int64 latency_p90_ms = 5;
+  bool tokens_known = 6;
+  uint64 tokens_p50 = 7;
+  uint64 tokens_p90 = 8;
+  Money cost_p50 = 9;
+  Money cost_p90 = 10;
+  string price_snapshot_id = 11;
+  string price_source = 12;
+  google.protobuf.Timestamp price_captured_at = 13;
+  repeated string uncertainty_reasons = 14;
+  uint64 revision = 15;
 }
 
 message BudgetView {
@@ -86,6 +130,16 @@ message GraphNodeView {
   SafePath source_path = 5;
   uint32 source_line = 6;
   uint32 rank = 7;
+  RedactedText contract_purpose = 8;
+  repeated RedactedText contract_inputs = 9;
+  repeated RedactedText contract_outputs = 10;
+  repeated RedactedText contract_effects = 11;
+  bool tombstoned = 12;
+  repeated StableIdentity related_message_ids = 13;
+  repeated StableIdentity event_ids = 14;
+  repeated GraphPlanStepLinkView plan_steps = 15;
+  repeated GraphSourceLocationView source_locations = 16;
+  GraphLayoutHintView layout = 17;
 }
 
 message GraphEdgeView {
@@ -93,6 +147,35 @@ message GraphEdgeView {
   StableIdentity from_node_id = 2;
   StableIdentity to_node_id = 3;
   string kind = 4;
+  bool tombstoned = 5;
+  repeated StableIdentity event_ids = 6;
+  repeated GraphPlanStepLinkView plan_steps = 7;
+}
+
+message GraphPlanStepLinkView {
+  uint64 plan_revision = 1;
+  string step_id = 2;
+}
+
+message GraphSourceLocationView {
+  StableIdentity repository_id = 1;
+  string repository_revision = 2;
+  SafePath repository_relative_path = 3;
+  uint32 start_line = 4;
+  uint32 start_column = 5;
+  uint32 end_line = 6;
+  uint32 end_column = 7;
+}
+
+message GraphLayoutHintView {
+  string algorithm = 1;
+  uint64 algorithm_version = 2;
+  sint64 x_milli = 3;
+  sint64 y_milli = 4;
+  uint64 width_milli = 5;
+  uint64 height_milli = 6;
+  uint64 rank = 7;
+  uint64 sibling_order = 8;
 }
 
 message GraphSliceView {
@@ -104,6 +187,23 @@ message GraphSliceView {
   repeated GraphEdgeView edges = 6;
   string continuation_cursor = 7;
   bool truncated = 8;
+  string mode = 9;
+  uint32 graph_schema_version = 10;
+  string content_sha256 = 11;
+  string layout_algorithm = 12;
+  uint64 layout_algorithm_version = 13;
+  google.protobuf.Timestamp created_at = 14;
+  StableIdentity parent_graph_revision_id = 15;
+}
+
+message GraphRevisionChangeView {
+  string entity_kind = 1;
+  string change_kind = 2;
+  string stable_id = 3;
+  GraphNodeView before_node = 4;
+  GraphNodeView after_node = 5;
+  GraphEdgeView before_edge = 6;
+  GraphEdgeView after_edge = 7;
 }
 
 message DiffSummaryView {

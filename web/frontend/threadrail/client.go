@@ -195,6 +195,16 @@ func (c GRPCClient) decodeThread(view *codefluxv1.ThreadView) (Thread, error) {
 			return Thread{}, fmt.Errorf("%w: task identity", ErrInvalidPage)
 		}
 	}
+	var projectID domain.ProjectID
+	if view.GetProjectId() != nil {
+		if view.GetProjectId().GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_PROJECT {
+			return Thread{}, fmt.Errorf("%w: project identity", ErrInvalidPage)
+		}
+		projectID, err = domain.ParseProjectID(view.GetProjectId().GetValue())
+		if err != nil {
+			return Thread{}, fmt.Errorf("%w: project identity", ErrInvalidPage)
+		}
+	}
 	taskState, taskStateOK := threadRailTaskState(domain.TaskState(view.GetTaskState()))
 	if !taskStateOK {
 		return Thread{}, fmt.Errorf("%w: task state", ErrInvalidPage)
@@ -204,13 +214,13 @@ func (c GRPCClient) decodeThread(view *codefluxv1.ThreadView) (Thread, error) {
 		attention = AttentionNone
 	}
 	return NewThread(ThreadInput{
-		ID: threadID, SessionID: sessionID, RepositoryID: c.repositoryID, WorkspaceID: c.workspaceID, TaskID: taskID,
+		ID: threadID, ProjectID: projectID, SessionID: sessionID, RepositoryID: c.repositoryID, WorkspaceID: c.workspaceID, TaskID: taskID,
 		Title: view.GetTitle().GetValue(), TaskState: taskState, Attention: attention, Unread: view.GetUnreadCount(),
 		Archived: view.GetArchived(), Revision: view.GetRevision(), UpdatedAt: view.GetUpdatedAt().AsTime(),
 	})
 }
 
-func threadRailTaskState(state domain.TaskState) (TaskState, bool) {
+func threadRailTaskState(state domain.TaskState) (RailTaskState, bool) {
 	switch state {
 	case "":
 		return TaskStateNone, true

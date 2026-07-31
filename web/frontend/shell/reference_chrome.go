@@ -106,11 +106,16 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			worktree = "worktree status"
 		}
 	}
+	provider := fallback(props.View.Provider, "provider")
 	model := fallback(props.View.Model, "model")
 	effort := fallback(props.View.Effort, "effort")
 	forecast := fallback(props.View.ForecastCost, "forecast")
+	tokensUsed := fallback(props.View.ActualTokens, "usage")
 	actual := fallback(props.View.ActualCost, fallback(props.CostLabel, "actual"))
+	pricing := fallback(props.View.PricingSnapshot, "pricing snapshot")
 	budget := fallback(props.View.HardBudget, "budget")
+	remaining := fallback(props.View.RemainingBudget, "remaining")
+	warning := fallback(props.View.BudgetWarning, "threshold")
 	connection := string(props.View.Connection)
 	if connection == "" {
 		connection = string(props.Session.Connection)
@@ -172,10 +177,14 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			contextControl("branch", "⑂", branch, "/settings", props.Mode, props.OnNavigatePath),
 			contextControl("worktree", "✓", worktree, "/settings", props.Mode, props.OnNavigatePath),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl("model", "◈", model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
+				contextControl("model", "◈", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl("budget", "$", forecast+" / "+actual+" / "+budget, "/settings", props.Mode, props.OnNavigatePath),
+				contextControl(
+					"budget", "$",
+					forecast+" / "+tokensUsed+" / "+actual+" / "+pricing+" / "+budget+" / "+remaining+" / "+warning,
+					"/settings", props.Mode, props.OnNavigatePath,
+				),
 			),
 		),
 		html.Div(html.Props{
@@ -195,6 +204,7 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				),
 				Text: "●  Local " + humanize(connection),
 			}),
+			manualReconnectControl(props, connection),
 			headerIconButtonWithID("global-search-trigger", "⌕", "Search", props.Mode, props.OnSearchOpen),
 			headerIconButton("◐", "Change color theme", props.Mode, props.OnThemeChange),
 			headerIconButton("?", "Shortcut help", props.Mode, props.OnShortcutHelp),
@@ -223,6 +233,16 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			OnNavigatePath: props.OnNavigatePath,
 		}),
 	)
+}
+
+func manualReconnectControl(props ApplicationBarProps, connection string) ui.Node {
+	if connection != string(state.ConnectionDisconnected) || props.OnReconnectRequested == nil {
+		return nil
+	}
+	return primitives.Button(primitives.ButtonProps{
+		ID: "session-reconnect", Label: "Reconnect", AccessibleLabel: "Reconnect live session",
+		Mode: props.Mode, OnClick: props.OnReconnectRequested,
+	})
 }
 
 func applicationBarClass(tracks []css.Track, tokens design.Tokens) string {
@@ -839,6 +859,8 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 	tokens := props.Mode.Tokens()
 	pauseLabel, pauseAccessible := taskPausePresentation(props.Snapshot.TopBar.TaskState, false)
 	taskStateLabel := humanize(fallback(props.Snapshot.TopBar.TaskState, "unknown"))
+	taskTitle := fallback(props.Snapshot.TopBar.TaskTitle, "Selected task")
+	taskSummary := fallback(props.Snapshot.TopBar.TaskSummary, "No authoritative task summary is available.")
 	taskStateColor := tokens.Colors.Active
 	switch {
 	case strings.Contains(strings.ToLower(taskStateLabel), "paused"):
@@ -897,7 +919,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 								css.Font(css.FontStack(tokens.Fonts.Display)),
 								css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 							).String(),
-							Text: "Implement the Codeflux frontend shell",
+							Text: taskTitle,
 						}),
 						statusPill("● "+taskStateLabel, taskStateColor, tokens),
 					),
@@ -907,7 +929,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 							css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
 							css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
 						).String(),
-						Text: "Build the local-first GWC workspace with explicit correctness and browser evidence.",
+						Text: taskSummary,
 					}),
 				),
 			),
@@ -943,7 +965,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 				),
 			),
 		),
-		taskMetricStrip(taskStateLabel, taskStateColor, tokens),
+		taskMetricStrip(props.Snapshot.TopBar, taskStateLabel, taskStateColor, tokens),
 	)
 }
 
@@ -1039,14 +1061,14 @@ func taskPausePresentation(taskState string, compact bool) (string, string) {
 	return "Ⅱ  Pause", "Pause task"
 }
 
-func taskMetricStrip(taskState string, taskStateColor design.Color, tokens design.Tokens) ui.Node {
+func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor design.Color, tokens design.Tokens) ui.Node {
 	metrics := []detailRow{
-		{"Correctness profile", "Strict"},
+		{"Correctness profile", "Unknown"},
 		{"Task state", taskState},
-		{"Progress", "68%"},
-		{"Elapsed", "2.1 min"},
-		{"Cost", "$0.42"},
-		{"Gates", "3 / 5"},
+		{"Progress", "Unknown"},
+		{"Elapsed", "Unknown"},
+		{"Cost", fallback(topBar.ActualCost, "Unknown")},
+		{"Gates", "Unknown"},
 	}
 	nodes := make([]ui.Node, 0, len(metrics))
 	for index, metric := range metrics {
@@ -1146,16 +1168,30 @@ func GraphPane(props GraphPaneProps) ui.Node {
 		if props.Viewport == state.ViewportNarrow || props.Viewport == state.ViewportMinimum {
 			height = 420
 		}
-		content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{
-			Nodes:          props.Nodes,
-			Edges:          graphCanvasEdges(props.Nodes),
-			SelectedID:     props.SelectedID,
-			CurrentID:      currentGraphNodeID(props.Nodes),
-			ResponsiveMode: string(props.Viewport),
-			Mode:           props.Mode,
-			Height:         height,
-			OnSelect:       props.OnSelect,
-		})
+		if props.Authoritative != nil {
+			authoritative := *props.Authoritative
+			authoritative.ResponsiveMode = string(props.Viewport)
+			authoritative.VisualMode = props.Mode
+			authoritative.Height = height
+			content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{Authoritative: &authoritative})
+		} else {
+			content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{
+				Nodes:          props.Nodes,
+				Edges:          graphCanvasEdges(props.Nodes),
+				SelectedID:     props.SelectedID,
+				CurrentID:      currentGraphNodeID(props.Nodes),
+				ResponsiveMode: string(props.Viewport),
+				Mode:           props.Mode,
+				Height:         height,
+				OnSelect:       props.OnSelect,
+			})
+		}
+		if props.Inspector != nil {
+			content = html.Div(html.Props{
+				Data:  map[string]string{"component": "authoritative-graph-workspace"},
+				Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)), css.OverflowY.Auto).String(),
+			}, content, props.Inspector)
+		}
 	}
 	return html.Aside(html.Props{
 		ID: "graph-region", TabIndex: -1,

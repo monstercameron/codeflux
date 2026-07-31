@@ -20,17 +20,19 @@ func TestProductServiceMethodSurface(t *testing.T) {
 		"codeflux.v1.TaskService": {
 			"CreateTask", "GetTask", "StartTask", "PauseTask", "ResumeTask", "CancelTask",
 			"ApproveAction", "SetBudget", "RequestRepair", "RollbackTask",
+			"PreserveRecoveryPatch", "ReconcileRecovery", "SafeResumeRecovery",
 		},
 		"codeflux.v1.GraphService": {
-			"GetGraphSlice", "ExpandGraph", "GetNode", "ExplainNode", "CompareGraphRevisions",
+			"GetGraphSlice", "ExpandGraph", "GetNode", "SearchGraph", "ExplainNode", "CompareGraphRevisions",
 		},
 		"codeflux.v1.ReviewService": {
 			"GetDiffSummary", "GetValidationReport", "AcceptChange", "RejectChange", "OpenInEditor",
 		},
 		"codeflux.v1.SettingsService": {
 			"GetModels", "GetPolicy", "SetPolicy", "SetBudgetDefaults", "ConfigureProvider", "TestProvider",
+			"RecordFrontendTelemetry", "ListFrontendTelemetry", "DeleteFrontendTelemetry",
 		},
-		"codeflux.v1.SessionService": {"SubscribeSession"},
+		"codeflux.v1.SessionService": {"GetSessionSnapshot", "SubscribeSession"},
 	}
 
 	for serviceName, methodNames := range expected {
@@ -69,11 +71,16 @@ func TestEveryMutationCarriesStandardControl(t *testing.T) {
 		"codeflux.v1.SetBudgetRequest",
 		"codeflux.v1.RequestRepairRequest",
 		"codeflux.v1.RollbackTaskRequest",
+		"codeflux.v1.PreserveRecoveryPatchRequest",
+		"codeflux.v1.ReconcileRecoveryRequest",
+		"codeflux.v1.SafeResumeRecoveryRequest",
 		"codeflux.v1.AcceptChangeRequest",
 		"codeflux.v1.RejectChangeRequest",
 		"codeflux.v1.OpenInEditorRequest",
 		"codeflux.v1.SetPolicyRequest",
 		"codeflux.v1.SetBudgetDefaultsRequest",
+		"codeflux.v1.RecordFrontendTelemetryRequest",
+		"codeflux.v1.DeleteFrontendTelemetryRequest",
 		"codeflux.v1.ConfigureProviderRequest",
 	}
 

@@ -114,13 +114,14 @@ func (hub *Hub) Subscribe(
 	}
 	hub.nextID++
 	subscription := &Subscription{
-		id:        hub.nextID,
-		hub:       hub,
-		query:     query,
-		liveAfter: boundary,
-		capacity:  hub.capacity,
-		signal:    make(chan struct{}, 1),
-		done:      make(chan struct{}),
+		id:           hub.nextID,
+		hub:          hub,
+		query:        query,
+		liveBoundary: boundary,
+		liveAfter:    boundary,
+		capacity:     hub.capacity,
+		signal:       make(chan struct{}, 1),
+		done:         make(chan struct{}),
 	}
 	after := query.AfterSequence
 	for after < boundary {
@@ -252,11 +253,12 @@ func (hub *Hub) SessionMetrics(sessionID domain.SessionID) Metrics {
 
 // Subscription is a bounded, cancellation-aware event cursor.
 type Subscription struct {
-	id        uint64
-	hub       *Hub
-	query     SubscriptionQuery
-	liveAfter uint64
-	capacity  int
+	id           uint64
+	hub          *Hub
+	query        SubscriptionQuery
+	liveBoundary uint64
+	liveAfter    uint64
+	capacity     int
 
 	mu          sync.Mutex
 	queue       []SessionEvent
@@ -265,6 +267,17 @@ type Subscription struct {
 	closeErr    error
 	closed      bool
 	stopContext func() bool
+}
+
+// ReplayBoundary returns the immutable committed sequence captured when the
+// subscription joined replay to live delivery.
+func (subscription *Subscription) ReplayBoundary() uint64 {
+	if subscription == nil {
+		return 0
+	}
+	subscription.mu.Lock()
+	defer subscription.mu.Unlock()
+	return subscription.liveBoundary
 }
 
 // Next returns the next ordered event or the terminal subscription error.
