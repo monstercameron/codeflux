@@ -14,27 +14,50 @@ func (repositories *Repositories) CreateTask(
 	ctx context.Context,
 	input CreateTask,
 ) (Task, error) {
-	switch {
-	case input.ID.IsZero():
-		return Task{}, errors.New("task ID must not be empty")
-	case input.ThreadID.IsZero():
-		return Task{}, errors.New("thread ID must not be empty")
-	case input.RepositoryID.IsZero():
-		return Task{}, errors.New("repository ID must not be empty")
-	case !input.PolicyPreset.IsValid():
-		return Task{}, errors.New("policy preset is invalid")
-	case !input.ReasoningEffort.IsValid():
-		return Task{}, errors.New("reasoning effort is invalid")
-	case !input.RiskLevel.IsValid():
-		return Task{}, errors.New("risk level is invalid")
-	case !input.RequiredAssurance.IsValid() ||
-		input.RequiredAssurance == domain.AssuranceLevelInvalidated:
-		return Task{}, errors.New("required assurance is invalid")
-	}
-	if err := validateBounded("task idempotency key", input.IdempotencyKey, 255); err != nil {
+	if err := validateCreateTaskInput(input); err != nil {
 		return Task{}, err
 	}
 	now, micros := repositories.timestamp()
+	var task Task
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		var err error
+		task, err = createTaskTransaction(ctx, transaction, input, now, micros)
+		return err
+	})
+	return task, err
+}
+
+func validateCreateTaskInput(input CreateTask) error {
+	switch {
+	case input.ID.IsZero():
+		return errors.New("task ID must not be empty")
+	case input.ThreadID.IsZero():
+		return errors.New("thread ID must not be empty")
+	case input.RepositoryID.IsZero():
+		return errors.New("repository ID must not be empty")
+	case !input.PolicyPreset.IsValid():
+		return errors.New("policy preset is invalid")
+	case !input.ReasoningEffort.IsValid():
+		return errors.New("reasoning effort is invalid")
+	case !input.RiskLevel.IsValid():
+		return errors.New("risk level is invalid")
+	case !input.RequiredAssurance.IsValid() ||
+		input.RequiredAssurance == domain.AssuranceLevelInvalidated:
+		return errors.New("required assurance is invalid")
+	}
+	if err := validateBounded("task idempotency key", input.IdempotencyKey, 255); err != nil {
+		return err
+	}
+	return nil
+}
+
+func createTaskTransaction(
+	ctx context.Context,
+	transaction *Transaction,
+	input CreateTask,
+	now time.Time,
+	micros int64,
+) (Task, error) {
 	task := Task{
 		ID:                input.ID,
 		ThreadID:          input.ThreadID,
@@ -48,45 +71,42 @@ func (repositories *Repositories) CreateTask(
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
-		existing, found, err := findTaskByIdempotency(
+	existing, found, err := findTaskByIdempotency(
+		ctx,
+		transaction,
+		input.ThreadID,
+		input.IdempotencyKey,
+	)
+	if err != nil {
+		return Task{}, err
+	}
+	if found {
+		settingsRevision, err := taskSettingsRevisionTransaction(
 			ctx,
 			transaction,
-			input.ThreadID,
-			input.IdempotencyKey,
+			existing.ID,
 		)
 		if err != nil {
-			return err
+			return Task{}, err
 		}
-		if found {
-			settingsRevision, err := taskSettingsRevisionTransaction(
-				ctx,
-				transaction,
-				existing.ID,
+		if existing.RepositoryID != input.RepositoryID ||
+			existing.PolicyPreset != input.PolicyPreset ||
+			existing.ReasoningEffort != input.ReasoningEffort ||
+			existing.RiskLevel != input.RiskLevel ||
+			existing.RequiredAssurance != input.RequiredAssurance ||
+			settingsRevision != input.SettingsRevision ||
+			!sameMessageID(existing.RequestMessageID, input.RequestMessageID) {
+			return Task{}, typedError(
+				ErrConflict,
+				"create idempotent task",
+				errors.New("idempotency key belongs to different task"),
 			)
-			if err != nil {
-				return err
-			}
-			if existing.ID != input.ID ||
-				existing.RepositoryID != input.RepositoryID ||
-				existing.PolicyPreset != input.PolicyPreset ||
-				existing.ReasoningEffort != input.ReasoningEffort ||
-				existing.RiskLevel != input.RiskLevel ||
-				existing.RequiredAssurance != input.RequiredAssurance ||
-				settingsRevision != input.SettingsRevision ||
-				!sameMessageID(existing.RequestMessageID, input.RequestMessageID) {
-				return typedError(
-					ErrConflict,
-					"create idempotent task",
-					errors.New("idempotency key belongs to different task"),
-				)
-			}
-			task = existing
-			return nil
 		}
-		result, err := transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO tasks (
+		return existing, nil
+	}
+	result, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO tasks (
 				id, thread_id, repository_id, request_message_id, state,
 				policy_preset, reasoning_effort, risk_level, required_assurance,
 				idempotency_key, created_at_unix_micros,
@@ -102,51 +122,49 @@ func (repositories *Repositories) CreateTask(
 					WHERE id = ? AND thread_id = ?
 				)
 			  )`,
-			input.ID,
-			input.ThreadID,
-			input.RepositoryID,
-			nullableMessageID(input.RequestMessageID),
-			input.PolicyPreset,
-			input.ReasoningEffort,
-			input.RiskLevel,
-			input.RequiredAssurance,
-			input.IdempotencyKey,
-			micros,
-			micros,
-			input.ThreadID,
-			input.RepositoryID,
-			nullableMessageID(input.RequestMessageID),
-			nullableMessageID(input.RequestMessageID),
-			input.ThreadID,
+		input.ID,
+		input.ThreadID,
+		input.RepositoryID,
+		nullableMessageID(input.RequestMessageID),
+		input.PolicyPreset,
+		input.ReasoningEffort,
+		input.RiskLevel,
+		input.RequiredAssurance,
+		input.IdempotencyKey,
+		micros,
+		micros,
+		input.ThreadID,
+		input.RepositoryID,
+		nullableMessageID(input.RequestMessageID),
+		nullableMessageID(input.RequestMessageID),
+		input.ThreadID,
+	)
+	if err != nil {
+		return Task{}, repositoryWriteError("create task", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return Task{}, err
+	}
+	if affected != 1 {
+		return Task{}, typedError(
+			ErrConstraint,
+			"create task",
+			errors.New("thread does not belong to repository"),
 		)
-		if err != nil {
-			return repositoryWriteError("create task", err)
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected != 1 {
-			return typedError(
-				ErrConstraint,
-				"create task",
-				errors.New("thread does not belong to repository"),
-			)
-		}
-		if _, err := transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO task_settings_bindings (
+	}
+	if _, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO task_settings_bindings (
 				task_id, settings_revision, bound_at_unix_micros
 			) VALUES (?, ?, ?)`,
-			input.ID,
-			input.SettingsRevision,
-			micros,
-		); err != nil {
-			return repositoryWriteError("bind task settings revision", err)
-		}
-		return nil
-	})
-	return task, err
+		input.ID,
+		input.SettingsRevision,
+		micros,
+	); err != nil {
+		return Task{}, repositoryWriteError("bind task settings revision", err)
+	}
+	return task, nil
 }
 
 func taskSettingsRevisionTransaction(

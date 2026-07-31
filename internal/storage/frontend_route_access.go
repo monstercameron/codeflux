@@ -14,6 +14,7 @@ const maxFrontendRouteAccessIdentities = 10_000
 // excluded.
 type FrontendRouteAccess struct {
 	FirstRunComplete       bool
+	SelectedWorkspaceID    domain.WorkspaceID
 	AccessibleRepositories []domain.RepositoryID
 	AccessibleThreads      []domain.ThreadID
 	ArchivedThreads        []domain.ThreadID
@@ -34,11 +35,18 @@ func (repositories *Repositories) ReadFrontendRouteAccess(
 			FROM repositories
 			WHERE deleted_at_unix_micros IS NULL
 			UNION ALL
+			SELECT 'workspace', workspaces.id, 'active'
+			FROM workspaces
+			JOIN repositories ON repositories.id = workspaces.repository_id
+			WHERE workspaces.state = 'active'
+			  AND repositories.deleted_at_unix_micros IS NULL
+			UNION ALL
 			SELECT 'thread', threads.id,
-				CASE WHEN threads.deleted_at_unix_micros IS NULL THEN 'active' ELSE 'archived' END
+				CASE WHEN threads.archived_at_unix_micros IS NULL THEN 'active' ELSE 'archived' END
 			FROM threads
 			JOIN repositories ON repositories.id = threads.repository_id
 			WHERE repositories.deleted_at_unix_micros IS NULL
+			  AND threads.deleted_at_unix_micros IS NULL
 		)
 		ORDER BY identity_kind, identity_value
 		LIMIT ?`, maxFrontendRouteAccessIdentities+1)
@@ -75,6 +83,14 @@ func (repositories *Repositories) ReadFrontendRouteAccess(
 				result.ArchivedThreads = append(result.ArchivedThreads, identity)
 			} else {
 				result.AccessibleThreads = append(result.AccessibleThreads, identity)
+			}
+		case "workspace":
+			if result.SelectedWorkspaceID.IsZero() {
+				identity, parseErr := domain.ParseWorkspaceID(value)
+				if parseErr != nil {
+					return FrontendRouteAccess{}, classify("parse frontend workspace identity", parseErr)
+				}
+				result.SelectedWorkspaceID = identity
 			}
 		}
 	}

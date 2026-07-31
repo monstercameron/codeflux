@@ -19,6 +19,7 @@ type ButtonProps struct {
 	Busy            bool
 	Expanded        *bool
 	Controls        string
+	DescribedBy     string
 	Mode            Mode
 	OnClick         func()
 }
@@ -40,6 +41,9 @@ func Button(props ButtonProps) ui.Node {
 	}
 	if props.Controls != "" {
 		htmlProps.Aria["controls"] = props.Controls
+	}
+	if props.DescribedBy != "" {
+		htmlProps.Aria["describedby"] = props.DescribedBy
 	}
 	htmlProps.Data = map[string]string{
 		"component":       "button",
@@ -229,10 +233,13 @@ func Tabs(props TabsProps) ui.Node {
 	}
 	return html.Div(
 		html.Props{
-			Role:  "tablist",
-			Aria:  map[string]string{"label": props.Label, "orientation": "horizontal"},
-			Data:  map[string]string{"component": "tabs", "keyboard": "arrows-home-end"},
-			Class: css.New(u.Flex, css.Gap(css.Px(tokens.Spacing.XS))).String(),
+			Role: "tablist",
+			Aria: map[string]string{"label": props.Label, "orientation": "horizontal"},
+			Data: map[string]string{"component": "tabs", "keyboard": "arrows-home-end"},
+			Class: css.New(
+				u.Flex, css.Gap(css.Px(tokens.Spacing.XS)),
+				css.MaxWidth(css.Full), css.OverflowX.Auto, css.Padding(css.Px(1)),
+			).String(),
 		},
 		children...,
 	)
@@ -275,10 +282,25 @@ func TextField(props TextFieldProps) ui.Node {
 	}
 	inputProps.Data = map[string]string{"component": "text-field", "state": stateName(InteractionState{Disabled: props.Disabled})}
 	inputProps.Class = fieldClass(tokens)
-	children := []ui.Node{html.Label(html.Props{For: props.ID}, html.Text(props.Label)), html.Input(inputProps)}
+	children := []ui.Node{html.Label(html.Props{
+		For: props.ID,
+		Class: css.New(
+			css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+			css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+			css.LineHeightLen(css.Px(tokens.Typography.ControlLabel.LineHeight)),
+			css.FontWeight.Semibold,
+		).String(),
+	}, html.Text(props.Label)), html.Input(inputProps)}
 	if props.InvalidMessage != "" {
 		children = append(children, html.Span(
-			html.Props{ID: props.ID + "-error", Role: "alert"},
+			html.Props{
+				ID: props.ID + "-error", Role: "alert",
+				Class: css.New(
+					css.TextColor(css.Hex(string(tokens.Colors.Failure))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+				).String(),
+			},
 			html.Text(props.InvalidMessage),
 		))
 	}
@@ -289,15 +311,32 @@ func fieldClass(tokens design.Tokens) string {
 	rules := []css.Rule{
 		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
 		css.PaddingX(css.Px(tokens.Spacing.MD)),
-		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
 	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors, css.PropShadow),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+	)...)
+	rules = append(rules, css.Disabled(
+		css.OpacityNum(css.Num(0.55)), css.Cursor.NotAllowed,
+	)...)
 	rules = append(rules, css.FocusVisible(
 		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
 		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
 	)...)
 	return css.New(rules...).String()
 }

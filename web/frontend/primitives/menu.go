@@ -126,7 +126,7 @@ func Menu(props MenuProps) ui.Node {
 				"state":     map[bool]string{true: "open", false: "closed"}[props.Open],
 				"keyboard":  "arrows-home-end-enter-space-escape",
 			},
-			Class: surfaceClass(tokens),
+			Class: surfaceClassAt(tokens, tokens.Elevation.Floating),
 		},
 		items...,
 	)

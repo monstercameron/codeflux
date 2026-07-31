@@ -28,6 +28,9 @@ enum SessionEventKind {
   SESSION_EVENT_KIND_CHECKPOINT_CREATED = 18;
   SESSION_EVENT_KIND_RECOVERY_REQUIRED = 19;
   SESSION_EVENT_KIND_ERROR = 20;
+  SESSION_EVENT_KIND_THREAD_CREATED = 21;
+  SESSION_EVENT_KIND_THREAD_RENAMED = 22;
+  SESSION_EVENT_KIND_THREAD_ARCHIVED = 23;
 }
 
 message SessionEvent {
@@ -57,6 +60,9 @@ message SessionEvent {
     CheckpointEvent checkpoint = 32;
     RecoveryRequiredEvent recovery_required = 33;
     UserErrorEvent error = 34;
+    ThreadCreatedEvent thread_created = 35;
+    ThreadRenamedEvent thread_renamed = 36;
+    ThreadArchivedEvent thread_archived = 37;
   }
 }
 
@@ -69,6 +75,21 @@ message MessageFinalEvent {
   StableIdentity message_id = 1;
   string role = 2;
   string redacted_body = 3;
+}
+
+message ThreadCreatedEvent {
+  StableIdentity workspace_id = 1;
+  string title = 2;
+  bool archived = 3;
+}
+
+message ThreadRenamedEvent {
+  string previous_title = 1;
+  string title = 2;
+}
+
+message ThreadArchivedEvent {
+  bool archived = 1;
 }
 
 message PlanEvent {

@@ -35,29 +35,30 @@ type VirtualListItemProps[T any] struct {
 // VirtualListProps configures a fixed-height, controlled virtualized listbox.
 // Items are treated as immutable, matching the GWC virtualization contract.
 type VirtualListProps[T any] struct {
-	ID                string
-	Label             string
-	Items             []T
-	State             VirtualListState
-	Height            float64
-	RowHeight         float64
-	Overscan          int
-	Mode              Mode
-	ActiveKey         string
-	ItemKey           func(T) string
-	ItemLabel         func(T) string
-	RenderItem        func(VirtualListItemProps[T]) ui.Node
-	OnActiveChange    func(string)
-	OnActivate        func(string)
-	EmptyTitle        string
-	EmptyBody         string
-	LoadingLabel      string
-	ErrorTitle        string
-	ErrorBody         string
-	DisconnectedTitle string
-	DisconnectedBody  string
-	RetryLabel        string
-	OnRetry           func()
+	ID                   string
+	Label                string
+	Items                []T
+	State                VirtualListState
+	Height               float64
+	RowHeight            float64
+	Overscan             int
+	Mode                 Mode
+	ActiveKey            string
+	ItemKey              func(T) string
+	ItemLabel            func(T) string
+	RenderItem           func(VirtualListItemProps[T]) ui.Node
+	OnActiveChange       func(string)
+	OnActivate           func(string)
+	OnVisibleRangeChange func(int)
+	EmptyTitle           string
+	EmptyBody            string
+	LoadingLabel         string
+	ErrorTitle           string
+	ErrorBody            string
+	DisconnectedTitle    string
+	DisconnectedBody     string
+	RetryLabel           string
+	OnRetry              func()
 }
 
 // VirtualListKeyDecision is the pure result of listbox keyboard navigation.
@@ -211,6 +212,11 @@ func VirtualList[T any](props VirtualListProps[T]) ui.Node {
 	return ui.CreateElement(virtualization.List[T], virtualization.ListProps[T]{
 		ID: props.ID, Items: props.Items, Height: props.Height, RowHeight: props.RowHeight,
 		Overscan: props.Overscan, OuterProps: outerProps,
+		OnViewportChange: func(diagnostics virtualization.ViewportDiagnostics) {
+			if props.OnVisibleRangeChange != nil {
+				props.OnVisibleRangeChange(diagnostics.VisibleEnd)
+			}
+		},
 		ItemKey: func(item T) string { return strings.TrimSpace(props.ItemKey(item)) },
 		RenderRow: func(row virtualization.RowRenderProps[T]) ui.Node {
 			itemKey := keys[row.Index]

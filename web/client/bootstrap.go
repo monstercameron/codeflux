@@ -18,13 +18,14 @@ import (
 const defaultBootstrapTimeout = 12 * time.Second
 
 type bootstrapEnvelope struct {
-	ApplicationVersion string                     `json:"application_version"`
-	APIVersion         string                     `json:"api_version"`
-	SchemaVersion      int                        `json:"schema_version"`
-	FrontendVersion    string                     `json:"frontend_version"`
-	BridgePath         string                     `json:"bridge_path"`
-	SelectedSessionID  *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
-	RouteAccess        routeAccessEnvelope        `json:"route_access"`
+	ApplicationVersion  string                     `json:"application_version"`
+	APIVersion          string                     `json:"api_version"`
+	SchemaVersion       int                        `json:"schema_version"`
+	FrontendVersion     string                     `json:"frontend_version"`
+	BridgePath          string                     `json:"bridge_path"`
+	SelectedSessionID   *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
+	SelectedWorkspaceID *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
+	RouteAccess         routeAccessEnvelope        `json:"route_access"`
 }
 
 // routeAccessEnvelope contains identifiers only. Repository paths, thread
@@ -169,6 +170,12 @@ func routeAccessKey(envelope bootstrapEnvelope) string {
 	builder.WriteString(strconv.Itoa(envelope.SchemaVersion))
 	builder.WriteByte('|')
 	builder.WriteString(strconv.FormatBool(envelope.RouteAccess.FirstRunComplete))
+	if workspaceID := envelope.SelectedWorkspaceID; workspaceID != nil {
+		builder.WriteByte('|')
+		builder.WriteString(strconv.Itoa(int(workspaceID.GetKind())))
+		builder.WriteByte(':')
+		builder.WriteString(workspaceID.GetValue())
+	}
 	for _, identities := range [][]*codefluxv1.StableIdentity{
 		envelope.RouteAccess.AccessibleRepositories,
 		envelope.RouteAccess.AccessibleThreads,

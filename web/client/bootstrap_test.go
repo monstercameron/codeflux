@@ -115,6 +115,24 @@ func TestRestorationContextUsesOnlyTypedServerConfirmedIdentifiers(t *testing.T)
 	}
 }
 
+func TestRouteAccessKeyIncludesSelectedWorkspaceAuthority(t *testing.T) {
+	first := bootstrapEnvelope{
+		ApplicationVersion: "0.17.0", APIVersion: "codeflux.v1", SchemaVersion: 17,
+		SelectedWorkspaceID: &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,
+			Value: "wsp_01890f3c-4a00-7abc-8def-0123456789ab",
+		},
+	}
+	second := first
+	second.SelectedWorkspaceID = &codefluxv1.StableIdentity{
+		Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,
+		Value: "wsp_01890f3c-4a00-7abc-8def-0123456789ac",
+	}
+	if firstKey, secondKey := routeAccessKey(first), routeAccessKey(second); firstKey == secondKey {
+		t.Fatalf("workspace authority did not change route access key: %q", firstKey)
+	}
+}
+
 func containsSensitiveDetail(message string) bool {
 	for _, candidate := range []string{".sqlite", "SELECT ", "C:\\", "/Users/"} {
 		if strings.Contains(message, candidate) {

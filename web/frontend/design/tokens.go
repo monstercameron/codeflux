@@ -77,8 +77,9 @@ type ColorTokens struct {
 
 // FontTokens uses only local system stacks.
 type FontTokens struct {
-	UI   string
-	Code string
+	Display string
+	UI      string
+	Code    string
 }
 
 // TypeStyle is one fixed typography role in CSS pixels.
@@ -245,36 +246,37 @@ func TokensFor(options Options) (Tokens, error) {
 		Theme: theme, Density: density, ReducedMotion: options.ReducedMotion,
 		Colors: colors,
 		Fonts: FontTokens{
-			UI:   `ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif`,
-			Code: `ui-monospace,"Cascadia Code","SFMono-Regular",Consolas,monospace`,
+			Display: `Bahnschrift,"DIN Alternate","Segoe UI Variable Display","Segoe UI",sans-serif`,
+			UI:      `"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,-apple-system,sans-serif`,
+			Code:    `"Cascadia Mono","SFMono-Regular",ui-monospace,Consolas,monospace`,
 		},
 		Typography: TypographyTokens{
-			WorkspaceTitle: TypeStyle{Size: 24, LineHeight: 32, Weight: 600},
-			TaskTitle:      TypeStyle{Size: 20, LineHeight: 28, Weight: 600},
-			SectionTitle:   TypeStyle{Size: 16, LineHeight: 24, Weight: 600},
-			PanelHeading:   TypeStyle{Size: 14, LineHeight: 20, Weight: 600},
-			Body:           TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
-			CompactBody:    TypeStyle{Size: 12, LineHeight: 18, Weight: 400},
-			Metadata:       TypeStyle{Size: 11, LineHeight: 16, Weight: 500},
-			ControlLabel:   TypeStyle{Size: 12, LineHeight: 16, Weight: 600},
+			WorkspaceTitle: TypeStyle{Size: 28, LineHeight: 36, Weight: 600},
+			TaskTitle:      TypeStyle{Size: 22, LineHeight: 30, Weight: 600},
+			SectionTitle:   TypeStyle{Size: 18, LineHeight: 26, Weight: 600},
+			PanelHeading:   TypeStyle{Size: 15, LineHeight: 22, Weight: 600},
+			Body:           TypeStyle{Size: 14, LineHeight: 21, Weight: 400},
+			CompactBody:    TypeStyle{Size: 13, LineHeight: 19, Weight: 400},
+			Metadata:       TypeStyle{Size: 12, LineHeight: 17, Weight: 500},
+			ControlLabel:   TypeStyle{Size: 13, LineHeight: 18, Weight: 600},
 			MetricValue: TypeStyle{
-				Size: 16, LineHeight: 22, Weight: 600, Tabular: true,
+				Size: 17, LineHeight: 23, Weight: 600, Tabular: true,
 			},
-			Code: TypeStyle{Size: 12, LineHeight: 18, Weight: 400},
+			Code: TypeStyle{Size: 13, LineHeight: 19, Weight: 400},
 		},
 		Spacing: SpacingTokens{XS: 4, SM: 8, MD: 12, LG: 16, XL: 24, XXL: 32},
 		Geometry: GeometryTokens{
 			BorderWidth: 1, BorderStrongWidth: 2,
-			RadiusSmall: 6, ControlRadius: 8, PanelRadius: 12,
-			DialogRadius: 16, PillRadius: 999,
+			RadiusSmall: 3, ControlRadius: 4, PanelRadius: 6,
+			DialogRadius: 8, PillRadius: 999,
 			FocusRingWidth: 3, FocusRingOffset: 2,
-			Shadow: "0 8px 24px rgba(0,0,0,0.18)",
+			Shadow: "0 10px 30px -10px rgba(3,12,20,0.34)",
 		},
 		Elevation: ElevationTokens{
 			Flat:     Elevation{},
-			Resting:  Elevation{OffsetY: 1, Blur: 3, Opacity: 0.12},
-			Floating: Elevation{OffsetY: 8, Blur: 24, Spread: -4, Opacity: 0.22},
-			Modal:    Elevation{OffsetY: 18, Blur: 48, Spread: -10, Opacity: 0.32},
+			Resting:  Elevation{OffsetY: 1, Blur: 2, Opacity: 0.08},
+			Floating: Elevation{OffsetY: 10, Blur: 28, Spread: -8, Opacity: 0.24},
+			Modal:    Elevation{OffsetY: 22, Blur: 56, Spread: -16, Opacity: 0.38},
 		},
 		Motion: motion,
 		Interaction: InteractionTokens{
@@ -312,7 +314,7 @@ func (tokens Tokens) Validate() error {
 	if err := validateGeometry(tokens.Geometry, tokens.Elevation); err != nil {
 		return err
 	}
-	for _, stack := range []string{tokens.Fonts.UI, tokens.Fonts.Code} {
+	for _, stack := range []string{tokens.Fonts.Display, tokens.Fonts.UI, tokens.Fonts.Code} {
 		lower := strings.ToLower(stack)
 		if strings.Contains(lower, "url(") ||
 			strings.Contains(lower, "http://") ||
@@ -346,49 +348,49 @@ func (tokens Tokens) Validate() error {
 
 func darkColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#050a0f", Shell: "#07111a",
-		Surface1: "#0b151f", Surface2: "#101c28", Surface3: "#162535",
-		SurfaceRaised: "#142230", SurfaceInset: "#03070b",
-		BorderSubtle: "#2a3a49", BorderStrong: "#536c80",
-		TextPrimary: "#f2f6f8", TextSecondary: "#b8c4ce", TextMuted: "#94a5b3",
-		TextDisabled: "#71818e",
-		Accent:       "#5ee27b", AccentHover: "#7deb95", AccentPressed: "#43c963",
-		OnAccent: "#06110a", Link: "#76bfff",
-		Selection: "#183d29", OnSelection: "#dfffe7",
-		Success: "#4fd36b", OnSuccess: "#071109",
-		Warning: "#f0a84a", OnWarning: "#191005",
-		Failure: "#f06070", OnFailure: "#190609",
-		Active: "#3c97ff", OnActive: "#06111c",
-		Blocked: "#ee7bdc", OnBlocked: "#190516",
-		Invalidated: "#c79aaa", OnInvalidated: "#160b0f",
-		Pending: "#93a1ad", OnPending: "#091017",
-		Plan: "#a76bfa", OnPlan: "#13071f",
-		Evidence: "#e5b94b", OnEvidence: "#171103",
-		FocusRing: "#8ac7ff",
+		Canvas: "#071018", Shell: "#0a1621",
+		Surface1: "#101c28", Surface2: "#142332", Surface3: "#1a2c3e",
+		SurfaceRaised: "#172738", SurfaceInset: "#08131d",
+		BorderSubtle: "#2a3d4d", BorderStrong: "#607b8f",
+		TextPrimary: "#edf5f8", TextSecondary: "#b5c5d0", TextMuted: "#899daa",
+		TextDisabled: "#718491",
+		Accent:       "#28b8d2", AccentHover: "#55c9dc", AccentPressed: "#149ab5",
+		OnAccent: "#06151c", Link: "#79bfff",
+		Selection: "#123d52", OnSelection: "#ddf8ff",
+		Success: "#45b982", OnSuccess: "#06160f",
+		Warning: "#d9aa4e", OnWarning: "#1a1204",
+		Failure: "#e36b72", OnFailure: "#1b0709",
+		Active: "#58a8f8", OnActive: "#071522",
+		Blocked: "#d97891", OnBlocked: "#1b080f",
+		Invalidated: "#b49aa3", OnInvalidated: "#180d11",
+		Pending: "#91a3ae", OnPending: "#0a1116",
+		Plan: "#7897f2", OnPlan: "#081127",
+		Evidence: "#d2b15f", OnEvidence: "#181303",
+		FocusRing: "#80def1",
 	}
 }
 
 func lightColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#f3f6f8", Shell: "#e9eef2",
-		Surface1: "#ffffff", Surface2: "#f5f7f9", Surface3: "#e8edf1",
-		SurfaceRaised: "#ffffff", SurfaceInset: "#e2e8ed",
-		BorderSubtle: "#c9d2da", BorderStrong: "#627487",
-		TextPrimary: "#17212b", TextSecondary: "#344555", TextMuted: "#586a7a",
-		TextDisabled: "#73818d",
-		Accent:       "#147a32", AccentHover: "#106528", AccentPressed: "#0c5421",
-		OnAccent: "#ffffff", Link: "#075fbd",
-		Selection: "#c7efd0", OnSelection: "#14301b",
-		Success: "#176f2c", OnSuccess: "#ffffff",
-		Warning: "#8a4b00", OnWarning: "#ffffff",
-		Failure: "#a51d36", OnFailure: "#ffffff",
-		Active: "#075eb5", OnActive: "#ffffff",
-		Blocked: "#8c246f", OnBlocked: "#ffffff",
-		Invalidated: "#74515e", OnInvalidated: "#ffffff",
-		Pending: "#53655e", OnPending: "#ffffff",
-		Plan: "#6631ad", OnPlan: "#ffffff",
-		Evidence: "#755900", OnEvidence: "#ffffff",
-		FocusRing: "#005fcc",
+		Canvas: "#edf2f4", Shell: "#e2eaee",
+		Surface1: "#f9fbfb", Surface2: "#f1f5f6", Surface3: "#e6eef1",
+		SurfaceRaised: "#ffffff", SurfaceInset: "#dce7eb",
+		BorderSubtle: "#c2d0d7", BorderStrong: "#60788a",
+		TextPrimary: "#152836", TextSecondary: "#344c5c", TextMuted: "#5d7281",
+		TextDisabled: "#71838f",
+		Accent:       "#007d99", AccentHover: "#006c86", AccentPressed: "#005c73",
+		OnAccent: "#ffffff", Link: "#075fae",
+		Selection: "#c8edf5", OnSelection: "#123645",
+		Success: "#20704f", OnSuccess: "#ffffff",
+		Warning: "#825700", OnWarning: "#ffffff",
+		Failure: "#a83245", OnFailure: "#ffffff",
+		Active: "#1b66b3", OnActive: "#ffffff",
+		Blocked: "#9c3b58", OnBlocked: "#ffffff",
+		Invalidated: "#75545f", OnInvalidated: "#ffffff",
+		Pending: "#526671", OnPending: "#ffffff",
+		Plan: "#3f5fae", OnPlan: "#ffffff",
+		Evidence: "#745b12", OnEvidence: "#ffffff",
+		FocusRing: "#006a85",
 	}
 }
 
@@ -400,17 +402,17 @@ func highContrastColors() ColorTokens {
 		BorderSubtle: "#ffffff", BorderStrong: "#ffffff",
 		TextPrimary: "#ffffff", TextSecondary: "#ffffff", TextMuted: "#e6e6e6",
 		TextDisabled: "#d0d0d0",
-		Accent:       "#75ff82", AccentHover: "#a1ffab", AccentPressed: "#52e962",
+		Accent:       "#5ee8ff", AccentHover: "#9af1ff", AccentPressed: "#33cce8",
 		OnAccent: "#000000", Link: "#8ed1ff",
 		Selection: "#ffffff", OnSelection: "#000000",
-		Success: "#75ff82", OnSuccess: "#000000",
+		Success: "#71f2b5", OnSuccess: "#000000",
 		Warning: "#ffd75e", OnWarning: "#000000",
 		Failure: "#ff8fa3", OnFailure: "#000000",
 		Active: "#79c7ff", OnActive: "#000000",
-		Blocked: "#ff9deb", OnBlocked: "#000000",
+		Blocked: "#ff9caf", OnBlocked: "#000000",
 		Invalidated: "#ffd0df", OnInvalidated: "#000000",
 		Pending: "#e6e6e6", OnPending: "#000000",
-		Plan: "#d3a7ff", OnPlan: "#000000",
+		Plan: "#9eb7ff", OnPlan: "#000000",
 		Evidence: "#ffe27a", OnEvidence: "#000000",
 		FocusRing: "#ffff00",
 	}

@@ -96,8 +96,11 @@ message SendMessageRequest {
   MutationControl control = 1;
   StableIdentity thread_id = 2;
   string body = 3;
+  // Legacy browser-supplied paths are retained for wire compatibility only.
+  // Servers reject non-empty values; clients send repository-scoped identities.
   repeated string attachment_paths = 4;
   bool create_draft_task = 5;
+  repeated StableIdentity attachment_ids = 6;
 }
 
 message SendMessageResponse {

@@ -31,13 +31,14 @@ const (
 // Bootstrap is the secret-free compatibility envelope consumed before the
 // browser opens a bridge session.
 type Bootstrap struct {
-	ApplicationVersion string                     `json:"application_version"`
-	APIVersion         string                     `json:"api_version"`
-	SchemaVersion      int                        `json:"schema_version"`
-	FrontendVersion    string                     `json:"frontend_version"`
-	BridgePath         string                     `json:"bridge_path"`
-	SelectedSessionID  *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
-	RouteAccess        RouteAccess                `json:"route_access"`
+	ApplicationVersion  string                     `json:"application_version"`
+	APIVersion          string                     `json:"api_version"`
+	SchemaVersion       int                        `json:"schema_version"`
+	FrontendVersion     string                     `json:"frontend_version"`
+	BridgePath          string                     `json:"bridge_path"`
+	SelectedSessionID   *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
+	SelectedWorkspaceID *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
+	RouteAccess         RouteAccess                `json:"route_access"`
 }
 
 // RouteAccess is the minimal server-confirmed allowlist used to validate a
@@ -77,6 +78,14 @@ func NewHandler(options Options) (http.Handler, error) {
 		}
 		if _, parseErr := domain.ParseSessionID(selected.GetValue()); parseErr != nil {
 			return nil, errors.New("frontend selected session identity is invalid")
+		}
+	}
+	if selected := options.Bootstrap.SelectedWorkspaceID; selected != nil {
+		if selected.GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE {
+			return nil, errors.New("frontend selected workspace identity is invalid")
+		}
+		if _, parseErr := domain.ParseWorkspaceID(selected.GetValue()); parseErr != nil {
+			return nil, errors.New("frontend selected workspace identity is invalid")
 		}
 	}
 	if err := validateRouteAccess(options.Bootstrap.RouteAccess); err != nil {

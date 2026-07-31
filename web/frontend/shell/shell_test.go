@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/shell"
 	"codeflux.dev/codeflux/web/frontend/state"
@@ -136,6 +137,22 @@ func TestEveryAsyncPaneStateHasVisibleSemantics(t *testing.T) {
 				t.Fatal("state rendered no content")
 			}
 		})
+	}
+}
+
+func TestConversationTimelineUsesExplicitCompactCardSpacing(t *testing.T) {
+	markup := render(t, ui.CreateElement(shell.ConversationPane, shell.ConversationPaneProps{
+		State: state.DataReady,
+		Messages: []state.MessageView{
+			{ID: "first", Role: "agent", Body: "First", Sequence: 1},
+			{ID: "second", Role: "agent", Body: "Second", Sequence: 2},
+		},
+		Mode: primitives.Mode{Theme: design.ThemeDark, Density: design.DensityComfortable},
+	}))
+	for _, want := range []string{`data-component="timeline-card-stack"`, `data-gap="8px"`} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("timeline stack missing %q: %s", want, markup)
+		}
 	}
 }
 
@@ -325,5 +342,23 @@ func TestRouteShellsHaveDedicatedMainLandmarks(t *testing.T) {
 				t.Fatalf("route shell markup = %s", markup)
 			}
 		})
+	}
+}
+
+func TestFirstRunDeclaresSingleRouteScrollOwner(t *testing.T) {
+	markup := render(t, ui.CreateElement(shell.FirstRunShell, shell.SimpleRouteProps{
+		Title: "Welcome to CodeFlux", State: state.DataReady,
+	}))
+	for _, want := range []string{
+		`data-component="first-run-scroll-owner"`,
+		`data-scroll-owner="route"`,
+		`data-component="first-run-shell"`,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Fatalf("first-run scroll contract missing %q: %s", want, markup)
+		}
+	}
+	if count := strings.Count(markup, `data-scroll-owner="route"`); count != 1 {
+		t.Fatalf("first-run route scroll owners = %d, want 1: %s", count, markup)
 	}
 }

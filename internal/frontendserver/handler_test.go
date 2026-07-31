@@ -98,6 +98,45 @@ func TestBootstrapIncludesOnlyAnExplicitValidSelectedSession(t *testing.T) {
 	}
 }
 
+func TestBootstrapIncludesOnlyAnExplicitValidSelectedWorkspace(t *testing.T) {
+	selected := &codefluxv1.StableIdentity{
+		Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,
+		Value: "wsp_018f0123-4567-789a-8bcd-ef0123456789",
+	}
+	handler, err := NewHandler(Options{
+		AssetsDirectory: writeGeneratedAssets(t),
+		GRPCServer:      grpc.NewServer(),
+		SessionToken:    testSessionToken,
+		Bootstrap:       Bootstrap{SelectedWorkspaceID: selected},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/bootstrap", nil)
+	request.Host = "127.0.0.1:8080"
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK ||
+		!strings.Contains(response.Body.String(), `"selected_workspace_id"`) ||
+		!strings.Contains(response.Body.String(), selected.GetValue()) ||
+		strings.Contains(response.Body.String(), testSessionToken) {
+		t.Fatalf("bootstrap returned %d %q", response.Code, response.Body.String())
+	}
+
+	_, err = NewHandler(Options{
+		AssetsDirectory: writeGeneratedAssets(t),
+		GRPCServer:      grpc.NewServer(),
+		SessionToken:    testSessionToken,
+		Bootstrap: Bootstrap{SelectedWorkspaceID: &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+			Value: "repo-not-a-workspace",
+		}},
+	})
+	if err == nil {
+		t.Fatal("NewHandler accepted a non-workspace selected identity")
+	}
+}
+
 func TestBootstrapRouteAccessContainsOnlyValidatedStableIdentities(t *testing.T) {
 	repository := &codefluxv1.StableIdentity{
 		Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,

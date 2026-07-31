@@ -2507,140 +2507,140 @@ Milestone output: resumable thread navigation, virtualized typed event cards, a 
 
 ## Thread Rail Data
 
-- [ ] `M17-001 BLOCKER` Fetch the first page of threads for the open repository.
-- [ ] `M17-002` Render thread title, task state, last activity, and unread/attention indicator.
-- [ ] `M17-003` Sort active attention-required threads before inactive threads.
-- [ ] `M17-004` Preserve stable ordering when two timestamps are equal.
-- [ ] `M17-005` Load the next page when the rail approaches its end.
-- [ ] `M17-006` Avoid duplicate rows across pagination boundaries.
-- [ ] `M17-007` Render a thread-list skeleton during first load.
-- [ ] `M17-008` Render a retryable list error.
-- [ ] `M17-009` Render an empty-repository thread state.
-- [ ] `M17-010` Select a thread and update the route.
-- [ ] `M17-011` Restore selection after reload.
-- [ ] `M17-012` Create a new thread with an idempotency key.
-- [ ] `M17-013` Optimistically show a pending new thread without duplicating the committed thread.
-- [ ] `M17-014` Rename a thread.
-- [ ] `M17-015` Archive a thread after confirmation.
-- [ ] `M17-016` Remove an archived thread from the default view.
-- [ ] `M17-017` Add an archived-thread filter.
-- [ ] `M17-018 TEST` Test 1,000 thread rows with virtualized scrolling.
+- [x] `M17-001 BLOCKER` Fetch the first page of threads for the open repository.
+- [x] `M17-002` Render thread title, task state, last activity, and unread/attention indicator.
+- [x] `M17-003` Sort active attention-required threads before inactive threads.
+- [x] `M17-004` Preserve stable ordering when two timestamps are equal.
+- [x] `M17-005` Load the next page when the rail approaches its end.
+- [x] `M17-006` Avoid duplicate rows across pagination boundaries.
+- [x] `M17-007` Render a thread-list skeleton during first load.
+- [x] `M17-008` Render a retryable list error.
+- [x] `M17-009` Render an empty-repository thread state.
+- [x] `M17-010` Select a thread and update the route.
+- [x] `M17-011` Restore selection after reload.
+- [x] `M17-012` Create a new thread with an idempotency key.
+- [x] `M17-013` Optimistically show a pending new thread without duplicating the committed thread.
+- [x] `M17-014` Rename a thread.
+- [x] `M17-015` Archive a thread after confirmation.
+- [x] `M17-016` Remove an archived thread from the default view.
+- [x] `M17-017` Add an archived-thread filter.
+- [x] `M17-018 TEST` Test 1,000 thread rows with virtualized scrolling.
 
 ## Timeline Pagination and Anchoring
 
-- [ ] `M17-019 BLOCKER` Fetch the newest thread page on selection.
-- [ ] `M17-020` Group events into presentation items without changing durable order.
-- [ ] `M17-021` Use event sequence as the stable presentation key.
-- [ ] `M17-022` Load older events when the user scrolls near the top.
-- [ ] `M17-023` Preserve visual scroll position after prepending older events.
-- [ ] `M17-024` Avoid duplicate events after replay joins pagination.
-- [ ] `M17-025` Show a clear beginning-of-thread marker.
-- [ ] `M17-026` Auto-follow new events only when the user is already near the bottom.
-- [ ] `M17-027` Show a new-events button when the user has scrolled upward.
-- [ ] `M17-028` Return to live position when the button is activated.
-- [ ] `M17-029` Preserve readable ordering for simultaneous event timestamps.
-- [ ] `M17-030` Render a gap-recovery indicator if sequence continuity is temporarily unresolved.
-- [ ] `M17-031 TEST` Test pagination/replay joining at every page boundary.
-- [ ] `M17-032 TEST` Test anchor preservation with variable-height cards.
+- [x] `M17-019 BLOCKER` Fetch the newest thread page on selection.
+- [x] `M17-020` Group events into presentation items without changing durable order.
+- [x] `M17-021` Use event sequence as the stable presentation key.
+- [x] `M17-022` Load older events when the user scrolls near the top.
+- [x] `M17-023` Preserve visual scroll position after prepending older events.
+- [x] `M17-024` Avoid duplicate events after replay joins pagination.
+- [x] `M17-025` Show a clear beginning-of-thread marker.
+- [x] `M17-026` Auto-follow new events only when the user is already near the bottom.
+- [x] `M17-027` Show a new-events button when the user has scrolled upward.
+- [x] `M17-028` Return to live position when the button is activated.
+- [x] `M17-029` Preserve readable ordering for simultaneous event timestamps.
+- [x] `M17-030` Render a gap-recovery indicator if sequence continuity is temporarily unresolved.
+- [x] `M17-031 TEST` Test pagination/replay joining at every page boundary.
+- [x] `M17-032 TEST` Test anchor preservation with variable-height cards.
 
 ## Message Presentation
 
-- [ ] `M17-033 UX` Implement user message bubbles.
-- [ ] `M17-034 UX` Implement agent message bubbles.
-- [ ] `M17-035 UX` Render streamed deltas into one in-progress message.
-- [ ] `M17-036 UX` Replace the in-progress message with the durable final message.
-- [ ] `M17-037 UX` Indicate interrupted or incomplete model output.
-- [ ] `M17-038 UX` Render safe Markdown without executable HTML.
-- [ ] `M17-039 SECURITY` Sanitize links and block unsafe URL schemes.
-- [ ] `M17-040 UX` Render code blocks with copy action.
-- [ ] `M17-041 UX` Add line wrapping and horizontal scroll behavior for code.
-- [ ] `M17-042 UX` Render stable graph-node identity chips.
-- [ ] `M17-043 UX` Focus the associated graph node when a node chip is activated.
-- [ ] `M17-044 UX` Explain when the associated graph revision is no longer current.
-- [ ] `M17-045 UX` Add message timestamps through an unobtrusive details affordance.
-- [ ] `M17-046 UX` Add copy-message action.
-- [ ] `M17-047 UX` Add accessible labels for user, agent, system event, and status.
+- [x] `M17-033 UX` Implement user message bubbles.
+- [x] `M17-034 UX` Implement agent message bubbles.
+- [x] `M17-035 UX` Render streamed deltas into one in-progress message.
+- [x] `M17-036 UX` Replace the in-progress message with the durable final message.
+- [x] `M17-037 UX` Indicate interrupted or incomplete model output.
+- [x] `M17-038 UX` Render safe Markdown without executable HTML.
+- [x] `M17-039 SECURITY` Sanitize links and block unsafe URL schemes.
+- [x] `M17-040 UX` Render code blocks with copy action.
+- [x] `M17-041 UX` Add line wrapping and horizontal scroll behavior for code.
+- [x] `M17-042 UX` Render stable graph-node identity chips.
+- [x] `M17-043 UX` Focus the associated graph node when a node chip is activated.
+- [x] `M17-044 UX` Explain when the associated graph revision is no longer current.
+- [x] `M17-045 UX` Add message timestamps through an unobtrusive details affordance.
+- [x] `M17-046 UX` Add copy-message action.
+- [x] `M17-047 UX` Add accessible labels for user, agent, system event, and status.
 
 ## Typed Cards
 
-- [ ] `M17-048 UX` Implement requirement/ambiguity card.
-- [ ] `M17-049 UX` Implement forecast card with P50/P90 ranges.
-- [ ] `M17-050 UX` Implement plan card with step status.
-- [ ] `M17-051 UX` Implement plan-revision diff card.
-- [ ] `M17-052 UX` Implement context-selection card.
-- [ ] `M17-053 UX` Implement collapsed tool-started card.
-- [ ] `M17-054 UX` Update the same card for tool completion.
-- [ ] `M17-055 UX` Show command, scope, duration, exit state, and summarized output.
-- [ ] `M17-056 UX` Keep raw redacted output collapsed by default.
-- [ ] `M17-057 UX` Lazy-load large redacted output pages.
-- [ ] `M17-058 UX` Implement approval card with exact requested authority.
-- [ ] `M17-059 UX` Add allow-once action.
-- [ ] `M17-060 UX` Add allow-for-task action with displayed scope.
-- [ ] `M17-061 UX` Add deny action.
-- [ ] `M17-062 UX` Disable approval actions after one resolution commits.
-- [ ] `M17-063 UX` Show who or what resolved the approval.
-- [ ] `M17-064 UX` Implement checkpoint card.
-- [ ] `M17-065 UX` Implement validation summary card.
-- [ ] `M17-066 UX` Implement diff summary card.
-- [ ] `M17-067 UX` Implement cost/budget update card only for meaningful threshold events.
-- [ ] `M17-068 UX` Implement error and recovery-choice card.
-- [ ] `M17-069 UX` Implement final completion summary.
-- [ ] `M17-070 UX` Implement unsupported-event fallback that preserves kind and sequence.
+- [x] `M17-048 UX` Implement requirement/ambiguity card.
+- [x] `M17-049 UX` Implement forecast card with P50/P90 ranges.
+- [x] `M17-050 UX` Implement plan card with step status.
+- [x] `M17-051 UX` Implement plan-revision diff card.
+- [x] `M17-052 UX` Implement context-selection card.
+- [x] `M17-053 UX` Implement collapsed tool-started card.
+- [x] `M17-054 UX` Update the same card for tool completion.
+- [x] `M17-055 UX` Show command, scope, duration, exit state, and summarized output.
+- [x] `M17-056 UX` Keep raw redacted output collapsed by default.
+- [x] `M17-057 UX` Lazy-load large redacted output pages.
+- [x] `M17-058 UX` Implement approval card with exact requested authority.
+- [x] `M17-059 UX` Add allow-once action.
+- [x] `M17-060 UX` Add allow-for-task action with displayed scope.
+- [x] `M17-061 UX` Add deny action.
+- [x] `M17-062 UX` Disable approval actions after one resolution commits.
+- [x] `M17-063 UX` Show who or what resolved the approval.
+- [x] `M17-064 UX` Implement checkpoint card.
+- [x] `M17-065 UX` Implement validation summary card.
+- [x] `M17-066 UX` Implement diff summary card.
+- [x] `M17-067 UX` Implement cost/budget update card only for meaningful threshold events.
+- [x] `M17-068 UX` Implement error and recovery-choice card.
+- [x] `M17-069 UX` Implement final completion summary.
+- [x] `M17-070 UX` Implement unsupported-event fallback that preserves kind and sequence.
 
 ## Composer
 
-- [ ] `M17-071 BLOCKER UX` Implement a multiline composer.
-- [ ] `M17-072 UX` Submit with the chosen keyboard convention.
-- [ ] `M17-073 UX` Insert a newline without submitting.
-- [ ] `M17-074 UX` Disable submit for empty or whitespace-only input.
-- [ ] `M17-075 UX` Show pending send state.
-- [ ] `M17-076` Generate and retain an idempotency key until send resolves.
-- [ ] `M17-077` Restore the unsent draft for the current thread.
-- [ ] `M17-078` Keep drafts isolated per thread.
-- [ ] `M17-079` Clear the draft only after committed message confirmation.
-- [ ] `M17-080 UX` Show an explicit retry after send failure.
-- [ ] `M17-081 UX` Add cost/speed/correctness policy selector.
-- [ ] `M17-082 UX` Add hard-budget input with exact currency.
-- [ ] `M17-083 UX` Add optional model override.
-- [ ] `M17-084 UX` Add optional reasoning-effort override.
-- [ ] `M17-085 UX` Add repository file/symbol attachment picker.
-- [ ] `M17-086 UX` Display selected attachments as removable chips.
-- [ ] `M17-087 SECURITY` Resolve attachments through server-side repository identities, not browser file paths.
-- [ ] `M17-088 UX` Change composer actions appropriately for running, paused, awaiting-approval, and completed states.
-- [ ] `M17-089 UX` Keep stop immediately reachable while the agent is running.
+- [x] `M17-071 BLOCKER UX` Implement a multiline composer.
+- [x] `M17-072 UX` Submit with the chosen keyboard convention.
+- [x] `M17-073 UX` Insert a newline without submitting.
+- [x] `M17-074 UX` Disable submit for empty or whitespace-only input.
+- [x] `M17-075 UX` Show pending send state.
+- [x] `M17-076` Generate and retain an idempotency key until send resolves.
+- [x] `M17-077` Restore the unsent draft for the current thread.
+- [x] `M17-078` Keep drafts isolated per thread.
+- [x] `M17-079` Clear the draft only after committed message confirmation.
+- [x] `M17-080 UX` Show an explicit retry after send failure.
+- [x] `M17-081 UX` Add cost/speed/correctness policy selector.
+- [x] `M17-082 UX` Add hard-budget input with exact currency.
+- [x] `M17-083 UX` Add optional model override.
+- [x] `M17-084 UX` Add optional reasoning-effort override.
+- [x] `M17-085 UX` Add repository file/symbol attachment picker.
+- [x] `M17-086 UX` Display selected attachments as removable chips.
+- [x] `M17-087 SECURITY` Resolve attachments through server-side repository identities, not browser file paths.
+- [x] `M17-088 UX` Change composer actions appropriately for running, paused, awaiting-approval, and completed states.
+- [x] `M17-089 UX` Keep stop immediately reachable while the agent is running.
 
 ## Tests and Gate
 
-- [ ] `M17-090 TEST` Render every card from a fixed event fixture.
-- [ ] `M17-091 TEST` Snapshot or structurally compare every status variant.
-- [ ] `M17-092 TEST` Test unsafe Markdown and URL payloads.
-- [ ] `M17-093 TEST` Test double-click approval idempotency.
-- [ ] `M17-094 TEST` Test message-send retry.
-- [ ] `M17-095 TEST` Test per-thread draft isolation.
-- [ ] `M17-096 TEST` Keyboard-test the entire thread and composer.
-- [ ] `M17-097 TEST` Screen-reader-test one complete task timeline.
-- [ ] `M17-098` Implement an exhaustive timeline-item registry that requires every event kind to map to a card or documented grouping rule.
-- [ ] `M17-099` Implement unknown-event fallback with kind, time, sequence, safe details, and diagnostics link.
-- [ ] `M17-100` Implement `ApplyMessageDelta`, `FinalizeMessage`, `MergeThreadPage`, and `ShouldAutoFollow` as pure deterministic reducers.
-- [ ] `M17-101 UX` Ensure streamed text is visibly provisional until the durable final message arrives.
-- [ ] `M17-102 UX` Ensure plan cards show assumptions, authority, validation, completion criteria, and revision history before approval.
-- [ ] `M17-103 UX` Ensure context cards explain inclusion reason and revision without dumping full source.
-- [ ] `M17-104 UX` Ensure tool cards update in place and do not create one row per progress chunk.
-- [ ] `M17-105 UX` Ensure approval cards do not steal typing focus and retain attributable resolution after actions disappear.
-- [ ] `M17-106 UX` Ensure validation cards distinguish passed, failed, waived, skipped, unavailable, cancelled, and stale.
-- [ ] `M17-107 UX` Ensure completion cards distinguish implemented, validated, reviewed, accepted, rejected, and rolled-back outcomes.
-- [ ] `M17-108 UX` Implement first-message latency presentation that shows the current phase and Stop after the threshold instead of an indefinite spinner.
-- [ ] `M17-109 UX` Preserve thread and graph position when opening and closing review.
-- [ ] `M17-110 TEST` Test new-thread pending row replacement without selection or focus jump.
-- [ ] `M17-111 TEST` Test plan revision resets approval and preserves prior plan history.
-- [ ] `M17-112 TEST` Test graph auto-highlighting never pans away from deliberate user inspection without a Return to current action control.
-- [ ] `M17-113 TEST` Test repair feedback attached to task, file, hunk, validation, and graph node identities.
-- [ ] `M17-114 TEST` Test raw output pagination, redaction, truncation, and copy behavior.
-- [ ] `M17-115 TEST` Verify no routine progress event creates a toast, modal, or assertive announcement.
-- [ ] `M17-G01 GATE` A user can create, leave, reopen, paginate, and continue a thread without lost or duplicated content.
-- [ ] `M17-G02 GATE` Every correctness-bearing event has a distinct, inspectable presentation.
-- [ ] `M17-G03 GATE` Approval and stop actions remain reachable without expanding raw tool output.
-- [ ] `M17-G04 GATE` Every timeline event, card, composer state, and review transition has deterministic reducer, progressive-disclosure, focus, replay, and failure behavior.
+- [x] `M17-090 TEST` Render every card from a fixed event fixture.
+- [x] `M17-091 TEST` Snapshot or structurally compare every status variant.
+- [x] `M17-092 TEST` Test unsafe Markdown and URL payloads.
+- [x] `M17-093 TEST` Test double-click approval idempotency.
+- [x] `M17-094 TEST` Test message-send retry.
+- [x] `M17-095 TEST` Test per-thread draft isolation.
+- [x] `M17-096 TEST` Keyboard-test the entire thread and composer.
+- [x] `M17-097 TEST` Screen-reader-test one complete task timeline.
+- [x] `M17-098` Implement an exhaustive timeline-item registry that requires every event kind to map to a card or documented grouping rule.
+- [x] `M17-099` Implement unknown-event fallback with kind, time, sequence, safe details, and diagnostics link.
+- [x] `M17-100` Implement `ApplyMessageDelta`, `FinalizeMessage`, `MergeThreadPage`, and `ShouldAutoFollow` as pure deterministic reducers.
+- [x] `M17-101 UX` Ensure streamed text is visibly provisional until the durable final message arrives.
+- [x] `M17-102 UX` Ensure plan cards show assumptions, authority, validation, completion criteria, and revision history before approval.
+- [x] `M17-103 UX` Ensure context cards explain inclusion reason and revision without dumping full source.
+- [x] `M17-104 UX` Ensure tool cards update in place and do not create one row per progress chunk.
+- [x] `M17-105 UX` Ensure approval cards do not steal typing focus and retain attributable resolution after actions disappear.
+- [x] `M17-106 UX` Ensure validation cards distinguish passed, failed, waived, skipped, unavailable, cancelled, and stale.
+- [x] `M17-107 UX` Ensure completion cards distinguish implemented, validated, reviewed, accepted, rejected, and rolled-back outcomes.
+- [x] `M17-108 UX` Implement first-message latency presentation that shows the current phase and Stop after the threshold instead of an indefinite spinner.
+- [x] `M17-109 UX` Preserve thread and graph position when opening and closing review.
+- [x] `M17-110 TEST` Test new-thread pending row replacement without selection or focus jump.
+- [x] `M17-111 TEST` Test plan revision resets approval and preserves prior plan history.
+- [x] `M17-112 TEST` Test graph auto-highlighting never pans away from deliberate user inspection without a Return to current action control.
+- [x] `M17-113 TEST` Test repair feedback attached to task, file, hunk, validation, and graph node identities.
+- [x] `M17-114 TEST` Test raw output pagination, redaction, truncation, and copy behavior.
+- [x] `M17-115 TEST` Verify no routine progress event creates a toast, modal, or assertive announcement.
+- [x] `M17-G01 GATE` A user can create, leave, reopen, paginate, and continue a thread without lost or duplicated content.
+- [x] `M17-G02 GATE` Every correctness-bearing event has a distinct, inspectable presentation.
+- [x] `M17-G03 GATE` Approval and stop actions remain reachable without expanding raw tool output.
+- [x] `M17-G04 GATE` Every timeline event, card, composer state, and review transition has deterministic reducer, progressive-disclosure, focus, replay, and failure behavior.
 
 ---
 

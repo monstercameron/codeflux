@@ -35,7 +35,12 @@ type Thread struct {
 	ID           domain.ThreadID
 	ProjectID    domain.ProjectID
 	RepositoryID domain.RepositoryID
+	WorkspaceID  domain.WorkspaceID
+	SessionID    domain.SessionID
+	TaskID       domain.TaskID
+	TaskState    domain.TaskState
 	Title        string
+	Archived     bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Revision     uint64
@@ -67,6 +72,7 @@ type Message struct {
 	Sequence       uint64
 	Role           MessageRole
 	BodyRedacted   string
+	AttachmentIDs  []domain.ArtifactID
 	IdempotencyKey string
 	CreatedAt      time.Time
 }
@@ -304,8 +310,16 @@ type ProjectOperations interface {
 // ConversationOperations groups thread and immutable message operations.
 type ConversationOperations interface {
 	CreateThread(context.Context, CreateThread) (Thread, error)
+	CreateThreadCommit(context.Context, CreateThread) (ThreadCommit, error)
 	ListThreads(context.Context, ListThreads) (ThreadPage, error)
+	GetThread(context.Context, domain.ThreadID) (Thread, error)
+	ListMessages(context.Context, ListMessages) (MessagePage, error)
 	AppendMessage(context.Context, AppendMessage) (Message, error)
+	AppendMessageAndDraftTask(context.Context, AppendMessageAndDraftTask) (AppendedMessageAndDraftTask, error)
+	RenameThread(context.Context, RenameThread) (Thread, error)
+	RenameThreadCommit(context.Context, RenameThread) (ThreadCommit, error)
+	ArchiveThread(context.Context, ArchiveThread) (Thread, error)
+	ArchiveThreadCommit(context.Context, ArchiveThread) (ThreadCommit, error)
 }
 
 // Session is one durable, thread-scoped ordered event stream.
@@ -363,6 +377,7 @@ type SessionCommandOperation func(*Transaction) (resultJSON string, finalSequenc
 // SessionEventOperations groups durable append and replay operations.
 type SessionEventOperations interface {
 	CreateSession(context.Context, CreateSession) (Session, error)
+	GetThreadSession(context.Context, domain.ThreadID) (Session, error)
 	AppendSessionEvent(context.Context, *Transaction, events.NewSessionEvent) (events.SessionEvent, error)
 	PersistSessionEvent(context.Context, events.NewSessionEvent) (events.SessionEvent, error)
 	PersistAndPublishSessionEvent(context.Context, events.NewSessionEvent, CommittedEventPublisher) (events.SessionEvent, error)
@@ -394,10 +409,20 @@ type CreateRepository struct {
 
 // CreateThread declares one repository-scoped conversation.
 type CreateThread struct {
-	ID           domain.ThreadID
-	ProjectID    domain.ProjectID
-	RepositoryID domain.RepositoryID
-	Title        string
+	ID             domain.ThreadID
+	SessionID      domain.SessionID
+	ProjectID      domain.ProjectID
+	RepositoryID   domain.RepositoryID
+	WorkspaceID    domain.WorkspaceID
+	Title          string
+	IdempotencyKey string
+}
+
+// ThreadCommit carries correctness-bearing events committed atomically with a
+// thread command. Events is empty for an idempotent replay.
+type ThreadCommit struct {
+	Thread Thread
+	Events []events.SessionEvent
 }
 
 // ThreadCursor is an exclusive stable cursor over descending update order.
@@ -408,9 +433,11 @@ type ThreadCursor struct {
 
 // ListThreads declares bounded repository thread pagination.
 type ListThreads struct {
-	RepositoryID domain.RepositoryID
-	Before       *ThreadCursor
-	Limit        int
+	RepositoryID    domain.RepositoryID
+	WorkspaceID     domain.WorkspaceID
+	Before          *ThreadCursor
+	Limit           int
+	IncludeArchived bool
 }
 
 // ThreadPage carries one stable page and an optional exclusive next cursor.
@@ -425,7 +452,63 @@ type AppendMessage struct {
 	ThreadID       domain.ThreadID
 	Role           MessageRole
 	BodyRedacted   string
+	AttachmentIDs  []domain.ArtifactID
 	IdempotencyKey string
+}
+
+// AppendMessageAndDraftTask declares one message and optional draft task that
+// must commit or roll back as a single durable command.
+type AppendMessageAndDraftTask struct {
+	Message          AppendMessage
+	ExpectedRevision uint64
+	DraftTask        *CreateTask
+}
+
+// AppendedMessageAndDraftTask is the exact idempotent command result.
+type AppendedMessageAndDraftTask struct {
+	Message   Message
+	DraftTask *Task
+	Events    []events.SessionEvent
+}
+
+// MessageCursor is an exclusive cursor over descending durable sequence.
+type MessageCursor struct{ BeforeSequence uint64 }
+
+// ListMessages declares bounded newest-first thread pagination.
+type ListMessages struct {
+	ThreadID domain.ThreadID
+	Before   *MessageCursor
+	Limit    int
+}
+
+// MessagePage carries one newest-first page and its exclusive continuation.
+type MessagePage struct {
+	Messages []Message
+	Next     *MessageCursor
+}
+
+// RenameThread declares one optimistic, idempotent title mutation.
+type RenameThread struct {
+	ThreadID         domain.ThreadID
+	ExpectedRevision uint64
+	Title            string
+	IdempotencyKey   string
+}
+
+// ArchiveThread declares one optimistic, idempotent archive-state mutation.
+type ArchiveThread struct {
+	ThreadID         domain.ThreadID
+	ExpectedRevision uint64
+	Archived         bool
+	IdempotencyKey   string
+}
+
+// WorkspaceScope is the durable repository authority of one workspace.
+type WorkspaceScope struct {
+	WorkspaceID   domain.WorkspaceID
+	RepositoryID  domain.RepositoryID
+	ProjectID     domain.ProjectID
+	CanonicalPath string
 }
 
 // Task is one durable task aggregate.

@@ -4,35 +4,105 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/events"
 )
 
 func (repositories *Repositories) CreateThread(
 	ctx context.Context,
 	input CreateThread,
 ) (Thread, error) {
+	commit, err := repositories.CreateThreadCommit(ctx, input)
+	return commit.Thread, err
+}
+
+func (repositories *Repositories) CreateThreadCommit(
+	ctx context.Context,
+	input CreateThread,
+) (ThreadCommit, error) {
 	switch {
 	case input.ID.IsZero():
-		return Thread{}, errors.New("thread ID must not be empty")
+		return ThreadCommit{}, errors.New("thread ID must not be empty")
 	case input.ProjectID.IsZero():
-		return Thread{}, errors.New("project ID must not be empty")
+		return ThreadCommit{}, errors.New("project ID must not be empty")
 	case input.RepositoryID.IsZero():
-		return Thread{}, errors.New("repository ID must not be empty")
+		return ThreadCommit{}, errors.New("repository ID must not be empty")
+	case input.WorkspaceID.IsZero() != (input.IdempotencyKey == ""):
+		return ThreadCommit{}, errors.New("workspace ID and thread idempotency key must be supplied together")
+	case input.WorkspaceID.IsZero() != input.SessionID.IsZero():
+		return ThreadCommit{}, errors.New("workspace thread creation requires a session ID")
 	}
 	if err := validateBounded("thread title", input.Title, 512); err != nil {
-		return Thread{}, err
+		return ThreadCommit{}, err
 	}
 	now, micros := repositories.timestamp()
 	thread := Thread{
 		ID:           input.ID,
 		ProjectID:    input.ProjectID,
 		RepositoryID: input.RepositoryID,
+		WorkspaceID:  input.WorkspaceID,
+		SessionID:    input.SessionID,
 		Title:        input.Title,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+	var committedEvents []events.SessionEvent
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		if !input.WorkspaceID.IsZero() {
+			existing, found, err := findThreadByCreateKey(ctx, transaction, input.WorkspaceID, input.IdempotencyKey)
+			if err != nil {
+				return err
+			}
+			if found {
+				if existing.ProjectID != input.ProjectID || existing.RepositoryID != input.RepositoryID || existing.Title != input.Title {
+					return typedError(ErrConflict, "create idempotent thread", errors.New("idempotency key belongs to different thread content"))
+				}
+				thread = existing
+				return nil
+			}
+			result, err := transaction.sql.ExecContext(ctx, `INSERT INTO threads (
+				id, project_id, repository_id, workspace_id, title,
+				create_idempotency_key, created_at_unix_micros,
+				updated_at_unix_micros, revision
+			)
+			SELECT ?, repositories.project_id, workspaces.repository_id, workspaces.id, ?, ?, ?, ?, 0
+			FROM workspaces
+			JOIN repositories ON repositories.id = workspaces.repository_id
+			WHERE workspaces.id = ? AND workspaces.repository_id = ?
+			  AND repositories.project_id = ? AND workspaces.state = 'active'
+			  AND repositories.deleted_at_unix_micros IS NULL`,
+				input.ID, input.Title, input.IdempotencyKey, micros, micros,
+				input.WorkspaceID, input.RepositoryID, input.ProjectID,
+			)
+			if err != nil {
+				return err
+			}
+			affected, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected != 1 {
+				return typedError(ErrConstraint, "create thread", errors.New("workspace does not authorize repository"))
+			}
+			session := Session{ID: input.SessionID, ThreadID: input.ID, CreatedAt: now, UpdatedAt: now}
+			if err := createSessionTransaction(ctx, transaction, session, micros); err != nil {
+				return err
+			}
+			workspaceID := input.WorkspaceID
+			event, err := repositories.AppendSessionEvent(ctx, transaction, events.NewSessionEvent{
+				SessionID: input.SessionID, ThreadID: input.ID, Kind: events.KindThreadCreated,
+				Revision: 0, PayloadVersion: 1, Payload: events.Payload{ThreadCreated: &events.ThreadCreated{
+					WorkspaceID: &workspaceID, Title: input.Title,
+				}},
+			})
+			if err != nil {
+				return err
+			}
+			committedEvents = append(committedEvents, event)
+			return nil
+		}
 		result, err := transaction.sql.ExecContext(
 			ctx,
 			`INSERT INTO threads (
@@ -68,9 +138,18 @@ func (repositories *Repositories) CreateThread(
 		return nil
 	})
 	if err != nil {
-		return Thread{}, repositoryWriteError("create thread", err)
+		return ThreadCommit{}, repositoryWriteError("create thread", err)
 	}
-	return thread, nil
+	return ThreadCommit{Thread: thread, Events: committedEvents}, nil
+}
+
+func findThreadByCreateKey(ctx context.Context, transaction *Transaction, workspaceID domain.WorkspaceID, key string) (Thread, bool, error) {
+	thread, err := scanThread(transaction.sql.QueryRowContext(ctx, threadSelect+`
+		WHERE threads.workspace_id = ? AND threads.create_idempotency_key = ?`, workspaceID, key), "find idempotent thread")
+	if errors.Is(err, ErrNotFound) {
+		return Thread{}, false, nil
+	}
+	return thread, err == nil, err
 }
 
 func (repositories *Repositories) ListThreads(
@@ -80,17 +159,33 @@ func (repositories *Repositories) ListThreads(
 	if input.RepositoryID.IsZero() {
 		return ThreadPage{}, errors.New("repository ID must not be empty")
 	}
+	if !input.WorkspaceID.IsZero() {
+		var authorized int
+		if err := repositories.database.sql.QueryRowContext(ctx,
+			`SELECT count(*) FROM workspaces WHERE id = ? AND repository_id = ? AND state = 'active'`,
+			input.WorkspaceID, input.RepositoryID,
+		).Scan(&authorized); err != nil {
+			return ThreadPage{}, classify("authorize thread workspace", err)
+		}
+		if authorized != 1 {
+			return ThreadPage{}, typedError(ErrNotFound, "authorize thread workspace", sql.ErrNoRows)
+		}
+	}
 	if input.Limit == 0 {
 		input.Limit = 50
 	}
 	if input.Limit < 1 || input.Limit > 100 {
 		return ThreadPage{}, errors.New("thread page limit must be between 1 and 100")
 	}
-	query := `SELECT id, project_id, repository_id, title,
-	                 created_at_unix_micros, updated_at_unix_micros, revision
-	          FROM threads
-	          WHERE repository_id = ? AND deleted_at_unix_micros IS NULL`
+	query := threadSelect + ` WHERE threads.repository_id = ? AND threads.deleted_at_unix_micros IS NULL`
 	arguments := []any{input.RepositoryID}
+	if !input.WorkspaceID.IsZero() {
+		query += ` AND threads.workspace_id = ?`
+		arguments = append(arguments, input.WorkspaceID)
+	}
+	if !input.IncludeArchived {
+		query += ` AND threads.archived_at_unix_micros IS NULL`
+	}
 	if input.Before != nil {
 		if input.Before.ID.IsZero() || input.Before.UpdatedAt.IsZero() {
 			return ThreadPage{}, errors.New("thread cursor must be complete")
@@ -111,24 +206,10 @@ func (repositories *Repositories) ListThreads(
 	defer rows.Close()
 	threads := make([]Thread, 0, input.Limit+1)
 	for rows.Next() {
-		var (
-			thread        Thread
-			createdMicros int64
-			updatedMicros int64
-		)
-		if err := rows.Scan(
-			&thread.ID,
-			&thread.ProjectID,
-			&thread.RepositoryID,
-			&thread.Title,
-			&createdMicros,
-			&updatedMicros,
-			&thread.Revision,
-		); err != nil {
+		thread, err := scanThreadValues(rows)
+		if err != nil {
 			return ThreadPage{}, classify("scan thread page", err)
 		}
-		thread.CreatedAt = repositoryTime(createdMicros)
-		thread.UpdatedAt = repositoryTime(updatedMicros)
 		threads = append(threads, thread)
 	}
 	if err := rows.Err(); err != nil {
@@ -147,79 +228,112 @@ func (repositories *Repositories) AppendMessage(
 	ctx context.Context,
 	input AppendMessage,
 ) (Message, error) {
-	switch {
-	case input.ID.IsZero():
-		return Message{}, errors.New("message ID must not be empty")
-	case input.ThreadID.IsZero():
-		return Message{}, errors.New("thread ID must not be empty")
-	case !input.Role.IsValid():
-		return Message{}, errors.New("message role is invalid")
-	}
-	if err := validateBounded("message idempotency key", input.IdempotencyKey, 255); err != nil {
+	if err := validateAppendMessageInput(input); err != nil {
 		return Message{}, err
 	}
 	now, micros := repositories.timestamp()
 	var message Message
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
-		existing, found, err := findMessageByIdempotency(
-			ctx,
-			transaction,
-			input.ThreadID,
-			input.IdempotencyKey,
-		)
-		if err != nil {
-			return err
-		}
-		if found {
-			if existing.ID != input.ID ||
-				existing.Role != input.Role ||
-				existing.BodyRedacted != input.BodyRedacted {
-				return typedError(
-					ErrConflict,
-					"append idempotent message",
-					errors.New("idempotency key belongs to different message content"),
-				)
-			}
-			message = existing
-			return nil
-		}
-		var sequence uint64
-		if err := transaction.sql.QueryRowContext(
-			ctx,
-			`SELECT COALESCE(MAX(sequence), 0) + 1 FROM messages WHERE thread_id = ?`,
-			input.ThreadID,
-		).Scan(&sequence); err != nil {
-			return classify("allocate message sequence", err)
-		}
-		_, err = transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO messages (
-				id, thread_id, sequence, role, body_redacted,
-				idempotency_key, created_at_unix_micros
-			) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			input.ID,
-			input.ThreadID,
-			sequence,
-			input.Role,
-			input.BodyRedacted,
-			input.IdempotencyKey,
-			micros,
-		)
-		if err != nil {
-			return repositoryWriteError("append message", err)
-		}
-		message = Message{
-			ID:             input.ID,
-			ThreadID:       input.ThreadID,
-			Sequence:       sequence,
-			Role:           input.Role,
-			BodyRedacted:   input.BodyRedacted,
-			IdempotencyKey: input.IdempotencyKey,
-			CreatedAt:      now,
-		}
-		return nil
+		var err error
+		message, err = appendMessageTransaction(ctx, transaction, input, now, micros)
+		return err
 	})
 	return message, err
+}
+
+func validateAppendMessageInput(input AppendMessage) error {
+	switch {
+	case input.ID.IsZero():
+		return errors.New("message ID must not be empty")
+	case input.ThreadID.IsZero():
+		return errors.New("thread ID must not be empty")
+	case !input.Role.IsValid():
+		return errors.New("message role is invalid")
+	}
+	if err := validateBounded("message idempotency key", input.IdempotencyKey, 255); err != nil {
+		return err
+	}
+	return nil
+}
+
+func appendMessageTransaction(
+	ctx context.Context,
+	transaction *Transaction,
+	input AppendMessage,
+	now time.Time,
+	micros int64,
+) (Message, error) {
+	existing, found, err := findMessageByIdempotency(ctx, transaction, input.ThreadID, input.IdempotencyKey)
+	if err != nil {
+		return Message{}, err
+	}
+	if found {
+		if existing.Role != input.Role || existing.BodyRedacted != input.BodyRedacted ||
+			!sameArtifactIDs(existing.AttachmentIDs, input.AttachmentIDs) {
+			return Message{}, typedError(ErrConflict, "append idempotent message",
+				errors.New("idempotency key belongs to different message content"))
+		}
+		return existing, nil
+	}
+	var sequence uint64
+	if err := transaction.sql.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(sequence), 0) + 1 FROM messages WHERE thread_id = ?`,
+		input.ThreadID).Scan(&sequence); err != nil {
+		return Message{}, classify("allocate message sequence", err)
+	}
+	result, err := transaction.sql.ExecContext(ctx, `INSERT INTO messages (
+		id, thread_id, sequence, role, body_redacted,
+		idempotency_key, created_at_unix_micros
+	)
+	SELECT ?, ?, ?, ?, ?, ?, ?
+	FROM threads
+	WHERE id = ? AND deleted_at_unix_micros IS NULL
+	  AND archived_at_unix_micros IS NULL`, input.ID, input.ThreadID, sequence,
+		input.Role, input.BodyRedacted, input.IdempotencyKey, micros, input.ThreadID)
+	if err != nil {
+		return Message{}, repositoryWriteError("append message", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return Message{}, err
+	}
+	if affected != 1 {
+		return Message{}, typedError(ErrNotFound, "append message", sql.ErrNoRows)
+	}
+	for ordinal, artifactID := range input.AttachmentIDs {
+		if artifactID.IsZero() {
+			return Message{}, errors.New("attachment artifact ID must not be empty")
+		}
+		result, err := transaction.sql.ExecContext(ctx, `INSERT INTO message_attachments (
+			message_id, ordinal, artifact_id
+		)
+		SELECT ?, ?, artifacts.id
+		FROM artifacts
+		JOIN threads ON threads.id = ?
+		WHERE artifacts.id = ? AND artifacts.project_id = threads.project_id
+		  AND artifacts.deleted_at_unix_micros IS NULL`, input.ID, ordinal, input.ThreadID, artifactID)
+		if err != nil {
+			return Message{}, repositoryWriteError("attach message artifact", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return Message{}, err
+		}
+		if affected != 1 {
+			return Message{}, typedError(ErrConstraint, "attach message artifact",
+				errors.New("artifact does not belong to thread project"))
+		}
+	}
+	if _, err := transaction.sql.ExecContext(ctx, `UPDATE threads
+		SET updated_at_unix_micros = ?, revision = revision + 1
+		WHERE id = ?`, micros, input.ThreadID); err != nil {
+		return Message{}, repositoryWriteError("advance thread after message", err)
+	}
+	return Message{
+		ID: input.ID, ThreadID: input.ThreadID, Sequence: sequence, Role: input.Role,
+		BodyRedacted: input.BodyRedacted, AttachmentIDs: append([]domain.ArtifactID(nil), input.AttachmentIDs...),
+		IdempotencyKey: input.IdempotencyKey, CreatedAt: now,
+	}, nil
 }
 
 func findMessageByIdempotency(
@@ -256,5 +370,22 @@ func findMessageByIdempotency(
 		return Message{}, false, classify("find idempotent message", err)
 	}
 	message.CreatedAt = repositoryTime(createdMicros)
+	attachments, err := listMessageAttachmentIDs(ctx, transaction.sql, message.ID)
+	if err != nil {
+		return Message{}, false, err
+	}
+	message.AttachmentIDs = attachments
 	return message, true, nil
+}
+
+func sameArtifactIDs(left, right []domain.ArtifactID) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }

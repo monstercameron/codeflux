@@ -24,6 +24,54 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-069
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-068
+Request-or-TODO: M17-001 through M17-115 and M17-G01 through M17-G04; user
+  required a fixed-port, fully observable GWC UI, backend-owned durable work,
+  working controls, real routing, E2E inspection, adversarial refinement, and
+  marked TODOs.
+Goal: Deliver the Layer 13 resumable conversation journey on authoritative
+  SQLite, coordinator, RPC, and ordered-session boundaries while keeping the
+  browser a typed projection and command surface.
+Assumptions: A selected workspace identity is server authority, not browser
+  state; the user-owned untracked `design/` tree remains excluded; local
+  preview data must never claim durable mutation success.
+Decisions: Add real ThreadService and SessionService composition over SQLite
+  and EventHub; bind every thread to one session; lift authoritative selection
+  into the root; page newest/older thread events and join replay/live delivery
+  by stable sequence; retain preview only when bootstrap has no authorized
+  workspace; disable unsafe offline composer actions; preserve pending approval
+  state and idempotency keys after transport failure; author all presentation,
+  routing, canvas interaction, responsive behavior, and accessibility in Go
+  with GoWebComponents v5.
+Files-or-schemas: Protobuf thread/session resources and generated Go; event
+  registry; migrations 000016 and 000017; SQLite thread/session repositories;
+  coordinator and transport services; browser bootstrap and RPC bridges; GWC
+  composer, thread rail, timeline/card/view, graph canvas, shell, primitives,
+  routes, design tokens, and exhaustive browser/reducer tests.
+Validation: The live server at `127.0.0.1:63131` passes 260 Chromium checks
+  spanning routes, pagination, replay, modals/drawers, keyboard and focus,
+  approval failure, offline mutation safety, graph inspection, responsive
+  first-run, and all mounted M17 surfaces. `go test ./... -count=1`, `go vet
+  ./...`, generation, lint, migration, artifact, js/wasm build, diff, and
+  source secret checks pass.
+Failures-or-discarded-approaches: Rejected popovers that imposed modal
+  background state, controlled search input that dropped characters, exact
+  serialized float assertions, cross-scenario browser state leakage, fake
+  approval settlement after a failed bridge call, and disabled-control clicks.
+  An older disposable preview database was preserved after its unreleased
+  migration checksum diverged; a fresh artifact database validates the final
+  schema.
+Known-limitations: The currently running disposable profile has no selected
+  workspace record, so its UI correctly reports Local Offline and disables
+  durable mutations until an authorized workspace is opened. Workspace-opening
+  product flow and complete live task controls remain later milestone work.
+Next-safe-step: Commit and push M17, verify the public workflow, then implement
+  M18 connection, projection, task-control, cost, recovery, and action-state
+  contracts through the same observable UI.
+
 Dev-Log: DL-20260731-068
 Date: 2026-07-31
 Status: Complete

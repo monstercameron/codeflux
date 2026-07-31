@@ -125,7 +125,7 @@ func DefaultLayoutPreferences() LayoutPreferences {
 	return LayoutPreferences{
 		RailWidth:    240,
 		GraphWidth:   420,
-		SplitPercent: 58,
+		SplitPercent: 52,
 		Viewport:     ViewportWide,
 		ActivePane:   PaneConversation,
 	}

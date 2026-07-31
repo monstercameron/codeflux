@@ -6,17 +6,21 @@ package main
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/buildinfo"
+	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/web/frontend/design"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/preferences"
+	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
 	"codeflux.dev/codeflux/web/frontend/shell"
 	frontendstate "codeflux.dev/codeflux/web/frontend/state"
+	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"github.com/monstercameron/GoWebComponents/v5/fetch"
 	"github.com/monstercameron/GoWebComponents/v5/router"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
@@ -28,6 +32,7 @@ func main() {
 	for _, route := range []string{
 		"/",
 		"/tasks",
+		"/graphs",
 		"/memory",
 		"/settings",
 		"/diagnostics",
@@ -49,6 +54,7 @@ func productPage(router.Attrs) ui.Node {
 
 func productApplication() ui.Node {
 	location := router.UseLocation()
+	navigator := router.UseNavigate()
 	bootstrap := fetch.UseResource(loadBootstrap)
 	streamStatus := ui.UseState(sessionclient.Status{State: sessionclient.StateIdle})
 	reducedMotion := ui.UsePrefersReducedMotion()
@@ -56,6 +62,9 @@ func productApplication() ui.Node {
 	activeTheme, setTheme := ui.UseTheme(string(preferredScheme))
 	layoutState := ui.UseState(frontendstate.DefaultLayoutPreferences())
 	selectedGraphID := ui.UseState("")
+	selectedThread := ui.UseState(threadrail.Thread{})
+	latestThreadEvent := ui.UseState(events.SessionEvent{})
+	previewTaskState := ui.UseState("in progress")
 	preferencesReady := ui.UseState(false)
 	resource := bootstrap.Get()
 	restoreContext := routes.RestorationContext{}
@@ -87,6 +96,11 @@ func productApplication() ui.Node {
 	}
 
 	store := sampleStore()
+	previewTopBar := store.Snapshot().TopBar
+	previewTopBar.TaskState = previewTaskState.Get()
+	previewTopBar.CanPause = previewTaskState.Get() != "stopped"
+	previewTopBar.CanStop = previewTaskState.Get() != "stopped"
+	store = store.ReduceRemote(frontendstate.TopBarChanged{TopBar: previewTopBar})
 	session := frontendstate.SessionView{
 		Bootstrap:  frontendstate.BootstrapBooting,
 		Connection: frontendstate.ConnectionConnecting,
@@ -169,8 +183,9 @@ func productApplication() ui.Node {
 			store = selectedStore
 		}
 	}
-	appRoute := routeFor(location.Path)
+	appRoute := routeFor(location.Path, location.Query)
 	if location.Path == "/" &&
+		strings.TrimSpace(location.Query) == "" &&
 		resource.Ready &&
 		restoreContextErr == nil &&
 		!restoreContext.FirstRunComplete {
@@ -179,16 +194,59 @@ func productApplication() ui.Node {
 		// expose a transient repository chooser for an unfinished installation.
 		appRoute = routes.Route{Name: routes.FirstRun}
 	}
+	previewTimeline := livePreviewTimeline()
+	timelineProps := mountedAuthoritativeTimeline(
+		selectedThread.Get(), previewTimeline, latestThreadEvent.Set,
+	)
 	root := shell.RootProps{
 		Snapshot: store.Snapshot(),
-		Route:    appRoute,
-		Tokens:   tokens,
+		Composer: livePreviewComposer(selectedGraphID),
+		Timeline: timelineProps,
+		ThreadRail: ui.CreateElement(mountedThreadRail, mountedThreadRailProps{
+			Envelope: resource.Value, Snapshot: store.Snapshot(), Route: appRoute,
+			Mode: primitives.Mode{
+				Theme: tokens.Theme, Density: tokens.Density,
+				HighContrast: tokens.Theme == design.ThemeHighContrast, ReducedMotion: tokens.ReducedMotion,
+			},
+			OnNavigate: func(route routes.Route) {
+				path, err := routes.Path(route)
+				if location.Path == "/tasks" {
+					path, err = routes.TaskSelectionPath(route)
+				}
+				if err == nil {
+					navigator.Navigate(path)
+				}
+			},
+			OnAuthoritativeSelection: selectedThread.Set,
+		}),
+		Route:  appRoute,
+		Tokens: tokens,
 		Translator: frontendi18n.EnglishRegistry().Resolve(
 			string(frontendi18n.LocaleEnglishUnitedStates),
 		),
 		OnLayoutChange: layoutState.Set,
 		OnGraphSelect:  selectedGraphID.Set,
+		OnThreadNavigate: func(route routes.Route) {
+			path, err := routes.Path(route)
+			if location.Path == "/tasks" {
+				path, err = routes.TaskSelectionPath(route)
+			}
+			if err == nil {
+				navigator.Navigate(path)
+			}
+		},
+		OnNavigatePath: navigator.Navigate,
 		OnRetry:        bootstrap.Reload,
+		OnPauseRequested: func() {
+			if previewTaskState.Get() == "paused" {
+				previewTaskState.Set("in progress")
+				return
+			}
+			previewTaskState.Set("paused")
+		},
+		OnStopRequested: func() {
+			previewTaskState.Set("stopped")
+		},
 		OnThemeChange: func() {
 			switch theme {
 			case design.ThemeDark:
@@ -287,7 +345,7 @@ func useLayoutPreferences(
 
 func isShellPreviewRoute(path string) bool {
 	switch path {
-	case "/tasks", "/memory", "/settings", "/diagnostics", "/first-run":
+	case "/tasks", "/graphs", "/memory", "/settings", "/diagnostics", "/first-run":
 		return true
 	default:
 		return false
@@ -391,10 +449,15 @@ func responsiveLayout() frontendstate.LayoutPreferences {
 	return layout
 }
 
-func routeFor(path string) routes.Route {
+func routeFor(path, query string) routes.Route {
 	switch path {
 	case "/tasks":
+		if selected, err := routes.ParseTaskSelection(query); err == nil {
+			return selected
+		}
 		return routes.Route{Name: routes.ThreadWorkspace}
+	case "/graphs":
+		return routes.Route{Name: routes.Graphs}
 	case "/memory":
 		// The local preview route deliberately omits a repository identifier so
 		// every frontend data state can be exercised before repository setup.

@@ -24,6 +24,9 @@ func runAdversarialInteractionChecks(
 	artifactDir string,
 	result *Result,
 ) {
+	runMountedGraphCanvasContractCheck(page, base, artifactDir, result)
+	runGraphCanvasInteractionCheck(page, base, artifactDir, result)
+	runGraphCanvasResponsiveBoundsCheck(page, base, artifactDir, result)
 	runGraphSelectionPersistenceCheck(page, base, artifactDir, result)
 	runReducedVisualViewportComposerCheck(page, base, artifactDir, result)
 	runKeyboardTraversalCheck(page, base, artifactDir, result)
@@ -537,7 +540,7 @@ func focusAndPress(locator playwright.Locator, key string) error {
 
 func keyboardTabStops(page playwright.Page) ([]playwright.Locator, []string, error) {
 	candidates, err := page.Locator(
-		`a[href],button,input,textarea,select,[tabindex]:not([tabindex="-1"])`,
+		`a[href],button,input,textarea,select,summary,[tabindex]:not([tabindex="-1"])`,
 	).All()
 	if err != nil {
 		return nil, nil, err

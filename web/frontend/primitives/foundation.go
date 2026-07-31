@@ -133,10 +133,14 @@ func boolARIA(value bool) string {
 
 func controlClass(tokens design.Tokens, primary bool) string {
 	background := tokens.Colors.Surface2
+	hoverBackground := tokens.Colors.Surface3
+	pressedBackground := tokens.Colors.SurfaceInset
 	foreground := tokens.Colors.TextPrimary
-	border := tokens.Colors.BorderStrong
+	border := tokens.Colors.BorderSubtle
 	if primary {
 		background = tokens.Colors.Accent
+		hoverBackground = tokens.Colors.AccentHover
+		pressedBackground = tokens.Colors.AccentPressed
 		foreground = tokens.Colors.OnAccent
 		border = tokens.Colors.Accent
 	}
@@ -153,19 +157,50 @@ func controlClass(tokens design.Tokens, primary bool) string {
 		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(border))),
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.Font(css.FontStack(tokens.Fonts.UI)),
-		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+		css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.ControlLabel.LineHeight)),
 		css.FontWeight.Medium,
 		css.Cursor.Pointer,
 	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors, css.PropTransform, css.PropShadow),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(hoverBackground))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+	)...)
+	if !tokens.ReducedMotion {
+		rules = append(rules, css.Hover(
+			css.Transform(css.TranslateY(css.Px(-1))),
+			css.Shadow(elevationShadow(tokens, tokens.Elevation.Resting)),
+		)...)
+	}
+	activeRules := []css.Rule{css.Bg(css.Hex(string(pressedBackground)))}
+	if !tokens.ReducedMotion {
+		activeRules = append(activeRules, css.Transform(css.TranslateY(css.Zero)))
+	}
+	rules = append(rules, css.Active(activeRules...)...)
+	rules = append(rules, css.Disabled(
+		css.OpacityNum(css.Num(0.5)), css.Cursor.NotAllowed, css.Shadow(css.ShadowNone), css.Transform(css.TranslateY(css.Zero)),
+	)...)
 	rules = append(rules, css.FocusVisible(
 		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
 		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
 	)...)
 	return css.New(rules...).String()
 }
 
 func surfaceClass(tokens design.Tokens) string {
-	return css.New(
+	return surfaceClassAt(tokens, tokens.Elevation.Resting)
+}
+
+func surfaceClassAt(tokens design.Tokens, elevation design.Elevation) string {
+	rules := []css.Rule{
 		u.Flex,
 		u.FlexCol,
 		css.Gap(css.Px(tokens.Spacing.MD)),
@@ -173,8 +208,26 @@ func surfaceClass(tokens design.Tokens) string {
 		css.Padding(css.Px(tokens.Rhythm.PanelInset)),
 		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
 		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
 		css.Font(css.FontStack(tokens.Fonts.UI)),
-	).String()
+		css.Shadow(elevationShadow(tokens, elevation)),
+	}
+	rules = append(rules, css.Media(
+		css.MaxW(799),
+		css.Padding(css.Px(tokens.Spacing.MD)),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+	)...)
+	return css.New(rules...).String()
+}
+
+func elevationShadow(tokens design.Tokens, elevation design.Elevation) css.ShadowToken {
+	red, green, blue := 3, 12, 20
+	if tokens.Theme == design.ThemeLight {
+		red, green, blue = 34, 57, 71
+	}
+	return css.ShadowOf(
+		css.Zero, css.Px(elevation.OffsetY), css.Px(elevation.Blur), css.Px(elevation.Spread),
+		css.RGBA(red, green, blue, elevation.Opacity),
+	)
 }

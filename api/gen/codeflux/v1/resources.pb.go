@@ -199,6 +199,11 @@ type ThreadView struct {
 	Archived      bool                   `protobuf:"varint,4,opt,name=archived,proto3" json:"archived,omitempty"`
 	Revision      uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SessionId     *StableIdentity        `protobuf:"bytes,7,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	TaskId        *StableIdentity        `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	TaskState     string                 `protobuf:"bytes,9,opt,name=task_state,json=taskState,proto3" json:"task_state,omitempty"`
+	Attention     string                 `protobuf:"bytes,10,opt,name=attention,proto3" json:"attention,omitempty"`
+	UnreadCount   uint32                 `protobuf:"varint,11,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -275,15 +280,53 @@ func (x *ThreadView) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *ThreadView) GetSessionId() *StableIdentity {
+	if x != nil {
+		return x.SessionId
+	}
+	return nil
+}
+
+func (x *ThreadView) GetTaskId() *StableIdentity {
+	if x != nil {
+		return x.TaskId
+	}
+	return nil
+}
+
+func (x *ThreadView) GetTaskState() string {
+	if x != nil {
+		return x.TaskState
+	}
+	return ""
+}
+
+func (x *ThreadView) GetAttention() string {
+	if x != nil {
+		return x.Attention
+	}
+	return ""
+}
+
+func (x *ThreadView) GetUnreadCount() uint32 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
 type MessageView struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	MessageId     *StableIdentity        `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	ThreadId      *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
-	Body          *RedactedText          `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	MessageId *StableIdentity        `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	ThreadId  *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Role      string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	Body      *RedactedText          `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	// SafePath is retained for wire compatibility with older clients.
 	Attachments   []*SafePath            `protobuf:"bytes,5,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	Revision      uint64                 `protobuf:"varint,6,opt,name=revision,proto3" json:"revision,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	AttachmentIds []*StableIdentity      `protobuf:"bytes,8,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
+	Sequence      uint64                 `protobuf:"varint,9,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -365,6 +408,20 @@ func (x *MessageView) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *MessageView) GetAttachmentIds() []*StableIdentity {
+	if x != nil {
+		return x.AttachmentIds
+	}
+	return nil
+}
+
+func (x *MessageView) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
 }
 
 type TaskView struct {
@@ -1326,7 +1383,7 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x02 \x01(\v2\x19.codeflux.v1.RedactedTextR\vdisplayName\x12)\n" +
 	"\x04root\x18\x03 \x01(\v2\x15.codeflux.v1.SafePathR\x04root\x12+\n" +
 	"\x03git\x18\x04 \x01(\v2\x19.codeflux.v1.GitStateViewR\x03git\x12\x1a\n" +
-	"\brevision\x18\x05 \x01(\x04R\brevision\"\xaa\x02\n" +
+	"\brevision\x18\x05 \x01(\x04R\brevision\"\xfc\x03\n" +
 	"\n" +
 	"ThreadView\x128\n" +
 	"\tthread_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12>\n" +
@@ -1335,7 +1392,15 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\barchived\x18\x04 \x01(\bR\barchived\x12\x1a\n" +
 	"\brevision\x18\x05 \x01(\x04R\brevision\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd6\x02\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12:\n" +
+	"\n" +
+	"session_id\x18\a \x01(\v2\x1b.codeflux.v1.StableIdentityR\tsessionId\x124\n" +
+	"\atask_id\x18\b \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\x12\x1d\n" +
+	"\n" +
+	"task_state\x18\t \x01(\tR\ttaskState\x12\x1c\n" +
+	"\tattention\x18\n" +
+	" \x01(\tR\tattention\x12!\n" +
+	"\funread_count\x18\v \x01(\rR\vunreadCount\"\xb6\x03\n" +
 	"\vMessageView\x12:\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\tmessageId\x128\n" +
@@ -1345,7 +1410,9 @@ const file_codeflux_v1_resources_proto_rawDesc = "" +
 	"\vattachments\x18\x05 \x03(\v2\x15.codeflux.v1.SafePathR\vattachments\x12\x1a\n" +
 	"\brevision\x18\x06 \x01(\x04R\brevision\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xdb\x04\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12B\n" +
+	"\x0eattachment_ids\x18\b \x03(\v2\x1b.codeflux.v1.StableIdentityR\rattachmentIds\x12\x1a\n" +
+	"\bsequence\x18\t \x01(\x04R\bsequence\"\xdb\x04\n" +
 	"\bTaskView\x124\n" +
 	"\atask_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\x128\n" +
 	"\tthread_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12:\n" +
@@ -1496,53 +1563,56 @@ var file_codeflux_v1_resources_proto_depIdxs = []int32{
 	15, // 11: codeflux.v1.ThreadView.workspace_id:type_name -> codeflux.v1.StableIdentity
 	18, // 12: codeflux.v1.ThreadView.title:type_name -> codeflux.v1.RedactedText
 	19, // 13: codeflux.v1.ThreadView.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 14: codeflux.v1.MessageView.message_id:type_name -> codeflux.v1.StableIdentity
-	15, // 15: codeflux.v1.MessageView.thread_id:type_name -> codeflux.v1.StableIdentity
-	18, // 16: codeflux.v1.MessageView.body:type_name -> codeflux.v1.RedactedText
-	16, // 17: codeflux.v1.MessageView.attachments:type_name -> codeflux.v1.SafePath
-	19, // 18: codeflux.v1.MessageView.created_at:type_name -> google.protobuf.Timestamp
-	15, // 19: codeflux.v1.TaskView.task_id:type_name -> codeflux.v1.StableIdentity
-	15, // 20: codeflux.v1.TaskView.thread_id:type_name -> codeflux.v1.StableIdentity
-	15, // 21: codeflux.v1.TaskView.session_id:type_name -> codeflux.v1.StableIdentity
-	18, // 22: codeflux.v1.TaskView.summary:type_name -> codeflux.v1.RedactedText
-	20, // 23: codeflux.v1.TaskView.actual_cost:type_name -> codeflux.v1.Money
-	20, // 24: codeflux.v1.TaskView.hard_budget:type_name -> codeflux.v1.Money
-	21, // 25: codeflux.v1.TaskView.actual_tokens:type_name -> codeflux.v1.TokenAmount
-	22, // 26: codeflux.v1.TaskView.elapsed:type_name -> google.protobuf.Duration
-	19, // 27: codeflux.v1.TaskView.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 28: codeflux.v1.BudgetView.budget_id:type_name -> codeflux.v1.StableIdentity
-	15, // 29: codeflux.v1.BudgetView.task_id:type_name -> codeflux.v1.StableIdentity
-	20, // 30: codeflux.v1.BudgetView.hard_limit:type_name -> codeflux.v1.Money
-	20, // 31: codeflux.v1.BudgetView.reserved:type_name -> codeflux.v1.Money
-	20, // 32: codeflux.v1.BudgetView.actual:type_name -> codeflux.v1.Money
-	15, // 33: codeflux.v1.GraphNodeView.node_id:type_name -> codeflux.v1.StableIdentity
-	18, // 34: codeflux.v1.GraphNodeView.label:type_name -> codeflux.v1.RedactedText
-	16, // 35: codeflux.v1.GraphNodeView.source_path:type_name -> codeflux.v1.SafePath
-	15, // 36: codeflux.v1.GraphEdgeView.edge_id:type_name -> codeflux.v1.StableIdentity
-	15, // 37: codeflux.v1.GraphEdgeView.from_node_id:type_name -> codeflux.v1.StableIdentity
-	15, // 38: codeflux.v1.GraphEdgeView.to_node_id:type_name -> codeflux.v1.StableIdentity
-	15, // 39: codeflux.v1.GraphSliceView.graph_id:type_name -> codeflux.v1.StableIdentity
-	15, // 40: codeflux.v1.GraphSliceView.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	15, // 41: codeflux.v1.GraphSliceView.task_id:type_name -> codeflux.v1.StableIdentity
-	6,  // 42: codeflux.v1.GraphSliceView.nodes:type_name -> codeflux.v1.GraphNodeView
-	7,  // 43: codeflux.v1.GraphSliceView.edges:type_name -> codeflux.v1.GraphEdgeView
-	15, // 44: codeflux.v1.DiffSummaryView.task_id:type_name -> codeflux.v1.StableIdentity
-	18, // 45: codeflux.v1.DiffSummaryView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 46: codeflux.v1.ValidationItemView.validation_id:type_name -> codeflux.v1.StableIdentity
-	18, // 47: codeflux.v1.ValidationItemView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 48: codeflux.v1.ValidationReportView.task_id:type_name -> codeflux.v1.StableIdentity
-	10, // 49: codeflux.v1.ValidationReportView.items:type_name -> codeflux.v1.ValidationItemView
-	18, // 50: codeflux.v1.ValidationReportView.summary:type_name -> codeflux.v1.RedactedText
-	15, // 51: codeflux.v1.ModelView.provider_id:type_name -> codeflux.v1.StableIdentity
-	18, // 52: codeflux.v1.ModelView.display_name:type_name -> codeflux.v1.RedactedText
-	22, // 53: codeflux.v1.ModelView.default_timeout:type_name -> google.protobuf.Duration
-	15, // 54: codeflux.v1.ProviderView.provider_id:type_name -> codeflux.v1.StableIdentity
-	18, // 55: codeflux.v1.ProviderView.display_name:type_name -> codeflux.v1.RedactedText
-	56, // [56:56] is the sub-list for method output_type
-	56, // [56:56] is the sub-list for method input_type
-	56, // [56:56] is the sub-list for extension type_name
-	56, // [56:56] is the sub-list for extension extendee
-	0,  // [0:56] is the sub-list for field type_name
+	15, // 14: codeflux.v1.ThreadView.session_id:type_name -> codeflux.v1.StableIdentity
+	15, // 15: codeflux.v1.ThreadView.task_id:type_name -> codeflux.v1.StableIdentity
+	15, // 16: codeflux.v1.MessageView.message_id:type_name -> codeflux.v1.StableIdentity
+	15, // 17: codeflux.v1.MessageView.thread_id:type_name -> codeflux.v1.StableIdentity
+	18, // 18: codeflux.v1.MessageView.body:type_name -> codeflux.v1.RedactedText
+	16, // 19: codeflux.v1.MessageView.attachments:type_name -> codeflux.v1.SafePath
+	19, // 20: codeflux.v1.MessageView.created_at:type_name -> google.protobuf.Timestamp
+	15, // 21: codeflux.v1.MessageView.attachment_ids:type_name -> codeflux.v1.StableIdentity
+	15, // 22: codeflux.v1.TaskView.task_id:type_name -> codeflux.v1.StableIdentity
+	15, // 23: codeflux.v1.TaskView.thread_id:type_name -> codeflux.v1.StableIdentity
+	15, // 24: codeflux.v1.TaskView.session_id:type_name -> codeflux.v1.StableIdentity
+	18, // 25: codeflux.v1.TaskView.summary:type_name -> codeflux.v1.RedactedText
+	20, // 26: codeflux.v1.TaskView.actual_cost:type_name -> codeflux.v1.Money
+	20, // 27: codeflux.v1.TaskView.hard_budget:type_name -> codeflux.v1.Money
+	21, // 28: codeflux.v1.TaskView.actual_tokens:type_name -> codeflux.v1.TokenAmount
+	22, // 29: codeflux.v1.TaskView.elapsed:type_name -> google.protobuf.Duration
+	19, // 30: codeflux.v1.TaskView.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 31: codeflux.v1.BudgetView.budget_id:type_name -> codeflux.v1.StableIdentity
+	15, // 32: codeflux.v1.BudgetView.task_id:type_name -> codeflux.v1.StableIdentity
+	20, // 33: codeflux.v1.BudgetView.hard_limit:type_name -> codeflux.v1.Money
+	20, // 34: codeflux.v1.BudgetView.reserved:type_name -> codeflux.v1.Money
+	20, // 35: codeflux.v1.BudgetView.actual:type_name -> codeflux.v1.Money
+	15, // 36: codeflux.v1.GraphNodeView.node_id:type_name -> codeflux.v1.StableIdentity
+	18, // 37: codeflux.v1.GraphNodeView.label:type_name -> codeflux.v1.RedactedText
+	16, // 38: codeflux.v1.GraphNodeView.source_path:type_name -> codeflux.v1.SafePath
+	15, // 39: codeflux.v1.GraphEdgeView.edge_id:type_name -> codeflux.v1.StableIdentity
+	15, // 40: codeflux.v1.GraphEdgeView.from_node_id:type_name -> codeflux.v1.StableIdentity
+	15, // 41: codeflux.v1.GraphEdgeView.to_node_id:type_name -> codeflux.v1.StableIdentity
+	15, // 42: codeflux.v1.GraphSliceView.graph_id:type_name -> codeflux.v1.StableIdentity
+	15, // 43: codeflux.v1.GraphSliceView.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	15, // 44: codeflux.v1.GraphSliceView.task_id:type_name -> codeflux.v1.StableIdentity
+	6,  // 45: codeflux.v1.GraphSliceView.nodes:type_name -> codeflux.v1.GraphNodeView
+	7,  // 46: codeflux.v1.GraphSliceView.edges:type_name -> codeflux.v1.GraphEdgeView
+	15, // 47: codeflux.v1.DiffSummaryView.task_id:type_name -> codeflux.v1.StableIdentity
+	18, // 48: codeflux.v1.DiffSummaryView.summary:type_name -> codeflux.v1.RedactedText
+	15, // 49: codeflux.v1.ValidationItemView.validation_id:type_name -> codeflux.v1.StableIdentity
+	18, // 50: codeflux.v1.ValidationItemView.summary:type_name -> codeflux.v1.RedactedText
+	15, // 51: codeflux.v1.ValidationReportView.task_id:type_name -> codeflux.v1.StableIdentity
+	10, // 52: codeflux.v1.ValidationReportView.items:type_name -> codeflux.v1.ValidationItemView
+	18, // 53: codeflux.v1.ValidationReportView.summary:type_name -> codeflux.v1.RedactedText
+	15, // 54: codeflux.v1.ModelView.provider_id:type_name -> codeflux.v1.StableIdentity
+	18, // 55: codeflux.v1.ModelView.display_name:type_name -> codeflux.v1.RedactedText
+	22, // 56: codeflux.v1.ModelView.default_timeout:type_name -> google.protobuf.Duration
+	15, // 57: codeflux.v1.ProviderView.provider_id:type_name -> codeflux.v1.StableIdentity
+	18, // 58: codeflux.v1.ProviderView.display_name:type_name -> codeflux.v1.RedactedText
+	59, // [59:59] is the sub-list for method output_type
+	59, // [59:59] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_resources_proto_init() }

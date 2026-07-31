@@ -270,6 +270,18 @@ func TestMenuAndNonModalOverlaysExposeTheirContracts(t *testing.T) {
 		ID: "details-popover", Open: true, LabelledBy: "details-trigger", Content: html.Text("Details"),
 	}))
 	requireContains(t, popover, `data-component="popover"`, `data-focus-policy="restore"`, "Details")
+	popoverNode := Popover(OverlayProps{
+		ID: "details-popover-policy", Open: true, LabelledBy: "details-trigger", Content: html.Text("Details"),
+	})
+	rawPopoverProps, ok := popoverNode.Props["__ui_props"]
+	if !ok {
+		t.Fatal("popover did not preserve a framework component boundary")
+	}
+	accessiblePopoverProps, ok := rawPopoverProps.(ui.AccessibleOverlayProps)
+	if !ok || accessiblePopoverProps.Role != "region" || accessiblePopoverProps.Modal ||
+		accessiblePopoverProps.BackgroundInert || accessiblePopoverProps.TrapFocus {
+		t.Fatalf("popover became modal or inert: %#v", rawPopoverProps)
+	}
 
 	tooltip := render(t, Tooltip(TooltipProps{
 		ID: "refresh-tip", Open: true, Label: "Refresh graph",

@@ -10,6 +10,18 @@ func TestReadFrontendRouteAccessReturnsIdentifiersWithoutPaths(t *testing.T) {
 	projectID := testProjectID(t, 700)
 	repositoryID := testRepositoryID(t, 701)
 	mustCreateProjectRepository(t, repositories, projectID, repositoryID)
+	workspaceID := testWorkspaceID(t, 704)
+	now := time.Now().UTC().UnixMicro()
+	if _, err := repositories.database.sql.ExecContext(
+		t.Context(),
+		`INSERT INTO workspaces (
+			id, repository_id, canonical_path, state,
+			created_at_unix_micros, updated_at_unix_micros, revision
+		) VALUES (?, ?, ?, 'active', ?, ?, 0)`,
+		workspaceID, repositoryID, `C:\authorized\workspace`, now, now,
+	); err != nil {
+		t.Fatal(err)
+	}
 	activeThread := testThreadID(t, 702)
 	archivedThread := testThreadID(t, 703)
 	for _, threadID := range []int{702, 703} {
@@ -22,7 +34,7 @@ func TestReadFrontendRouteAccessReturnsIdentifiersWithoutPaths(t *testing.T) {
 	}
 	if _, err := repositories.database.sql.ExecContext(
 		t.Context(),
-		"UPDATE threads SET deleted_at_unix_micros = ? WHERE id = ?",
+		"UPDATE threads SET archived_at_unix_micros = ? WHERE id = ?",
 		time.Now().UTC().UnixMicro(),
 		archivedThread,
 	); err != nil {
@@ -35,6 +47,9 @@ func TestReadFrontendRouteAccessReturnsIdentifiersWithoutPaths(t *testing.T) {
 	}
 	if !access.FirstRunComplete || len(access.AccessibleRepositories) != 1 || access.AccessibleRepositories[0] != repositoryID {
 		t.Fatalf("repository access = %#v", access)
+	}
+	if access.SelectedWorkspaceID != workspaceID {
+		t.Fatalf("selected workspace = %s, want %s", access.SelectedWorkspaceID, workspaceID)
 	}
 	if len(access.AccessibleThreads) != 1 || access.AccessibleThreads[0] != activeThread {
 		t.Fatalf("active thread access = %#v", access)

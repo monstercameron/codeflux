@@ -48,13 +48,24 @@ func CodeBlock(props CodeBlockProps) ui.Node {
 			Data:  map[string]string{"component": "code-block"},
 			Class: surfaceClass(tokens),
 		},
-		html.Figcaption(html.Props{}, html.Text(props.Label)),
+		html.Figcaption(html.Props{
+			Class: css.New(
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+				css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.PanelHeading.LineHeight)),
+				css.FontWeight.Semibold,
+			).String(),
+		}, html.Text(props.Label)),
 		CopyButton(CopyButtonProps{Label: "Copy code", Mode: props.Mode, OnCopy: props.OnCopy}),
 		html.Pre(
 			html.Props{
 				TabIndex: html.TabIndexZero,
 				Aria:     map[string]string{"label": props.Label},
 				Class: css.New(
+					css.Margin(css.Zero), css.Padding(css.Px(tokens.Spacing.MD)),
+					css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+					css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+					css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
 					css.Overflow.Auto,
 					css.Font(css.FontStack(tokens.Fonts.Code)),
 					css.FontSize(css.Px(tokens.Typography.Code.Size)),

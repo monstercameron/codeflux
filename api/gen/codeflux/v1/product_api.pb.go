@@ -726,12 +726,15 @@ func (x *GetThreadPageResponse) GetPage() *PageInfo {
 }
 
 type SendMessageRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Control         *MutationControl       `protobuf:"bytes,1,opt,name=control,proto3" json:"control,omitempty"`
-	ThreadId        *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	Body            string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
-	AttachmentPaths []string               `protobuf:"bytes,4,rep,name=attachment_paths,json=attachmentPaths,proto3" json:"attachment_paths,omitempty"`
-	CreateDraftTask bool                   `protobuf:"varint,5,opt,name=create_draft_task,json=createDraftTask,proto3" json:"create_draft_task,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Control  *MutationControl       `protobuf:"bytes,1,opt,name=control,proto3" json:"control,omitempty"`
+	ThreadId *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Body     string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	// Legacy browser-supplied paths are retained for wire compatibility only.
+	// Servers reject non-empty values; clients send repository-scoped identities.
+	AttachmentPaths []string          `protobuf:"bytes,4,rep,name=attachment_paths,json=attachmentPaths,proto3" json:"attachment_paths,omitempty"`
+	CreateDraftTask bool              `protobuf:"varint,5,opt,name=create_draft_task,json=createDraftTask,proto3" json:"create_draft_task,omitempty"`
+	AttachmentIds   []*StableIdentity `protobuf:"bytes,6,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -799,6 +802,13 @@ func (x *SendMessageRequest) GetCreateDraftTask() bool {
 		return x.CreateDraftTask
 	}
 	return false
+}
+
+func (x *SendMessageRequest) GetAttachmentIds() []*StableIdentity {
+	if x != nil {
+		return x.AttachmentIds
+	}
+	return nil
 }
 
 type SendMessageResponse struct {
@@ -4002,13 +4012,14 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\x15GetThreadPageResponse\x12/\n" +
 	"\x06thread\x18\x01 \x01(\v2\x17.codeflux.v1.ThreadViewR\x06thread\x124\n" +
 	"\bmessages\x18\x02 \x03(\v2\x18.codeflux.v1.MessageViewR\bmessages\x12)\n" +
-	"\x04page\x18\x03 \x01(\v2\x15.codeflux.v1.PageInfoR\x04page\"\xf1\x01\n" +
+	"\x04page\x18\x03 \x01(\v2\x15.codeflux.v1.PageInfoR\x04page\"\xb5\x02\n" +
 	"\x12SendMessageRequest\x126\n" +
 	"\acontrol\x18\x01 \x01(\v2\x1c.codeflux.v1.MutationControlR\acontrol\x128\n" +
 	"\tthread_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12\x12\n" +
 	"\x04body\x18\x03 \x01(\tR\x04body\x12)\n" +
 	"\x10attachment_paths\x18\x04 \x03(\tR\x0fattachmentPaths\x12*\n" +
-	"\x11create_draft_task\x18\x05 \x01(\bR\x0fcreateDraftTask\"\x7f\n" +
+	"\x11create_draft_task\x18\x05 \x01(\bR\x0fcreateDraftTask\x12B\n" +
+	"\x0eattachment_ids\x18\x06 \x03(\v2\x1b.codeflux.v1.StableIdentityR\rattachmentIds\"\x7f\n" +
 	"\x13SendMessageResponse\x122\n" +
 	"\amessage\x18\x01 \x01(\v2\x18.codeflux.v1.MessageViewR\amessage\x124\n" +
 	"\n" +
@@ -4388,180 +4399,181 @@ var file_codeflux_v1_product_api_proto_depIdxs = []int32{
 	79,  // 21: codeflux.v1.GetThreadPageResponse.page:type_name -> codeflux.v1.PageInfo
 	74,  // 22: codeflux.v1.SendMessageRequest.control:type_name -> codeflux.v1.MutationControl
 	76,  // 23: codeflux.v1.SendMessageRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	82,  // 24: codeflux.v1.SendMessageResponse.message:type_name -> codeflux.v1.MessageView
-	83,  // 25: codeflux.v1.SendMessageResponse.draft_task:type_name -> codeflux.v1.TaskView
-	74,  // 26: codeflux.v1.RenameThreadRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 27: codeflux.v1.RenameThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	81,  // 28: codeflux.v1.RenameThreadResponse.thread:type_name -> codeflux.v1.ThreadView
-	74,  // 29: codeflux.v1.ArchiveThreadRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 30: codeflux.v1.ArchiveThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	81,  // 31: codeflux.v1.ArchiveThreadResponse.thread:type_name -> codeflux.v1.ThreadView
-	74,  // 32: codeflux.v1.CreateTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 33: codeflux.v1.CreateTaskRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 34: codeflux.v1.CreateTaskRequest.source_message_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 35: codeflux.v1.CreateTaskResponse.task:type_name -> codeflux.v1.TaskView
-	76,  // 36: codeflux.v1.GetTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 37: codeflux.v1.GetTaskResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 38: codeflux.v1.StartTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 39: codeflux.v1.StartTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 40: codeflux.v1.StartTaskResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 41: codeflux.v1.PauseTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 42: codeflux.v1.PauseTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 43: codeflux.v1.PauseTaskResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 44: codeflux.v1.ResumeTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 45: codeflux.v1.ResumeTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 46: codeflux.v1.ResumeTaskResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 47: codeflux.v1.CancelTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 48: codeflux.v1.CancelTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 49: codeflux.v1.CancelTaskResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 50: codeflux.v1.ApproveActionRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 51: codeflux.v1.ApproveActionRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 52: codeflux.v1.ApproveActionRequest.approval_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 53: codeflux.v1.ApproveActionResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 54: codeflux.v1.SetBudgetRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 55: codeflux.v1.SetBudgetRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	84,  // 56: codeflux.v1.SetBudgetRequest.hard_limit:type_name -> codeflux.v1.Money
-	85,  // 57: codeflux.v1.SetBudgetResponse.budget:type_name -> codeflux.v1.BudgetView
-	74,  // 58: codeflux.v1.RequestRepairRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 59: codeflux.v1.RequestRepairRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 60: codeflux.v1.RequestRepairRequest.evidence_ids:type_name -> codeflux.v1.StableIdentity
-	83,  // 61: codeflux.v1.RequestRepairResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 62: codeflux.v1.RollbackTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 63: codeflux.v1.RollbackTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 64: codeflux.v1.RollbackTaskRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 65: codeflux.v1.RollbackTaskResponse.task:type_name -> codeflux.v1.TaskView
-	76,  // 66: codeflux.v1.GetGraphSliceRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	86,  // 67: codeflux.v1.GetGraphSliceResponse.graph:type_name -> codeflux.v1.GraphSliceView
-	76,  // 68: codeflux.v1.ExpandGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 69: codeflux.v1.ExpandGraphRequest.root_node_ids:type_name -> codeflux.v1.StableIdentity
-	86,  // 70: codeflux.v1.ExpandGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
-	76,  // 71: codeflux.v1.GetNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 72: codeflux.v1.GetNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
-	87,  // 73: codeflux.v1.GetNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
-	76,  // 74: codeflux.v1.GetNodeResponse.related_message_ids:type_name -> codeflux.v1.StableIdentity
-	76,  // 75: codeflux.v1.GetNodeResponse.evidence_ids:type_name -> codeflux.v1.StableIdentity
-	76,  // 76: codeflux.v1.ExplainNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 77: codeflux.v1.ExplainNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
-	87,  // 78: codeflux.v1.ExplainNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
-	80,  // 79: codeflux.v1.ExplainNodeResponse.explanation:type_name -> codeflux.v1.RedactedText
-	76,  // 80: codeflux.v1.CompareGraphRevisionsRequest.from_graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 81: codeflux.v1.CompareGraphRevisionsRequest.to_graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	87,  // 82: codeflux.v1.CompareGraphRevisionsResponse.added_nodes:type_name -> codeflux.v1.GraphNodeView
-	87,  // 83: codeflux.v1.CompareGraphRevisionsResponse.changed_nodes:type_name -> codeflux.v1.GraphNodeView
-	76,  // 84: codeflux.v1.CompareGraphRevisionsResponse.removed_node_ids:type_name -> codeflux.v1.StableIdentity
-	76,  // 85: codeflux.v1.GetDiffSummaryRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	88,  // 86: codeflux.v1.GetDiffSummaryResponse.diff:type_name -> codeflux.v1.DiffSummaryView
-	76,  // 87: codeflux.v1.GetValidationReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	89,  // 88: codeflux.v1.GetValidationReportResponse.report:type_name -> codeflux.v1.ValidationReportView
-	74,  // 89: codeflux.v1.AcceptChangeRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 90: codeflux.v1.AcceptChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 91: codeflux.v1.AcceptChangeResponse.task:type_name -> codeflux.v1.TaskView
-	80,  // 92: codeflux.v1.AcceptChangeResponse.acceptance_summary:type_name -> codeflux.v1.RedactedText
-	74,  // 93: codeflux.v1.RejectChangeRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 94: codeflux.v1.RejectChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	83,  // 95: codeflux.v1.RejectChangeResponse.task:type_name -> codeflux.v1.TaskView
-	74,  // 96: codeflux.v1.OpenInEditorRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 97: codeflux.v1.OpenInEditorRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	90,  // 98: codeflux.v1.OpenInEditorResponse.path:type_name -> codeflux.v1.SafePath
-	76,  // 99: codeflux.v1.GetModelsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	91,  // 100: codeflux.v1.GetModelsResponse.models:type_name -> codeflux.v1.ModelView
-	76,  // 101: codeflux.v1.GetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	92,  // 102: codeflux.v1.GetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
-	74,  // 103: codeflux.v1.SetPolicyRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 104: codeflux.v1.SetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	92,  // 105: codeflux.v1.SetPolicyRequest.policy:type_name -> codeflux.v1.PolicyView
-	92,  // 106: codeflux.v1.SetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
-	74,  // 107: codeflux.v1.SetBudgetDefaultsRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 108: codeflux.v1.SetBudgetDefaultsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	84,  // 109: codeflux.v1.SetBudgetDefaultsRequest.default_hard_limit:type_name -> codeflux.v1.Money
-	84,  // 110: codeflux.v1.SetBudgetDefaultsResponse.default_hard_limit:type_name -> codeflux.v1.Money
-	74,  // 111: codeflux.v1.ConfigureProviderRequest.control:type_name -> codeflux.v1.MutationControl
-	76,  // 112: codeflux.v1.ConfigureProviderRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	76,  // 113: codeflux.v1.ConfigureProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
-	93,  // 114: codeflux.v1.ConfigureProviderResponse.provider:type_name -> codeflux.v1.ProviderView
-	76,  // 115: codeflux.v1.TestProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
-	80,  // 116: codeflux.v1.TestProviderResponse.summary:type_name -> codeflux.v1.RedactedText
-	76,  // 117: codeflux.v1.SubscribeSessionRequest.session_id:type_name -> codeflux.v1.StableIdentity
-	94,  // 118: codeflux.v1.SubscribeSessionResponse.event:type_name -> codeflux.v1.SessionEvent
-	0,   // 119: codeflux.v1.WorkspaceService.OpenWorkspace:input_type -> codeflux.v1.OpenWorkspaceRequest
-	2,   // 120: codeflux.v1.WorkspaceService.GetWorkspaceState:input_type -> codeflux.v1.GetWorkspaceStateRequest
-	4,   // 121: codeflux.v1.WorkspaceService.ListRepositories:input_type -> codeflux.v1.ListRepositoriesRequest
-	6,   // 122: codeflux.v1.WorkspaceService.InspectRepository:input_type -> codeflux.v1.InspectRepositoryRequest
-	8,   // 123: codeflux.v1.ThreadService.CreateThread:input_type -> codeflux.v1.CreateThreadRequest
-	10,  // 124: codeflux.v1.ThreadService.ListThreads:input_type -> codeflux.v1.ListThreadsRequest
-	12,  // 125: codeflux.v1.ThreadService.GetThreadPage:input_type -> codeflux.v1.GetThreadPageRequest
-	14,  // 126: codeflux.v1.ThreadService.SendMessage:input_type -> codeflux.v1.SendMessageRequest
-	16,  // 127: codeflux.v1.ThreadService.RenameThread:input_type -> codeflux.v1.RenameThreadRequest
-	18,  // 128: codeflux.v1.ThreadService.ArchiveThread:input_type -> codeflux.v1.ArchiveThreadRequest
-	20,  // 129: codeflux.v1.TaskService.CreateTask:input_type -> codeflux.v1.CreateTaskRequest
-	22,  // 130: codeflux.v1.TaskService.GetTask:input_type -> codeflux.v1.GetTaskRequest
-	24,  // 131: codeflux.v1.TaskService.StartTask:input_type -> codeflux.v1.StartTaskRequest
-	26,  // 132: codeflux.v1.TaskService.PauseTask:input_type -> codeflux.v1.PauseTaskRequest
-	28,  // 133: codeflux.v1.TaskService.ResumeTask:input_type -> codeflux.v1.ResumeTaskRequest
-	30,  // 134: codeflux.v1.TaskService.CancelTask:input_type -> codeflux.v1.CancelTaskRequest
-	32,  // 135: codeflux.v1.TaskService.ApproveAction:input_type -> codeflux.v1.ApproveActionRequest
-	34,  // 136: codeflux.v1.TaskService.SetBudget:input_type -> codeflux.v1.SetBudgetRequest
-	36,  // 137: codeflux.v1.TaskService.RequestRepair:input_type -> codeflux.v1.RequestRepairRequest
-	38,  // 138: codeflux.v1.TaskService.RollbackTask:input_type -> codeflux.v1.RollbackTaskRequest
-	40,  // 139: codeflux.v1.GraphService.GetGraphSlice:input_type -> codeflux.v1.GetGraphSliceRequest
-	42,  // 140: codeflux.v1.GraphService.ExpandGraph:input_type -> codeflux.v1.ExpandGraphRequest
-	44,  // 141: codeflux.v1.GraphService.GetNode:input_type -> codeflux.v1.GetNodeRequest
-	46,  // 142: codeflux.v1.GraphService.ExplainNode:input_type -> codeflux.v1.ExplainNodeRequest
-	48,  // 143: codeflux.v1.GraphService.CompareGraphRevisions:input_type -> codeflux.v1.CompareGraphRevisionsRequest
-	50,  // 144: codeflux.v1.ReviewService.GetDiffSummary:input_type -> codeflux.v1.GetDiffSummaryRequest
-	52,  // 145: codeflux.v1.ReviewService.GetValidationReport:input_type -> codeflux.v1.GetValidationReportRequest
-	54,  // 146: codeflux.v1.ReviewService.AcceptChange:input_type -> codeflux.v1.AcceptChangeRequest
-	56,  // 147: codeflux.v1.ReviewService.RejectChange:input_type -> codeflux.v1.RejectChangeRequest
-	58,  // 148: codeflux.v1.ReviewService.OpenInEditor:input_type -> codeflux.v1.OpenInEditorRequest
-	60,  // 149: codeflux.v1.SettingsService.GetModels:input_type -> codeflux.v1.GetModelsRequest
-	62,  // 150: codeflux.v1.SettingsService.GetPolicy:input_type -> codeflux.v1.GetPolicyRequest
-	64,  // 151: codeflux.v1.SettingsService.SetPolicy:input_type -> codeflux.v1.SetPolicyRequest
-	66,  // 152: codeflux.v1.SettingsService.SetBudgetDefaults:input_type -> codeflux.v1.SetBudgetDefaultsRequest
-	68,  // 153: codeflux.v1.SettingsService.ConfigureProvider:input_type -> codeflux.v1.ConfigureProviderRequest
-	70,  // 154: codeflux.v1.SettingsService.TestProvider:input_type -> codeflux.v1.TestProviderRequest
-	72,  // 155: codeflux.v1.SessionService.SubscribeSession:input_type -> codeflux.v1.SubscribeSessionRequest
-	1,   // 156: codeflux.v1.WorkspaceService.OpenWorkspace:output_type -> codeflux.v1.OpenWorkspaceResponse
-	3,   // 157: codeflux.v1.WorkspaceService.GetWorkspaceState:output_type -> codeflux.v1.GetWorkspaceStateResponse
-	5,   // 158: codeflux.v1.WorkspaceService.ListRepositories:output_type -> codeflux.v1.ListRepositoriesResponse
-	7,   // 159: codeflux.v1.WorkspaceService.InspectRepository:output_type -> codeflux.v1.InspectRepositoryResponse
-	9,   // 160: codeflux.v1.ThreadService.CreateThread:output_type -> codeflux.v1.CreateThreadResponse
-	11,  // 161: codeflux.v1.ThreadService.ListThreads:output_type -> codeflux.v1.ListThreadsResponse
-	13,  // 162: codeflux.v1.ThreadService.GetThreadPage:output_type -> codeflux.v1.GetThreadPageResponse
-	15,  // 163: codeflux.v1.ThreadService.SendMessage:output_type -> codeflux.v1.SendMessageResponse
-	17,  // 164: codeflux.v1.ThreadService.RenameThread:output_type -> codeflux.v1.RenameThreadResponse
-	19,  // 165: codeflux.v1.ThreadService.ArchiveThread:output_type -> codeflux.v1.ArchiveThreadResponse
-	21,  // 166: codeflux.v1.TaskService.CreateTask:output_type -> codeflux.v1.CreateTaskResponse
-	23,  // 167: codeflux.v1.TaskService.GetTask:output_type -> codeflux.v1.GetTaskResponse
-	25,  // 168: codeflux.v1.TaskService.StartTask:output_type -> codeflux.v1.StartTaskResponse
-	27,  // 169: codeflux.v1.TaskService.PauseTask:output_type -> codeflux.v1.PauseTaskResponse
-	29,  // 170: codeflux.v1.TaskService.ResumeTask:output_type -> codeflux.v1.ResumeTaskResponse
-	31,  // 171: codeflux.v1.TaskService.CancelTask:output_type -> codeflux.v1.CancelTaskResponse
-	33,  // 172: codeflux.v1.TaskService.ApproveAction:output_type -> codeflux.v1.ApproveActionResponse
-	35,  // 173: codeflux.v1.TaskService.SetBudget:output_type -> codeflux.v1.SetBudgetResponse
-	37,  // 174: codeflux.v1.TaskService.RequestRepair:output_type -> codeflux.v1.RequestRepairResponse
-	39,  // 175: codeflux.v1.TaskService.RollbackTask:output_type -> codeflux.v1.RollbackTaskResponse
-	41,  // 176: codeflux.v1.GraphService.GetGraphSlice:output_type -> codeflux.v1.GetGraphSliceResponse
-	43,  // 177: codeflux.v1.GraphService.ExpandGraph:output_type -> codeflux.v1.ExpandGraphResponse
-	45,  // 178: codeflux.v1.GraphService.GetNode:output_type -> codeflux.v1.GetNodeResponse
-	47,  // 179: codeflux.v1.GraphService.ExplainNode:output_type -> codeflux.v1.ExplainNodeResponse
-	49,  // 180: codeflux.v1.GraphService.CompareGraphRevisions:output_type -> codeflux.v1.CompareGraphRevisionsResponse
-	51,  // 181: codeflux.v1.ReviewService.GetDiffSummary:output_type -> codeflux.v1.GetDiffSummaryResponse
-	53,  // 182: codeflux.v1.ReviewService.GetValidationReport:output_type -> codeflux.v1.GetValidationReportResponse
-	55,  // 183: codeflux.v1.ReviewService.AcceptChange:output_type -> codeflux.v1.AcceptChangeResponse
-	57,  // 184: codeflux.v1.ReviewService.RejectChange:output_type -> codeflux.v1.RejectChangeResponse
-	59,  // 185: codeflux.v1.ReviewService.OpenInEditor:output_type -> codeflux.v1.OpenInEditorResponse
-	61,  // 186: codeflux.v1.SettingsService.GetModels:output_type -> codeflux.v1.GetModelsResponse
-	63,  // 187: codeflux.v1.SettingsService.GetPolicy:output_type -> codeflux.v1.GetPolicyResponse
-	65,  // 188: codeflux.v1.SettingsService.SetPolicy:output_type -> codeflux.v1.SetPolicyResponse
-	67,  // 189: codeflux.v1.SettingsService.SetBudgetDefaults:output_type -> codeflux.v1.SetBudgetDefaultsResponse
-	69,  // 190: codeflux.v1.SettingsService.ConfigureProvider:output_type -> codeflux.v1.ConfigureProviderResponse
-	71,  // 191: codeflux.v1.SettingsService.TestProvider:output_type -> codeflux.v1.TestProviderResponse
-	73,  // 192: codeflux.v1.SessionService.SubscribeSession:output_type -> codeflux.v1.SubscribeSessionResponse
-	156, // [156:193] is the sub-list for method output_type
-	119, // [119:156] is the sub-list for method input_type
-	119, // [119:119] is the sub-list for extension type_name
-	119, // [119:119] is the sub-list for extension extendee
-	0,   // [0:119] is the sub-list for field type_name
+	76,  // 24: codeflux.v1.SendMessageRequest.attachment_ids:type_name -> codeflux.v1.StableIdentity
+	82,  // 25: codeflux.v1.SendMessageResponse.message:type_name -> codeflux.v1.MessageView
+	83,  // 26: codeflux.v1.SendMessageResponse.draft_task:type_name -> codeflux.v1.TaskView
+	74,  // 27: codeflux.v1.RenameThreadRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 28: codeflux.v1.RenameThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	81,  // 29: codeflux.v1.RenameThreadResponse.thread:type_name -> codeflux.v1.ThreadView
+	74,  // 30: codeflux.v1.ArchiveThreadRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 31: codeflux.v1.ArchiveThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	81,  // 32: codeflux.v1.ArchiveThreadResponse.thread:type_name -> codeflux.v1.ThreadView
+	74,  // 33: codeflux.v1.CreateTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 34: codeflux.v1.CreateTaskRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 35: codeflux.v1.CreateTaskRequest.source_message_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 36: codeflux.v1.CreateTaskResponse.task:type_name -> codeflux.v1.TaskView
+	76,  // 37: codeflux.v1.GetTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 38: codeflux.v1.GetTaskResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 39: codeflux.v1.StartTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 40: codeflux.v1.StartTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 41: codeflux.v1.StartTaskResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 42: codeflux.v1.PauseTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 43: codeflux.v1.PauseTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 44: codeflux.v1.PauseTaskResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 45: codeflux.v1.ResumeTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 46: codeflux.v1.ResumeTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 47: codeflux.v1.ResumeTaskResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 48: codeflux.v1.CancelTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 49: codeflux.v1.CancelTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 50: codeflux.v1.CancelTaskResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 51: codeflux.v1.ApproveActionRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 52: codeflux.v1.ApproveActionRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 53: codeflux.v1.ApproveActionRequest.approval_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 54: codeflux.v1.ApproveActionResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 55: codeflux.v1.SetBudgetRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 56: codeflux.v1.SetBudgetRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	84,  // 57: codeflux.v1.SetBudgetRequest.hard_limit:type_name -> codeflux.v1.Money
+	85,  // 58: codeflux.v1.SetBudgetResponse.budget:type_name -> codeflux.v1.BudgetView
+	74,  // 59: codeflux.v1.RequestRepairRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 60: codeflux.v1.RequestRepairRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 61: codeflux.v1.RequestRepairRequest.evidence_ids:type_name -> codeflux.v1.StableIdentity
+	83,  // 62: codeflux.v1.RequestRepairResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 63: codeflux.v1.RollbackTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 64: codeflux.v1.RollbackTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 65: codeflux.v1.RollbackTaskRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 66: codeflux.v1.RollbackTaskResponse.task:type_name -> codeflux.v1.TaskView
+	76,  // 67: codeflux.v1.GetGraphSliceRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	86,  // 68: codeflux.v1.GetGraphSliceResponse.graph:type_name -> codeflux.v1.GraphSliceView
+	76,  // 69: codeflux.v1.ExpandGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 70: codeflux.v1.ExpandGraphRequest.root_node_ids:type_name -> codeflux.v1.StableIdentity
+	86,  // 71: codeflux.v1.ExpandGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
+	76,  // 72: codeflux.v1.GetNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 73: codeflux.v1.GetNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
+	87,  // 74: codeflux.v1.GetNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
+	76,  // 75: codeflux.v1.GetNodeResponse.related_message_ids:type_name -> codeflux.v1.StableIdentity
+	76,  // 76: codeflux.v1.GetNodeResponse.evidence_ids:type_name -> codeflux.v1.StableIdentity
+	76,  // 77: codeflux.v1.ExplainNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 78: codeflux.v1.ExplainNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
+	87,  // 79: codeflux.v1.ExplainNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
+	80,  // 80: codeflux.v1.ExplainNodeResponse.explanation:type_name -> codeflux.v1.RedactedText
+	76,  // 81: codeflux.v1.CompareGraphRevisionsRequest.from_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 82: codeflux.v1.CompareGraphRevisionsRequest.to_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	87,  // 83: codeflux.v1.CompareGraphRevisionsResponse.added_nodes:type_name -> codeflux.v1.GraphNodeView
+	87,  // 84: codeflux.v1.CompareGraphRevisionsResponse.changed_nodes:type_name -> codeflux.v1.GraphNodeView
+	76,  // 85: codeflux.v1.CompareGraphRevisionsResponse.removed_node_ids:type_name -> codeflux.v1.StableIdentity
+	76,  // 86: codeflux.v1.GetDiffSummaryRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	88,  // 87: codeflux.v1.GetDiffSummaryResponse.diff:type_name -> codeflux.v1.DiffSummaryView
+	76,  // 88: codeflux.v1.GetValidationReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	89,  // 89: codeflux.v1.GetValidationReportResponse.report:type_name -> codeflux.v1.ValidationReportView
+	74,  // 90: codeflux.v1.AcceptChangeRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 91: codeflux.v1.AcceptChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 92: codeflux.v1.AcceptChangeResponse.task:type_name -> codeflux.v1.TaskView
+	80,  // 93: codeflux.v1.AcceptChangeResponse.acceptance_summary:type_name -> codeflux.v1.RedactedText
+	74,  // 94: codeflux.v1.RejectChangeRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 95: codeflux.v1.RejectChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	83,  // 96: codeflux.v1.RejectChangeResponse.task:type_name -> codeflux.v1.TaskView
+	74,  // 97: codeflux.v1.OpenInEditorRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 98: codeflux.v1.OpenInEditorRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	90,  // 99: codeflux.v1.OpenInEditorResponse.path:type_name -> codeflux.v1.SafePath
+	76,  // 100: codeflux.v1.GetModelsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	91,  // 101: codeflux.v1.GetModelsResponse.models:type_name -> codeflux.v1.ModelView
+	76,  // 102: codeflux.v1.GetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	92,  // 103: codeflux.v1.GetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
+	74,  // 104: codeflux.v1.SetPolicyRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 105: codeflux.v1.SetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	92,  // 106: codeflux.v1.SetPolicyRequest.policy:type_name -> codeflux.v1.PolicyView
+	92,  // 107: codeflux.v1.SetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
+	74,  // 108: codeflux.v1.SetBudgetDefaultsRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 109: codeflux.v1.SetBudgetDefaultsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	84,  // 110: codeflux.v1.SetBudgetDefaultsRequest.default_hard_limit:type_name -> codeflux.v1.Money
+	84,  // 111: codeflux.v1.SetBudgetDefaultsResponse.default_hard_limit:type_name -> codeflux.v1.Money
+	74,  // 112: codeflux.v1.ConfigureProviderRequest.control:type_name -> codeflux.v1.MutationControl
+	76,  // 113: codeflux.v1.ConfigureProviderRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	76,  // 114: codeflux.v1.ConfigureProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
+	93,  // 115: codeflux.v1.ConfigureProviderResponse.provider:type_name -> codeflux.v1.ProviderView
+	76,  // 116: codeflux.v1.TestProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
+	80,  // 117: codeflux.v1.TestProviderResponse.summary:type_name -> codeflux.v1.RedactedText
+	76,  // 118: codeflux.v1.SubscribeSessionRequest.session_id:type_name -> codeflux.v1.StableIdentity
+	94,  // 119: codeflux.v1.SubscribeSessionResponse.event:type_name -> codeflux.v1.SessionEvent
+	0,   // 120: codeflux.v1.WorkspaceService.OpenWorkspace:input_type -> codeflux.v1.OpenWorkspaceRequest
+	2,   // 121: codeflux.v1.WorkspaceService.GetWorkspaceState:input_type -> codeflux.v1.GetWorkspaceStateRequest
+	4,   // 122: codeflux.v1.WorkspaceService.ListRepositories:input_type -> codeflux.v1.ListRepositoriesRequest
+	6,   // 123: codeflux.v1.WorkspaceService.InspectRepository:input_type -> codeflux.v1.InspectRepositoryRequest
+	8,   // 124: codeflux.v1.ThreadService.CreateThread:input_type -> codeflux.v1.CreateThreadRequest
+	10,  // 125: codeflux.v1.ThreadService.ListThreads:input_type -> codeflux.v1.ListThreadsRequest
+	12,  // 126: codeflux.v1.ThreadService.GetThreadPage:input_type -> codeflux.v1.GetThreadPageRequest
+	14,  // 127: codeflux.v1.ThreadService.SendMessage:input_type -> codeflux.v1.SendMessageRequest
+	16,  // 128: codeflux.v1.ThreadService.RenameThread:input_type -> codeflux.v1.RenameThreadRequest
+	18,  // 129: codeflux.v1.ThreadService.ArchiveThread:input_type -> codeflux.v1.ArchiveThreadRequest
+	20,  // 130: codeflux.v1.TaskService.CreateTask:input_type -> codeflux.v1.CreateTaskRequest
+	22,  // 131: codeflux.v1.TaskService.GetTask:input_type -> codeflux.v1.GetTaskRequest
+	24,  // 132: codeflux.v1.TaskService.StartTask:input_type -> codeflux.v1.StartTaskRequest
+	26,  // 133: codeflux.v1.TaskService.PauseTask:input_type -> codeflux.v1.PauseTaskRequest
+	28,  // 134: codeflux.v1.TaskService.ResumeTask:input_type -> codeflux.v1.ResumeTaskRequest
+	30,  // 135: codeflux.v1.TaskService.CancelTask:input_type -> codeflux.v1.CancelTaskRequest
+	32,  // 136: codeflux.v1.TaskService.ApproveAction:input_type -> codeflux.v1.ApproveActionRequest
+	34,  // 137: codeflux.v1.TaskService.SetBudget:input_type -> codeflux.v1.SetBudgetRequest
+	36,  // 138: codeflux.v1.TaskService.RequestRepair:input_type -> codeflux.v1.RequestRepairRequest
+	38,  // 139: codeflux.v1.TaskService.RollbackTask:input_type -> codeflux.v1.RollbackTaskRequest
+	40,  // 140: codeflux.v1.GraphService.GetGraphSlice:input_type -> codeflux.v1.GetGraphSliceRequest
+	42,  // 141: codeflux.v1.GraphService.ExpandGraph:input_type -> codeflux.v1.ExpandGraphRequest
+	44,  // 142: codeflux.v1.GraphService.GetNode:input_type -> codeflux.v1.GetNodeRequest
+	46,  // 143: codeflux.v1.GraphService.ExplainNode:input_type -> codeflux.v1.ExplainNodeRequest
+	48,  // 144: codeflux.v1.GraphService.CompareGraphRevisions:input_type -> codeflux.v1.CompareGraphRevisionsRequest
+	50,  // 145: codeflux.v1.ReviewService.GetDiffSummary:input_type -> codeflux.v1.GetDiffSummaryRequest
+	52,  // 146: codeflux.v1.ReviewService.GetValidationReport:input_type -> codeflux.v1.GetValidationReportRequest
+	54,  // 147: codeflux.v1.ReviewService.AcceptChange:input_type -> codeflux.v1.AcceptChangeRequest
+	56,  // 148: codeflux.v1.ReviewService.RejectChange:input_type -> codeflux.v1.RejectChangeRequest
+	58,  // 149: codeflux.v1.ReviewService.OpenInEditor:input_type -> codeflux.v1.OpenInEditorRequest
+	60,  // 150: codeflux.v1.SettingsService.GetModels:input_type -> codeflux.v1.GetModelsRequest
+	62,  // 151: codeflux.v1.SettingsService.GetPolicy:input_type -> codeflux.v1.GetPolicyRequest
+	64,  // 152: codeflux.v1.SettingsService.SetPolicy:input_type -> codeflux.v1.SetPolicyRequest
+	66,  // 153: codeflux.v1.SettingsService.SetBudgetDefaults:input_type -> codeflux.v1.SetBudgetDefaultsRequest
+	68,  // 154: codeflux.v1.SettingsService.ConfigureProvider:input_type -> codeflux.v1.ConfigureProviderRequest
+	70,  // 155: codeflux.v1.SettingsService.TestProvider:input_type -> codeflux.v1.TestProviderRequest
+	72,  // 156: codeflux.v1.SessionService.SubscribeSession:input_type -> codeflux.v1.SubscribeSessionRequest
+	1,   // 157: codeflux.v1.WorkspaceService.OpenWorkspace:output_type -> codeflux.v1.OpenWorkspaceResponse
+	3,   // 158: codeflux.v1.WorkspaceService.GetWorkspaceState:output_type -> codeflux.v1.GetWorkspaceStateResponse
+	5,   // 159: codeflux.v1.WorkspaceService.ListRepositories:output_type -> codeflux.v1.ListRepositoriesResponse
+	7,   // 160: codeflux.v1.WorkspaceService.InspectRepository:output_type -> codeflux.v1.InspectRepositoryResponse
+	9,   // 161: codeflux.v1.ThreadService.CreateThread:output_type -> codeflux.v1.CreateThreadResponse
+	11,  // 162: codeflux.v1.ThreadService.ListThreads:output_type -> codeflux.v1.ListThreadsResponse
+	13,  // 163: codeflux.v1.ThreadService.GetThreadPage:output_type -> codeflux.v1.GetThreadPageResponse
+	15,  // 164: codeflux.v1.ThreadService.SendMessage:output_type -> codeflux.v1.SendMessageResponse
+	17,  // 165: codeflux.v1.ThreadService.RenameThread:output_type -> codeflux.v1.RenameThreadResponse
+	19,  // 166: codeflux.v1.ThreadService.ArchiveThread:output_type -> codeflux.v1.ArchiveThreadResponse
+	21,  // 167: codeflux.v1.TaskService.CreateTask:output_type -> codeflux.v1.CreateTaskResponse
+	23,  // 168: codeflux.v1.TaskService.GetTask:output_type -> codeflux.v1.GetTaskResponse
+	25,  // 169: codeflux.v1.TaskService.StartTask:output_type -> codeflux.v1.StartTaskResponse
+	27,  // 170: codeflux.v1.TaskService.PauseTask:output_type -> codeflux.v1.PauseTaskResponse
+	29,  // 171: codeflux.v1.TaskService.ResumeTask:output_type -> codeflux.v1.ResumeTaskResponse
+	31,  // 172: codeflux.v1.TaskService.CancelTask:output_type -> codeflux.v1.CancelTaskResponse
+	33,  // 173: codeflux.v1.TaskService.ApproveAction:output_type -> codeflux.v1.ApproveActionResponse
+	35,  // 174: codeflux.v1.TaskService.SetBudget:output_type -> codeflux.v1.SetBudgetResponse
+	37,  // 175: codeflux.v1.TaskService.RequestRepair:output_type -> codeflux.v1.RequestRepairResponse
+	39,  // 176: codeflux.v1.TaskService.RollbackTask:output_type -> codeflux.v1.RollbackTaskResponse
+	41,  // 177: codeflux.v1.GraphService.GetGraphSlice:output_type -> codeflux.v1.GetGraphSliceResponse
+	43,  // 178: codeflux.v1.GraphService.ExpandGraph:output_type -> codeflux.v1.ExpandGraphResponse
+	45,  // 179: codeflux.v1.GraphService.GetNode:output_type -> codeflux.v1.GetNodeResponse
+	47,  // 180: codeflux.v1.GraphService.ExplainNode:output_type -> codeflux.v1.ExplainNodeResponse
+	49,  // 181: codeflux.v1.GraphService.CompareGraphRevisions:output_type -> codeflux.v1.CompareGraphRevisionsResponse
+	51,  // 182: codeflux.v1.ReviewService.GetDiffSummary:output_type -> codeflux.v1.GetDiffSummaryResponse
+	53,  // 183: codeflux.v1.ReviewService.GetValidationReport:output_type -> codeflux.v1.GetValidationReportResponse
+	55,  // 184: codeflux.v1.ReviewService.AcceptChange:output_type -> codeflux.v1.AcceptChangeResponse
+	57,  // 185: codeflux.v1.ReviewService.RejectChange:output_type -> codeflux.v1.RejectChangeResponse
+	59,  // 186: codeflux.v1.ReviewService.OpenInEditor:output_type -> codeflux.v1.OpenInEditorResponse
+	61,  // 187: codeflux.v1.SettingsService.GetModels:output_type -> codeflux.v1.GetModelsResponse
+	63,  // 188: codeflux.v1.SettingsService.GetPolicy:output_type -> codeflux.v1.GetPolicyResponse
+	65,  // 189: codeflux.v1.SettingsService.SetPolicy:output_type -> codeflux.v1.SetPolicyResponse
+	67,  // 190: codeflux.v1.SettingsService.SetBudgetDefaults:output_type -> codeflux.v1.SetBudgetDefaultsResponse
+	69,  // 191: codeflux.v1.SettingsService.ConfigureProvider:output_type -> codeflux.v1.ConfigureProviderResponse
+	71,  // 192: codeflux.v1.SettingsService.TestProvider:output_type -> codeflux.v1.TestProviderResponse
+	73,  // 193: codeflux.v1.SessionService.SubscribeSession:output_type -> codeflux.v1.SubscribeSessionResponse
+	157, // [157:194] is the sub-list for method output_type
+	120, // [120:157] is the sub-list for method input_type
+	120, // [120:120] is the sub-list for extension type_name
+	120, // [120:120] is the sub-list for extension extendee
+	0,   // [0:120] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_product_api_proto_init() }

@@ -28,40 +28,74 @@ func (repositories *Repositories) CreateSession(
 		UpdatedAt: now,
 	}
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
-		result, err := transaction.sql.ExecContext(
-			ctx,
-			`INSERT INTO sessions (
+		return createSessionTransaction(ctx, transaction, session, micros)
+	})
+	if err != nil {
+		return Session{}, err
+	}
+	return session, nil
+}
+
+func createSessionTransaction(
+	ctx context.Context,
+	transaction *Transaction,
+	session Session,
+	micros int64,
+) error {
+	result, err := transaction.sql.ExecContext(
+		ctx,
+		`INSERT INTO sessions (
 				id, thread_id, current_sequence, compacted_through_sequence,
 				created_at_unix_micros, updated_at_unix_micros
 			)
 			SELECT ?, ?, 0, 0, ?, ?
 			FROM threads
 			WHERE id = ? AND deleted_at_unix_micros IS NULL`,
-			input.ID,
-			input.ThreadID,
-			micros,
-			micros,
-			input.ThreadID,
-		)
-		if err != nil {
-			return repositoryWriteError("create session", err)
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected != 1 {
-			return typedError(
-				ErrNotFound,
-				"create session",
-				errors.New("thread does not exist"),
-			)
-		}
-		return nil
-	})
+		session.ID,
+		session.ThreadID,
+		micros,
+		micros,
+		session.ThreadID,
+	)
 	if err != nil {
-		return Session{}, err
+		return repositoryWriteError("create session", err)
 	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return typedError(
+			ErrNotFound,
+			"create session",
+			errors.New("thread does not exist"),
+		)
+	}
+	return nil
+}
+
+// GetThreadSession returns the sole authoritative event stream for a thread.
+func (repositories *Repositories) GetThreadSession(ctx context.Context, threadID domain.ThreadID) (Session, error) {
+	if threadID.IsZero() {
+		return Session{}, errors.New("session thread ID must not be empty")
+	}
+	var session Session
+	var createdMicros, updatedMicros int64
+	err := repositories.database.sql.QueryRowContext(ctx, `SELECT id, thread_id,
+		current_sequence, compacted_through_sequence,
+		created_at_unix_micros, updated_at_unix_micros
+		FROM sessions WHERE thread_id = ?`, threadID).Scan(
+		&session.ID, &session.ThreadID, &session.CurrentSequence,
+		&session.CompactedThroughSequence, &createdMicros, &updatedMicros,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Session{}, typedError(ErrNotFound, "get thread session", err)
+	}
+	if err != nil {
+		return Session{}, classify("get thread session", err)
+	}
+	session.CreatedAt = repositoryTime(createdMicros)
+	session.UpdatedAt = repositoryTime(updatedMicros)
 	return session, nil
 }
 

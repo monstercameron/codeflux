@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/graphcanvas"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/state"
@@ -14,22 +15,25 @@ import (
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 )
 
-func applicationFrameClass(layout state.LayoutPreferences, tokens design.Tokens) string {
+func applicationFrameClass(
+	layout state.LayoutPreferences,
+	tokens design.Tokens,
+	inspectorCollapsed bool,
+) string {
 	layout = layout.Normalize()
 	tracks := []css.Track{css.MinMax(css.TrackLen(css.Zero), css.Fr(1))}
 	switch layout.Viewport {
 	case state.ViewportWide:
 		if layout.RailCollapsed {
-			tracks = []css.Track{
-				css.MinMax(css.TrackLen(css.Zero), css.Fr(1)),
-				css.TrackLen(css.Px(316)),
-			}
+			tracks = []css.Track{css.MinMax(css.TrackLen(css.Zero), css.Fr(1))}
 		} else {
 			tracks = []css.Track{
 				css.TrackLen(css.Px(layout.RailWidth)),
 				css.MinMax(css.TrackLen(css.Zero), css.Fr(1)),
-				css.TrackLen(css.Px(316)),
 			}
+		}
+		if !inspectorCollapsed {
+			tracks = append(tracks, css.TrackLen(css.Px(316)))
 		}
 	}
 	return css.New(
@@ -39,7 +43,7 @@ func applicationFrameClass(layout state.LayoutPreferences, tokens design.Tokens)
 		css.W(css.Full),
 		// Dynamic viewport units follow the visual viewport as a software
 		// keyboard opens, keeping the grid's anchored composer reachable.
-		css.H(css.RawLength("calc(100dvh - 58px)")),
+		css.H(css.RawLength("calc(100dvh - 64px)")),
 		css.MinWidth(css.Zero),
 		css.MinHeight(css.Zero),
 		css.Overflow.Hidden,
@@ -102,7 +106,6 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			worktree = "worktree status"
 		}
 	}
-	taskState := fallback(props.View.TaskState, "task state")
 	model := fallback(props.View.Model, "model")
 	effort := fallback(props.View.Effort, "effort")
 	forecast := fallback(props.View.ForecastCost, "forecast")
@@ -129,10 +132,18 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 					css.FontSize(css.Px(21)),
 					css.FontWeight.Semibold,
 					css.Tracking(css.Ems(-0.02)),
+					css.Font(css.FontStack(tokens.Fonts.Display)),
 					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 				).String(),
 				Text: "Codeflux",
 			}),
+			html.Div(html.Props{},
+				primitives.Button(primitives.ButtonProps{
+					ID: "thread-rail-toggle", Label: "☰", AccessibleLabel: "Toggle thread rail",
+					Expanded: &props.RailOpen, Controls: "product-sidebar-navigation",
+					Mode: props.Mode, Disabled: props.OnRailToggle == nil, OnClick: props.OnRailToggle,
+				}),
+			),
 			html.Span(html.Props{
 				Hidden: compact,
 				Class: desktopOnlyClass(
@@ -157,34 +168,20 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				u.Flex, u.ItemsCenter, u.JustifyCenter, css.Gap(css.Px(tokens.Spacing.SM)),
 			),
 		},
-			contextControl("▣", repository, tokens),
-			contextControl("⑂", branch, tokens),
-			contextControl("✓", worktree, tokens),
+			contextControl("repository", "▣", repository, "/", props.Mode, props.OnNavigatePath),
+			contextControl("branch", "⑂", branch, "/settings", props.Mode, props.OnNavigatePath),
+			contextControl("worktree", "✓", worktree, "/settings", props.Mode, props.OnNavigatePath),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl("◈", model+" · "+effort, tokens),
+				contextControl("model", "◈", model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl("$", forecast+" / "+actual+" / "+budget, tokens),
+				contextControl("budget", "$", forecast+" / "+actual+" / "+budget, "/settings", props.Mode, props.OnNavigatePath),
 			),
 		),
 		html.Div(html.Props{
 			Aria:  map[string]string{"label": "Session controls"},
 			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyEnd, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 		},
-			html.Div(html.Props{Class: desktopOnlyClass()},
-				headerIconButtonWithID(
-					"thread-rail-toggle", "☰", "Toggle thread rail", props.Mode, props.OnRailToggle,
-				),
-			),
-			html.Span(html.Props{
-				Hidden: compact,
-				Class: wideOnlyClass(
-					css.TextColor(css.Hex(string(tokens.Colors.Active))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-					css.FontWeight.Medium,
-				),
-				Text: "● " + humanize(taskState),
-			}),
 			html.Span(html.Props{
 				Hidden: compact,
 				Data:   map[string]string{"connection": connection},
@@ -198,14 +195,14 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				),
 				Text: "●  Local " + humanize(connection),
 			}),
-			html.Div(html.Props{Class: wideOnlyClass(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)))},
-				headerIconButton("Ⅱ", "Pause task", props.Mode, props.OnPauseRequested),
-				headerIconButton("■", "Stop task", props.Mode, props.OnStopRequested),
-				headerIconButton("•••", "More task actions", props.Mode, nil),
-			),
-			headerIconButton("⌕", "Search", props.Mode, nil),
-			headerIconButton("?", "Shortcut help", props.Mode, props.OnShortcutHelp),
+			headerIconButtonWithID("global-search-trigger", "⌕", "Search", props.Mode, props.OnSearchOpen),
 			headerIconButton("◐", "Change color theme", props.Mode, props.OnThemeChange),
+			headerIconButton("?", "Shortcut help", props.Mode, props.OnShortcutHelp),
+			html.Div(html.Props{Class: wideOnlyClass()},
+				headerIconButtonWithID(
+					"assurance-rail-toggle", "▥", "Toggle task details sidebar", props.Mode, props.OnInspectorToggle,
+				),
+			),
 			html.Span(html.Props{
 				Hidden: compact,
 				Aria:   map[string]string{"label": "Current user"},
@@ -220,6 +217,11 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				Text: "CF",
 			}),
 		),
+		ui.CreateElement(SearchDialog, SearchDialogProps{
+			Open: props.SearchOpen, Query: props.SearchQuery, Mode: props.Mode,
+			OnDismiss: props.OnSearchDismiss, OnQueryChange: props.OnSearchQueryChange,
+			OnNavigatePath: props.OnNavigatePath,
+		}),
 	)
 }
 
@@ -228,13 +230,16 @@ func applicationBarClass(tracks []css.Track, tokens design.Tokens) string {
 		u.Grid,
 		css.GridCols(tracks...),
 		u.ItemsCenter,
-		css.Gap(css.Px(tokens.Spacing.MD)),
+		css.Gap(css.Px(tokens.Spacing.LG)),
 		css.W(css.Full),
-		css.MinHeight(css.Px(58)),
-		css.PaddingX(css.Px(tokens.Spacing.LG)),
+		css.MinHeight(css.Px(64)),
+		css.PaddingX(css.Px(tokens.Spacing.XL)),
 		css.Bg(css.Hex(string(tokens.Colors.Shell))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 		css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Shadow(css.ShadowOf(
+			css.Zero, css.Px(8), css.Px(30), css.Px(-24), css.RGBA(0, 0, 0, 0.55),
+		)),
 	}
 	rules = append(rules, css.Media(
 		css.MaxW(1179),
@@ -261,42 +266,92 @@ func brandMark(tokens design.Tokens) ui.Node {
 		Aria: map[string]string{"hidden": "true"},
 		Class: css.New(
 			u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-			css.W(css.Px(30)), css.H(css.Px(30)),
-			css.Rounded(css.Px(tokens.Geometry.PillRadius)),
-			css.Border(css.Px(4), css.Hex(string(tokens.Colors.Accent))),
-			css.TextColor(css.Hex(string(tokens.Colors.Accent))),
-			css.FontSize(css.Px(10)),
+			css.W(css.Px(34)), css.H(css.Px(34)),
+			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.Accent))),
+			css.Border(css.Px(1), css.Hex(string(tokens.Colors.AccentHover))),
+			css.TextColor(css.Hex(string(tokens.Colors.OnAccent))),
+			css.FontSize(css.Px(18)),
+			css.FontWeight.Bold,
 			css.Shadow(css.ShadowOf(
-				css.Zero, css.Zero, css.Px(12), css.Zero,
-				css.RGBA(94, 226, 123, 0.22),
+				css.Zero, css.Px(8), css.Px(18), css.Px(-10),
+				css.RGBA(30, 110, 170, 0.6),
 			)),
 		).String(),
-		Text: "●",
+		Text: "⌁",
 	})
 }
 
-func contextControl(icon, label string, tokens design.Tokens) ui.Node {
-	return html.Button(html.Props{
-		Type: "button",
-		Aria: map[string]string{"label": label},
-		Class: css.New(
-			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-			css.MinHeight(css.Px(36)),
-			css.PaddingX(css.Px(tokens.Spacing.MD)),
-			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
-			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-			css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
-			css.Cursor.Pointer,
-		).String(),
-		Text: icon + "  " + label + "  ⌄",
-	})
+func contextControl(
+	kind string,
+	icon string,
+	label string,
+	targetPath string,
+	mode primitives.Mode,
+	onNavigate func(string),
+) ui.Node {
+	tokens := mode.Tokens()
+	return html.Details(html.Props{
+		Data:  map[string]string{"component": "context-option", "kind": kind},
+		Class: css.New(u.Relative).String(),
+	},
+		html.Summary(html.Props{
+			Aria: map[string]string{"label": label},
+			Class: css.New(
+				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+				css.MinHeight(css.Px(34)),
+				css.PaddingX(css.Px(tokens.Spacing.MD)),
+				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+				css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+				css.Border(css.Px(1), css.Transparent),
+				css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+				css.Cursor.Pointer,
+			).String(),
+			Text: icon + "  " + label + "  ⌄",
+		}),
+		html.Div(html.Props{
+			Role: "group", Aria: map[string]string{"label": label + " options"},
+			Data: map[string]string{"component": "context-option-panel"},
+			Class: css.New(
+				u.Absolute,
+				css.Top(css.RawLength("calc(100% + 4px)")), css.Left(css.Zero), css.ZIndex(40),
+				css.MinWidth(css.Px(220)),
+				css.Padding(css.Px(tokens.Spacing.MD)),
+				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+				css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
+				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderStrong))),
+				css.Shadow(css.ShadowOf(
+					css.Zero, css.Px(8), css.Px(24), css.Zero, css.RGBA(0, 0, 0, 0.28),
+				)),
+			).String(),
+		},
+			html.Strong(html.Props{Text: label}),
+			html.P(html.Props{
+				Class: css.New(
+					css.MarginY(css.Px(tokens.Spacing.SM)),
+					css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				).String(),
+				Text: "Current " + kind + " selection",
+			}),
+			primitives.Button(primitives.ButtonProps{
+				Label: "Open " + map[bool]string{true: "repositories", false: "settings"}[targetPath == "/"],
+				Mode:  mode, Disabled: onNavigate == nil,
+				OnClick: func() {
+					if onNavigate != nil {
+						onNavigate(targetPath)
+					}
+				},
+			}),
+		),
+	)
 }
 
 func headerIconButton(label, accessible string, mode primitives.Mode, handler func()) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		Label: label, AccessibleLabel: accessible, Mode: mode, OnClick: handler,
+		Label: label, AccessibleLabel: accessible, Mode: mode,
+		Disabled: handler == nil, OnClick: handler,
 	})
 }
 
@@ -308,26 +363,142 @@ func headerIconButtonWithID(
 	handler func(),
 ) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		ID: id, Label: label, AccessibleLabel: accessible, Mode: mode, OnClick: handler,
+		ID: id, Label: label, AccessibleLabel: accessible, Mode: mode,
+		Disabled: handler == nil, OnClick: handler,
+	})
+}
+
+type SearchDialogProps struct {
+	Open           bool
+	Query          string
+	Mode           primitives.Mode
+	OnDismiss      func()
+	OnQueryChange  func(string)
+	OnNavigatePath func(string)
+}
+
+func SearchDialog(props SearchDialogProps) ui.Node {
+	tokens := props.Mode.Tokens()
+	searchProps := html.PropsOf(
+		html.OnInput(func(event ui.InputEvent) {
+			if props.OnQueryChange != nil {
+				props.OnQueryChange(event.GetValue())
+			}
+		}),
+	)
+	searchProps.ID = "global-search-input"
+	searchProps.Type = "search"
+	searchProps.Placeholder = "Search tasks, graphs, memory, or repositories"
+	searchProps.Aria = map[string]string{
+		"label": "Search Codeflux",
+	}
+	searchProps.Data = map[string]string{"component": "global-search-input"}
+	searchProps.Class = css.New(
+		css.W(css.Full), css.MinHeight(css.Px(44)),
+		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderStrong))),
+	).String()
+	destinations := []struct {
+		glyph string
+		label string
+		path  string
+	}{
+		{glyph: "▣", label: "Search tasks", path: "/tasks"},
+		{glyph: "⌘", label: "Search task graph", path: "/graphs"},
+		{glyph: "◫", label: "Search memory", path: "/memory"},
+		{glyph: "▤", label: "Search repositories", path: "/"},
+	}
+	query := strings.ToLower(strings.TrimSpace(props.Query))
+	results := make([]ui.Node, 0, len(destinations))
+	for _, destination := range destinations {
+		destination := destination
+		if query != "" && !strings.Contains(strings.ToLower(destination.label), query) {
+			continue
+		}
+		results = append(results, primitives.Button(primitives.ButtonProps{
+			Label:           destination.glyph + "  " + destination.label,
+			AccessibleLabel: destination.label,
+			Mode:            props.Mode, Disabled: props.OnNavigatePath == nil,
+			OnClick: func() {
+				if props.OnDismiss != nil {
+					props.OnDismiss()
+				}
+				if props.OnNavigatePath != nil {
+					props.OnNavigatePath(destination.path)
+				}
+			},
+		}))
+	}
+	if len(results) == 0 {
+		results = append(results, html.P(html.Props{
+			Role: "status", Text: "No matching search area. Try tasks, graph, memory, or repositories.",
+			Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
+		}))
+	}
+	return primitives.Dialog(primitives.OverlayProps{
+		ID: "global-search-dialog", Open: props.Open,
+		LabelledBy: "global-search-title", DescribedBy: "global-search-description",
+		InitialFocusSelector: "#global-search-input", AppRootSelector: `[data-component="app-shell"]`,
+		Mode: props.Mode, OnDismiss: props.OnDismiss,
+		Content: html.Section(html.Props{
+			Data:  map[string]string{"component": "global-search"},
+			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD))).String(),
+		},
+			html.Div(html.Props{Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String()},
+				html.Div(html.Props{},
+					html.H2(html.Props{ID: "global-search-title", Text: "Search Codeflux"}),
+					html.P(html.Props{
+						ID: "global-search-description", Text: "Choose a scoped search destination. Your query stays local.",
+						Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
+					}),
+				),
+				primitives.Button(primitives.ButtonProps{
+					Label: "×", AccessibleLabel: "Close search", Mode: props.Mode,
+					Disabled: props.OnDismiss == nil, OnClick: props.OnDismiss,
+				}),
+			),
+			html.Label(html.Props{For: "global-search-input", Text: "Search"}),
+			html.Input(searchProps),
+			html.Div(html.Props{
+				Role: "group", Aria: map[string]string{"label": "Search destinations"},
+				Class: css.New(u.Grid, css.GridCols(css.Repeat(2, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))), css.Gap(css.Px(tokens.Spacing.SM))).String(),
+			}, results...),
+		),
 	})
 }
 
 type ProductSidebarProps struct {
-	Snapshot   state.Snapshot
-	Route      routes.Route
-	Mode       primitives.Mode
-	OnCollapse func()
-	OnNarrower func()
-	OnWider    func()
+	Snapshot         state.Snapshot
+	Route            routes.Route
+	Mode             primitives.Mode
+	ThreadRail       ui.Node
+	CompactOpen      bool
+	OnThreadNavigate func(routes.Route)
+	OnNavigatePath   func(string)
+	OnCollapse       func()
+	OnNarrower       func()
+	OnWider          func()
 }
 
 func ProductSidebar(props ProductSidebarProps) ui.Node {
 	layout := props.Snapshot.Layout.Normalize()
-	hidden := layout.RailCollapsed ||
-		layout.Viewport == state.ViewportNarrow ||
-		layout.Viewport == state.ViewportMinimum
+	compact := layout.Viewport == state.ViewportNarrow || layout.Viewport == state.ViewportMinimum
+	hidden := layout.RailCollapsed
+	if compact {
+		hidden = !props.CompactOpen
+	}
 	tokens := props.Mode.Tokens()
-	if hidden {
+	threadRailNode := props.ThreadRail
+	if threadRailNode == nil {
+		threadRailNode = ui.CreateElement(TypedThreadRailPreview, TypedThreadRailPreviewProps{
+			Snapshot: props.Snapshot, Route: props.Route, Mode: props.Mode,
+			OnNavigate: props.OnThreadNavigate,
+		})
+	}
+	if hidden && !compact {
 		return html.Nav(html.Props{
 			Hidden: true,
 			Aria:   map[string]string{"label": "Primary navigation"},
@@ -348,7 +519,7 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 	}{
 		{"⌂", "Home", "/"},
 		{"▣", "Tasks", "/tasks"},
-		{"⌘", "Graphs", "/tasks"},
+		{"⌘", "Graphs", "/graphs"},
 		{"◫", "Memory", "/memory"},
 		{"▤", "Repositories", "/"},
 		{"⚙", "Settings", "/settings"},
@@ -356,45 +527,27 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 	items := make([]ui.Node, 0, len(navItems))
 	for _, item := range navItems {
 		selected := routeSelected(props.Route, item.label)
+		path := item.path
+		buttonProps := html.PropsOf(html.OnClick(func() {
+			if props.OnNavigatePath != nil {
+				props.OnNavigatePath(path)
+			}
+			if compact && props.OnCollapse != nil {
+				props.OnCollapse()
+			}
+		}))
+		buttonProps.Type = "button"
+		buttonProps.Disabled = props.OnNavigatePath == nil
+		buttonProps.Aria = map[string]string{"current": selectedAria(selected)}
+		buttonProps.Data = map[string]string{"component": "client-route-control", "path": path}
+		buttonProps.Class = sidebarLinkClass(tokens, selected)
+		buttonProps.Text = item.icon + "   " + item.label
 		items = append(items, html.Div(html.Props{},
-			html.A(html.Props{
-				Href:  item.path,
-				Aria:  map[string]string{"current": selectedAria(selected)},
-				Class: sidebarLinkClass(tokens, selected),
-				Text:  item.icon + "   " + item.label,
-			}),
+			html.Button(buttonProps),
 		))
 	}
-	threads := props.Snapshot.Threads()
-	recent := make([]ui.Node, 0, len(threads))
-	for index, thread := range threads {
-		if index == 5 {
-			break
-		}
-		recent = append(recent, html.Div(html.Props{
-			Data:  map[string]string{"thread-id": thread.ID, "status": thread.Status},
-			Class: css.New(css.MarginY(css.Px(tokens.Spacing.XS))).String(),
-		},
-			html.A(html.Props{
-				Href:  "/tasks",
-				Title: thread.Title,
-				Aria: map[string]string{
-					"label": thread.Title + " - " + humanize(thread.Status),
-				},
-				Class: css.New(
-					u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-					css.MinHeight(css.Px(30)),
-					css.PaddingX(css.Px(tokens.Spacing.SM)),
-					css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
-					css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-					css.TextDecoration.None,
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-				).String(),
-				Text: statusDot(thread.Status) + " " + compactLabel(thread.Title, 27),
-			}),
-		))
-	}
-	return html.Nav(html.Props{
+	navigation := html.Nav(html.Props{
+		ID:   "product-sidebar-navigation",
 		Aria: map[string]string{"label": navigationLabel},
 		Data: map[string]string{
 			"component": "product-sidebar",
@@ -404,18 +557,18 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 		},
 		Class: productSidebarClass(layout, tokens),
 	},
-		primitives.Button(primitives.ButtonProps{
-			Label: "+  New Task", AccessibleLabel: "Create new task",
-			Primary: true, Mode: props.Mode,
-		}),
 		html.Div(html.Props{
 			Aria:  map[string]string{"label": "Thread rail layout controls"},
 			Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS))).String(),
 		},
+			headerIconButtonWithID("product-sidebar-close", "×", "Collapse thread rail", props.Mode, props.OnCollapse),
 			headerIconButton("‹", "Narrow thread rail", props.Mode, props.OnNarrower),
 			headerIconButton("›", "Widen thread rail", props.Mode, props.OnWider),
-			headerIconButton("×", "Collapse thread rail", props.Mode, props.OnCollapse),
 		),
+		html.H2(html.Props{
+			ID: "product-sidebar-title", Text: navigationLabel,
+			Class: shellAssistiveClass(),
+		}),
 		html.Div(html.Props{
 			Class: css.New(
 				css.MarginY(css.Px(tokens.Spacing.LG)),
@@ -429,19 +582,7 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 				css.FlexGrow(css.Num(1)),
 			).String(),
 		},
-			html.P(html.Props{
-				Class: css.New(
-					css.Margin(css.Zero),
-					css.TextTransform.Uppercase,
-					css.Tracking(css.Ems(0.08)),
-					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-				).String(),
-				Text: "Recent Tasks",
-			}),
-			html.Div(html.Props{
-				Class: css.New(css.MarginY(css.Px(tokens.Spacing.SM)), css.Padding(css.Zero)).String(),
-			}, recent...),
+			threadRailNode,
 		),
 		html.Div(html.Props{
 			Class: css.New(
@@ -476,13 +617,33 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 			}),
 		),
 	)
+	if !compact {
+		return navigation
+	}
+	return primitives.Drawer(primitives.OverlayProps{
+		ID: "product-sidebar-drawer", Open: props.CompactOpen,
+		LabelledBy:           "product-sidebar-title",
+		InitialFocusSelector: "#product-sidebar-close",
+		AppRootSelector:      `[data-component="app-shell"]`,
+		Mode:                 props.Mode,
+		Content:              navigation,
+		OnDismiss:            props.OnCollapse,
+	})
+}
+
+func shellAssistiveClass() string {
+	return css.New(
+		css.Position.Absolute, css.W(css.Px(1)), css.H(css.Px(1)),
+		css.Margin(css.Px(-1)), css.Padding(css.Zero), css.Overflow.Hidden,
+	).String()
 }
 
 func productSidebarClass(layout state.LayoutPreferences, tokens design.Tokens) string {
 	rules := []css.Rule{
 		u.Flex, u.FlexCol,
 		css.MinWidth(css.Zero), css.H(css.Full),
-		css.Padding(css.Px(tokens.Spacing.LG)),
+		css.PaddingY(css.Px(tokens.Spacing.LG)),
+		css.PaddingX(css.Px(tokens.Spacing.MD)),
 		css.Bg(css.Hex(string(tokens.Colors.Shell))),
 		css.BorderRight(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 		css.OverflowY.Auto,
@@ -508,7 +669,7 @@ func routeSelected(route routes.Route, label string) bool {
 	case "Tasks":
 		return route.Name == routes.ThreadWorkspace
 	case "Graphs":
-		return false
+		return route.Name == routes.Graphs
 	case "Memory":
 		return route.Name == routes.Memory
 	case "Settings":
@@ -527,17 +688,22 @@ func selectedAria(selected bool) string {
 func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 	rules := []css.Rule{
 		u.Flex, u.ItemsCenter,
-		css.MinHeight(css.Px(40)),
-		css.MarginY(css.Px(tokens.Spacing.XS)),
-		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.W(css.Full),
+		css.MinHeight(css.Px(44)),
+		css.MarginY(css.Px(2)),
+		css.PaddingX(css.Px(tokens.Spacing.LG)),
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Bg(css.Transparent),
+		css.Border(css.Zero, css.Transparent),
 		css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
 		css.TextDecoration.None,
-		css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+		css.FontWeight.Medium,
+		css.Cursor.Pointer,
 	}
 	if selected {
 		rules = append(rules,
-			css.Bg(css.Hex(string(tokens.Colors.Surface3))),
+			css.Bg(css.Hex(string(tokens.Colors.Selection))),
 			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.BorderLeft(css.Px(3), css.Hex(string(tokens.Colors.Accent))),
 		)
@@ -546,13 +712,15 @@ func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 }
 
 type AssuranceRailProps struct {
-	Snapshot state.Snapshot
-	Mode     primitives.Mode
+	Snapshot   state.Snapshot
+	Mode       primitives.Mode
+	Collapsed  bool
+	OnCollapse func()
 }
 
 func AssuranceRail(props AssuranceRailProps) ui.Node {
 	layout := props.Snapshot.Layout.Normalize()
-	hidden := layout.Viewport != state.ViewportWide
+	hidden := layout.Viewport != state.ViewportWide || props.Collapsed
 	tokens := props.Mode.Tokens()
 	if hidden {
 		return html.Aside(html.Props{
@@ -580,7 +748,13 @@ func AssuranceRail(props AssuranceRailProps) ui.Node {
 			css.OverflowY.Auto,
 		).String(),
 	},
-		inspectorCard("Task details", []detailRow{
+		html.Div(html.Props{
+			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
+		},
+			html.Strong(html.Props{Text: "Task details"}),
+			headerIconButton("×", "Collapse task details sidebar", props.Mode, props.OnCollapse),
+		),
+		inspectorCard("Identity and plan", []detailRow{
 			{"Milestone", "M16"},
 			{"Plan reference", "§27A · §27C"},
 			{"Repository", fallback(props.Snapshot.Workspace.RepositoryName, "Not selected")},
@@ -663,11 +837,24 @@ func gatesCard(tokens design.Tokens) ui.Node {
 
 func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 	tokens := props.Mode.Tokens()
+	pauseLabel, pauseAccessible := taskPausePresentation(props.Snapshot.TopBar.TaskState, false)
+	taskStateLabel := humanize(fallback(props.Snapshot.TopBar.TaskState, "unknown"))
+	taskStateColor := tokens.Colors.Active
+	switch {
+	case strings.Contains(strings.ToLower(taskStateLabel), "paused"):
+		taskStateColor = tokens.Colors.Warning
+	case strings.Contains(strings.ToLower(taskStateLabel), "complete"):
+		taskStateColor = tokens.Colors.Success
+	case strings.Contains(strings.ToLower(taskStateLabel), "fail"),
+		strings.Contains(strings.ToLower(taskStateLabel), "blocked"):
+		taskStateColor = tokens.Colors.Failure
+	}
+	moreExpanded := props.TaskActionsOpen
 	return html.Div(html.Props{
 		DataAttr: html.DataAttribute{Name: "component", Value: "task-workspace-header"},
 		Class: css.New(
 			u.Flex, u.FlexCol,
-			css.Gap(css.Px(tokens.Spacing.SM)),
+			css.Gap(css.Px(6)),
 			css.MinWidth(css.Zero),
 		).String(),
 	},
@@ -676,27 +863,25 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 			Class: css.New(
 				u.Flex, u.ItemsCenter, u.JustifyBetween, css.FlexWrap.Wrap,
 				css.Gap(css.Px(tokens.Spacing.MD)),
-				css.MinHeight(css.Px(64)),
-				css.PaddingX(css.Px(tokens.Spacing.LG)),
-				css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
-				css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+				css.MinHeight(css.Px(58)),
+				css.PaddingY(css.Px(tokens.Spacing.XS)),
+				css.PaddingX(css.Px(tokens.Spacing.SM)),
 			).String(),
 		},
 			html.Div(html.Props{
-				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.MD))).String(),
+				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.LG))).String(),
 			},
 				html.Span(html.Props{
 					Aria: map[string]string{"hidden": "true"},
 					Class: css.New(
 						u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-						css.W(css.Px(38)), css.H(css.Px(38)),
-						css.Rounded(css.Px(tokens.Geometry.PillRadius)),
-						css.Bg(css.Hex(string(tokens.Colors.Selection))),
+						css.W(css.Px(40)), css.H(css.Px(40)),
+						css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+						css.Bg(css.Hex(string(tokens.Colors.Surface2))),
 						css.TextColor(css.Hex(string(tokens.Colors.Accent))),
-						css.FontSize(css.Px(19)),
+						css.FontSize(css.Px(21)),
 					).String(),
-					Text: "✓",
+					Text: "⌁",
 				}),
 				html.Div(html.Props{},
 					html.Div(html.Props{
@@ -705,14 +890,16 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 						html.H1(html.Props{
 							Class: css.New(
 								css.Margin(css.Zero),
-								css.FontSize(css.Px(tokens.Typography.TaskTitle.Size)),
-								css.LineHeightLen(css.Px(tokens.Typography.TaskTitle.LineHeight)),
+								css.FontSize(css.Px(tokens.Typography.WorkspaceTitle.Size)),
+								css.LineHeightLen(css.Px(tokens.Typography.WorkspaceTitle.LineHeight)),
 								css.FontWeight.Semibold,
+								css.Tracking(css.Ems(-0.025)),
+								css.Font(css.FontStack(tokens.Fonts.Display)),
 								css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 							).String(),
 							Text: "Implement the Codeflux frontend shell",
 						}),
-						statusPill("● In progress", tokens.Colors.Success, tokens),
+						statusPill("● "+taskStateLabel, taskStateColor, tokens),
 					),
 					html.P(html.Props{
 						Class: css.New(
@@ -728,7 +915,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 			},
 				primitives.Button(primitives.ButtonProps{
-					Label: "Ⅱ  Pause", AccessibleLabel: "Pause task", Mode: props.Mode,
+					Label: pauseLabel, AccessibleLabel: pauseAccessible, Mode: props.Mode,
 					Disabled: !props.Snapshot.TopBar.CanPause || props.OnPauseRequested == nil,
 					OnClick:  props.OnPauseRequested,
 				}),
@@ -737,18 +924,125 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 					Disabled: !props.Snapshot.TopBar.CanStop || props.OnStopRequested == nil,
 					OnClick:  props.OnStopRequested,
 				}),
-				primitives.Button(primitives.ButtonProps{Label: "◇  Request review", AccessibleLabel: "Request review", Mode: props.Mode}),
-				primitives.Button(primitives.ButtonProps{Label: "•••", AccessibleLabel: "More task actions", Mode: props.Mode}),
+				primitives.Button(primitives.ButtonProps{
+					Label: "◇  Request review", AccessibleLabel: "Request review", Mode: props.Mode,
+					Disabled: props.OnReviewRequested == nil, OnClick: props.OnReviewRequested,
+				}),
+				html.Div(html.Props{Class: css.New(u.Relative).String()},
+					primitives.Button(primitives.ButtonProps{
+						ID: "task-actions-trigger", Label: "•••", AccessibleLabel: "More task actions", Mode: props.Mode,
+						Expanded: &moreExpanded, Controls: "task-actions-popover",
+						Disabled: props.OnTaskActionsOpen == nil, OnClick: props.OnTaskActionsOpen,
+					}),
+					ui.CreateElement(TaskActionsPopover, TaskActionsPopoverProps{
+						Open: props.TaskActionsOpen, Snapshot: props.Snapshot, Mode: props.Mode,
+						OnDismiss: props.OnTaskActionsDismiss, OnNavigatePath: props.OnNavigatePath,
+						OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+						OnReviewRequested: props.OnReviewRequested,
+					}),
+				),
 			),
 		),
-		taskMetricStrip(tokens),
+		taskMetricStrip(taskStateLabel, taskStateColor, tokens),
 	)
 }
 
-func taskMetricStrip(tokens design.Tokens) ui.Node {
+type TaskActionsPopoverProps struct {
+	Open              bool
+	Snapshot          state.Snapshot
+	Mode              primitives.Mode
+	OnDismiss         func()
+	OnNavigatePath    func(string)
+	OnPauseRequested  func()
+	OnStopRequested   func()
+	OnReviewRequested func()
+}
+
+func TaskActionsPopover(props TaskActionsPopoverProps) ui.Node {
+	tokens := props.Mode.Tokens()
+	pauseLabel, pauseAccessible := taskPausePresentation(props.Snapshot.TopBar.TaskState, false)
+	invoke := func(action func()) func() {
+		if action == nil {
+			return nil
+		}
+		return func() {
+			if props.OnDismiss != nil {
+				props.OnDismiss()
+			}
+			action()
+		}
+	}
+	navigate := func(path string) func() {
+		if props.OnNavigatePath == nil {
+			return nil
+		}
+		return func() {
+			if props.OnDismiss != nil {
+				props.OnDismiss()
+			}
+			props.OnNavigatePath(path)
+		}
+	}
+	return primitives.Dialog(primitives.OverlayProps{
+		ID: "task-actions-popover", Open: props.Open,
+		LabelledBy: "task-actions-title", DescribedBy: "task-actions-description",
+		InitialFocusSelector: "#task-actions-open-graph", AppRootSelector: `[data-component="app-shell"]`,
+		Mode: props.Mode, OnDismiss: props.OnDismiss,
+		Content: html.Section(html.Props{
+			Data:  map[string]string{"component": "task-actions"},
+			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)), css.MinWidth(css.Px(260))).String(),
+		},
+			html.H2(html.Props{
+				ID: "task-actions-title", Text: "Task actions",
+				Class: css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.PanelHeading.Size))).String(),
+			}),
+			html.P(html.Props{
+				ID: "task-actions-description", Text: "Inspect, review, pause, or stop the current task.",
+				Class: css.New(css.Margin(css.Zero), css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
+			}),
+			primitives.Button(primitives.ButtonProps{
+				ID: "task-actions-open-graph", Label: "⌘  Open task graph", AccessibleLabel: "Open task graph", Mode: props.Mode,
+				Disabled: props.OnNavigatePath == nil, OnClick: navigate("/graphs"),
+			}),
+			primitives.Button(primitives.ButtonProps{
+				Label: "◇  Request review", AccessibleLabel: "Request review from task actions", Mode: props.Mode,
+				Disabled: props.OnReviewRequested == nil, OnClick: invoke(props.OnReviewRequested),
+			}),
+			primitives.Button(primitives.ButtonProps{
+				Label: pauseLabel, AccessibleLabel: pauseAccessible + " from task actions", Mode: props.Mode,
+				Disabled: !props.Snapshot.TopBar.CanPause || props.OnPauseRequested == nil,
+				OnClick:  invoke(props.OnPauseRequested),
+			}),
+			primitives.Button(primitives.ButtonProps{
+				Label: "■  Stop", AccessibleLabel: "Stop task from task actions", Mode: props.Mode,
+				Disabled: !props.Snapshot.TopBar.CanStop || props.OnStopRequested == nil,
+				OnClick:  invoke(props.OnStopRequested),
+			}),
+			primitives.Button(primitives.ButtonProps{
+				Label: "⚙  Task settings", AccessibleLabel: "Open task settings", Mode: props.Mode,
+				Disabled: props.OnNavigatePath == nil, OnClick: navigate("/settings"),
+			}),
+		),
+	})
+}
+
+func taskPausePresentation(taskState string, compact bool) (string, string) {
+	if strings.Contains(strings.ToLower(strings.TrimSpace(taskState)), "paused") {
+		if compact {
+			return "▶", "Resume task"
+		}
+		return "▶  Resume", "Resume task"
+	}
+	if compact {
+		return "Ⅱ", "Pause task"
+	}
+	return "Ⅱ  Pause", "Pause task"
+}
+
+func taskMetricStrip(taskState string, taskStateColor design.Color, tokens design.Tokens) ui.Node {
 	metrics := []detailRow{
 		{"Correctness profile", "Strict"},
-		{"Evidence", "In progress"},
+		{"Task state", taskState},
 		{"Progress", "68%"},
 		{"Elapsed", "2.1 min"},
 		{"Cost", "$0.42"},
@@ -758,7 +1052,7 @@ func taskMetricStrip(tokens design.Tokens) ui.Node {
 	for index, metric := range metrics {
 		valueColor := tokens.Colors.TextPrimary
 		if index == 1 {
-			valueColor = tokens.Colors.Evidence
+			valueColor = taskStateColor
 		}
 		if index == 2 {
 			valueColor = tokens.Colors.Active
@@ -768,8 +1062,10 @@ func taskMetricStrip(tokens design.Tokens) ui.Node {
 		}
 		nodes = append(nodes, html.Div(html.Props{
 			Class: css.New(
-				css.PaddingX(css.Px(tokens.Spacing.LG)),
-				css.BorderRight(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.SM)),
+				css.PaddingY(css.Px(tokens.Spacing.XS)),
+				css.PaddingX(css.Px(tokens.Spacing.MD)),
 			).String(),
 		},
 			html.P(html.Props{
@@ -782,7 +1078,7 @@ func taskMetricStrip(tokens design.Tokens) ui.Node {
 			}),
 			html.Strong(html.Props{
 				Class: css.New(
-					css.FontSize(css.Px(tokens.Typography.MetricValue.Size)),
+					css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
 					css.LineHeightLen(css.Px(tokens.Typography.MetricValue.LineHeight)),
 					css.FontWeight.Semibold,
 					css.TextColor(css.Hex(string(valueColor))),
@@ -795,10 +1091,12 @@ func taskMetricStrip(tokens design.Tokens) ui.Node {
 		u.Grid,
 		css.GridCols(css.Repeat(6, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
 		u.ItemsCenter,
-		css.MinHeight(css.Px(66)),
+		css.MinHeight(css.Px(44)),
 		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
-		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
-		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+		css.Shadow(css.ShadowOf(
+			css.Zero, css.Px(8), css.Px(30), css.Px(-26), css.RGBA(0, 0, 0, 0.5),
+		)),
 	}
 	rules = append(rules, css.Media(
 		css.MaxW(799),
@@ -841,7 +1139,23 @@ func GraphPane(props GraphPaneProps) ui.Node {
 	}
 	content := asyncStateContent(props.State, "task graph nodes", len(props.Nodes), props.Mode)
 	if props.State == state.DataReady || props.State == state.DataPartialStale {
-		content = graphCanvas(props.Nodes, props.SelectedID, tokens, props.OnSelect)
+		height := 510
+		if props.Viewport == state.ViewportWide {
+			height = 640
+		}
+		if props.Viewport == state.ViewportNarrow || props.Viewport == state.ViewportMinimum {
+			height = 420
+		}
+		content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{
+			Nodes:          props.Nodes,
+			Edges:          graphCanvasEdges(props.Nodes),
+			SelectedID:     props.SelectedID,
+			CurrentID:      currentGraphNodeID(props.Nodes),
+			ResponsiveMode: string(props.Viewport),
+			Mode:           props.Mode,
+			Height:         height,
+			OnSelect:       props.OnSelect,
+		})
 	}
 	return html.Aside(html.Props{
 		ID: "graph-region", TabIndex: -1,
@@ -856,17 +1170,20 @@ func GraphPane(props GraphPaneProps) ui.Node {
 		Class: css.New(
 			u.Flex, u.FlexCol,
 			css.MinWidth(css.Zero), css.H(css.Full),
-			css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+			css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
 			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			css.Shadow(css.ShadowOf(
+				css.Zero, css.Px(18), css.Px(44), css.Px(-28), css.RGBA(0, 0, 0, 0.72),
+			)),
 			css.Overflow.Hidden,
 		).String(),
 	},
 		html.Div(html.Props{
 			Class: css.New(
 				u.Flex, u.ItemsCenter, u.JustifyBetween,
-				css.MinHeight(css.Px(44)),
+				css.MinHeight(css.Px(50)),
 				css.PaddingX(css.Px(tokens.Spacing.MD)),
 				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 			).String(),
@@ -889,12 +1206,87 @@ func GraphPane(props GraphPaneProps) ui.Node {
 					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 				).String(),
-				Text: "● Code   ● Test   ● Plan   ● Evidence",
+				Text: "▣ Work  ⬡ Tool  ◇ Plan  ● Proof  ◉ Memory",
 			}),
 		),
 		content,
 	)
 }
+
+func graphCanvasEdges(nodes []state.GraphNodeView) []graphcanvas.Edge {
+	present := make(map[string]bool, len(nodes))
+	for _, node := range nodes {
+		present[node.ID] = true
+	}
+	candidates := []graphcanvas.Edge{
+		{ID: "requirements-design", FromID: "requirements", ToID: "design", Kind: graphcanvas.EdgeData},
+		{ID: "requirements-routes", FromID: "requirements", ToID: "routes", Kind: graphcanvas.EdgeData},
+		{ID: "design-implementation", FromID: "design", ToID: "implementation", Kind: graphcanvas.EdgeControl},
+		{ID: "routes-implementation", FromID: "routes", ToID: "implementation", Kind: graphcanvas.EdgeControl},
+		{ID: "bootstrap-implementation", FromID: "bootstrap", ToID: "implementation", Kind: graphcanvas.EdgeControl},
+		{ID: "plan-implementation", FromID: "plan", ToID: "implementation", Kind: graphcanvas.EdgeControl},
+		{ID: "implementation-responsive", FromID: "implementation", ToID: "responsive", Kind: graphcanvas.EdgeControl},
+		{ID: "implementation-browser", FromID: "implementation", ToID: "browser", Kind: graphcanvas.EdgeControl},
+		{ID: "responsive-review", FromID: "responsive", ToID: "review", Kind: graphcanvas.EdgeEvidence},
+		{ID: "browser-review", FromID: "browser", ToID: "review", Kind: graphcanvas.EdgeEvidence},
+		{ID: "review-evidence", FromID: "review", ToID: "evidence", Kind: graphcanvas.EdgeEvidence},
+	}
+	edges := make([]graphcanvas.Edge, 0, len(candidates))
+	for _, edge := range candidates {
+		if present[edge.FromID] && present[edge.ToID] {
+			edges = append(edges, edge)
+		}
+	}
+	if len(edges) > 0 || len(nodes) < 2 {
+		return edges
+	}
+	for index := 1; index < len(nodes); index++ {
+		edges = append(edges, graphcanvas.Edge{
+			ID:     "sequence-" + strconv.Itoa(index),
+			FromID: nodes[index-1].ID,
+			ToID:   nodes[index].ID,
+			Kind:   graphcanvas.EdgeData,
+		})
+	}
+	return edges
+}
+
+func currentGraphNodeID(nodes []state.GraphNodeView) string {
+	for _, node := range nodes {
+		if node.ID == "implementation" {
+			return node.ID
+		}
+	}
+	for _, node := range nodes {
+		if node.Selected {
+			return node.ID
+		}
+	}
+	for _, node := range nodes {
+		status := strings.ToLower(strings.TrimSpace(node.Status))
+		if status == "active" || status == "running" || status == "in progress" {
+			return node.ID
+		}
+	}
+	if len(nodes) > 0 {
+		return nodes[0].ID
+	}
+	return ""
+}
+
+// Legacy DOM graph helpers remain as non-mounted compatibility fixtures while
+// the production surface is the interactive Canvas 2D renderer.
+var (
+	_ = graphCanvas
+	_ = graphNode
+	_ = graphEdges
+	_ = graphArrowPoints
+	_ = graphToolbar
+	_ = graphToolButton
+	_ = graphMinimap
+	_ = graphPlacement
+	_ = statusDot
+)
 
 func graphCanvas(
 	nodes []state.GraphNodeView,
@@ -921,11 +1313,6 @@ func graphCanvas(
 			css.MinHeight(css.Px(390)),
 			css.Padding(css.Px(tokens.Spacing.LG)),
 			css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
-			css.BgImage(css.RadialGradient(
-				css.CircleSizedAt(css.Px(460), css.Percent(50), css.Percent(45)),
-				css.Stop(css.RGBA(60, 151, 255, 0.09)),
-				css.StopAt(css.Transparent, css.Percent(72)),
-			)),
 			css.Overflow.Auto,
 		).String(),
 	}, items...)
@@ -938,19 +1325,11 @@ func graphNode(
 	tokens design.Tokens,
 	onSelect func(string),
 ) ui.Node {
-	tone := tokens.Colors.Success
-	if strings.Contains(strings.ToLower(node.Title), "plan") ||
-		strings.Contains(strings.ToLower(node.Title), "strategy") {
-		tone = tokens.Colors.Plan
-	} else if strings.Contains(strings.ToLower(node.Title), "evidence") {
-		tone = tokens.Colors.Evidence
-	} else if node.Status == "active" || node.Status == "running" {
-		tone = tokens.Colors.Active
-	}
 	selected := node.Selected
 	if selectedID != "" {
 		selected = node.ID == selectedID
 	}
+	tone, emphasis := graphNodeEmphasis(node, selected, tokens)
 	rules := []css.Rule{
 		u.Relative,
 		u.Flex, u.ItemsCenter, u.JustifyBetween,
@@ -968,7 +1347,7 @@ func graphNode(
 	rules = append(rules, graphPlacement(index)...)
 	if selected {
 		rules = append(rules, css.Shadow(css.ShadowOf(
-			css.Zero, css.Zero, css.Px(18), css.Zero, css.RGBA(60, 151, 255, 0.34),
+			css.Zero, css.Zero, css.Px(10), css.Zero, css.RGBA(60, 151, 255, 0.22),
 		)))
 	}
 	children := []ui.Node{
@@ -994,10 +1373,11 @@ func graphNode(
 	)
 	buttonProps.Type = "button"
 	buttonProps.Data = map[string]string{
-		"node-id":  node.ID,
-		"status":   node.Status,
-		"selected": strconv.FormatBool(selected),
-		"position": strconv.Itoa(index),
+		"node-id":         node.ID,
+		"status":          node.Status,
+		"selected":        strconv.FormatBool(selected),
+		"visual-emphasis": emphasis,
+		"position":        strconv.Itoa(index),
 	}
 	buttonProps.Aria = map[string]string{
 		"label":   node.Title + " - " + humanize(node.Status),
@@ -1005,6 +1385,23 @@ func graphNode(
 	}
 	buttonProps.Class = css.New(rules...).String()
 	return html.Button(buttonProps, children...)
+}
+
+func graphNodeEmphasis(node state.GraphNodeView, selected bool, tokens design.Tokens) (design.Color, string) {
+	if selected {
+		return tokens.Colors.Active, "selected"
+	}
+	status := strings.ToLower(strings.TrimSpace(node.Status))
+	if status == "active" || status == "running" || status == "in progress" {
+		return tokens.Colors.Active, "active"
+	}
+	if status == "blocked" || status == "failed" {
+		return tokens.Colors.Failure, "blocked"
+	}
+	if strings.Contains(strings.ToLower(node.Title), "evidence") {
+		return tokens.Colors.Evidence, "evidence"
+	}
+	return tokens.Colors.BorderSubtle, "idle"
 }
 
 func graphEdges(tokens design.Tokens, nodeCount int) ui.Node {
@@ -1161,12 +1558,4 @@ func statusDot(status string) string {
 	default:
 		return "○"
 	}
-}
-
-func compactLabel(value string, limit int) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= limit {
-		return value
-	}
-	return value[:limit-1] + "…"
 }

@@ -80,6 +80,82 @@ func TestSemanticThemeTokensAreCompleteAndPurposeful(t *testing.T) {
 	}
 }
 
+func TestInstrumentWorkspacePaletteUsesMineralSurfacesAndCoolSignals(t *testing.T) {
+	dark, err := TokensFor(Options{Theme: ThemeDark})
+	if err != nil {
+		t.Fatal(err)
+	}
+	light, err := TokensFor(Options{Theme: ThemeLight})
+	if err != nil {
+		t.Fatal(err)
+	}
+	darkCanvas, _ := ParseColor(string(dark.Colors.Canvas))
+	darkShell, _ := ParseColor(string(dark.Colors.Shell))
+	darkSurface1, _ := ParseColor(string(dark.Colors.Surface1))
+	darkSurface2, _ := ParseColor(string(dark.Colors.Surface2))
+	darkAccent, _ := ParseColor(string(dark.Colors.Accent))
+	lightText, _ := ParseColor(string(light.Colors.TextPrimary))
+	if darkCanvas == (RGB{}) || darkShell == (RGB{}) {
+		t.Fatal("dark mineral surfaces collapsed to pure black")
+	}
+	if !(relativeLuminance(darkCanvas) < relativeLuminance(darkShell) &&
+		relativeLuminance(darkShell) < relativeLuminance(darkSurface1) &&
+		relativeLuminance(darkSurface1) < relativeLuminance(darkSurface2)) {
+		t.Fatalf("dark mineral surface ladder is not deliberate: %#v", dark.Colors)
+	}
+	if darkAccent.Blue <= darkAccent.Red || darkAccent.Green <= darkAccent.Red {
+		t.Fatalf("signal accent is not in the cool cyan/cobalt family: %s", dark.Colors.Accent)
+	}
+	if dark.Colors.Accent == dark.Colors.Success || dark.Colors.Plan == dark.Colors.Blocked {
+		t.Fatal("action and semantic state colors collapsed into one meaning")
+	}
+	if lightText.Blue <= lightText.Red || lightText.Green <= lightText.Red {
+		t.Fatalf("light theme primary typography is not ink/navy: %s", light.Colors.TextPrimary)
+	}
+	for _, forbidden := range []Color{"#5ee27b", "#a76bfa", "#ee7bdc", "#147a32", "#6631ad"} {
+		for name, color := range tokenColorMap(dark.Colors) {
+			if color == forbidden {
+				t.Fatalf("dark %s retained the superseded generic accent %s", name, forbidden)
+			}
+		}
+		for name, color := range tokenColorMap(light.Colors) {
+			if color == forbidden {
+				t.Fatalf("light %s retained the superseded generic accent %s", name, forbidden)
+			}
+		}
+	}
+}
+
+func TestInstrumentWorkspaceTypeMotionAndGeometryRemainPrecise(t *testing.T) {
+	tokens, err := TokensFor(Options{Theme: ThemeDark})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tokens.Fonts.UI, "Segoe UI Variable Text") ||
+		!strings.Contains(tokens.Fonts.Code, "Cascadia Mono") {
+		t.Fatalf("system-safe type roles = %#v", tokens.Fonts)
+	}
+	if !tokens.Typography.MetricValue.Tabular || tokens.Typography.Code.Tabular {
+		t.Fatalf("readout/code numeric roles = %#v", tokens.Typography)
+	}
+	if tokens.Geometry != (GeometryTokens{
+		BorderWidth: 1, BorderStrongWidth: 2,
+		RadiusSmall: 3, ControlRadius: 4, PanelRadius: 6, DialogRadius: 8,
+		PillRadius: 999, FocusRingWidth: 3, FocusRingOffset: 2,
+		Shadow: "0 10px 30px -10px rgba(3,12,20,0.34)",
+	}) {
+		t.Fatalf("instrument geometry drifted: %#v", tokens.Geometry)
+	}
+	reduced, err := TokensFor(Options{Theme: ThemeDark, ReducedMotion: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reduced.Motion.InstantFeedback != 0 || reduced.Motion.Control != 0 ||
+		reduced.Motion.Pane != 0 || reduced.Motion.GraphPatch != 0 {
+		t.Fatalf("reduced motion retained non-essential duration: %#v", reduced.Motion)
+	}
+}
+
 func TestTypeGeometryAndElevationScalesPreserveHierarchy(t *testing.T) {
 	tokens, err := TokensFor(Options{})
 	if err != nil {

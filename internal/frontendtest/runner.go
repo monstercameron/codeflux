@@ -176,6 +176,7 @@ func Run(ctx context.Context, config Config) (Result, error) {
 	}
 	if loadedAtLeastOnce {
 		runAdversarialInteractionChecks(page, base, config.ArtifactDir, &result)
+		runM17MountedChecks(page, base, config.ArtifactDir, &result)
 	}
 	result.ExternalRequests = guard.externalURLs()
 	result.BrowserErrors = diagnostics.errors()

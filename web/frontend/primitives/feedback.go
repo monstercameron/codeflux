@@ -34,7 +34,10 @@ func InlineAlert(props InlineAlertProps) ui.Node {
 		live = "assertive"
 	}
 	children := []ui.Node{
-		html.Span(html.Props{Aria: map[string]string{"hidden": "true"}}, html.Text(presentation.Icon)),
+		html.Span(html.Props{
+			Aria:  map[string]string{"hidden": "true"},
+			Class: css.New(css.TextColor(css.Hex(string(presentation.Background))), css.FontWeight.Bold).String(),
+		}, html.Text(presentation.Icon)),
 	}
 	if props.Title != "" {
 		children = append(children, html.Strong(html.Props{}, html.Text(props.Title)))
@@ -54,9 +57,10 @@ func InlineAlert(props InlineAlertProps) ui.Node {
 				u.ItemsCenter,
 				css.Gap(css.Px(tokens.Spacing.SM)),
 				css.Padding(css.Px(tokens.Spacing.MD)),
-				css.Bg(css.Hex(string(presentation.Background))),
-				css.TextColor(css.Hex(string(presentation.Foreground))),
-				css.Border(css.Px(tokens.Geometry.BorderStrongWidth), css.Hex(string(presentation.Foreground))),
+				css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+				css.BorderLeft(css.Px(tokens.Geometry.BorderStrongWidth), css.Hex(string(presentation.Background))),
 				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 			).String(),
 		},
@@ -165,13 +169,19 @@ func Badge(props BadgeProps) ui.Node {
 				u.ItemsCenter,
 				css.Gap(css.Px(4)),
 				css.PaddingX(css.Px(8)),
-				css.Bg(css.Hex(string(presentation.Background))),
-				css.TextColor(css.Hex(string(presentation.Foreground))),
-				css.Border(css.Px(1), css.Hex(string(presentation.Foreground))),
+				css.Bg(css.Hex(string(props.Mode.Tokens().Colors.Surface3))),
+				css.TextColor(css.Hex(string(props.Mode.Tokens().Colors.TextPrimary))),
+				css.Border(css.Px(1), css.Hex(string(presentation.Background))),
 				css.Rounded(css.Px(999)),
+				css.FontSize(css.Px(props.Mode.Tokens().Typography.Metadata.Size)),
+				css.LineHeightLen(css.Px(props.Mode.Tokens().Typography.Metadata.LineHeight)),
+				css.FontWeight.Medium,
 			).String(),
 		},
-		html.Span(html.Props{Aria: map[string]string{"hidden": "true"}}, html.Text(presentation.Icon)),
+		html.Span(html.Props{
+			Aria:  map[string]string{"hidden": "true"},
+			Class: css.New(css.TextColor(css.Hex(string(presentation.Background)))).String(),
+		}, html.Text(presentation.Icon)),
 		html.Text(props.Label),
 	)
 }
@@ -205,9 +215,23 @@ func statePanel(component, role, title, body, actionLabel string, mode Mode, onA
 		return contractError(component, "title is required")
 	}
 	tokens := mode.Tokens()
-	children := []ui.Node{html.H2(html.Props{}, html.Text(title))}
+	children := []ui.Node{html.H2(html.Props{
+		Class: css.New(
+			css.Margin(css.Zero),
+			css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+			css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+			css.FontWeight.Semibold,
+		).String(),
+	}, html.Text(title))}
 	if body != "" {
-		children = append(children, html.P(html.Props{}, html.Text(body)))
+		children = append(children, html.P(html.Props{
+			Class: css.New(
+				css.Margin(css.Zero), css.MaxWidth(css.Ch(72)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+				css.FontSize(css.Px(tokens.Typography.Body.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
+			).String(),
+		}, html.Text(body)))
 	}
 	if actionLabel != "" {
 		children = append(children, Button(ButtonProps{

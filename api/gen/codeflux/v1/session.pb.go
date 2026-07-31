@@ -45,6 +45,9 @@ const (
 	SessionEventKind_SESSION_EVENT_KIND_CHECKPOINT_CREATED SessionEventKind = 18
 	SessionEventKind_SESSION_EVENT_KIND_RECOVERY_REQUIRED  SessionEventKind = 19
 	SessionEventKind_SESSION_EVENT_KIND_ERROR              SessionEventKind = 20
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_CREATED     SessionEventKind = 21
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_RENAMED     SessionEventKind = 22
+	SessionEventKind_SESSION_EVENT_KIND_THREAD_ARCHIVED    SessionEventKind = 23
 )
 
 // Enum value maps for SessionEventKind.
@@ -71,6 +74,9 @@ var (
 		18: "SESSION_EVENT_KIND_CHECKPOINT_CREATED",
 		19: "SESSION_EVENT_KIND_RECOVERY_REQUIRED",
 		20: "SESSION_EVENT_KIND_ERROR",
+		21: "SESSION_EVENT_KIND_THREAD_CREATED",
+		22: "SESSION_EVENT_KIND_THREAD_RENAMED",
+		23: "SESSION_EVENT_KIND_THREAD_ARCHIVED",
 	}
 	SessionEventKind_value = map[string]int32{
 		"SESSION_EVENT_KIND_UNSPECIFIED":        0,
@@ -94,6 +100,9 @@ var (
 		"SESSION_EVENT_KIND_CHECKPOINT_CREATED": 18,
 		"SESSION_EVENT_KIND_RECOVERY_REQUIRED":  19,
 		"SESSION_EVENT_KIND_ERROR":              20,
+		"SESSION_EVENT_KIND_THREAD_CREATED":     21,
+		"SESSION_EVENT_KIND_THREAD_RENAMED":     22,
+		"SESSION_EVENT_KIND_THREAD_ARCHIVED":    23,
 	}
 )
 
@@ -153,6 +162,9 @@ type SessionEvent struct {
 	//	*SessionEvent_Checkpoint
 	//	*SessionEvent_RecoveryRequired
 	//	*SessionEvent_Error
+	//	*SessionEvent_ThreadCreated
+	//	*SessionEvent_ThreadRenamed
+	//	*SessionEvent_ThreadArchived
 	Payload       isSessionEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -400,6 +412,33 @@ func (x *SessionEvent) GetError() *UserErrorEvent {
 	return nil
 }
 
+func (x *SessionEvent) GetThreadCreated() *ThreadCreatedEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*SessionEvent_ThreadCreated); ok {
+			return x.ThreadCreated
+		}
+	}
+	return nil
+}
+
+func (x *SessionEvent) GetThreadRenamed() *ThreadRenamedEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*SessionEvent_ThreadRenamed); ok {
+			return x.ThreadRenamed
+		}
+	}
+	return nil
+}
+
+func (x *SessionEvent) GetThreadArchived() *ThreadArchivedEvent {
+	if x != nil {
+		if x, ok := x.Payload.(*SessionEvent_ThreadArchived); ok {
+			return x.ThreadArchived
+		}
+	}
+	return nil
+}
+
 type isSessionEvent_Payload interface {
 	isSessionEvent_Payload()
 }
@@ -464,6 +503,18 @@ type SessionEvent_Error struct {
 	Error *UserErrorEvent `protobuf:"bytes,34,opt,name=error,proto3,oneof"`
 }
 
+type SessionEvent_ThreadCreated struct {
+	ThreadCreated *ThreadCreatedEvent `protobuf:"bytes,35,opt,name=thread_created,json=threadCreated,proto3,oneof"`
+}
+
+type SessionEvent_ThreadRenamed struct {
+	ThreadRenamed *ThreadRenamedEvent `protobuf:"bytes,36,opt,name=thread_renamed,json=threadRenamed,proto3,oneof"`
+}
+
+type SessionEvent_ThreadArchived struct {
+	ThreadArchived *ThreadArchivedEvent `protobuf:"bytes,37,opt,name=thread_archived,json=threadArchived,proto3,oneof"`
+}
+
 func (*SessionEvent_MessageDelta) isSessionEvent_Payload() {}
 
 func (*SessionEvent_MessageFinal) isSessionEvent_Payload() {}
@@ -493,6 +544,12 @@ func (*SessionEvent_Checkpoint) isSessionEvent_Payload() {}
 func (*SessionEvent_RecoveryRequired) isSessionEvent_Payload() {}
 
 func (*SessionEvent_Error) isSessionEvent_Payload() {}
+
+func (*SessionEvent_ThreadCreated) isSessionEvent_Payload() {}
+
+func (*SessionEvent_ThreadRenamed) isSessionEvent_Payload() {}
+
+func (*SessionEvent_ThreadArchived) isSessionEvent_Payload() {}
 
 type MessageDeltaEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -606,6 +663,162 @@ func (x *MessageFinalEvent) GetRedactedBody() string {
 	return ""
 }
 
+type ThreadCreatedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *StableIdentity        `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Archived      bool                   `protobuf:"varint,3,opt,name=archived,proto3" json:"archived,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ThreadCreatedEvent) Reset() {
+	*x = ThreadCreatedEvent{}
+	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ThreadCreatedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ThreadCreatedEvent) ProtoMessage() {}
+
+func (x *ThreadCreatedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ThreadCreatedEvent.ProtoReflect.Descriptor instead.
+func (*ThreadCreatedEvent) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ThreadCreatedEvent) GetWorkspaceId() *StableIdentity {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return nil
+}
+
+func (x *ThreadCreatedEvent) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ThreadCreatedEvent) GetArchived() bool {
+	if x != nil {
+		return x.Archived
+	}
+	return false
+}
+
+type ThreadRenamedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PreviousTitle string                 `protobuf:"bytes,1,opt,name=previous_title,json=previousTitle,proto3" json:"previous_title,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ThreadRenamedEvent) Reset() {
+	*x = ThreadRenamedEvent{}
+	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ThreadRenamedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ThreadRenamedEvent) ProtoMessage() {}
+
+func (x *ThreadRenamedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ThreadRenamedEvent.ProtoReflect.Descriptor instead.
+func (*ThreadRenamedEvent) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ThreadRenamedEvent) GetPreviousTitle() string {
+	if x != nil {
+		return x.PreviousTitle
+	}
+	return ""
+}
+
+func (x *ThreadRenamedEvent) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+type ThreadArchivedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Archived      bool                   `protobuf:"varint,1,opt,name=archived,proto3" json:"archived,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ThreadArchivedEvent) Reset() {
+	*x = ThreadArchivedEvent{}
+	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ThreadArchivedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ThreadArchivedEvent) ProtoMessage() {}
+
+func (x *ThreadArchivedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ThreadArchivedEvent.ProtoReflect.Descriptor instead.
+func (*ThreadArchivedEvent) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ThreadArchivedEvent) GetArchived() bool {
+	if x != nil {
+		return x.Archived
+	}
+	return false
+}
+
 type PlanEvent struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	PlanRevision    uint64                 `protobuf:"varint,1,opt,name=plan_revision,json=planRevision,proto3" json:"plan_revision,omitempty"`
@@ -616,7 +829,7 @@ type PlanEvent struct {
 
 func (x *PlanEvent) Reset() {
 	*x = PlanEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	mi := &file_codeflux_v1_session_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -628,7 +841,7 @@ func (x *PlanEvent) String() string {
 func (*PlanEvent) ProtoMessage() {}
 
 func (x *PlanEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[3]
+	mi := &file_codeflux_v1_session_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -641,7 +854,7 @@ func (x *PlanEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanEvent.ProtoReflect.Descriptor instead.
 func (*PlanEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PlanEvent) GetPlanRevision() uint64 {
@@ -670,7 +883,7 @@ type ToolEvent struct {
 
 func (x *ToolEvent) Reset() {
 	*x = ToolEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	mi := &file_codeflux_v1_session_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +895,7 @@ func (x *ToolEvent) String() string {
 func (*ToolEvent) ProtoMessage() {}
 
 func (x *ToolEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[4]
+	mi := &file_codeflux_v1_session_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +908,7 @@ func (x *ToolEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolEvent.ProtoReflect.Descriptor instead.
 func (*ToolEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{4}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ToolEvent) GetExecutionId() string {
@@ -738,7 +951,7 @@ type ApprovalEvent struct {
 
 func (x *ApprovalEvent) Reset() {
 	*x = ApprovalEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	mi := &file_codeflux_v1_session_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +963,7 @@ func (x *ApprovalEvent) String() string {
 func (*ApprovalEvent) ProtoMessage() {}
 
 func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[5]
+	mi := &file_codeflux_v1_session_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +976,7 @@ func (x *ApprovalEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovalEvent.ProtoReflect.Descriptor instead.
 func (*ApprovalEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{5}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ApprovalEvent) GetApprovalId() *StableIdentity {
@@ -805,7 +1018,7 @@ type TaskStateChangedEvent struct {
 
 func (x *TaskStateChangedEvent) Reset() {
 	*x = TaskStateChangedEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[6]
+	mi := &file_codeflux_v1_session_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -817,7 +1030,7 @@ func (x *TaskStateChangedEvent) String() string {
 func (*TaskStateChangedEvent) ProtoMessage() {}
 
 func (x *TaskStateChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[6]
+	mi := &file_codeflux_v1_session_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -830,7 +1043,7 @@ func (x *TaskStateChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskStateChangedEvent.ProtoReflect.Descriptor instead.
 func (*TaskStateChangedEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{6}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TaskStateChangedEvent) GetFrom() string {
@@ -872,7 +1085,7 @@ type ForecastEvent struct {
 
 func (x *ForecastEvent) Reset() {
 	*x = ForecastEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[7]
+	mi := &file_codeflux_v1_session_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +1097,7 @@ func (x *ForecastEvent) String() string {
 func (*ForecastEvent) ProtoMessage() {}
 
 func (x *ForecastEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[7]
+	mi := &file_codeflux_v1_session_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +1110,7 @@ func (x *ForecastEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForecastEvent.ProtoReflect.Descriptor instead.
 func (*ForecastEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{7}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ForecastEvent) GetCostKnown() bool {
@@ -983,7 +1196,7 @@ type UsageEvent struct {
 
 func (x *UsageEvent) Reset() {
 	*x = UsageEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[8]
+	mi := &file_codeflux_v1_session_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -995,7 +1208,7 @@ func (x *UsageEvent) String() string {
 func (*UsageEvent) ProtoMessage() {}
 
 func (x *UsageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[8]
+	mi := &file_codeflux_v1_session_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1008,7 +1221,7 @@ func (x *UsageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageEvent.ProtoReflect.Descriptor instead.
 func (*UsageEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{8}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UsageEvent) GetKnown() bool {
@@ -1057,7 +1270,7 @@ type CostEvent struct {
 
 func (x *CostEvent) Reset() {
 	*x = CostEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[9]
+	mi := &file_codeflux_v1_session_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1282,7 @@ func (x *CostEvent) String() string {
 func (*CostEvent) ProtoMessage() {}
 
 func (x *CostEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[9]
+	mi := &file_codeflux_v1_session_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1295,7 @@ func (x *CostEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CostEvent.ProtoReflect.Descriptor instead.
 func (*CostEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{9}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CostEvent) GetKnown() bool {
@@ -1118,7 +1331,7 @@ type BudgetEvent struct {
 
 func (x *BudgetEvent) Reset() {
 	*x = BudgetEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[10]
+	mi := &file_codeflux_v1_session_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1130,7 +1343,7 @@ func (x *BudgetEvent) String() string {
 func (*BudgetEvent) ProtoMessage() {}
 
 func (x *BudgetEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[10]
+	mi := &file_codeflux_v1_session_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1143,7 +1356,7 @@ func (x *BudgetEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BudgetEvent.ProtoReflect.Descriptor instead.
 func (*BudgetEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{10}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BudgetEvent) GetHardLimitMinor() int64 {
@@ -1185,7 +1398,7 @@ type ValidationEvent struct {
 
 func (x *ValidationEvent) Reset() {
 	*x = ValidationEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[11]
+	mi := &file_codeflux_v1_session_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1197,7 +1410,7 @@ func (x *ValidationEvent) String() string {
 func (*ValidationEvent) ProtoMessage() {}
 
 func (x *ValidationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[11]
+	mi := &file_codeflux_v1_session_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1210,7 +1423,7 @@ func (x *ValidationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidationEvent.ProtoReflect.Descriptor instead.
 func (*ValidationEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{11}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ValidationEvent) GetValidationId() *StableIdentity {
@@ -1244,7 +1457,7 @@ type GraphEvent struct {
 
 func (x *GraphEvent) Reset() {
 	*x = GraphEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[12]
+	mi := &file_codeflux_v1_session_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1256,7 +1469,7 @@ func (x *GraphEvent) String() string {
 func (*GraphEvent) ProtoMessage() {}
 
 func (x *GraphEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[12]
+	mi := &file_codeflux_v1_session_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1269,7 +1482,7 @@ func (x *GraphEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GraphEvent.ProtoReflect.Descriptor instead.
 func (*GraphEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{12}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GraphEvent) GetGraphRevisionId() *StableIdentity {
@@ -1296,7 +1509,7 @@ type CheckpointEvent struct {
 
 func (x *CheckpointEvent) Reset() {
 	*x = CheckpointEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[13]
+	mi := &file_codeflux_v1_session_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +1521,7 @@ func (x *CheckpointEvent) String() string {
 func (*CheckpointEvent) ProtoMessage() {}
 
 func (x *CheckpointEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[13]
+	mi := &file_codeflux_v1_session_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +1534,7 @@ func (x *CheckpointEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckpointEvent.ProtoReflect.Descriptor instead.
 func (*CheckpointEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{13}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CheckpointEvent) GetCheckpointId() *StableIdentity {
@@ -1348,7 +1561,7 @@ type RecoveryRequiredEvent struct {
 
 func (x *RecoveryRequiredEvent) Reset() {
 	*x = RecoveryRequiredEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[14]
+	mi := &file_codeflux_v1_session_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1360,7 +1573,7 @@ func (x *RecoveryRequiredEvent) String() string {
 func (*RecoveryRequiredEvent) ProtoMessage() {}
 
 func (x *RecoveryRequiredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[14]
+	mi := &file_codeflux_v1_session_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1373,7 +1586,7 @@ func (x *RecoveryRequiredEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryRequiredEvent.ProtoReflect.Descriptor instead.
 func (*RecoveryRequiredEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{14}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RecoveryRequiredEvent) GetCheckpointId() *StableIdentity {
@@ -1401,7 +1614,7 @@ type UserErrorEvent struct {
 
 func (x *UserErrorEvent) Reset() {
 	*x = UserErrorEvent{}
-	mi := &file_codeflux_v1_session_proto_msgTypes[15]
+	mi := &file_codeflux_v1_session_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1413,7 +1626,7 @@ func (x *UserErrorEvent) String() string {
 func (*UserErrorEvent) ProtoMessage() {}
 
 func (x *UserErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_session_proto_msgTypes[15]
+	mi := &file_codeflux_v1_session_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1426,7 +1639,7 @@ func (x *UserErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserErrorEvent.ProtoReflect.Descriptor instead.
 func (*UserErrorEvent) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{15}
+	return file_codeflux_v1_session_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UserErrorEvent) GetCode() string {
@@ -1454,7 +1667,7 @@ var File_codeflux_v1_session_proto protoreflect.FileDescriptor
 
 const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x19codeflux/v1/session.proto\x12\vcodeflux.v1\x1a\x1acodeflux/v1/identity.proto\"\x8f\v\n" +
+	"\x19codeflux/v1/session.proto\x12\vcodeflux.v1\x1a\x1acodeflux/v1/identity.proto\"\xf0\f\n" +
 	"\fSessionEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12:\n" +
 	"\n" +
@@ -1486,7 +1699,10 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"checkpoint\x18  \x01(\v2\x1c.codeflux.v1.CheckpointEventH\x00R\n" +
 	"checkpoint\x12Q\n" +
 	"\x11recovery_required\x18! \x01(\v2\".codeflux.v1.RecoveryRequiredEventH\x00R\x10recoveryRequired\x123\n" +
-	"\x05error\x18\" \x01(\v2\x1b.codeflux.v1.UserErrorEventH\x00R\x05errorB\t\n" +
+	"\x05error\x18\" \x01(\v2\x1b.codeflux.v1.UserErrorEventH\x00R\x05error\x12H\n" +
+	"\x0ethread_created\x18# \x01(\v2\x1f.codeflux.v1.ThreadCreatedEventH\x00R\rthreadCreated\x12H\n" +
+	"\x0ethread_renamed\x18$ \x01(\v2\x1f.codeflux.v1.ThreadRenamedEventH\x00R\rthreadRenamed\x12K\n" +
+	"\x0fthread_archived\x18% \x01(\v2 .codeflux.v1.ThreadArchivedEventH\x00R\x0ethreadArchivedB\t\n" +
 	"\apayload\"v\n" +
 	"\x11MessageDeltaEvent\x12:\n" +
 	"\n" +
@@ -1496,7 +1712,16 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\tmessageId\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12#\n" +
-	"\rredacted_body\x18\x03 \x01(\tR\fredactedBody\"[\n" +
+	"\rredacted_body\x18\x03 \x01(\tR\fredactedBody\"\x86\x01\n" +
+	"\x12ThreadCreatedEvent\x12>\n" +
+	"\fworkspace_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\vworkspaceId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1a\n" +
+	"\barchived\x18\x03 \x01(\bR\barchived\"Q\n" +
+	"\x12ThreadRenamedEvent\x12%\n" +
+	"\x0eprevious_title\x18\x01 \x01(\tR\rpreviousTitle\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\"1\n" +
+	"\x13ThreadArchivedEvent\x12\x1a\n" +
+	"\barchived\x18\x01 \x01(\bR\barchived\"[\n" +
 	"\tPlanEvent\x12#\n" +
 	"\rplan_revision\x18\x01 \x01(\x04R\fplanRevision\x12)\n" +
 	"\x10redacted_summary\x18\x02 \x01(\tR\x0fredactedSummary\"\x92\x01\n" +
@@ -1564,7 +1789,7 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\x0eUserErrorEvent\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12)\n" +
 	"\x10redacted_message\x18\x02 \x01(\tR\x0fredactedMessage\x12\x1c\n" +
-	"\tretryable\x18\x03 \x01(\bR\tretryable*\xc2\x06\n" +
+	"\tretryable\x18\x03 \x01(\bR\tretryable*\xb8\a\n" +
 	"\x10SessionEventKind\x12\"\n" +
 	"\x1eSESSION_EVENT_KIND_UNSPECIFIED\x10\x00\x12$\n" +
 	" SESSION_EVENT_KIND_MESSAGE_DELTA\x10\x01\x12$\n" +
@@ -1587,7 +1812,10 @@ const file_codeflux_v1_session_proto_rawDesc = "" +
 	"\x1eSESSION_EVENT_KIND_GRAPH_PATCH\x10\x11\x12)\n" +
 	"%SESSION_EVENT_KIND_CHECKPOINT_CREATED\x10\x12\x12(\n" +
 	"$SESSION_EVENT_KIND_RECOVERY_REQUIRED\x10\x13\x12\x1c\n" +
-	"\x18SESSION_EVENT_KIND_ERROR\x10\x14B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
+	"\x18SESSION_EVENT_KIND_ERROR\x10\x14\x12%\n" +
+	"!SESSION_EVENT_KIND_THREAD_CREATED\x10\x15\x12%\n" +
+	"!SESSION_EVENT_KIND_THREAD_RENAMED\x10\x16\x12&\n" +
+	"\"SESSION_EVENT_KIND_THREAD_ARCHIVED\x10\x17B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
 
 var (
 	file_codeflux_v1_session_proto_rawDescOnce sync.Once
@@ -1602,61 +1830,68 @@ func file_codeflux_v1_session_proto_rawDescGZIP() []byte {
 }
 
 var file_codeflux_v1_session_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codeflux_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_codeflux_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_codeflux_v1_session_proto_goTypes = []any{
 	(SessionEventKind)(0),         // 0: codeflux.v1.SessionEventKind
 	(*SessionEvent)(nil),          // 1: codeflux.v1.SessionEvent
 	(*MessageDeltaEvent)(nil),     // 2: codeflux.v1.MessageDeltaEvent
 	(*MessageFinalEvent)(nil),     // 3: codeflux.v1.MessageFinalEvent
-	(*PlanEvent)(nil),             // 4: codeflux.v1.PlanEvent
-	(*ToolEvent)(nil),             // 5: codeflux.v1.ToolEvent
-	(*ApprovalEvent)(nil),         // 6: codeflux.v1.ApprovalEvent
-	(*TaskStateChangedEvent)(nil), // 7: codeflux.v1.TaskStateChangedEvent
-	(*ForecastEvent)(nil),         // 8: codeflux.v1.ForecastEvent
-	(*UsageEvent)(nil),            // 9: codeflux.v1.UsageEvent
-	(*CostEvent)(nil),             // 10: codeflux.v1.CostEvent
-	(*BudgetEvent)(nil),           // 11: codeflux.v1.BudgetEvent
-	(*ValidationEvent)(nil),       // 12: codeflux.v1.ValidationEvent
-	(*GraphEvent)(nil),            // 13: codeflux.v1.GraphEvent
-	(*CheckpointEvent)(nil),       // 14: codeflux.v1.CheckpointEvent
-	(*RecoveryRequiredEvent)(nil), // 15: codeflux.v1.RecoveryRequiredEvent
-	(*UserErrorEvent)(nil),        // 16: codeflux.v1.UserErrorEvent
-	(*StableIdentity)(nil),        // 17: codeflux.v1.StableIdentity
+	(*ThreadCreatedEvent)(nil),    // 4: codeflux.v1.ThreadCreatedEvent
+	(*ThreadRenamedEvent)(nil),    // 5: codeflux.v1.ThreadRenamedEvent
+	(*ThreadArchivedEvent)(nil),   // 6: codeflux.v1.ThreadArchivedEvent
+	(*PlanEvent)(nil),             // 7: codeflux.v1.PlanEvent
+	(*ToolEvent)(nil),             // 8: codeflux.v1.ToolEvent
+	(*ApprovalEvent)(nil),         // 9: codeflux.v1.ApprovalEvent
+	(*TaskStateChangedEvent)(nil), // 10: codeflux.v1.TaskStateChangedEvent
+	(*ForecastEvent)(nil),         // 11: codeflux.v1.ForecastEvent
+	(*UsageEvent)(nil),            // 12: codeflux.v1.UsageEvent
+	(*CostEvent)(nil),             // 13: codeflux.v1.CostEvent
+	(*BudgetEvent)(nil),           // 14: codeflux.v1.BudgetEvent
+	(*ValidationEvent)(nil),       // 15: codeflux.v1.ValidationEvent
+	(*GraphEvent)(nil),            // 16: codeflux.v1.GraphEvent
+	(*CheckpointEvent)(nil),       // 17: codeflux.v1.CheckpointEvent
+	(*RecoveryRequiredEvent)(nil), // 18: codeflux.v1.RecoveryRequiredEvent
+	(*UserErrorEvent)(nil),        // 19: codeflux.v1.UserErrorEvent
+	(*StableIdentity)(nil),        // 20: codeflux.v1.StableIdentity
 }
 var file_codeflux_v1_session_proto_depIdxs = []int32{
-	17, // 0: codeflux.v1.SessionEvent.session_id:type_name -> codeflux.v1.StableIdentity
-	17, // 1: codeflux.v1.SessionEvent.thread_id:type_name -> codeflux.v1.StableIdentity
-	17, // 2: codeflux.v1.SessionEvent.task_id:type_name -> codeflux.v1.StableIdentity
+	20, // 0: codeflux.v1.SessionEvent.session_id:type_name -> codeflux.v1.StableIdentity
+	20, // 1: codeflux.v1.SessionEvent.thread_id:type_name -> codeflux.v1.StableIdentity
+	20, // 2: codeflux.v1.SessionEvent.task_id:type_name -> codeflux.v1.StableIdentity
 	0,  // 3: codeflux.v1.SessionEvent.kind:type_name -> codeflux.v1.SessionEventKind
-	17, // 4: codeflux.v1.SessionEvent.causation_id:type_name -> codeflux.v1.StableIdentity
-	17, // 5: codeflux.v1.SessionEvent.correlation_id:type_name -> codeflux.v1.StableIdentity
+	20, // 4: codeflux.v1.SessionEvent.causation_id:type_name -> codeflux.v1.StableIdentity
+	20, // 5: codeflux.v1.SessionEvent.correlation_id:type_name -> codeflux.v1.StableIdentity
 	2,  // 6: codeflux.v1.SessionEvent.message_delta:type_name -> codeflux.v1.MessageDeltaEvent
 	3,  // 7: codeflux.v1.SessionEvent.message_final:type_name -> codeflux.v1.MessageFinalEvent
-	4,  // 8: codeflux.v1.SessionEvent.plan:type_name -> codeflux.v1.PlanEvent
-	5,  // 9: codeflux.v1.SessionEvent.tool:type_name -> codeflux.v1.ToolEvent
-	6,  // 10: codeflux.v1.SessionEvent.approval:type_name -> codeflux.v1.ApprovalEvent
-	7,  // 11: codeflux.v1.SessionEvent.task_state_changed:type_name -> codeflux.v1.TaskStateChangedEvent
-	8,  // 12: codeflux.v1.SessionEvent.forecast:type_name -> codeflux.v1.ForecastEvent
-	9,  // 13: codeflux.v1.SessionEvent.usage:type_name -> codeflux.v1.UsageEvent
-	10, // 14: codeflux.v1.SessionEvent.cost:type_name -> codeflux.v1.CostEvent
-	11, // 15: codeflux.v1.SessionEvent.budget:type_name -> codeflux.v1.BudgetEvent
-	12, // 16: codeflux.v1.SessionEvent.validation:type_name -> codeflux.v1.ValidationEvent
-	13, // 17: codeflux.v1.SessionEvent.graph:type_name -> codeflux.v1.GraphEvent
-	14, // 18: codeflux.v1.SessionEvent.checkpoint:type_name -> codeflux.v1.CheckpointEvent
-	15, // 19: codeflux.v1.SessionEvent.recovery_required:type_name -> codeflux.v1.RecoveryRequiredEvent
-	16, // 20: codeflux.v1.SessionEvent.error:type_name -> codeflux.v1.UserErrorEvent
-	17, // 21: codeflux.v1.MessageDeltaEvent.message_id:type_name -> codeflux.v1.StableIdentity
-	17, // 22: codeflux.v1.MessageFinalEvent.message_id:type_name -> codeflux.v1.StableIdentity
-	17, // 23: codeflux.v1.ApprovalEvent.approval_id:type_name -> codeflux.v1.StableIdentity
-	17, // 24: codeflux.v1.ValidationEvent.validation_id:type_name -> codeflux.v1.StableIdentity
-	17, // 25: codeflux.v1.GraphEvent.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	17, // 26: codeflux.v1.CheckpointEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	17, // 27: codeflux.v1.RecoveryRequiredEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	7,  // 8: codeflux.v1.SessionEvent.plan:type_name -> codeflux.v1.PlanEvent
+	8,  // 9: codeflux.v1.SessionEvent.tool:type_name -> codeflux.v1.ToolEvent
+	9,  // 10: codeflux.v1.SessionEvent.approval:type_name -> codeflux.v1.ApprovalEvent
+	10, // 11: codeflux.v1.SessionEvent.task_state_changed:type_name -> codeflux.v1.TaskStateChangedEvent
+	11, // 12: codeflux.v1.SessionEvent.forecast:type_name -> codeflux.v1.ForecastEvent
+	12, // 13: codeflux.v1.SessionEvent.usage:type_name -> codeflux.v1.UsageEvent
+	13, // 14: codeflux.v1.SessionEvent.cost:type_name -> codeflux.v1.CostEvent
+	14, // 15: codeflux.v1.SessionEvent.budget:type_name -> codeflux.v1.BudgetEvent
+	15, // 16: codeflux.v1.SessionEvent.validation:type_name -> codeflux.v1.ValidationEvent
+	16, // 17: codeflux.v1.SessionEvent.graph:type_name -> codeflux.v1.GraphEvent
+	17, // 18: codeflux.v1.SessionEvent.checkpoint:type_name -> codeflux.v1.CheckpointEvent
+	18, // 19: codeflux.v1.SessionEvent.recovery_required:type_name -> codeflux.v1.RecoveryRequiredEvent
+	19, // 20: codeflux.v1.SessionEvent.error:type_name -> codeflux.v1.UserErrorEvent
+	4,  // 21: codeflux.v1.SessionEvent.thread_created:type_name -> codeflux.v1.ThreadCreatedEvent
+	5,  // 22: codeflux.v1.SessionEvent.thread_renamed:type_name -> codeflux.v1.ThreadRenamedEvent
+	6,  // 23: codeflux.v1.SessionEvent.thread_archived:type_name -> codeflux.v1.ThreadArchivedEvent
+	20, // 24: codeflux.v1.MessageDeltaEvent.message_id:type_name -> codeflux.v1.StableIdentity
+	20, // 25: codeflux.v1.MessageFinalEvent.message_id:type_name -> codeflux.v1.StableIdentity
+	20, // 26: codeflux.v1.ThreadCreatedEvent.workspace_id:type_name -> codeflux.v1.StableIdentity
+	20, // 27: codeflux.v1.ApprovalEvent.approval_id:type_name -> codeflux.v1.StableIdentity
+	20, // 28: codeflux.v1.ValidationEvent.validation_id:type_name -> codeflux.v1.StableIdentity
+	20, // 29: codeflux.v1.GraphEvent.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	20, // 30: codeflux.v1.CheckpointEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	20, // 31: codeflux.v1.RecoveryRequiredEvent.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_session_proto_init() }
@@ -1681,6 +1916,9 @@ func file_codeflux_v1_session_proto_init() {
 		(*SessionEvent_Checkpoint)(nil),
 		(*SessionEvent_RecoveryRequired)(nil),
 		(*SessionEvent_Error)(nil),
+		(*SessionEvent_ThreadCreated)(nil),
+		(*SessionEvent_ThreadRenamed)(nil),
+		(*SessionEvent_ThreadArchived)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1688,7 +1926,7 @@ func file_codeflux_v1_session_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codeflux_v1_session_proto_rawDesc), len(file_codeflux_v1_session_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

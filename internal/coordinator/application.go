@@ -307,6 +307,18 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	threadApplication, err := NewThreadApplication(repositories, application.secret, application.events)
+	if err != nil {
+		return nil, err
+	}
+	threadService, err := transport.NewThreadService(threadApplication)
+	if err != nil {
+		return nil, err
+	}
+	sessionService, err := transport.NewSessionService(application.events)
+	if err != nil {
+		return nil, err
+	}
 	application.taskServer = grpc.NewServer(
 		grpc.UnaryInterceptor(
 			application.transport.UnaryInterceptor(),
@@ -319,6 +331,8 @@ func StartApplication(
 		application.taskServer,
 		taskService,
 	)
+	codefluxv1.RegisterThreadServiceServer(application.taskServer, threadService)
+	codefluxv1.RegisterSessionServiceServer(application.taskServer, sessionService)
 	application.taskServeDone = make(chan error, 1)
 	go func() {
 		application.taskServeDone <- application.taskServer.Serve(
@@ -446,6 +460,13 @@ func StartApplication(
 				Value: threadID.String(),
 			})
 		}
+		var selectedWorkspaceID *codefluxv1.StableIdentity
+		if !routeAccess.SelectedWorkspaceID.IsZero() {
+			selectedWorkspaceID = &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,
+				Value: routeAccess.SelectedWorkspaceID.String(),
+			}
+		}
 		info := buildinfo.Current()
 		frontend, frontendErr := frontendserver.NewHandler(
 			frontendserver.Options{
@@ -453,10 +474,11 @@ func StartApplication(
 				GRPCServer:      application.taskServer,
 				SessionToken:    application.secret,
 				Bootstrap: frontendserver.Bootstrap{
-					ApplicationVersion: info.Version,
-					APIVersion:         "codeflux.v1",
-					SchemaVersion:      int(info.SchemaVersion),
-					FrontendVersion:    info.FrontendVersion,
+					ApplicationVersion:  info.Version,
+					APIVersion:          "codeflux.v1",
+					SchemaVersion:       int(info.SchemaVersion),
+					FrontendVersion:     info.FrontendVersion,
+					SelectedWorkspaceID: selectedWorkspaceID,
 					RouteAccess: frontendserver.RouteAccess{
 						FirstRunComplete:       routeAccess.FirstRunComplete,
 						AccessibleRepositories: accessibleRepositories,

@@ -7,11 +7,14 @@ import (
 	"strings"
 	"time"
 
+	frontendcomposer "codeflux.dev/codeflux/web/frontend/composer"
 	"codeflux.dev/codeflux/web/frontend/design"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/state"
+	"codeflux.dev/codeflux/web/frontend/timelinecard"
+	"codeflux.dev/codeflux/web/frontend/timelineview"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
@@ -20,12 +23,17 @@ import (
 
 type RootProps struct {
 	Snapshot         state.Snapshot
+	Composer         frontendcomposer.Props
+	Timeline         TimelineControlProps
+	ThreadRail       ui.Node
 	Route            routes.Route
 	Tokens           design.Tokens
 	Translator       frontendi18n.Translator
 	Probe            RenderProbe
 	OnLayoutChange   func(state.LayoutPreferences)
 	OnGraphSelect    func(string)
+	OnThreadNavigate func(routes.Route)
+	OnNavigatePath   func(string)
 	OnThemeChange    func()
 	OnRetry          func()
 	OnPauseRequested func()
@@ -67,8 +75,11 @@ func AppRoot(props RootProps) ui.Node {
 			UI:    state.NewUIStore(props.Snapshot.Layout, nil),
 			Child: ui.CreateElement(AppShell, AppShellProps{
 				Snapshot: props.Snapshot, Route: props.Route, Tokens: props.Tokens,
+				Composer: props.Composer, Timeline: props.Timeline, ThreadRail: props.ThreadRail,
 				Translator: props.Translator, Probe: props.Probe,
 				OnLayoutChange: props.OnLayoutChange, OnGraphSelect: props.OnGraphSelect,
+				OnThreadNavigate: props.OnThreadNavigate,
+				OnNavigatePath:   props.OnNavigatePath,
 				OnThemeChange:    props.OnThemeChange,
 				OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 			}),
@@ -82,12 +93,17 @@ func AppRoot(props RootProps) ui.Node {
 
 type AppShellProps struct {
 	Snapshot         state.Snapshot
+	Composer         frontendcomposer.Props
+	Timeline         TimelineControlProps
+	ThreadRail       ui.Node
 	Route            routes.Route
 	Tokens           design.Tokens
 	Translator       frontendi18n.Translator
 	Probe            RenderProbe
 	OnLayoutChange   func(state.LayoutPreferences)
 	OnGraphSelect    func(string)
+	OnThreadNavigate func(routes.Route)
+	OnNavigatePath   func(string)
 	OnThemeChange    func()
 	OnPauseRequested func()
 	OnStopRequested  func()
@@ -103,15 +119,30 @@ func AppShell(props AppShellProps) ui.Node {
 	}
 	focusGraph := func() { focusManager.FocusByID("graph-region") }
 	layout := props.Snapshot.Layout.Normalize()
+	compactRailOpen := ui.UseState(false)
+	compactViewport := layout.Viewport == state.ViewportNarrow || layout.Viewport == state.ViewportMinimum
+	railOpen := !layout.RailCollapsed
+	if compactViewport {
+		railOpen = compactRailOpen.Get()
+	}
 	emitShellLayout := func(next state.LayoutPreferences) {
 		emitLayout(props.OnLayoutChange, next)
 	}
 	toggleRail := func() {
+		if compactViewport {
+			compactRailOpen.Set(!compactRailOpen.Get())
+			return
+		}
 		next := layout
 		next.RailCollapsed = !next.RailCollapsed
 		emitShellLayout(next)
 	}
 	collapseRail := func() {
+		if compactViewport {
+			compactRailOpen.Set(false)
+			focusManager.FocusByID("thread-rail-toggle")
+			return
+		}
 		next := layout
 		next.RailCollapsed = true
 		emitShellLayout(next)
@@ -124,9 +155,22 @@ func AppShell(props AppShellProps) ui.Node {
 			emitShellLayout(next)
 		}
 	}
+	inspectorCollapsed := ui.UseState(false)
+	toggleInspector := func() { inspectorCollapsed.Set(!inspectorCollapsed.Get()) }
+	collapseInspector := func() {
+		inspectorCollapsed.Set(true)
+		focusManager.FocusByID("assurance-rail-toggle")
+	}
 	helpOpen := ui.UseState(false)
 	openShortcutHelp := func() { helpOpen.Set(true) }
 	closeShortcutHelp := func() { helpOpen.Set(false) }
+	searchOpen := ui.UseState(false)
+	searchQuery := ui.UseState("")
+	openSearch := func() { searchOpen.Set(true) }
+	closeSearch := func() {
+		searchOpen.Set(false)
+		searchQuery.Set("")
+	}
 	pauseEnabled := props.Snapshot.TopBar.CanPause && props.OnPauseRequested != nil
 	stopEnabled := props.Snapshot.TopBar.CanStop && props.OnStopRequested != nil
 	announcerPolicy := ui.UseState(state.AnnouncerState{MinimumInterval: 5 * time.Second})
@@ -184,18 +228,32 @@ func AppShell(props AppShellProps) ui.Node {
 					Revision: props.Snapshot.TopBarRevision(), Mode: primitiveMode(props.Tokens),
 					Viewport: props.Snapshot.Layout.Viewport,
 					Probe:    props.Probe, OnThemeChange: props.OnThemeChange,
-					OnShortcutHelp:   openShortcutHelp,
-					OnRailToggle:     toggleRail,
-					OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+					OnShortcutHelp:      openShortcutHelp,
+					SearchOpen:          searchOpen.Get(),
+					SearchQuery:         searchQuery.Get(),
+					RailOpen:            railOpen,
+					OnSearchOpen:        openSearch,
+					OnSearchDismiss:     closeSearch,
+					OnSearchQueryChange: searchQuery.Set,
+					OnRailToggle:        toggleRail,
+					OnInspectorToggle:   toggleInspector,
+					OnNavigatePath:      props.OnNavigatePath,
+					OnPauseRequested:    props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 				}),
-				html.Div(html.Props{Class: applicationFrameClass(props.Snapshot.Layout, props.Tokens)},
+				html.Div(html.Props{Class: applicationFrameClass(
+					props.Snapshot.Layout, props.Tokens, inspectorCollapsed.Get(),
+				)},
 					ui.CreateElement(ProductSidebar, ProductSidebarProps{
-						Snapshot:   props.Snapshot,
-						Route:      props.Route,
-						Mode:       primitiveMode(props.Tokens),
-						OnCollapse: collapseRail,
-						OnNarrower: resizeRail(-32),
-						OnWider:    resizeRail(32),
+						Snapshot:         props.Snapshot,
+						Route:            props.Route,
+						Mode:             primitiveMode(props.Tokens),
+						ThreadRail:       props.ThreadRail,
+						CompactOpen:      compactRailOpen.Get(),
+						OnThreadNavigate: props.OnThreadNavigate,
+						OnNavigatePath:   props.OnNavigatePath,
+						OnCollapse:       collapseRail,
+						OnNarrower:       resizeRail(-32),
+						OnWider:          resizeRail(32),
 					}),
 					html.Div(html.Props{
 						DataAttr: html.DataAttribute{Name: "component", Value: "route-frame"},
@@ -203,18 +261,23 @@ func AppShell(props AppShellProps) ui.Node {
 					},
 						ui.CreateElement(AppRouter, RouteShellProps{
 							Snapshot:         props.Snapshot,
+							Composer:         props.Composer,
+							Timeline:         props.Timeline,
 							Route:            props.Route,
 							Tokens:           props.Tokens,
 							Probe:            props.Probe,
 							OnLayoutChange:   props.OnLayoutChange,
 							OnGraphSelect:    props.OnGraphSelect,
+							OnNavigatePath:   props.OnNavigatePath,
 							OnPauseRequested: props.OnPauseRequested,
 							OnStopRequested:  props.OnStopRequested,
 						}),
 					),
 					ui.CreateElement(AssuranceRail, AssuranceRailProps{
-						Snapshot: props.Snapshot,
-						Mode:     primitiveMode(props.Tokens),
+						Snapshot:   props.Snapshot,
+						Mode:       primitiveMode(props.Tokens),
+						Collapsed:  inspectorCollapsed.Get(),
+						OnCollapse: collapseInspector,
 					}),
 				),
 			}}),
@@ -279,19 +342,27 @@ func shellClass(tokens design.Tokens) string {
 }
 
 type ApplicationBarProps struct {
-	Session          state.SessionView
-	Workspace        state.WorkspaceView
-	View             state.TopBarView
-	CostLabel        string
-	Revision         uint64
-	Mode             primitives.Mode
-	Viewport         state.ViewportClass
-	Probe            RenderProbe
-	OnThemeChange    func()
-	OnShortcutHelp   func()
-	OnRailToggle     func()
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Session             state.SessionView
+	Workspace           state.WorkspaceView
+	View                state.TopBarView
+	CostLabel           string
+	Revision            uint64
+	Mode                primitives.Mode
+	Viewport            state.ViewportClass
+	Probe               RenderProbe
+	OnThemeChange       func()
+	OnShortcutHelp      func()
+	SearchOpen          bool
+	SearchQuery         string
+	RailOpen            bool
+	OnSearchOpen        func()
+	OnSearchDismiss     func()
+	OnSearchQueryChange func(string)
+	OnRailToggle        func()
+	OnInspectorToggle   func()
+	OnNavigatePath      func(string)
+	OnPauseRequested    func()
+	OnStopRequested     func()
 }
 
 var _ = legacyApplicationBar
@@ -455,11 +526,14 @@ func field(name, value string, tokens design.Tokens) ui.Node {
 
 type RouteShellProps struct {
 	Snapshot         state.Snapshot
+	Composer         frontendcomposer.Props
+	Timeline         TimelineControlProps
 	Route            routes.Route
 	Tokens           design.Tokens
 	Probe            RenderProbe
 	OnLayoutChange   func(state.LayoutPreferences)
 	OnGraphSelect    func(string)
+	OnNavigatePath   func(string)
 	OnPauseRequested func()
 	OnStopRequested  func()
 }
@@ -474,8 +548,21 @@ func RouteShell(props RouteShellProps) ui.Node {
 	case routes.ThreadWorkspace:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
+			Composer:         props.Composer,
+			Timeline:         props.Timeline,
 			OnLayoutChange:   props.OnLayoutChange,
 			OnGraphSelect:    props.OnGraphSelect,
+			OnNavigatePath:   props.OnNavigatePath,
+			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+		})
+	case routes.Graphs:
+		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
+			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
+			Composer:         props.Composer,
+			Timeline:         props.Timeline,
+			OnLayoutChange:   props.OnLayoutChange,
+			OnGraphSelect:    props.OnGraphSelect,
+			OnNavigatePath:   props.OnNavigatePath,
 			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 		})
 	case routes.Memory:
@@ -491,8 +578,9 @@ func RouteShell(props RouteShellProps) ui.Node {
 			Title: "Diagnostics", State: props.Snapshot.Diagnostics.State, Mode: mode,
 		})
 	case routes.FirstRun:
-		return ui.CreateElement(FirstRunShell, SimpleRouteProps{
+		return ui.CreateElement(FirstRunInteractiveShell, FirstRunProps{
 			Title: "Welcome to CodeFlux", State: props.Snapshot.FirstRun.State, Mode: mode,
+			OnNavigatePath: props.OnNavigatePath,
 		})
 	default:
 		return ui.CreateElement(TopLevelState, TopLevelStateProps{
@@ -503,10 +591,13 @@ func RouteShell(props RouteShellProps) ui.Node {
 
 type TaskWorkspaceProps struct {
 	Snapshot         state.Snapshot
+	Composer         frontendcomposer.Props
+	Timeline         TimelineControlProps
 	Tokens           design.Tokens
 	Probe            RenderProbe
 	OnLayoutChange   func(state.LayoutPreferences)
 	OnGraphSelect    func(string)
+	OnNavigatePath   func(string)
 	OnPauseRequested func()
 	OnStopRequested  func()
 }
@@ -514,6 +605,8 @@ type TaskWorkspaceProps struct {
 func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 	layout := props.Snapshot.Layout.Normalize()
 	mode := primitiveMode(props.Tokens)
+	taskActionsOpen := ui.UseState(false)
+	composerProps := composerPropsForConnection(props.Composer, props.Snapshot.Session.Connection)
 	rail := ui.CreateElement(ThreadRail, ThreadRailProps{
 		State: props.Snapshot.ThreadsState, Threads: props.Snapshot.Threads(),
 		SelectedID: props.Snapshot.SelectedThreadID, Revision: props.Snapshot.ThreadRevision(),
@@ -537,12 +630,13 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 		ui.CreateElement(ConversationPane, ConversationPaneProps{
 			State: props.Snapshot.ConversationState, Messages: props.Snapshot.Messages(),
 			Revision: props.Snapshot.ConversationRevision(), Mode: mode, Probe: props.Probe,
+			Composer: composerProps, Timeline: props.Timeline, OnGraphSelect: props.OnGraphSelect,
 		}),
 	)
 	graph := ui.CreateElement(GraphPane, GraphPaneProps{
 		State: props.Snapshot.GraphState, Nodes: props.Snapshot.GraphNodes(),
 		SelectedID: props.Snapshot.SelectedGraphID, Revision: props.Snapshot.GraphRevision(),
-		Collapsed: layout.GraphCollapsed, Mode: mode, Probe: props.Probe,
+		Collapsed: layout.GraphCollapsed, Viewport: layout.Viewport, Mode: mode, Probe: props.Probe,
 		OnSelect: props.OnGraphSelect,
 	})
 	split := primitives.ResizableSplit(primitives.ResizableSplitProps{
@@ -587,15 +681,48 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 			css.W(css.Full), css.H(css.Full), css.MaxWidth(css.Full), css.MinWidth(css.Zero),
 			css.MinHeight(css.Zero),
 			css.Overflow.Hidden,
-			css.Padding(css.Px(props.Tokens.Spacing.SM)),
+			css.PaddingY(css.Px(props.Tokens.Spacing.SM)),
+			css.PaddingX(css.Px(props.Tokens.Spacing.MD)),
+			css.Bg(css.Hex(string(props.Tokens.Colors.Canvas))),
 		).String(),
 	},
 		ui.CreateElement(TaskWorkspaceHeader, TaskWorkspaceHeaderProps{
 			Snapshot: props.Snapshot, Mode: mode,
+			TaskActionsOpen: taskActionsOpen.Get(),
+			OnTaskActionsOpen: func() {
+				taskActionsOpen.Set(true)
+			},
+			OnTaskActionsDismiss: func() {
+				taskActionsOpen.Set(false)
+			},
+			OnNavigatePath:   props.OnNavigatePath,
 			OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			OnReviewRequested: props.Timeline.OnOpenReview,
 		}),
 		workspace,
 	)
+}
+
+func composerPropsForConnection(
+	composerProps frontendcomposer.Props,
+	connection state.ConnectionState,
+) frontendcomposer.Props {
+	if connection == state.ConnectionLive {
+		return composerProps
+	}
+	composerProps.MutationDisabled = true
+	if composerProps.MutationDisabledReason == "" {
+		if connection == state.ConnectionOffline {
+			composerProps.MutationDisabledReason = "Local Offline: reconnect to send this draft"
+		} else {
+			composerProps.MutationDisabledReason = "Live session connection is unavailable"
+		}
+	}
+	// Keep OnTextChange intact: drafts remain browser-local and editable while
+	// durable mutation callbacks are severed at the shell boundary.
+	composerProps.OnSubmitRequested = nil
+	composerProps.OnRetryRequested = nil
+	return composerProps
 }
 
 func responsiveWorkspace(
@@ -697,10 +824,15 @@ func workspaceGridClass(_ state.LayoutPreferences) string {
 }
 
 type TaskWorkspaceHeaderProps struct {
-	Snapshot         state.Snapshot
-	Mode             primitives.Mode
-	OnPauseRequested func()
-	OnStopRequested  func()
+	Snapshot             state.Snapshot
+	Mode                 primitives.Mode
+	TaskActionsOpen      bool
+	OnTaskActionsOpen    func()
+	OnTaskActionsDismiss func()
+	OnNavigatePath       func(string)
+	OnPauseRequested     func()
+	OnStopRequested      func()
+	OnReviewRequested    func()
 }
 
 var _ = legacyTaskWorkspaceHeader
@@ -778,6 +910,7 @@ type ThreadRailProps struct {
 	Probe      RenderProbe
 	OnCollapse func()
 	OnRestore  func()
+	OnSelect   func(string)
 }
 
 func ThreadRail(props ThreadRailProps) ui.Node {
@@ -804,16 +937,23 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 			if thread.ID == props.SelectedID {
 				aria["current"] = "page"
 			}
+			threadID := thread.ID
+			buttonProps := html.PropsOf(html.OnClick(func() {
+				if props.OnSelect != nil {
+					props.OnSelect(threadID)
+				}
+			}))
+			buttonProps.Type = "button"
+			buttonProps.Aria = aria
+			buttonProps.Disabled = props.OnSelect == nil
+			buttonProps.Class = threadLinkClass(tokens)
+			buttonProps.Text = thread.Title
 			items = append(items, html.Li(html.Props{
 				Data: map[string]string{"thread-id": thread.ID, "status": thread.Status},
 				Class: css.New(
 					css.MarginY(css.Px(tokens.Spacing.XS)),
 				).String(),
-			}, html.A(html.Props{
-				Href: "#", Aria: aria,
-				Class: threadLinkClass(tokens),
-				Text:  thread.Title,
-			})))
+			}, html.Button(buttonProps)))
 		}
 		content = html.Ul(html.Props{
 			Class: css.New(
@@ -880,48 +1020,71 @@ func threadLinkClass(tokens design.Tokens) string {
 }
 
 type ConversationPaneProps struct {
-	State    state.DataState
-	Messages []state.MessageView
-	Revision uint64
-	Mode     primitives.Mode
-	Probe    RenderProbe
+	State         state.DataState
+	Messages      []state.MessageView
+	Revision      uint64
+	Mode          primitives.Mode
+	Probe         RenderProbe
+	Composer      frontendcomposer.Props
+	Timeline      TimelineControlProps
+	OnGraphSelect func(string)
 }
 
 func ConversationPane(props ConversationPaneProps) ui.Node {
 	recordRender(props.Probe, "conversation-pane", props.Revision)
 	tokens := props.Mode.Tokens()
+	timelineProps := props.Timeline
+	timelineProps.Mode = props.Mode
 	content := asyncStateContent(props.State, "messages", len(props.Messages), props.Mode)
 	if props.State == state.DataReady || props.State == state.DataPartialStale {
-		items := make([]ui.Node, 0, len(props.Messages))
-		for _, message := range props.Messages {
-			items = append(items, html.Article(html.Props{
-				Data: map[string]string{
-					"message-id": message.ID, "role": message.Role,
-					"pending": strconv.FormatBool(message.Pending),
-				},
-				Class: messageCardClass(message.Role, tokens),
-			},
-				html.H2(html.Props{
-					Class: css.New(
-						css.Margin(css.Zero),
-						css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-						css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
-						css.TextColor(css.Hex(string(tokens.Colors.Accent))),
-						css.TextTransform.Uppercase,
-						css.Tracking(css.Ems(0.08)),
-					).String(),
-					Text: humanize(message.Role),
-				}),
-				html.P(html.Props{
-					Class: css.New(
-						css.MarginY(css.Px(tokens.Spacing.SM)),
-						css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-					).String(),
-					Text: message.Body,
-				}),
-			))
+		cards := []timelinecard.Card(nil)
+		if !props.Timeline.Authoritative {
+			cards = timelineCardsForMessages(props.Messages)
 		}
-		content = html.Div(html.Props{}, items...)
+		cards = append(cards, props.Timeline.Cards...)
+		actions := props.Timeline.Actions
+		if actions.OnCopy == nil {
+			actions.OnCopy = copyTimelineText
+		}
+		if actions.OnSelectNode == nil {
+			actions.OnSelectNode = props.OnGraphSelect
+		}
+		items := make([]ui.Node, 0, len(cards))
+		for _, card := range cards {
+			items = append(items, ui.CreateElement(timelineview.Renderer, timelineview.Props{
+				Card: card, Mode: props.Mode, Actions: actions,
+			}))
+		}
+		timelineChildren := make([]ui.Node, 0, 2)
+		if !props.Timeline.HasOlder {
+			timelineChildren = append(timelineChildren, html.Div(html.Props{
+				Role: "status", Aria: map[string]string{"live": "off"},
+				Data: map[string]string{"component": "beginning-of-thread"},
+				Class: css.New(
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				).String(),
+				Text: "Beginning of thread",
+			}))
+		}
+		timelineChildren = append(timelineChildren, html.Div(html.Props{
+			Data:  map[string]string{"component": "timeline-card-stack", "gap": "8px"},
+			Class: timelineCardStackClass(tokens),
+		}, items...))
+		content = html.Div(html.Props{
+			Data: map[string]string{
+				"component":       "conversation-timeline",
+				"durable-order":   "sequence",
+				"auto-follow":     "near-bottom-only",
+				"routine-live":    "polite",
+				"assertive-toast": "false",
+			},
+			Class: css.New(
+				u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)),
+				css.PaddingY(css.Px(tokens.Spacing.LG)),
+				css.PaddingX(css.Px(tokens.Spacing.XS)),
+			).String(),
+		}, timelineChildren...)
 	}
 	return html.Section(html.Props{
 		Aria: map[string]string{"label": "Conversation"},
@@ -934,21 +1097,22 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 		html.Div(html.Props{
 			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
 		},
-			html.Div(html.Props{},
-				html.P(html.Props{
+			html.Div(html.Props{
+				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
+			},
+				html.Span(html.Props{
+					Aria: map[string]string{"hidden": "true"},
 					Class: css.New(
-						css.Margin(css.Zero),
-						css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+						css.TextColor(css.Hex(string(tokens.Colors.Success))),
 						css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-						css.TextTransform.Uppercase,
-						css.Tracking(css.Ems(0.08)),
 					).String(),
-					Text: "Live session",
+					Text: "●",
 				}),
 				html.H2(html.Props{
 					Class: css.New(
 						css.Margin(css.Zero),
-						css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
+						css.FontWeight.Semibold,
 					).String(),
 					Text: "Conversation",
 				}),
@@ -964,58 +1128,43 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 		html.Div(html.Props{
 			Class: css.New(
 				css.FlexGrow(css.Num(1)), css.MinHeight(css.Zero), css.OverflowY.Auto,
-			).String(),
-		}, content),
-		html.Div(html.Props{
-			Role: "group",
-			Aria: map[string]string{"label": "Message composer"},
-			Data: map[string]string{"focus-region": "composer", "focus-order": "3"},
-			Class: css.New(
-				u.Flex, u.ItemsEnd,
-				css.Gap(css.Px(tokens.Spacing.SM)),
-				css.PaddingY(css.Px(tokens.Spacing.MD)),
-				css.BorderTop(
-					css.Px(tokens.Geometry.BorderWidth),
-					css.Hex(string(tokens.Colors.BorderSubtle)),
-				),
+				css.PaddingX(css.Px(tokens.Spacing.XS)),
 			).String(),
 		},
-			html.Div(html.Props{
-				Class: css.New(css.FlexGrow(css.Num(1)), css.MinWidth(css.Zero)).String(),
-			}, primitives.TextField(primitives.TextFieldProps{
-				ID:          "thread-composer",
-				Label:       "Message",
-				Placeholder: "Describe the next change or ask a question",
-				Mode:        props.Mode,
-			})),
-			primitives.Button(primitives.ButtonProps{
-				Label: "Send", AccessibleLabel: "Send message",
-				Primary: true, Mode: props.Mode,
-			}),
+			ui.CreateElement(TimelineControls, timelineProps),
+			content,
 		),
+		html.Div(html.Props{
+			Data: map[string]string{"focus-region": "composer", "focus-order": "3"},
+			Class: css.New(
+				css.Padding(css.Px(tokens.Spacing.SM)),
+				css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+				css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
+				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+				css.Shadow(css.ShadowOf(
+					css.Zero, css.Px(14), css.Px(34), css.Px(-22), css.RGBA(0, 0, 0, 0.68),
+				)),
+			).String(),
+		}, ui.CreateElement(frontendcomposer.Composer, composerPropsForConversation(props))),
 	)
 }
 
-func messageCardClass(role string, tokens design.Tokens) string {
-	tone := tokens.Colors.BorderStrong
-	switch strings.ToLower(strings.TrimSpace(role)) {
-	case "requirement", "execution":
-		tone = tokens.Colors.Active
-	case "forecast", "validation":
-		tone = tokens.Colors.Success
-	case "plan":
-		tone = tokens.Colors.Plan
-	case "evidence":
-		tone = tokens.Colors.Evidence
-	}
+func timelineCardStackClass(tokens design.Tokens) string {
 	return css.New(
-		css.MarginY(css.Px(tokens.Spacing.SM)),
-		css.Padding(css.Px(tokens.Spacing.MD)),
-		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
-		css.BorderLeft(css.Px(3), css.Hex(string(tone))),
+		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)), css.MinWidth(css.Zero),
 	).String()
+}
+
+func composerPropsForConversation(props ConversationPaneProps) frontendcomposer.Props {
+	composerProps := props.Composer
+	composerProps.Mode = props.Mode
+	if props.State != state.DataReady && props.State != state.DataReadyEmpty {
+		composerProps.MutationDisabled = true
+		if composerProps.MutationDisabledReason == "" {
+			composerProps.MutationDisabledReason = "Conversation state is not current"
+		}
+	}
+	return composerProps
 }
 
 type GraphPaneProps struct {
@@ -1024,6 +1173,7 @@ type GraphPaneProps struct {
 	SelectedID string
 	Revision   uint64
 	Collapsed  bool
+	Viewport   state.ViewportClass
 	Mode       primitives.Mode
 	Probe      RenderProbe
 	OnSelect   func(string)
@@ -1118,10 +1268,10 @@ func panelClass(mode primitives.Mode) string {
 		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-		css.Padding(css.Px(tokens.Rhythm.PanelInset)),
-		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+		css.Padding(css.Px(tokens.Spacing.MD)),
+		css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
 		css.Shadow(css.ShadowOf(
-			css.Zero, css.Px(1), css.Px(3), css.Zero, css.RGBA(0, 0, 0, 0.12),
+			css.Zero, css.Px(14), css.Px(40), css.Px(-30), css.RGBA(0, 0, 0, 0.62),
 		)),
 		css.H(css.Full),
 		css.MinWidth(css.Zero), css.MaxWidth(css.Full), css.Overflow.Hidden,
@@ -1281,18 +1431,131 @@ func DiagnosticsShell(props SimpleRouteProps) ui.Node {
 }
 
 func FirstRunShell(props SimpleRouteProps) ui.Node {
-	return routeMain("first-run-shell", props.Title, props.Mode,
-		routeRegion(props.Mode, "local-promise", "Local-first promise",
-			routeStateContent(props, "local-first setup", html.P(html.Props{Text: "Your coordinator and durable state stay local."}))),
-		routeRegion(props.Mode, "provider", "Provider",
-			routeStateContent(props, "provider setup", html.P(html.Props{Text: "Connect an authorized model provider."}))),
-		routeRegion(props.Mode, "repository", "Repository",
-			routeStateContent(props, "repository setup", html.P(html.Props{Text: "Choose an authorized repository."}))),
-		routeRegion(props.Mode, "worktree-permissions", "Worktree and permissions",
-			routeStateContent(props, "worktree permissions", html.P(html.Props{Text: "Review file and command boundaries."}))),
-		routeRegion(props.Mode, "first-thread", "First Thread",
-			routeStateContent(props, "first Thread setup", html.P(html.Props{Text: "Create the first Thread after setup is complete."}))),
+	return firstRunLayout(FirstRunProps{
+		Title: props.Title, State: props.State, Mode: props.Mode,
+	})
+}
+
+type FirstRunProps struct {
+	Title          string
+	State          state.DataState
+	Mode           primitives.Mode
+	OnNavigatePath func(string)
+}
+
+func FirstRunInteractiveShell(props FirstRunProps) ui.Node {
+	return firstRunLayout(props)
+}
+
+func firstRunLayout(props FirstRunProps) ui.Node {
+	stateProps := SimpleRouteProps{Title: props.Title, State: props.State, Mode: props.Mode}
+	content := routeMain("first-run-shell", props.Title, props.Mode,
+		routeRegion(props.Mode, "local-promise", "01  /  Local boundary",
+			routeStateContent(stateProps, "local-first setup",
+				firstRunStep(props, "⌂", "Ready",
+					"Your coordinator, durable state, and task evidence stay on this machine.", "", ""),
+			)),
+		routeRegion(props.Mode, "provider", "02  /  Model provider",
+			routeStateContent(stateProps, "provider setup",
+				firstRunStep(props, "◈", "Needs connection",
+					"Authorize the model provider used for planning and execution.", "Review providers", "/settings?section=providers"),
+			)),
+		routeRegion(props.Mode, "repository", "03  /  Repository",
+			routeStateContent(stateProps, "repository setup",
+				firstRunStep(props, "▤", "Choose a scope",
+					"Select the repository CodeFlux may inspect and change.", "Choose repository", "/?setup=repository"),
+			)),
+		routeRegion(props.Mode, "worktree-permissions", "04  /  Boundaries",
+			routeStateContent(stateProps, "worktree permissions",
+				firstRunStep(props, "⬡", "Review required",
+					"Confirm file, command, network, and worktree authority.", "Review permissions", "/settings?section=policy"),
+			)),
+		routeRegion(props.Mode, "first-thread", "05  /  First thread",
+			routeStateContent(stateProps, "first Thread setup",
+				firstRunStep(props, "⌁", "Ready after setup",
+					"Start with a concrete outcome. CodeFlux will plan, execute, and preserve evidence.", "Open tasks", "/tasks"),
+			)),
 	)
+	// The application frame deliberately clips route content so task routes can
+	// own their pane scrolling. Static first-run content instead needs one
+	// explicit route-level scroll owner; without it, the cards extend beneath
+	// that clipped frame and pointer/touch users cannot reach the final steps.
+	scrollOwnerProps := html.PropsOf(html.OnWheel(handleFirstRunWheel))
+	scrollOwnerProps.Data = map[string]string{
+		"component":    "first-run-scroll-owner",
+		"scroll-owner": "route",
+	}
+	scrollOwnerProps.Class = css.New(
+		css.W(css.Full), css.H(css.Full),
+		css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+		css.OverflowX.Hidden, css.OverflowY.Auto,
+		css.OverscrollBehaviorY.Contain,
+	).String()
+	return html.Div(scrollOwnerProps,
+		content,
+	)
+}
+
+func firstRunStep(
+	props FirstRunProps,
+	glyph, status, body, actionLabel, path string,
+) ui.Node {
+	tokens := props.Mode.Tokens()
+	children := []ui.Node{
+		html.Div(html.Props{
+			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String(),
+		},
+			html.Span(html.Props{
+				Aria: map[string]string{"hidden": "true"},
+				Class: css.New(
+					u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
+					css.W(css.Px(44)), css.H(css.Px(44)),
+					css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+					css.Bg(css.Hex(string(tokens.Colors.Selection))),
+					css.TextColor(css.Hex(string(tokens.Colors.Accent))),
+					css.FontSize(css.Px(20)), css.FontWeight.Bold,
+				).String(),
+				Text: glyph,
+			}),
+			html.Span(html.Props{
+				Class: css.New(
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.FontWeight.Semibold,
+				).String(),
+				Text: status,
+			}),
+		),
+		html.P(html.Props{
+			Class: css.New(
+				css.Margin(css.Zero),
+				css.MaxWidth(css.Px(420)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+				css.FontSize(css.Px(tokens.Typography.Body.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
+			).String(),
+			Text: body,
+		}),
+	}
+	if actionLabel != "" {
+		target := path
+		children = append(children, primitives.Button(primitives.ButtonProps{
+			Label: actionLabel, Primary: target == "/tasks",
+			Mode: props.Mode, Disabled: props.OnNavigatePath == nil,
+			OnClick: func() {
+				if props.OnNavigatePath != nil {
+					props.OnNavigatePath(target)
+				}
+			},
+		}))
+	}
+	return html.Div(html.Props{
+		Class: css.New(
+			u.Flex, u.FlexCol, u.JustifyBetween,
+			css.Gap(css.Px(tokens.Spacing.LG)),
+			css.FlexGrow(css.Num(1)),
+		).String(),
+	}, children...)
 }
 
 func routeMain(component, title string, mode primitives.Mode, regions ...ui.Node) ui.Node {
@@ -1340,9 +1603,11 @@ func routeMain(component, title string, mode primitives.Mode, regions ...ui.Node
 			html.H1(html.Props{
 				Class: css.New(
 					css.MarginY(css.Px(tokens.Spacing.SM)),
-					css.FontSize(css.Px(tokens.Typography.WorkspaceTitle.Size)),
-					css.LineHeightLen(css.Px(tokens.Typography.WorkspaceTitle.LineHeight)),
+					css.FontSize(css.Px(38)),
+					css.LineHeightLen(css.Px(46)),
 					css.FontWeight.Semibold,
+					css.Font(css.FontStack(tokens.Fonts.Display)),
+					css.Tracking(css.Ems(-0.025)),
 				).String(),
 				Text: title,
 			}),
@@ -1367,15 +1632,15 @@ func routeRegion(mode primitives.Mode, name, title string, children ...ui.Node) 
 			u.Flex, u.FlexCol,
 			css.Gap(css.Px(tokens.Spacing.SM)),
 			css.Padding(css.Px(tokens.Spacing.XL)),
-			css.MinHeight(css.Px(176)),
-			css.Rounded(css.Px(tokens.Geometry.PanelRadius)), css.MinWidth(css.Zero),
-			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+			css.MinHeight(css.Px(210)),
+			css.Rounded(css.Px(tokens.Geometry.DialogRadius)), css.MinWidth(css.Zero),
+			css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
 			css.Border(
 				css.Px(tokens.Geometry.BorderWidth),
 				css.Hex(string(tokens.Colors.BorderSubtle)),
 			),
 			css.Shadow(css.ShadowOf(
-				css.Zero, css.Px(1), css.Px(4), css.Zero, css.RGBA(0, 0, 0, 0.12),
+				css.Zero, css.Px(16), css.Px(40), css.Px(-32), css.RGBA(0, 0, 0, 0.58),
 			)),
 		).String(),
 	}, append([]ui.Node{html.H2(html.Props{

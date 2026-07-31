@@ -21,6 +21,15 @@ const KindMessageDelta Kind = "message-delta"
 //codeflux:event session.message.final
 const KindMessageFinal Kind = "message-final"
 
+//codeflux:event session.thread.created
+const KindThreadCreated Kind = "thread-created"
+
+//codeflux:event session.thread.renamed
+const KindThreadRenamed Kind = "thread-renamed"
+
+//codeflux:event session.thread.archived
+const KindThreadArchived Kind = "thread-archived"
+
 //codeflux:event session.plan.created
 const KindPlanCreated Kind = "plan-created"
 
@@ -116,6 +125,9 @@ type NewSessionEvent struct {
 type Payload struct {
 	MessageDelta     *MessageDelta     `json:"message_delta,omitempty"`
 	MessageFinal     *MessageFinal     `json:"message_final,omitempty"`
+	ThreadCreated    *ThreadCreated    `json:"thread_created,omitempty"`
+	ThreadRenamed    *ThreadRenamed    `json:"thread_renamed,omitempty"`
+	ThreadArchived   *ThreadArchived   `json:"thread_archived,omitempty"`
 	Plan             *Plan             `json:"plan,omitempty"`
 	Tool             *Tool             `json:"tool,omitempty"`
 	Approval         *Approval         `json:"approval,omitempty"`
@@ -140,6 +152,23 @@ type MessageFinal struct {
 	MessageID    domain.MessageID `json:"message_id"`
 	Role         string           `json:"role"`
 	RedactedBody string           `json:"redacted_body"`
+}
+
+// ThreadCreated is the durable initial thread projection. WorkspaceID is
+// optional only for migrated legacy threads that predate workspace authority.
+type ThreadCreated struct {
+	WorkspaceID *domain.WorkspaceID `json:"workspace_id,omitempty"`
+	Title       string              `json:"title"`
+	Archived    bool                `json:"archived"`
+}
+
+type ThreadRenamed struct {
+	PreviousTitle string `json:"previous_title"`
+	Title         string `json:"title"`
+}
+
+type ThreadArchived struct {
+	Archived bool `json:"archived"`
 }
 
 type Plan struct {
@@ -355,7 +384,11 @@ func (event SessionEvent) DeliveryClass() DeliveryClass {
 // dropped from durable history or delivery.
 func (event SessionEvent) CorrectnessBearing() bool {
 	switch event.Kind {
-	case KindTaskStateChanged,
+	case KindMessageFinal,
+		KindThreadCreated,
+		KindThreadRenamed,
+		KindThreadArchived,
+		KindTaskStateChanged,
 		KindApprovalRequested,
 		KindApprovalResolved,
 		KindBudgetUpdated,
@@ -382,6 +415,9 @@ func (payload Payload) count() int {
 	for _, present := range []bool{
 		payload.MessageDelta != nil,
 		payload.MessageFinal != nil,
+		payload.ThreadCreated != nil,
+		payload.ThreadRenamed != nil,
+		payload.ThreadArchived != nil,
 		payload.Plan != nil,
 		payload.Tool != nil,
 		payload.Approval != nil,
@@ -409,6 +445,15 @@ func (event SessionEvent) validatePayload() error {
 		return validateMessageDelta(event.Payload.MessageDelta)
 	case KindMessageFinal:
 		return validateMessageFinal(event.Payload.MessageFinal)
+	case KindThreadCreated:
+		return validateThreadCreated(event.Payload.ThreadCreated)
+	case KindThreadRenamed:
+		return validateThreadRenamed(event.Payload.ThreadRenamed)
+	case KindThreadArchived:
+		if event.Payload.ThreadArchived == nil {
+			return errors.New("thread archive payload is missing")
+		}
+		return nil
 	case KindPlanCreated, KindPlanChanged:
 		return validatePlan(event.Payload.Plan)
 	case KindToolStarted, KindToolProgress, KindToolCompleted:
@@ -457,6 +502,22 @@ func validateMessageFinal(value *MessageFinal) error {
 	if value == nil || value.MessageID.IsZero() ||
 		strings.TrimSpace(value.Role) == "" {
 		return errors.New("message final is incomplete")
+	}
+	return nil
+}
+
+func validateThreadCreated(value *ThreadCreated) error {
+	if value == nil || strings.TrimSpace(value.Title) == "" ||
+		value.WorkspaceID != nil && value.WorkspaceID.IsZero() {
+		return errors.New("thread creation is incomplete")
+	}
+	return nil
+}
+
+func validateThreadRenamed(value *ThreadRenamed) error {
+	if value == nil || strings.TrimSpace(value.PreviousTitle) == "" ||
+		strings.TrimSpace(value.Title) == "" {
+		return errors.New("thread rename is incomplete")
 	}
 	return nil
 }

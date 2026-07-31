@@ -16,6 +16,7 @@ type Name string
 const (
 	RepositoryChooser Name = "repository-chooser"
 	ThreadWorkspace   Name = "thread-workspace"
+	Graphs            Name = "graphs"
 	Memory            Name = "memory"
 	Settings          Name = "settings"
 	Diagnostics       Name = "diagnostics"
@@ -41,6 +42,7 @@ func Map() []Spec {
 	return []Spec{
 		{Name: RepositoryChooser, Pattern: "/"},
 		{Name: ThreadWorkspace, Pattern: "/workspace/{repository_id}/thread/{thread_id}"},
+		{Name: Graphs, Pattern: "/graphs"},
 		{Name: Memory, Pattern: "/workspace/{repository_id}/memory"},
 		{Name: Settings, Pattern: "/settings"},
 		{Name: Diagnostics, Pattern: "/diagnostics"},
@@ -49,6 +51,8 @@ func Map() []Spec {
 }
 
 var ErrInvalidRoute = errors.New("frontend routes: invalid route")
+
+const taskSelectionQueryKey = "selection"
 
 // Parse parses only path state. Query and fragment values never participate in
 // authorization or route identity.
@@ -67,6 +71,8 @@ func Parse(raw string) (Route, error) {
 		return Route{Name: RepositoryChooser}, nil
 	case path == "/settings":
 		return Route{Name: Settings}, nil
+	case path == "/graphs":
+		return Route{Name: Graphs}, nil
 	case path == "/diagnostics":
 		return Route{Name: Diagnostics}, nil
 	case path == "/first-run":
@@ -107,6 +113,8 @@ func Path(route Route) (string, error) {
 		return "/", nil
 	case Settings:
 		return "/settings", nil
+	case Graphs:
+		return "/graphs", nil
 	case Diagnostics:
 		return "/diagnostics", nil
 	case FirstRun:
@@ -124,6 +132,40 @@ func Path(route Route) (string, error) {
 	default:
 		return "", fmt.Errorf("%w: unknown route %q", ErrInvalidRoute, route.Name)
 	}
+}
+
+// TaskSelectionPath encodes a canonical thread-workspace path as non-authority
+// UI state for the local /tasks surface. Callers must still restore the result
+// only against independently authorized, loaded thread rows.
+func TaskSelectionPath(route Route) (string, error) {
+	if route.Name != ThreadWorkspace {
+		return "", fmt.Errorf("%w: task selection requires a thread workspace", ErrInvalidRoute)
+	}
+	canonical, err := Path(route)
+	if err != nil {
+		return "", err
+	}
+	values := url.Values{}
+	values.Set(taskSelectionQueryKey, canonical)
+	return "/tasks?" + values.Encode(), nil
+}
+
+// ParseTaskSelection parses the non-authority /tasks query through the same
+// typed route parser used for canonical deep links.
+func ParseTaskSelection(rawQuery string) (Route, error) {
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return Route{}, fmt.Errorf("%w: task selection query: %v", ErrInvalidRoute, err)
+	}
+	raw := values.Get(taskSelectionQueryKey)
+	if raw == "" {
+		return Route{}, fmt.Errorf("%w: task selection is missing", ErrInvalidRoute)
+	}
+	route, err := Parse(raw)
+	if err != nil || route.Name != ThreadWorkspace {
+		return Route{}, fmt.Errorf("%w: task selection", ErrInvalidRoute)
+	}
+	return route, nil
 }
 
 // RestorationContext contains only server-confirmed access information.

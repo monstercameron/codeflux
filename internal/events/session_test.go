@@ -24,6 +24,9 @@ func TestEveryInitialSessionEventKindHasTypedVersionedPayload(t *testing.T) {
 	}{
 		{KindMessageDelta, Payload{MessageDelta: &MessageDelta{MessageID: ids.message, RedactedDelta: "delta"}}, DeliveryEphemeralCoalescible},
 		{KindMessageFinal, Payload{MessageFinal: &MessageFinal{MessageID: ids.message, Role: "assistant", RedactedBody: "final"}}, DeliveryMaterial},
+		{KindThreadCreated, Payload{ThreadCreated: &ThreadCreated{WorkspaceID: &ids.workspace, Title: "Thread"}}, DeliveryMaterial},
+		{KindThreadRenamed, Payload{ThreadRenamed: &ThreadRenamed{PreviousTitle: "Thread", Title: "Renamed"}}, DeliveryMaterial},
+		{KindThreadArchived, Payload{ThreadArchived: &ThreadArchived{Archived: true}}, DeliveryMaterial},
 		{KindPlanCreated, Payload{Plan: &Plan{Revision: 1, RedactedSummary: "plan"}}, DeliveryMaterial},
 		{KindPlanChanged, Payload{Plan: &Plan{Revision: 2, RedactedSummary: "plan changed"}}, DeliveryMaterial},
 		{KindToolStarted, Payload{Tool: &Tool{ExecutionID: "execution", CommandName: "test", State: "running"}}, DeliveryMaterial},
@@ -97,6 +100,10 @@ func TestSessionEventRejectsMismatchedAndUnversionedPayload(t *testing.T) {
 
 func TestCorrectnessBearingKindsCannotUseEphemeralDelivery(t *testing.T) {
 	for _, kind := range []Kind{
+		KindMessageFinal,
+		KindThreadCreated,
+		KindThreadRenamed,
+		KindThreadArchived,
 		KindTaskStateChanged,
 		KindApprovalRequested,
 		KindApprovalResolved,
@@ -124,6 +131,7 @@ func TestCorrectnessBearingKindsCannotUseEphemeralDelivery(t *testing.T) {
 
 type eventTestIDs struct {
 	session       domain.SessionID
+	workspace     domain.WorkspaceID
 	thread        domain.ThreadID
 	task          domain.TaskID
 	event         domain.EventID
@@ -140,6 +148,9 @@ func newEventTestIDs(t *testing.T) eventTestIDs {
 	var result eventTestIDs
 	var err error
 	if result.session, err = domain.NewSessionID(); err != nil {
+		t.Fatal(err)
+	}
+	if result.workspace, err = domain.NewWorkspaceID(); err != nil {
 		t.Fatal(err)
 	}
 	if result.thread, err = domain.NewThreadID(); err != nil {

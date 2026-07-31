@@ -170,8 +170,19 @@ func ResizableSplit(props ResizableSplitProps) ui.Node {
 		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
 		css.Cursor.Pointer,
 		css.UserSelect.None,
-		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+		css.Bg(css.Transparent),
+		css.TextColor(css.Hex(string(tokens.Colors.BorderStrong))),
+		css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors), css.Ms(int(tokens.Motion.Control.Milliseconds())), css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface3))),
+		css.TextColor(css.Hex(string(tokens.Colors.Accent))),
+	)...)
 	rules = append(rules, css.FocusVisible(
 		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
 		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),

@@ -30,6 +30,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-068
+Date: 2026-07-31
+Type: Authoritative conversation workspace
+Request-or-TODO: M17-001 through M17-115 and M17-G01 through M17-G04
+Outcome: Added the durable thread/session backend, reconnectable ordered event
+  stream, and typed Go/GWC thread rail, virtual timeline, cards, composer,
+  approval, review, and interactive graph workspace.
+Affected-behavior: An authorized workspace can create, paginate, rename,
+  archive, reopen, and continue threads through typed RPC clients; selected
+  sessions page and replay authoritative events without duplication. The UI
+  exposes disconnected state honestly, preserves drafts and idempotency keys,
+  and refuses to invent successful mutations when authority is unavailable.
+Compatibility-or-migration: Adds migrations 000016 and 000017 for thread
+  service state and thread/session lifecycle, extends the versioned protobuf
+  thread and session contracts, and regenerates the Go API and event catalogs.
+  No handwritten JavaScript, TypeScript, HTML, or CSS source is added.
+Verification: The 260-check live Chromium matrix passes on the fixed loopback
+  server. Full Go tests, coordinator/transport/storage/event integration,
+  js/wasm build, vet, lint, generation, migration, artifact, diff, and secret
+  checks pass.
+Dev-Log: DL-20260731-069
+
 Change-ID: CL-20260731-067
 Date: 2026-07-31
 Type: Cross-platform frontend build correction

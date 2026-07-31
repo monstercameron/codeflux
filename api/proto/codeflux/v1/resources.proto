@@ -34,6 +34,11 @@ message ThreadView {
   bool archived = 4;
   uint64 revision = 5;
   google.protobuf.Timestamp updated_at = 6;
+  StableIdentity session_id = 7;
+  StableIdentity task_id = 8;
+  string task_state = 9;
+  string attention = 10;
+  uint32 unread_count = 11;
 }
 
 message MessageView {
@@ -41,9 +46,12 @@ message MessageView {
   StableIdentity thread_id = 2;
   string role = 3;
   RedactedText body = 4;
+  // SafePath is retained for wire compatibility with older clients.
   repeated SafePath attachments = 5;
   uint64 revision = 6;
   google.protobuf.Timestamp created_at = 7;
+  repeated StableIdentity attachment_ids = 8;
+  uint64 sequence = 9;
 }
 
 message TaskView {

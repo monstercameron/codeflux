@@ -3,6 +3,9 @@ package primitives
 import (
 	"strings"
 
+	"codeflux.dev/codeflux/web/frontend/design"
+	"github.com/monstercameron/GoWebComponents/v5/css"
+	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 )
@@ -90,22 +93,70 @@ func modalOverlay(component string, kind ui.OverlayKind, props OverlayProps) ui.
 		LockScroll:            policy.LockScroll,
 		BackgroundInert:       policy.BackgroundInert,
 		Backdrop:              true,
-		SurfaceClass:          surfaceClass(tokens),
+		BackdropClass:         modalBackdropClass(tokens, kind),
+		SurfaceClass:          modalSurfaceClass(tokens, kind),
 		Child:                 content,
 		OnDismiss:             props.OnDismiss,
 	})
+}
+
+func modalBackdropClass(tokens design.Tokens, kind ui.OverlayKind) string {
+	rules := []css.Rule{
+		u.Fixed, css.Inset(css.Zero), u.Flex, u.ItemsCenter, u.JustifyCenter,
+		css.Padding(css.Px(tokens.Spacing.LG)),
+		css.Bg(css.RGBA(3, 12, 20, 0.76)),
+	}
+	if tokens.Theme == design.ThemeLight {
+		rules[len(rules)-1] = css.Bg(css.RGBA(21, 40, 54, 0.42))
+	}
+	if kind == ui.OverlayKindSheet {
+		rules = append(rules, u.JustifyEnd, css.Padding(css.Zero))
+	}
+	return css.New(rules...).String()
+}
+
+func modalSurfaceClass(tokens design.Tokens, kind ui.OverlayKind) string {
+	rules := []css.Rule{
+		css.W(css.RawLength("min(680px, calc(100vw - 32px))")),
+		css.MaxHeight(css.RawLength("calc(100dvh - 32px)")),
+		css.OverflowY.Auto,
+	}
+	if kind == ui.OverlayKindSheet {
+		rules = []css.Rule{
+			css.W(css.RawLength("min(480px, 100vw)")),
+			css.H(css.Full),
+			css.MaxHeight(css.Full),
+			css.OverflowY.Auto,
+			css.Rounded(css.Zero),
+		}
+	}
+	return css.New(append([]css.Rule{
+		u.Flex, u.FlexCol,
+		css.Gap(css.Px(tokens.Spacing.MD)),
+		css.Padding(css.Px(tokens.Rhythm.PanelInset)),
+		css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+		css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.Shadow(elevationShadow(tokens, tokens.Elevation.Modal)),
+	}, rules...)...).String()
 }
 
 func Popover(props OverlayProps) ui.Node {
 	if strings.TrimSpace(props.LabelledBy) == "" {
 		return contractError("popover", "labelled-by id is required")
 	}
+	tokens := props.Mode.Tokens()
 	return accessibleOverlay(ui.AccessibleOverlayProps{
-		Open:                props.Open,
-		AppRootSelector:     props.AppRootSelector,
-		SurfaceID:           props.ID,
-		Kind:                ui.OverlayKindPopover,
-		Role:                "dialog",
+		Open:            props.Open,
+		AppRootSelector: props.AppRootSelector,
+		SurfaceID:       props.ID,
+		Kind:            ui.OverlayKindPopover,
+		// GWC promotes every role=dialog surface to modal, which makes the app
+		// root inert. An anchored popover is non-modal and remains a labelled
+		// region so navigation cannot strand background accessibility state.
+		Role:                "region",
 		LabelledBy:          props.LabelledBy,
 		DescribedBy:         props.DescribedBy,
 		AnchorSelector:      props.AnchorSelector,
@@ -114,7 +165,7 @@ func Popover(props OverlayProps) ui.Node {
 		TrapFocus:           false,
 		CloseOnEscape:       true,
 		CloseOnOutsideClick: true,
-		SurfaceClass:        surfaceClass(props.Mode.Tokens()),
+		SurfaceClass:        surfaceClassAt(tokens, tokens.Elevation.Floating),
 		Child: html.Div(
 			html.Props{Data: map[string]string{
 				"component":    "popover",
@@ -139,6 +190,7 @@ func Tooltip(props TooltipProps) ui.Node {
 	if strings.TrimSpace(props.Label) == "" {
 		return contractError("tooltip", "label is required")
 	}
+	tokens := props.Mode.Tokens()
 	return accessibleOverlay(ui.AccessibleOverlayProps{
 		Open:                props.Open,
 		SurfaceID:           props.ID,
@@ -150,7 +202,7 @@ func Tooltip(props TooltipProps) ui.Node {
 		RestoreFocus:        false,
 		CloseOnEscape:       true,
 		CloseOnOutsideClick: false,
-		SurfaceClass:        surfaceClass(props.Mode.Tokens()),
+		SurfaceClass:        surfaceClassAt(tokens, tokens.Elevation.Floating),
 		Child: html.Span(
 			html.Props{Data: map[string]string{
 				"component":      "tooltip",
@@ -167,5 +219,8 @@ func Tooltip(props TooltipProps) ui.Node {
 // hooks to the caller, and the closed/open path can then shift any caller hooks
 // that follow the overlay.
 func accessibleOverlay(props ui.AccessibleOverlayProps) ui.Node {
+	if strings.TrimSpace(props.Target.Selector) == "" {
+		props.Target = ui.PortalTarget{Selector: "#app"}
+	}
 	return ui.CreateElement(ui.AccessibleOverlay, props)
 }

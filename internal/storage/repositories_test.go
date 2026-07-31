@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -172,7 +173,7 @@ func TestAppendMessageIsIdempotentAndAllocatesSequence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if retried != first || first.Sequence != 1 {
+	if !reflect.DeepEqual(retried, first) || first.Sequence != 1 {
 		t.Fatalf("idempotent messages = %#v, %#v", first, retried)
 	}
 	second, err := repositories.AppendMessage(ctx, AppendMessage{
