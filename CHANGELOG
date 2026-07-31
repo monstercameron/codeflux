@@ -30,6 +30,21 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-063
+Date: 2026-07-30
+Type: Cross-platform provider cancellation ordering
+Request-or-TODO: M14-060 and M14 public-CI follow-up
+Outcome: Make provider cancellation arbitration exactly-once when request
+  cancellation and attempt cleanup become ready concurrently
+Affected-behavior: A cancelled provider stream now always invokes the provider
+  cancel hook before attempt cleanup completes, while a cancellation watcher
+  and synchronous cleanup cannot issue duplicate cancel calls.
+Compatibility-or-migration: No schema, API, or persisted-data change.
+Verification: The macOS ARM64 failure is reproduced from public CI. The focused
+  cancellation test passes 100 consecutive runs locally, and coordinator
+  tests, lint, generation, and artifact checks pass.
+Dev-Log: DL-20260730-064
+
 Change-ID: CL-20260730-062
 Date: 2026-07-30
 Type: Bounded agent planning, execution, repair, and review

@@ -24,6 +24,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-064
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-063
+Request-or-TODO: M14-060 and M14 public-CI follow-up
+Goal: Preserve exactly-once provider cancellation across macOS scheduler
+  ordering during stream callback cancellation
+Assumptions: Context cancellation may race attempt cleanup; provider Cancel is
+  idempotent at the adapter boundary but the coordinator should issue it once
+Decisions: Share one sync.Once-protected cancellation function between the
+  watcher and deferred cleanup; cleanup synchronously observes a cancelled
+  context before stopping the watcher.
+Files-or-schemas: Provider execution coordinator and change/development ledgers
+Validation: The public macOS ARM64 fast-test failure reported zero provider
+  cancel calls. The focused cancellation regression passes 100 consecutive
+  local executions; coordinator tests, lint, generation, and artifact checks
+  pass.
+Failures-or-discarded-approaches: The watcher previously selected between an
+  already-ready context and an already-ready stop channel, so cleanup could
+  win and suppress cancellation. Calling Cancel unconditionally in both paths
+  was rejected because it permits duplicate calls.
+Known-limitations: Public cross-platform CI must confirm the scheduler-specific
+  regression on macOS ARM64.
+Next-safe-step: Push the focused follow-up and require the replacement public
+  CI run to pass while M15 implementation proceeds in independent files.
+
 Dev-Log: DL-20260730-063
 Date: 2026-07-30
 Status: Complete

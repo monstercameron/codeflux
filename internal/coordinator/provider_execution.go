@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -262,17 +263,28 @@ func (service *providerExecutionService) executeAttempt(
 			Err: errors.Join(nonRetryableAccountingError(accountingErr), err),
 		}
 	}
+	var cancelProviderOnce sync.Once
+	cancelProvider := func() {
+		cancelProviderOnce.Do(func() {
+			service.cancelProviderRequest(
+				input.Request.Identity.ModelRequestID,
+			)
+		})
+	}
 	stopCancellationWatch := make(chan struct{})
 	cancellationWatchDone := make(chan struct{})
 	go func() {
 		defer close(cancellationWatchDone)
 		select {
 		case <-ctx.Done():
-			service.cancelProviderRequest(input.Request.Identity.ModelRequestID)
+			cancelProvider()
 		case <-stopCancellationWatch:
 		}
 	}()
 	defer func() {
+		if ctx.Err() != nil {
+			cancelProvider()
+		}
 		close(stopCancellationWatch)
 		<-cancellationWatchDone
 		_ = stream.Close()
