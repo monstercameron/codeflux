@@ -193,6 +193,12 @@ func requiredAuthority(request ToolRequest) AuthorityClass {
 	return descriptorAuthority(request.Name)
 }
 
+// RequiredAuthority derives authority from the executable tool, ordered
+// arguments, and declared effects. Caller claims never lower this value.
+func RequiredAuthority(request ToolRequest) AuthorityClass {
+	return requiredAuthority(request)
+}
+
 func classifyCommandArguments(arguments []string) AuthorityClass {
 	if len(arguments) == 0 {
 		return AuthorityPrivileged

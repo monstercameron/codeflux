@@ -30,6 +30,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260730-062
+Date: 2026-07-30
+Type: Bounded agent planning, execution, repair, and review
+Request-or-TODO: M14-001 through M14-062 and M14-G01 through M14-G03
+Outcome: Added deterministic requirement intake, immutable structured plans,
+  a fixed-provider observe-think-act loop, exact validation profiles, bounded
+  repair, completion evidence, and explicit review decisions
+Affected-behavior: Persisted user intent now controls risk, scope, plan,
+  approved tools, exact executable validation, repair limits, and completion.
+  Every effect is attributable to durable plan, model, tool, and policy facts;
+  failures stop without silent fallback, authority expansion, validation
+  weakening, or automatic acceptance.
+Compatibility-or-migration: Adds migration 000014 for requirement and plan
+  revisions, run-plan bindings, plan-step state, validation selection and
+  attribution, repair attempts, completion candidates, and review decisions;
+  schema version advances from 13 to 14.
+Verification: Deterministic full-state-machine and boundary tests, real SQLite
+  constraints and reconstruction, executor/agent/coordinator/storage focused
+  suites, go test ./..., lint, generation, integration, security, and complete
+  local test-all gates pass. Five adversarial refinement rounds end in ACCEPT
+  on the frozen migration checksum.
+Dev-Log: DL-20260730-063
+
 Change-ID: CL-20260730-061
 Date: 2026-07-30
 Type: Fixed routing, forecasting, and exact budget enforcement

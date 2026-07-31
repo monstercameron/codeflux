@@ -2105,86 +2105,125 @@ Milestone output: a bounded requirement-plan-approve-edit-test-repair-review sta
 
 ## Requirement Intake
 
-- [ ] `M14-001 BLOCKER` Persist the user's task message before planning.
-- [ ] `M14-002` Classify task type using a deterministic rule or fixed model output.
-- [ ] `M14-003` Identify explicit files, symbols, commands, and acceptance criteria.
-- [ ] `M14-004` Detect obvious ambiguity that materially changes scope.
-- [ ] `M14-005` Ask a targeted clarification when proceeding would be unsafe.
-- [ ] `M14-006` Make a bounded reasonable assumption when ambiguity is non-material.
-- [ ] `M14-007` Display assumptions in the plan.
-- [ ] `M14-008` Produce an initial risk classification.
-- [ ] `M14-009` Select the fixed validation profile.
+- [x] `M14-001 BLOCKER` Persist the user's task message before planning.
+- [x] `M14-002` Classify task type using a deterministic rule or fixed model output.
+- [x] `M14-003` Identify explicit files, symbols, commands, and acceptance criteria.
+- [x] `M14-004` Detect obvious ambiguity that materially changes scope.
+- [x] `M14-005` Ask a targeted clarification when proceeding would be unsafe.
+- [x] `M14-006` Make a bounded reasonable assumption when ambiguity is non-material.
+- [x] `M14-007` Display assumptions in the plan.
+- [x] `M14-008` Produce an initial risk classification.
+- [x] `M14-009` Select the fixed validation profile.
 
 ## Plan Construction
 
-- [ ] `M14-010 BLOCKER` Define a structured plan schema.
-- [ ] `M14-011` Include goal, scope, expected files, steps, validation, risks, authority needs, and completion criteria.
-- [ ] `M14-012` Bind the plan to repository and context revisions.
-- [ ] `M14-013` Persist immutable plan revisions.
-- [ ] `M14-014` Generate a concise user-facing plan.
-- [ ] `M14-015` Generate machine-readable step IDs.
-- [ ] `M14-016` Link plan steps to graph nodes.
-- [ ] `M14-017` Present the forecast and budget with the plan.
-- [ ] `M14-018` Require plan approval for elevated or protected work.
-- [ ] `M14-019` Allow user redirection to create a new plan revision.
-- [ ] `M14-020` Prevent execution of a superseded plan.
+- [x] `M14-010 BLOCKER` Define a structured plan schema.
+- [x] `M14-011` Include goal, scope, expected files, steps, validation, risks, authority needs, and completion criteria.
+- [x] `M14-012` Bind the plan to repository and context revisions.
+- [x] `M14-013` Persist immutable plan revisions.
+- [x] `M14-014` Generate a concise user-facing plan.
+- [x] `M14-015` Generate machine-readable step IDs.
+- [x] `M14-016` Link plan steps to graph nodes.
+- [x] `M14-017` Present the forecast and budget with the plan.
+- [x] `M14-018` Require plan approval for elevated or protected work.
+- [x] `M14-019` Allow user redirection to create a new plan revision.
+- [x] `M14-020` Prevent execution of a superseded plan.
 
 ## Execution Loop
 
-- [ ] `M14-021 BLOCKER` Implement the observe-think-act-result loop around the fixed provider.
-- [ ] `M14-022` Provide only approved tool schemas.
-- [ ] `M14-023` Add selected repository context.
-- [ ] `M14-024` Add current plan and completed-step state.
-- [ ] `M14-025` Add relevant factual task events without replaying the entire transcript.
-- [ ] `M14-026` Validate model tool-call structure.
-- [ ] `M14-027` Reject unknown tools.
-- [ ] `M14-028` Route tool requests through permission policy.
-- [ ] `M14-029` Persist tool-start before execution.
-- [ ] `M14-030` Persist redacted tool result after execution.
-- [ ] `M14-031` Feed the bounded result back to the model.
-- [ ] `M14-032` Update plan-step state.
-- [ ] `M14-033` Create checkpoints after material edit batches.
-- [ ] `M14-034` Check pause, cancel, budget, and policy state between actions.
-- [ ] `M14-035` Enforce round, tool-call, token, time, and cost limits.
-- [ ] `M14-036` Detect repeated identical failed actions.
-- [ ] `M14-037` Stop and ask for direction instead of looping indefinitely.
-- [ ] `M14-038` Distinguish implementation completion from validation completion.
+- [x] `M14-021 BLOCKER` Implement the observe-think-act-result loop around the fixed provider.
+- [x] `M14-022` Provide only approved tool schemas.
+- [x] `M14-023` Add selected repository context.
+- [x] `M14-024` Add current plan and completed-step state.
+- [x] `M14-025` Add relevant factual task events without replaying the entire transcript.
+- [x] `M14-026` Validate model tool-call structure.
+- [x] `M14-027` Reject unknown tools.
+- [x] `M14-028` Route tool requests through permission policy.
+- [x] `M14-029` Persist tool-start before execution.
+- [x] `M14-030` Persist redacted tool result after execution.
+- [x] `M14-031` Feed the bounded result back to the model.
+- [x] `M14-032` Update plan-step state.
+- [x] `M14-033` Create checkpoints after material edit batches.
+- [x] `M14-034` Check pause, cancel, budget, and policy state between actions.
+- [x] `M14-035` Enforce round, tool-call, token, time, and cost limits.
+- [x] `M14-036` Detect repeated identical failed actions.
+- [x] `M14-037` Stop and ask for direction instead of looping indefinitely.
+- [x] `M14-038` Distinguish implementation completion from validation completion.
 
 ## Repair Loop
 
-- [ ] `M14-039` Run the selected validation commands.
-- [ ] `M14-040` Parse failures into bounded redacted summaries.
-- [ ] `M14-041` Link failures to relevant changed files and plan steps.
-- [ ] `M14-042` Permit a bounded repair round.
-- [ ] `M14-043` Preserve the pre-repair checkpoint.
-- [ ] `M14-044` Record why repair was attempted.
-- [ ] `M14-045` Rerun affected validation after repair.
-- [ ] `M14-046` Stop after the repair budget.
-- [ ] `M14-047` Present unresolved failures honestly.
-- [ ] `M14-048` Never silently weaken or skip an acceptance test.
+- [x] `M14-039` Run the selected validation commands.
+- [x] `M14-040` Parse failures into bounded redacted summaries.
+- [x] `M14-041` Link failures to relevant changed files and plan steps.
+- [x] `M14-042` Permit a bounded repair round.
+- [x] `M14-043` Preserve the pre-repair checkpoint.
+- [x] `M14-044` Record why repair was attempted.
+- [x] `M14-045` Rerun affected validation after repair.
+- [x] `M14-046` Stop after the repair budget.
+- [x] `M14-047` Present unresolved failures honestly.
+- [x] `M14-048` Never silently weaken or skip an acceptance test.
 
 ## Completion
 
-- [ ] `M14-049` Require final repository status and diff capture.
-- [ ] `M14-050` Require final validation summary.
-- [ ] `M14-051` Require budget and actual cost summary.
-- [ ] `M14-052` Require an assumption and limitation summary.
-- [ ] `M14-053` Transition to awaiting-review rather than auto-accepting.
-- [ ] `M14-054` Support accept, request repair, rollback, and abandon.
-- [ ] `M14-055` Record the user's final decision.
+- [x] `M14-049` Require final repository status and diff capture.
+- [x] `M14-050` Require final validation summary.
+- [x] `M14-051` Require budget and actual cost summary.
+- [x] `M14-052` Require an assumption and limitation summary.
+- [x] `M14-053` Transition to awaiting-review rather than auto-accepting.
+- [x] `M14-054` Support accept, request repair, rollback, and abandon.
+- [x] `M14-055` Record the user's final decision.
 
 ## Tests and Gate
 
-- [ ] `M14-056 TEST` Run a deterministic fake-model successful edit scenario.
-- [ ] `M14-057 TEST` Run a fake-model malformed-tool scenario.
-- [ ] `M14-058 TEST` Run a repeated-failure loop scenario.
-- [ ] `M14-059 TEST` Run a pause during tool execution scenario.
-- [ ] `M14-060 TEST` Run cancellation during model streaming.
-- [ ] `M14-061 TEST` Run budget exhaustion between repair rounds.
-- [ ] `M14-062 TEST` Run a user-redirection plan revision.
-- [ ] `M14-G01 GATE` The deterministic fake agent completes the full plan-edit-test-review state machine.
-- [ ] `M14-G02 GATE` Every action is attributable to a plan revision, model request, tool request, and policy decision.
-- [ ] `M14-G03 GATE` No failure path silently falls back, expands authority, or skips required validation.
+- [x] `M14-056 TEST` Run a deterministic fake-model successful edit scenario.
+- [x] `M14-057 TEST` Run a fake-model malformed-tool scenario.
+- [x] `M14-058 TEST` Run a repeated-failure loop scenario.
+- [x] `M14-059 TEST` Run a pause during tool execution scenario.
+- [x] `M14-060 TEST` Run cancellation during model streaming.
+- [x] `M14-061 TEST` Run budget exhaustion between repair rounds.
+- [x] `M14-062 TEST` Run a user-redirection plan revision.
+- [x] `M14-G01 GATE` The deterministic fake agent completes the full plan-edit-test-review state machine.
+- [x] `M14-G02 GATE` Every action is attributable to a plan revision, model request, tool request, and policy decision.
+- [x] `M14-G03 GATE` No failure path silently falls back, expands authority, or skips required validation.
+
+M14 test evidence:
+
+- Requirement intake is derived from the persisted original user message. It
+  deterministically records task type, explicit files, symbols, commands,
+  acceptance criteria, ambiguities, bounded assumptions, risk, and the fixed
+  validation floor; mutating intent cannot be downgraded to investigation.
+- Migration 000014 adds immutable requirement and plan revisions, plan-step
+  states, run-plan bindings, selected validation profiles, validation
+  attribution, bounded repair attempts, completion candidates, and explicit
+  review decisions. Real SQLite tests cover lineage, supersession, exact
+  idempotency, trigger enforcement, rollback, and reconstruction.
+- Validation commands use one canonical logical-worktree projection derived
+  from exact tool, ordered non-sensitive arguments, timeout, policy-derived
+  authority, and effects. Raw user commands remain visible but cannot become
+  execution authority; unsafe, sensitive, mutating, ambiguous, substituted,
+  or weakening command forms are rejected.
+- Routine, elevated, and protected profiles require one, two, and three
+  distinct required commands already present in the approved plan. Go
+  repository checks and SQLite triggers reject label-only upgrades,
+  duplicates, unknown profiles, downgrades, reordering, and acceptance-test
+  weakening.
+- The fixed-model observe-think-act loop exposes only approved strict tool
+  schemas and bounded context, persists intent before effects and redacted
+  outcomes afterward, attributes model/tool/policy facts, checkpoints material
+  edits, honors interrupts and hard limits, and stops repeated failures rather
+  than silently expanding authority.
+- The repair and completion flow preserves pre-repair checkpoints, links
+  bounded failures to canonical file scopes and plan steps, reruns exact
+  selected validation, enforces repair budgets, captures final repository,
+  validation, budget, assumption, and limitation evidence, then awaits an
+  explicit accept, repair, rollback, or abandon decision.
+- Deterministic fake-model tests cover success, malformed and unknown tools,
+  repeated failure, pause during execution, stream cancellation, budget
+  exhaustion, redirection, edit-test-repair-review ordering, and durable
+  attribution. Focused executor, agent, coordinator, storage, and migration
+  tests, `go test ./...`, lint, generation, integration, security, and the
+  complete local `test-all` gate pass. The fifth frozen-tree adversarial audit
+  accepts M14 with no remaining findings.
 
 ---
 

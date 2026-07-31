@@ -24,6 +24,55 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260730-063
+Date: 2026-07-30
+Status: Complete
+Change-ID: CL-20260730-062
+Request-or-TODO: M14-001 through M14-062 and M14-G01 through M14-G03
+Goal: Compose persisted requirements, immutable plans, the fixed provider,
+  mediated tools, hard budgets, bounded repair, and explicit review into the
+  smallest reliable coding-agent state machine
+Assumptions: M14 retains the frozen provider/model/effort policy; plans and
+  validation are approved before effects; physical task-worktree paths and
+  run identities are not known at intake; adaptive routing and multi-agent
+  runtime topology remain deferred
+Decisions: Derive requirement analysis from the stored original message;
+  close step kinds and completion tools; bind plans to repository, context,
+  policy, forecast, and budget revisions; project validation through one
+  canonical logical-worktree contract while retaining raw commands only for
+  user visibility; derive authority from policy semantics; require stronger
+  profile labels to carry broader distinct required commands already approved
+  in the plan; persist effect intent before execution and redacted outcomes
+  afterward; checkpoint material edits; reconstruct completion only from
+  durable step and validation evidence; require an explicit final decision
+Files-or-schemas: Migration 000014 and generated schema/build metadata;
+  executor validation-plan projection; agent loop, limits, tool schemas,
+  repair, validation, and completion contracts; coordinator persistence and
+  state-machine composition; requirement, plan, execution, validation,
+  repair, completion, and review repositories; milestone tests and evidence
+Validation: Executor, agent, coordinator, storage, and migration focused suites,
+  go vet, go test ./..., git diff checks, deterministic fake-provider G01,
+  real-SQLite triggers and recovery reconstruction, lint, generation, fast,
+  integration, security, and complete local test-all pass. Frozen checksum
+  7c304b402772e0fa688ee838a86c1ddda54008bfd48b76bec1f22b5ed9b468a0
+  receives independent round-five ACCEPT.
+Failures-or-discarded-approaches: Adversarial rounds rejected model-authored
+  completion without durable proof, checkpoint ordering gaps, weak limit
+  accounting, caller-forged requirement and plan fields, unsafe path-prefix
+  scope, incomplete failure linkage, raw validation labels detached from
+  executable requests, mutation misclassification, exact-only profile floors,
+  label-only assurance upgrades, and plans that could not reach validation
+  binding. Each accepted finding now has a deterministic invariant and
+  regression. Caller-authored display authority, sensitive command arguments,
+  silent test weakening, and auto-acceptance were rejected.
+Known-limitations: Browser E2E remains intentionally unavailable until the
+  M16 GWC harness. M15 must add production checkpoint persistence, cooperative
+  interruption, divergence-aware resume, crash classification, and patch
+  preservation before the frontend milestone may begin.
+Next-safe-step: Commit and publicly verify M14, then complete M15's checkpoint,
+  pause/cancel, resume, and recovery gates before implementing the mapped M16
+  GoWebComponents v5 shell.
+
 Dev-Log: DL-20260730-062
 Date: 2026-07-30
 Status: Complete
