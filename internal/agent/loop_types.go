@@ -3,12 +3,17 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/executor"
 	"codeflux.dev/codeflux/internal/providers"
 )
+
+// ErrActionBlocked reports the race where durable control closed the action
+// gate after the loop's between-action check but before registration.
+var ErrActionBlocked = errors.New("durable control blocks new actions")
 
 // StepKind is the closed semantic class of one immutable plan step. Each kind
 // has exactly one completion tool and fixed materiality/validation semantics.
@@ -223,7 +228,16 @@ type PlanStepStore interface {
 	PersistPlanStepTransition(context.Context, PlanStepTransition) error
 }
 
-// CheckpointRequest binds a material edit checkpoint to plan and action.
+// CheckpointTrigger identifies the correctness boundary that requested a
+// recovery point.
+type CheckpointTrigger string
+
+const (
+	CheckpointMaterialEdit CheckpointTrigger = "material-edit-applied"
+	CheckpointBeforeRisky  CheckpointTrigger = "before-risky-action"
+)
+
+// CheckpointRequest binds a recovery point to plan, action, and authority.
 type CheckpointRequest struct {
 	TaskID         domain.TaskID
 	RunID          domain.RunID
@@ -232,6 +246,9 @@ type CheckpointRequest struct {
 	ToolRequestID  string
 	ModelRequestID domain.ModelRequestID
 	Round          uint32
+	Trigger        CheckpointTrigger
+	PermissionID   string
+	ActionSHA256   string
 	Reason         string
 }
 
@@ -240,14 +257,32 @@ type CheckpointStore interface {
 	CreateCheckpoint(context.Context, CheckpointRequest) error
 }
 
+// PlanApprovedCheckpointRequest binds the exact approved plan authority to
+// the recovery point that must exist before model or tool work starts.
+type PlanApprovedCheckpointRequest struct {
+	TaskID       domain.TaskID
+	RunID        domain.RunID
+	PlanRevision uint64
+	ApprovalID   domain.ApprovalID
+}
+
+// PlanApprovedCheckpointStore owns the mandatory execution-start checkpoint.
+type PlanApprovedCheckpointStore interface {
+	CreatePlanApprovedCheckpoint(
+		context.Context,
+		PlanApprovedCheckpointRequest,
+	) error
+}
+
 // ControlDisposition is the externally authoritative run control state.
 type ControlDisposition string
 
 const (
-	ControlActive    ControlDisposition = "active"
-	ControlPaused    ControlDisposition = "paused"
-	ControlCancelled ControlDisposition = "cancelled"
-	ControlStopped   ControlDisposition = "stopped"
+	ControlActive         ControlDisposition = "active"
+	ControlPauseRequested ControlDisposition = "pause-requested"
+	ControlPaused         ControlDisposition = "paused"
+	ControlCancelled      ControlDisposition = "cancelled"
+	ControlStopped        ControlDisposition = "stopped"
 )
 
 // ControlState combines the latest pause/cancel, budget, policy, and
@@ -264,6 +299,25 @@ type ControlReader interface {
 	ReadControl(context.Context, domain.TaskID, domain.RunID) (ControlState, error)
 }
 
+// ActionKind identifies the in-flight operation governed by pause/cancel
+// policy.
+type ActionKind string
+
+const (
+	ActionModel      ActionKind = "model"
+	ActionTool       ActionKind = "tool"
+	ActionValidation ActionKind = "validation"
+)
+
+// ActionDescriptor is registered before an operation starts. Only explicitly
+// safe mediated reads may finish after a pause request.
+type ActionDescriptor struct {
+	Kind        ActionKind
+	RequestID   string
+	SafeRead    bool
+	LongRunning bool
+}
+
 // ControlInterruptBridge binds durable pause/cancel/stop changes to an active
 // model or tool context. Implementations typically subscribe to committed
 // control events and cancel the returned context when work must stop.
@@ -272,6 +326,7 @@ type ControlInterruptBridge interface {
 		context.Context,
 		domain.TaskID,
 		domain.RunID,
+		ActionDescriptor,
 	) (context.Context, context.CancelFunc, error)
 }
 
@@ -310,6 +365,7 @@ type LoopLimits struct {
 type LoopInput struct {
 	TaskID            domain.TaskID
 	RunID             domain.RunID
+	PlanApprovalID    domain.ApprovalID
 	WorktreePath      string
 	PolicyRevision    uint64
 	PolicySHA256      string
@@ -352,15 +408,16 @@ type LoopOutcome struct {
 // LoopDependencies are explicit ports to fixed-provider, authority, durable
 // journal, tool, checkpoint, plan, and control boundaries.
 type LoopDependencies struct {
-	Model       FixedModel
-	Authority   AuthorityRouter
-	Tools       ToolExecutor
-	Journal     ToolJournal
-	PlanSteps   PlanStepStore
-	Checkpoints CheckpointStore
-	Control     ControlReader
-	Interrupts  ControlInterruptBridge
-	Now         func() time.Time
+	Model                   FixedModel
+	Authority               AuthorityRouter
+	Tools                   ToolExecutor
+	Journal                 ToolJournal
+	PlanSteps               PlanStepStore
+	Checkpoints             CheckpointStore
+	PlanApprovalCheckpoints PlanApprovedCheckpointStore
+	Control                 ControlReader
+	Interrupts              ControlInterruptBridge
+	Now                     func() time.Time
 }
 
 // ApprovedToolSchema returns the strict JSON schema sent to the model.

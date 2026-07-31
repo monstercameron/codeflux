@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-065
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-064
+Request-or-TODO: M15-001 through M15-045 and M15-G01 through M15-G03
+Goal: Make interruption and process loss ordinary, explainable, and safe
+  without losing work or repeating correctness-bearing actions
+Assumptions: The coordinator owns durable truth; workers may disappear at any
+  boundary; a persisted intent without a terminal outcome is ambiguous;
+  recovery never silently changes the approved provider, model, policy, tools,
+  repository, worktree, or plan.
+Decisions: Canonicalize a closed checkpoint schema; derive runtime facts from
+  authoritative repositories; preserve dirty state through an isolated Git
+  index and private ref; atomically commit checkpoint events; close the action
+  gate before pausing; wait for complete quiescence; transmit only exact durable
+  checkpoint IDs; classify startup state before server bind; treat unresolved
+  and post-checkpoint completed actions as replay blockers; require an explicit
+  user decision before binary-safe patch export or recovery action.
+Files-or-schemas: Migration 000015 and generated metadata; checkpoint,
+  Git-preservation, recovery-observation, task-control, worker-control,
+  transport, CLI, agent-boundary, application-composition, and test sources;
+  M15 checklist evidence and change/development ledgers.
+Validation: Real linked-worktree and binary export tests; SQLite atomicity,
+  idempotency, close/reopen, and subprocess crash tests; six-trigger boundary
+  matrix; unchanged, non-overlapping, conflicting, missing, policy/provider/
+  tool-change, ambiguity, no-repeat, cancellation, shutdown, RPC, and CLI
+  cases; go test ./..., lint, generation, migration, integration, security,
+  git diff checks, and complete local test-all pass.
+Failures-or-discarded-approaches: Rejected caller-authored checkpoint facts,
+  hashes without patch preservation, branch-moving checkpoint commits,
+  fabricated worker checkpoint IDs, optional product control registration,
+  stale-revision checks before idempotent replay, provider-agnostic resume,
+  outcome-unknown-only ambiguity, automatic external-effect replay, checkpoint
+  sequence comparison against the pre-event snapshot, same-HEAD branch
+  substitution, and timestamp values that changed after SQLite replay.
+Known-limitations: Browser rendering and browser E2E begin at M16. Later task
+  UI milestones consume the authenticated TaskService and structured recovery
+  application services completed here.
+Next-safe-step: Commit and publicly verify M15, then implement the M16
+  GoWebComponents v5 shell, responsive design foundation, and browser harness
+  without handwritten JavaScript, HTML, or CSS.
+
 Dev-Log: DL-20260730-064
 Date: 2026-07-30
 Status: Complete

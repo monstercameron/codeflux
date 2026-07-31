@@ -60,6 +60,20 @@ type PreRepairCheckpointCreator interface {
 	) (domain.CheckpointID, error)
 }
 
+// SuccessfulValidationCheckpointCreator is the optional M15 checkpoint
+// trigger implemented by checkpoint services that can bind a passed required
+// validation to the current plan/worktree state.
+type SuccessfulValidationCheckpointCreator interface {
+	CreateSuccessfulValidationCheckpoint(
+		context.Context,
+		domain.TaskID,
+		domain.RunID,
+		uint64,
+		domain.ValidationID,
+		string,
+	) (domain.CheckpointID, error)
+}
+
 // RepairRequest contains only bounded redacted failures from the immutable
 // validation profile.
 type RepairRequest struct {
@@ -955,6 +969,14 @@ func (service *RepairCompletionService) ValidateAndRepair(
 		Reports: []agentloop.ValidationReport{report},
 	}
 	if report.RequiredPassed() {
+		if err := service.checkpointSuccessfulValidation(
+			ctx,
+			input,
+			report,
+			input.IdempotencyPrefix+"/validation/0/checkpoint",
+		); err != nil {
+			return outcome, err
+		}
 		outcome.ReadyForCompletion = true
 		return outcome, nil
 	}
@@ -1146,6 +1168,18 @@ func (service *RepairCompletionService) ValidateAndRepair(
 			return outcome, nil
 		}
 		if report.RequiredPassed() {
+			if err := service.checkpointSuccessfulValidation(
+				ctx,
+				input,
+				report,
+				fmt.Sprintf(
+					"%s/validation/%d/checkpoint",
+					input.IdempotencyPrefix,
+					ordinal,
+				),
+			); err != nil {
+				return outcome, err
+			}
 			outcome.ReadyForCompletion = true
 			outcome.UnresolvedReason = ""
 			return outcome, nil
@@ -1156,6 +1190,33 @@ func (service *RepairCompletionService) ValidateAndRepair(
 			unresolvedValidationSummary(outcome.Reports[len(outcome.Reports)-1]),
 	)
 	return outcome, nil
+}
+
+func (service *RepairCompletionService) checkpointSuccessfulValidation(
+	ctx context.Context,
+	input ValidationRepairInput,
+	report agentloop.ValidationReport,
+	idempotencyKey string,
+) error {
+	checkpoints, ok := service.dependencies.Checkpoints.(SuccessfulValidationCheckpointCreator)
+	if !ok {
+		return nil
+	}
+	validationID, found := firstPassedRequiredValidation(report)
+	if !found {
+		return errors.New(
+			"successful required validation lacks an attributable identity",
+		)
+	}
+	_, err := checkpoints.CreateSuccessfulValidationCheckpoint(
+		context.WithoutCancel(ctx),
+		input.TaskID,
+		input.RunID,
+		input.PlanRevision,
+		validationID,
+		idempotencyKey,
+	)
+	return err
 }
 
 // CompletionInput contains the non-model claims that must be checked before

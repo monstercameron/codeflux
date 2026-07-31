@@ -278,6 +278,10 @@ func applyControl(
 		executionGate.Resume()
 		*state = StatusRunning
 	case ControlCheckpoint:
+		if control.CheckpointID != "" {
+			*checkpoint = control.CheckpointID
+			break
+		}
 		if checkpointer == nil {
 			return false, errors.New("checkpoint requested without a checkpointer")
 		}

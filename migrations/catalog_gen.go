@@ -19,4 +19,5 @@ var Catalog = []Descriptor{
 	{Number: 12, Name: "000012_preflight_budget_adjustments.sql", SHA256: "41e2233e67515413726b3e7e0b3bd9223ec9d2ea2848bea8f571fda26cb6d7b2"},
 	{Number: 13, Name: "000013_provider_call_slot_reconciliation.sql", SHA256: "3b002da47edce72258223241cba0fd18e2507c7397ff309f1ec30345a470516e"},
 	{Number: 14, Name: "000014_agent_plans.sql", SHA256: "7c304b402772e0fa688ee838a86c1ddda54008bfd48b76bec1f22b5ed9b468a0"},
+	{Number: 15, Name: "000015_checkpoint_pause_recovery.sql", SHA256: "3e0ca8932231e3f48c637aa7d60a761190b95b1bd7ba50a4df4190be28ce86e5"},
 }

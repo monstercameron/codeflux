@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/storage"
 )
 
@@ -124,6 +125,65 @@ func TestUnknownCommandIsUsageError(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), `unknown command "unknown"`) {
 		t.Fatalf("unknown stderr = %q", stderr.String())
+	}
+}
+
+func TestTaskControlArgumentsRequireLoopbackAndExplicitRevision(
+	t *testing.T,
+) {
+	taskID, err := domain.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseTaskControlArguments(
+		"pause",
+		[]string{
+			"--endpoint", "127.0.0.1:58489",
+			"--task", taskID.String(),
+			"--revision", "7",
+			"--idempotency-key", "pause-cli-1",
+			"--reason", "user requested pause",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.taskID != taskID || parsed.revision != 7 ||
+		parsed.sessionTokenEnv != defaultSessionTokenEnvironment {
+		t.Fatalf("parsed control = %#v", parsed)
+	}
+	_, err = parseTaskControlArguments(
+		"resume",
+		[]string{
+			"--endpoint", "example.com:443",
+			"--task", taskID.String(),
+			"--revision", "7",
+			"--idempotency-key", "resume-cli-1",
+		},
+	)
+	if err == nil || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("remote endpoint error = %v", err)
+	}
+}
+
+func TestTaskControlDoesNotAcceptCredentialOnCommandLine(t *testing.T) {
+	taskID, err := domain.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = parseTaskControlArguments(
+		"cancel",
+		[]string{
+			"--endpoint", "localhost:58489",
+			"--task", taskID.String(),
+			"--revision", "3",
+			"--idempotency-key", "cancel-cli-1",
+			"--reason", "stop",
+			"--session-token", "must-not-be-accepted",
+		},
+	)
+	if err == nil || !strings.Contains(err.Error(), "unknown argument") {
+		t.Fatalf("credential argument error = %v", err)
 	}
 }
 

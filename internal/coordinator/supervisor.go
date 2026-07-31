@@ -28,6 +28,18 @@ type WorkerLeaseStore interface {
 	) (storage.WorkerLease, error)
 }
 
+// GracefulShutdownCheckpointer commits a real checkpoint before the worker
+// acknowledges its identity.
+type GracefulShutdownCheckpointer interface {
+	CaptureGracefulShutdownCheckpoint(
+		context.Context,
+		domain.TaskID,
+		domain.RunID,
+		string,
+		time.Duration,
+	) (domain.CheckpointID, error)
+}
+
 type StartWorker struct {
 	LeaseID             string
 	TaskID              domain.TaskID
@@ -52,16 +64,18 @@ type supervisedWorker struct {
 
 // Supervisor owns one subprocess per active run.
 type Supervisor struct {
-	mu           sync.Mutex
-	store        WorkerLeaseStore
-	gateway      *WorkerGateway
-	random       func([]byte) (int, error)
-	active       map[domain.RunID]*supervisedWorker
-	grace        time.Duration
-	closed       bool
-	complete     func(domain.TaskID, domain.RunID) error
-	completeErr  error
-	lifecycleErr error
+	mu                  sync.Mutex
+	store               WorkerLeaseStore
+	gateway             *WorkerGateway
+	random              func([]byte) (int, error)
+	active              map[domain.RunID]*supervisedWorker
+	grace               time.Duration
+	closed              bool
+	complete            func(domain.TaskID, domain.RunID) error
+	completeErr         error
+	lifecycleErr        error
+	shutdownCheckpoints GracefulShutdownCheckpointer
+	checkpointTimeout   time.Duration
 }
 
 func (supervisor *Supervisor) SetCompletionObserver(
@@ -80,6 +94,24 @@ func (supervisor *Supervisor) SetCompletionObserver(
 	return nil
 }
 
+func (supervisor *Supervisor) SetGracefulShutdownCheckpointer(
+	checkpoints GracefulShutdownCheckpointer,
+) error {
+	if checkpoints == nil {
+		return errors.New("graceful shutdown checkpointer is required")
+	}
+	supervisor.mu.Lock()
+	defer supervisor.mu.Unlock()
+	if supervisor.closed || len(supervisor.active) != 0 ||
+		supervisor.shutdownCheckpoints != nil {
+		return errors.New(
+			"graceful shutdown checkpointer cannot be changed",
+		)
+	}
+	supervisor.shutdownCheckpoints = checkpoints
+	return nil
+}
+
 func NewSupervisor(
 	store WorkerLeaseStore,
 	gateway *WorkerGateway,
@@ -89,8 +121,9 @@ func NewSupervisor(
 	}
 	return &Supervisor{
 		store: store, gateway: gateway, random: rand.Read,
-		active: make(map[domain.RunID]*supervisedWorker),
-		grace:  worker.GracePeriod,
+		active:            make(map[domain.RunID]*supervisedWorker),
+		grace:             worker.GracePeriod,
+		checkpointTimeout: 5 * time.Second,
 	}, nil
 }
 
@@ -292,14 +325,49 @@ func (supervisor *Supervisor) CheckpointAndStopAll(ctx context.Context) error {
 	for _, owned := range supervisor.active {
 		active = append(active, owned)
 	}
+	checkpoints := supervisor.shutdownCheckpoints
+	checkpointTimeout := supervisor.checkpointTimeout
 	supervisor.mu.Unlock()
+	var checkpointErr error
 	for _, owned := range active {
-		_ = supervisor.gateway.QueueControl(owned.runID, worker.Control{
-			Kind: worker.ControlCheckpoint, Reason: "coordinator shutdown",
-		})
-		_ = supervisor.gateway.QueueControl(owned.runID, worker.Control{
-			Kind: worker.ControlShutdown, Reason: "coordinator shutdown",
-		})
+		if checkpoints == nil {
+			checkpointErr = errors.Join(
+				checkpointErr,
+				errors.New(
+					"durable graceful shutdown checkpoint is unavailable",
+				),
+			)
+		} else {
+			checkpointID, err :=
+				checkpoints.CaptureGracefulShutdownCheckpoint(
+					ctx,
+					owned.taskID,
+					owned.runID,
+					"graceful-shutdown/"+owned.runID.String(),
+					checkpointTimeout,
+				)
+			if err != nil {
+				checkpointErr = errors.Join(checkpointErr, err)
+			} else {
+				checkpointErr = errors.Join(
+					checkpointErr,
+					supervisor.gateway.QueueControl(
+						owned.runID,
+						worker.Control{
+							Kind:         worker.ControlCheckpoint,
+							Reason:       "coordinator shutdown",
+							CheckpointID: checkpointID.String(),
+						},
+					),
+				)
+			}
+		}
+		checkpointErr = errors.Join(
+			checkpointErr,
+			supervisor.gateway.QueueControl(owned.runID, worker.Control{
+				Kind: worker.ControlShutdown, Reason: "coordinator shutdown",
+			}),
+		)
 	}
 	grace := supervisor.grace
 	if grace <= 0 {
@@ -315,7 +383,7 @@ func (supervisor *Supervisor) CheckpointAndStopAll(ctx context.Context) error {
 			for _, remaining := range active {
 				stopErr = errors.Join(stopErr, remaining.process.Stop())
 			}
-			return errors.Join(ctx.Err(), stopErr)
+			return errors.Join(ctx.Err(), stopErr, checkpointErr)
 		case <-graceTimer.C:
 			for _, remaining := range active {
 				stopErr = errors.Join(stopErr, remaining.process.Stop())
@@ -326,21 +394,26 @@ func (supervisor *Supervisor) CheckpointAndStopAll(ctx context.Context) error {
 				case <-remaining.done:
 				case <-ctx.Done():
 					forcedTimer.Stop()
-					return errors.Join(ctx.Err(), stopErr)
+					return errors.Join(ctx.Err(), stopErr, checkpointErr)
 				case <-forcedTimer.C:
 					return errors.Join(
 						stopErr,
+						checkpointErr,
 						errors.New("worker process did not exit after forced termination"),
 					)
 				}
 			}
 			forcedTimer.Stop()
-			return stopErr
+			return errors.Join(stopErr, checkpointErr)
 		}
 	}
 	supervisor.mu.Lock()
 	defer supervisor.mu.Unlock()
-	return errors.Join(supervisor.completeErr, supervisor.lifecycleErr)
+	return errors.Join(
+		supervisor.completeErr,
+		supervisor.lifecycleErr,
+		checkpointErr,
+	)
 }
 
 func (supervisor *Supervisor) ActiveCount() int {

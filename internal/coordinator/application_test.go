@@ -15,14 +15,94 @@ import (
 	"testing"
 	"time"
 
+	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/storage"
+	"codeflux.dev/codeflux/internal/transport"
 	"codeflux.dev/codeflux/internal/worker"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 const applicationCrashDatabase = "CODEFLUX_APPLICATION_CRASH_DATABASE"
 const applicationCrashParentPID = "CODEFLUX_APPLICATION_CRASH_PARENT_PID"
+
+func TestApplicationHostsAuthenticatedTaskControlService(t *testing.T) {
+	root := t.TempDir()
+	taskID, err := domain.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	controls := &applicationTaskControlStub{
+		view: transport.TaskControlView{
+			TaskID:    taskID,
+			State:     domain.TaskStatePaused,
+			Revision:  6,
+			UpdatedAt: time.Unix(1_700_000_000, 0).UTC(),
+		},
+	}
+	application, err := StartApplication(
+		t.Context(),
+		ApplicationOptions{
+			DatabasePath:      filepath.Join(root, "codeflux.sqlite3"),
+			BackupDirectory:   filepath.Join(root, "backups"),
+			ListenAddress:     "127.0.0.1:0",
+			TaskListenAddress: "127.0.0.1:0",
+			TaskControls:      controls,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection, err := grpc.NewClient(
+		application.TaskControlAddress(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision := uint64(5)
+	taskIdentity, err := transport.TaskIDToProto(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := metadata.AppendToOutgoingContext(
+		t.Context(),
+		transport.SessionMetadataKey,
+		application.BrowserSessionSecret(),
+	)
+	response, err := codefluxv1.NewTaskServiceClient(connection).PauseTask(
+		ctx,
+		&codefluxv1.PauseTaskRequest{
+			Control: &codefluxv1.MutationControl{
+				IdempotencyKey:   "application-pause-1",
+				ExpectedRevision: &revision,
+			},
+			TaskId: taskIdentity,
+			Reason: "integration pause",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.GetTask().GetState() !=
+		string(domain.TaskStatePaused) ||
+		controls.command.ExpectedRevision != 5 {
+		t.Fatalf(
+			"response=%#v command=%#v",
+			response,
+			controls.command,
+		)
+	}
+	if err := connection.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := application.Shutdown(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T) {
 	root := t.TempDir()
@@ -38,7 +118,8 @@ func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T
 			}
 			return len(buffer), nil
 		},
-		Workers: workers,
+		Workers:      workers,
+		TaskControls: &applicationTaskControlStub{},
 	}
 	application, err := StartApplication(t.Context(), options)
 	if err != nil {
@@ -50,6 +131,10 @@ func TestApplicationStartsOnceOnLoopbackMigratesAndShutsDownInOrder(t *testing.T
 	}
 	if application.EventHub() == nil || application.TransportBoundary() == nil {
 		t.Fatal("application did not initialize event and transport services")
+	}
+	if application.RecoveryDecisionService() == nil ||
+		len(application.RecoveryAssessments()) != 0 {
+		t.Fatal("application did not initialize bounded recovery services")
 	}
 	if application.ProviderDependencies().Credentials == nil ||
 		application.ProviderDependencies().References == nil ||
@@ -124,8 +209,11 @@ func TestApplicationBuildsDefaultWorkerRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if application.WorkerRuntime() == nil {
-		t.Fatal("default coordinator worker runtime was not initialized")
+	if application.WorkerRuntime() == nil ||
+		application.TaskControlAddress() == "" {
+		t.Fatal(
+			"default worker runtime or task control service was not initialized",
+		)
 	}
 	if err := application.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
@@ -135,11 +223,18 @@ func TestApplicationBuildsDefaultWorkerRuntime(t *testing.T) {
 func TestApplicationShutdownCheckpointsPausedWorkerAndCancelsQueuedTask(t *testing.T) {
 	root := t.TempDir()
 	databasePath := filepath.Join(root, "codeflux.db")
+	shutdownCheckpointID, err := domain.NewCheckpointID()
+	if err != nil {
+		t.Fatal(err)
+	}
 	application, err := StartApplication(t.Context(), ApplicationOptions{
 		DatabasePath:    databasePath,
 		BackupDirectory: filepath.Join(root, "backups"),
 		ListenAddress:   "127.0.0.1:0",
 		WorkerLimit:     1,
+		ShutdownCheckpoints: &supervisorGracefulCheckpointer{
+			id: shutdownCheckpointID,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -541,6 +636,15 @@ func TestCoordinatorCrashLeavesDurableRecoveryChoice(t *testing.T) {
 	if task.State != domain.TaskStateRecoveryRequired {
 		t.Fatalf("task state after coordinator crash = %s", task.State)
 	}
+	assessments := application.RecoveryAssessments()
+	if len(assessments) != 1 ||
+		assessments[0].TaskID != taskID ||
+		assessments[0].RunID != runID ||
+		assessments[0].CheckpointID != nil ||
+		assessments[0].Classification !=
+			storage.RecoveryClassificationImpossible {
+		t.Fatalf("startup recovery assessments = %#v", assessments)
+	}
 	if err := application.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -582,6 +686,36 @@ func crashFixtureIDs(
 type recordingWorkerController struct {
 	mu    sync.Mutex
 	count int
+}
+
+type applicationTaskControlStub struct {
+	command transport.TaskControlCommand
+	view    transport.TaskControlView
+	err     error
+}
+
+func (stub *applicationTaskControlStub) PauseTaskControl(
+	_ context.Context,
+	command transport.TaskControlCommand,
+) (transport.TaskControlView, error) {
+	stub.command = command
+	return stub.view, stub.err
+}
+
+func (stub *applicationTaskControlStub) ResumeTaskControl(
+	_ context.Context,
+	command transport.TaskControlCommand,
+) (transport.TaskControlView, error) {
+	stub.command = command
+	return stub.view, stub.err
+}
+
+func (stub *applicationTaskControlStub) CancelTaskControl(
+	_ context.Context,
+	command transport.TaskControlCommand,
+) (transport.TaskControlView, error) {
+	stub.command = command
+	return stub.view, stub.err
 }
 
 func (controller *recordingWorkerController) CheckpointAndStopAll(

@@ -126,8 +126,9 @@ type Heartbeat struct {
 }
 
 type Control struct {
-	Kind   ControlKind
-	Reason string
+	Kind         ControlKind
+	Reason       string
+	CheckpointID string
 }
 
 type Status struct {
@@ -197,6 +198,11 @@ func (control Control) Validate() error {
 	if len(control.Reason) > maxControlReasonBytes ||
 		strings.ContainsRune(control.Reason, 0) {
 		return errors.New("worker control reason is invalid")
+	}
+	if control.CheckpointID != "" &&
+		(control.Kind != ControlCheckpoint ||
+			!validRequiredIdentifier(control.CheckpointID)) {
+		return errors.New("worker control checkpoint identity is invalid")
 	}
 	return nil
 }

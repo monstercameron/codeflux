@@ -76,14 +76,20 @@ func TestDeterministicFakeAgentCompletesPlanEditTestReviewStateMachine(
 	executionLoop, err := agentloop.NewExecutionLoop(agentloop.LoopDependencies{
 		Model: harness, Authority: harness, Tools: harness,
 		Journal: harness, PlanSteps: harness, Checkpoints: harness,
-		Control: harness, Interrupts: harness, Now: time.Now,
+		PlanApprovalCheckpoints: harness,
+		Control:                 harness, Interrupts: harness, Now: time.Now,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	worktree := filepath.Join(t.TempDir(), "worktree")
+	approvalID, err := domain.NewApprovalID()
+	if err != nil {
+		t.Fatal(err)
+	}
 	loopInput := agentloop.LoopInput{
 		TaskID: taskID, RunID: runID, WorktreePath: worktree,
+		PlanApprovalID: approvalID,
 		PolicyRevision: harness.policyRevision, PolicySHA256: policySHA256,
 		Plan: agentloop.PlanProjection{
 			Revision: 7, RepositoryRevision: "git-revision-7",
@@ -220,6 +226,7 @@ func TestDeterministicFakeAgentCompletesPlanEditTestReviewStateMachine(
 	}
 
 	wantOrder := []string{
+		"checkpoint:plan-approved",
 		"model:1",
 		"authority:apply-edit",
 		"tool:start",
@@ -475,6 +482,14 @@ func (harness *agentStateMachineGateHarness) CreateCheckpoint(
 	return nil
 }
 
+func (harness *agentStateMachineGateHarness) CreatePlanApprovedCheckpoint(
+	_ context.Context,
+	_ agentloop.PlanApprovedCheckpointRequest,
+) error {
+	harness.addEvent("checkpoint:plan-approved")
+	return nil
+}
+
 func (harness *agentStateMachineGateHarness) ReadControl(
 	context.Context,
 	domain.TaskID,
@@ -490,6 +505,7 @@ func (harness *agentStateMachineGateHarness) BindActionContext(
 	parent context.Context,
 	_ domain.TaskID,
 	_ domain.RunID,
+	_ agentloop.ActionDescriptor,
 ) (context.Context, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(parent)
 	return ctx, cancel, nil

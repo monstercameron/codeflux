@@ -34,7 +34,6 @@ func TestSupervisorWorkerHelper(t *testing.T) {
 	}
 	err = worker.Run(context.Background(), startup, worker.ClientOptions{
 		HeartbeatInterval: 100 * time.Millisecond,
-		Checkpointer:      supervisorCheckpointer{},
 	})
 	if err != nil {
 		os.Exit(13)
@@ -51,6 +50,15 @@ func TestSupervisorOwnsOneProcessAndGracefullyStops(t *testing.T) {
 	defer server.Close()
 	supervisor, err := NewSupervisor(store, gateway)
 	if err != nil {
+		t.Fatal(err)
+	}
+	checkpointID, err := domain.NewCheckpointID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.SetGracefulShutdownCheckpointer(
+		&supervisorGracefulCheckpointer{id: checkpointID},
+	); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(supervisorHelperMode, "run")
@@ -78,7 +86,8 @@ func TestSupervisorOwnsOneProcessAndGracefullyStops(t *testing.T) {
 	if state := store.finishedState(input.RunID); state != storage.WorkerLeaseExited {
 		t.Fatalf("finished worker state = %s", state)
 	}
-	if checkpoint := store.lastCheckpoint(input.RunID); checkpoint != "checkpoint-supervisor" {
+	if checkpoint := store.lastCheckpoint(input.RunID); checkpoint !=
+		checkpointID.String() {
 		t.Fatalf("last checkpoint = %q", checkpoint)
 	}
 	if _, err := supervisor.Start(
@@ -105,6 +114,46 @@ func TestSupervisorRecordsWorkerCrash(t *testing.T) {
 	}
 	if exitCode := store.exitCode(input.RunID); exitCode != 12 {
 		t.Fatalf("crashed worker exit code = %d", exitCode)
+	}
+}
+
+func TestSupervisorSurfacesGracefulCheckpointFailureWithoutFalseID(
+	t *testing.T,
+) {
+	store := newSupervisorStore()
+	gateway, err := NewWorkerGateway(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(gateway.Handler())
+	defer server.Close()
+	supervisor, err := NewSupervisor(store, gateway)
+	if err != nil {
+		t.Fatal(err)
+	}
+	captureErr := errors.New("durable checkpoint commit failed")
+	checkpointID, _ := domain.NewCheckpointID()
+	if err := supervisor.SetGracefulShutdownCheckpointer(
+		&supervisorGracefulCheckpointer{
+			id:  checkpointID,
+			err: captureErr,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(supervisorHelperMode, "run")
+	input := supervisorStartFixture(t, server.URL)
+	if _, err := supervisor.Start(t.Context(), input); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return store.heartbeatCount() > 0 })
+	err = supervisor.CheckpointAndStopAll(t.Context())
+	if !errors.Is(err, captureErr) {
+		t.Fatalf("shutdown error = %v", err)
+	}
+	waitFor(t, func() bool { return supervisor.ActiveCount() == 0 })
+	if checkpoint := store.lastCheckpoint(input.RunID); checkpoint != "" {
+		t.Fatalf("false checkpoint identity = %q", checkpoint)
 	}
 }
 
@@ -156,6 +205,12 @@ func TestSupervisorForcesUnresponsiveWorkerToStopAfterGrace(t *testing.T) {
 	defer server.Close()
 	supervisor, _ := NewSupervisor(store, gateway)
 	supervisor.grace = 100 * time.Millisecond
+	checkpointID, _ := domain.NewCheckpointID()
+	if err := supervisor.SetGracefulShutdownCheckpointer(
+		&supervisorGracefulCheckpointer{id: checkpointID},
+	); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv(supervisorHelperMode, "unresponsive")
 	input := supervisorStartFixture(t, server.URL)
 	if _, err := supervisor.Start(t.Context(), input); err != nil {
@@ -195,10 +250,19 @@ func waitFor(t *testing.T, condition func() bool) {
 	}
 }
 
-type supervisorCheckpointer struct{}
+type supervisorGracefulCheckpointer struct {
+	id  domain.CheckpointID
+	err error
+}
 
-func (supervisorCheckpointer) Checkpoint(context.Context) (string, error) {
-	return "checkpoint-supervisor", nil
+func (stub *supervisorGracefulCheckpointer) CaptureGracefulShutdownCheckpoint(
+	context.Context,
+	domain.TaskID,
+	domain.RunID,
+	string,
+	time.Duration,
+) (domain.CheckpointID, error) {
+	return stub.id, stub.err
 }
 
 type supervisorStore struct {

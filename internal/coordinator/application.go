@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"google.golang.org/grpc"
 
+	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/buildinfo"
 	"codeflux.dev/codeflux/internal/credentials"
 	"codeflux.dev/codeflux/internal/domain"
@@ -23,6 +25,7 @@ import (
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
 	"codeflux.dev/codeflux/internal/worker"
+	"codeflux.dev/codeflux/internal/workspace"
 	"codeflux.dev/codeflux/migrations"
 )
 
@@ -34,15 +37,18 @@ type WorkerController interface {
 }
 
 type ApplicationOptions struct {
-	DatabasePath     string
-	BackupDirectory  string
-	ListenAddress    string
-	WorkerLimit      int
-	ProviderLimits   map[string]int
-	HeartbeatTimeout time.Duration
-	Now              func() time.Time
-	Random           func([]byte) (int, error)
-	Workers          WorkerController
+	DatabasePath        string
+	BackupDirectory     string
+	ListenAddress       string
+	WorkerLimit         int
+	ProviderLimits      map[string]int
+	HeartbeatTimeout    time.Duration
+	Now                 func() time.Time
+	Random              func([]byte) (int, error)
+	Workers             WorkerController
+	ShutdownCheckpoints GracefulShutdownCheckpointer
+	TaskControls        transport.TaskControlApplication
+	TaskListenAddress   string
 }
 
 type OrphanedWorkerCandidate struct {
@@ -54,36 +60,42 @@ type OrphanedWorkerCandidate struct {
 
 // Application is the long-lived local coordinator dependency root.
 type Application struct {
-	lock        *flock.Flock
-	database    *storage.Database
-	repos       *storage.Repositories
-	credentials credentials.Store
-	providers   ProviderDependencies
-	workspace   WorkspaceDependencies
-	preflight   *TaskPreflightService
-	events      *events.Hub
-	transport   *transport.Boundary
-	scheduler   *DurableScheduler
-	runtime     *WorkerRuntime
-	gateway     *WorkerGateway
-	supervisor  *Supervisor
-	listener    net.Listener
-	server      *http.Server
-	workers     WorkerController
-	secret      string
-	recovery    []storage.RecoveryCandidate
-	recoveryMu  sync.Mutex
-	worktrees   []storage.WorktreeRecoveryCandidate
-	taskRuns    []storage.UnownedTaskRunRecoveryCandidate
-	orphans     []OrphanedWorkerCandidate
-	heartbeat   time.Duration
-	now         func() time.Time
-	monitorStop context.CancelFunc
-	monitorDone chan struct{}
-	accepting   atomic.Bool
-	serveDone   chan error
-	closeOnce   sync.Once
-	closeErr    error
+	lock                *flock.Flock
+	database            *storage.Database
+	repos               *storage.Repositories
+	credentials         credentials.Store
+	providers           ProviderDependencies
+	workspace           WorkspaceDependencies
+	preflight           *TaskPreflightService
+	events              *events.Hub
+	transport           *transport.Boundary
+	scheduler           *DurableScheduler
+	runtime             *WorkerRuntime
+	gateway             *WorkerGateway
+	supervisor          *Supervisor
+	listener            net.Listener
+	server              *http.Server
+	taskListener        net.Listener
+	taskServer          *grpc.Server
+	taskServeDone       chan error
+	workers             WorkerController
+	secret              string
+	recovery            []storage.RecoveryCandidate
+	recoveryMu          sync.Mutex
+	worktrees           []storage.WorktreeRecoveryCandidate
+	taskRuns            []storage.UnownedTaskRunRecoveryCandidate
+	recoveryAssessments []storage.RecoveryAssessmentRecord
+	recoveryDecisions   *RecoveryDecisionService
+	orphans             []OrphanedWorkerCandidate
+	heartbeat           time.Duration
+	now                 func() time.Time
+	monitorStop         context.CancelFunc
+	monitorDone         chan struct{}
+	accepting           atomic.Bool
+	serveDone           chan error
+	closeOnce           sync.Once
+	closeErr            error
+	checkpointClose     func() error
 }
 
 func StartApplication(
@@ -203,6 +215,16 @@ func StartApplication(
 		heartbeat: options.HeartbeatTimeout, now: options.Now,
 		monitorDone: make(chan struct{}),
 	}
+	cleanupTaskListener := true
+	cleanupCheckpointing := true
+	defer func() {
+		if cleanupTaskListener && application.taskListener != nil {
+			_ = application.taskListener.Close()
+		}
+		if cleanupCheckpointing && application.checkpointClose != nil {
+			_ = application.checkpointClose()
+		}
+	}()
 	application.gateway, err = NewWorkerGateway(repositories)
 	if err != nil {
 		return nil, err
@@ -218,6 +240,15 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	checkpointing, err := newApplicationCheckpointing(
+		options.DatabasePath,
+		repositories,
+	)
+	if err != nil {
+		return nil, err
+	}
+	application.checkpointClose = checkpointing.close
+	taskControls := options.TaskControls
 	if application.workers == nil {
 		application.supervisor, err = NewSupervisor(repositories, application.gateway)
 		if err != nil {
@@ -234,8 +265,63 @@ func StartApplication(
 		); err != nil {
 			return nil, err
 		}
+		shutdownCheckpoints := options.ShutdownCheckpoints
+		if shutdownCheckpoints == nil {
+			shutdownCheckpoints = checkpointing.checkpoints
+		}
+		if err := application.supervisor.
+			SetGracefulShutdownCheckpointer(
+				shutdownCheckpoints,
+			); err != nil {
+			return nil, err
+		}
+		if taskControls == nil {
+			taskControls, err = newApplicationTaskControls(
+				repositories,
+				application.supervisor,
+				checkpointing,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
 		application.workers = application.supervisor
 	}
+	if taskControls == nil {
+		return nil, errors.New(
+			"task control service is required with a custom worker controller",
+		)
+	}
+	taskAddress := options.TaskListenAddress
+	if taskAddress == "" {
+		taskAddress = "127.0.0.1:0"
+	}
+	application.taskListener, err = listenLoopback(taskAddress)
+	if err != nil {
+		return nil, err
+	}
+	taskService, err := transport.NewTaskService(taskControls)
+	if err != nil {
+		return nil, err
+	}
+	application.taskServer = grpc.NewServer(
+		grpc.UnaryInterceptor(
+			application.transport.UnaryInterceptor(),
+		),
+		grpc.StreamInterceptor(
+			application.transport.StreamInterceptor(),
+		),
+	)
+	codefluxv1.RegisterTaskServiceServer(
+		application.taskServer,
+		taskService,
+	)
+	application.taskServeDone = make(chan error, 1)
+	go func() {
+		application.taskServeDone <- application.taskServer.Serve(
+			application.taskListener,
+		)
+	}()
 	application.recovery, err = repositories.AbandonActiveWorkerLeasesAfterRestart(ctx)
 	if err != nil {
 		return nil, err
@@ -265,6 +351,54 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	compatibility, err := NewDurableRecoveryCompatibilitySource(repositories)
+	if err != nil {
+		return nil, err
+	}
+	actions, err := NewDurableRecoveryActionSource(repositories)
+	if err != nil {
+		return nil, err
+	}
+	observations, err := NewDurableRecoveryObservationSource(
+		repositories,
+		checkpointing.worktrees,
+		compatibility,
+		actions,
+		workspace.ExecRunner{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	patches, err := NewDurableRecoveryPatchLocator(
+		repositories,
+		workspace.ExecRunner{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	assessments, err := NewRecoveryAssessmentService(
+		repositories,
+		observations,
+		patches,
+	)
+	if err != nil {
+		return nil, err
+	}
+	application.recoveryAssessments, err =
+		assessments.AssessIncompleteTaskRuns(
+			ctx,
+			maximumRecoveryCandidates,
+		)
+	if err != nil {
+		return nil, err
+	}
+	application.recoveryDecisions, err = NewRecoveryDecisionService(
+		repositories,
+		checkpointing.worktrees,
+	)
+	if err != nil {
+		return nil, err
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", application.health)
 	mux.Handle(
@@ -289,6 +423,8 @@ func StartApplication(
 	cleanupLock = false
 	cleanupDatabase = false
 	cleanupListener = false
+	cleanupTaskListener = false
+	cleanupCheckpointing = false
 	return application, nil
 }
 
@@ -399,6 +535,13 @@ func (application *Application) BrowserSessionSecret() string {
 	return application.secret
 }
 
+func (application *Application) TaskControlAddress() string {
+	if application.taskListener == nil {
+		return ""
+	}
+	return application.taskListener.Addr().String()
+}
+
 func (application *Application) RecoveryCandidates() []storage.RecoveryCandidate {
 	application.recoveryMu.Lock()
 	defer application.recoveryMu.Unlock()
@@ -423,6 +566,20 @@ func (application *Application) TaskRunRecoveryCandidates() []storage.UnownedTas
 	)
 }
 
+// RecoveryAssessments returns the immutable startup recovery presentation
+// facts. No candidate has been resumed automatically.
+func (application *Application) RecoveryAssessments() []storage.RecoveryAssessmentRecord {
+	return append(
+		[]storage.RecoveryAssessmentRecord(nil),
+		application.recoveryAssessments...,
+	)
+}
+
+// RecoveryDecisionService exposes explicit user-authorized recovery actions.
+func (application *Application) RecoveryDecisionService() *RecoveryDecisionService {
+	return application.recoveryDecisions
+}
+
 func (application *Application) AcceptingMutations() bool {
 	return application.accepting.Load()
 }
@@ -442,7 +599,35 @@ func (application *Application) Shutdown(ctx context.Context) error {
 		if application.workers != nil {
 			workerErr = application.workers.CheckpointAndStopAll(ctx)
 		}
+		var checkpointResourcesErr error
+		if application.checkpointClose != nil {
+			checkpointResourcesErr = application.checkpointClose()
+		}
 		eventErr := application.events.Close()
+		var taskServerErr error
+		if application.taskServer != nil {
+			taskServerErr = transport.StopGRPCServer(
+				ctx,
+				application.taskServer,
+			)
+			if application.taskListener != nil {
+				closeErr := application.taskListener.Close()
+				if !errors.Is(closeErr, net.ErrClosed) {
+					taskServerErr = errors.Join(
+						taskServerErr,
+						closeErr,
+					)
+				}
+			}
+			serveErr := <-application.taskServeDone
+			if !errors.Is(serveErr, grpc.ErrServerStopped) &&
+				!errors.Is(serveErr, net.ErrClosed) {
+				taskServerErr = errors.Join(
+					taskServerErr,
+					serveErr,
+				)
+			}
+		}
 		serverErr := application.server.Shutdown(ctx)
 		if serverErr != nil {
 			serverErr = errors.Join(serverErr, application.server.Close())
@@ -455,7 +640,9 @@ func (application *Application) Shutdown(ctx context.Context) error {
 		databaseErr := application.database.Close(ctx)
 		lockErr := application.lock.Close()
 		application.closeErr = errors.Join(
-			schedulerErr, workerErr, eventErr, serverErr, serveErr, checkpointErr,
+			schedulerErr, workerErr, checkpointResourcesErr, eventErr,
+			taskServerErr, serverErr,
+			serveErr, checkpointErr,
 			databaseErr, lockErr,
 		)
 	})

@@ -42,6 +42,8 @@ func run(stdout, stderr io.Writer, args []string) int {
 		return runBackup(stdout, stderr, args[1:])
 	case "integrity":
 		return runIntegrity(stdout, stderr, args[1:])
+	case "pause", "resume", "cancel":
+		return runTaskControl(stdout, stderr, args[0], args[1:])
 	default:
 		fmt.Fprintf(stderr, "codeflux: unknown command %q\n", args[0])
 		printHelp(stderr)
@@ -57,6 +59,9 @@ func printHelp(output io.Writer) {
 	fmt.Fprintln(output, "  doctor   Check available local prerequisites")
 	fmt.Fprintln(output, "  backup   Create an explicit SQLite recovery snapshot")
 	fmt.Fprintln(output, "  integrity  Run a full SQLite integrity check")
+	fmt.Fprintln(output, "  pause    Pause an active task at a safe checkpoint")
+	fmt.Fprintln(output, "  resume   Resume a compatible paused task")
+	fmt.Fprintln(output, "  cancel   Cancel an active or paused task")
 }
 
 func printVersion(output io.Writer, info buildinfo.Info) {

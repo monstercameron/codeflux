@@ -30,6 +30,27 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-064
+Date: 2026-07-31
+Type: Durable checkpoint, interruption, and crash recovery
+Request-or-TODO: M15-001 through M15-045 and M15-G01 through M15-G03
+Outcome: Added versioned secret-free checkpoints, cooperative task controls,
+  divergence-aware resume, startup recovery classification, immutable recovery
+  decisions and attempts, and binary-safe patch preservation
+Affected-behavior: Every execution boundary now has an attributable durable
+  recovery point. Pause, cancellation, shutdown, restart, and user edits cannot
+  silently repeat actions, change provider or policy authority, lose the task
+  patch, or convert cancellation into failure.
+Compatibility-or-migration: Adds migration 000015 for canonical checkpoint
+  state, idempotency aliases, task-control lineage, and recovery assessments,
+  decisions, and attempts; schema version advances from 14 to 15.
+Verification: Real Git preservation and divergence tests, SQLite atomicity and
+  close/reopen crash matrices, subprocess pre-checkpoint recovery, authenticated
+  task-control RPC and CLI tests, go test ./..., lint, generation, migration,
+  integration, security, and complete local test-all gates pass. The final
+  adversarial audit accepts all M15 gates.
+Dev-Log: DL-20260731-065
+
 Change-ID: CL-20260730-063
 Date: 2026-07-30
 Type: Cross-platform provider cancellation ordering

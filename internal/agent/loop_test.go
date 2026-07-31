@@ -100,6 +100,13 @@ func TestExecutionLoopSuccessfulEditUsesBoundedApprovedContextAndCheckpoint(
 			len(harness.checkpoints.requests),
 		)
 	}
+	if harness.checkpoints.requests[0].Trigger !=
+		CheckpointMaterialEdit {
+		t.Fatalf(
+			"material checkpoint = %#v",
+			harness.checkpoints.requests[0],
+		)
+	}
 	start := harness.journal.starts[0]
 	if start.ModelRequestID != requestOne ||
 		start.Authorization.DecisionID == "" ||
@@ -110,11 +117,78 @@ func TestExecutionLoopSuccessfulEditUsesBoundedApprovedContextAndCheckpoint(
 		t.Fatalf("tool start = %#v", start)
 	}
 	wantOrder := []string{
+		"plan-approved-checkpoint",
 		"authority", "start", "step:in-progress", "execute", "result",
 		"checkpoint", "step:implemented",
 	}
 	if strings.Join(harness.order.values, ",") != strings.Join(wantOrder, ",") {
 		t.Fatalf("execution order = %#v, want %#v", harness.order.values, wantOrder)
+	}
+}
+
+func TestExecutionLoopCheckpointsBeforeRiskyApprovedAction(t *testing.T) {
+	harness := newLoopHarness(t)
+	harness.input.Plan.Steps = []PlanStep{{
+		ID:                 "test",
+		Kind:               StepKindTest,
+		SummaryRedacted:    "Run the approved test recipe",
+		State:              StepPending,
+		ValidationRequired: true,
+		CompletionTools:    []executor.ToolName{executor.ToolTest},
+	}}
+	harness.input.ApprovedTools = []ApprovedTool{approvedTestTool(t)}
+	harness.model.steps = []modelStep{
+		func(context.Context, ModelInput) (ModelTurn, error) {
+			return successfulToolTurn(
+				harness.model.identity,
+				newModelRequestID(t),
+				"test-risky",
+				executor.ToolTest,
+				`{"executable":"go","arg1":"test","arg2":"./..."}`,
+				"test",
+				false,
+			), nil
+		},
+		func(context.Context, ModelInput) (ModelTurn, error) {
+			return completionTurn(
+				harness.model.identity,
+				newModelRequestID(t),
+				CompletionImplementationComplete,
+			), nil
+		},
+	}
+	harness.tools.result = executor.ToolResult{
+		RequestID:     "test-risky",
+		SchemaVersion: executor.ToolSchemaVersion,
+		State:         "succeeded",
+		Summary:       "tests passed",
+	}
+
+	if _, err := harness.loop.Run(t.Context(), harness.input); err != nil {
+		t.Fatal(err)
+	}
+	if len(harness.checkpoints.requests) != 1 {
+		t.Fatalf("risky checkpoints = %#v", harness.checkpoints.requests)
+	}
+	request := harness.checkpoints.requests[0]
+	if request.Trigger != CheckpointBeforeRisky ||
+		request.PermissionID != "permission-decision-1" ||
+		!validSHA256(request.ActionSHA256) {
+		t.Fatalf("risky checkpoint = %#v", request)
+	}
+	checkpointIndex := -1
+	executeIndex := -1
+	for index, event := range harness.order.values {
+		switch event {
+		case "checkpoint":
+			checkpointIndex = index
+		case "execute":
+			executeIndex = index
+		}
+	}
+	if checkpointIndex < 0 || executeIndex < 0 ||
+		checkpointIndex >= executeIndex {
+		t.Fatalf("risky action order = %v", harness.order.values)
 	}
 }
 
@@ -530,30 +604,35 @@ func TestExecutionLoopExecutionErrorOverridesContradictoryResult(t *testing.T) {
 		wantCancelled bool
 		wantTimedOut  bool
 		wantSummary   string
+		wantOutcome   OutcomeKind
 	}{
 		{
 			name:          "success plus error is unknown",
 			returnedState: "succeeded",
 			executionErr:  errors.New("transport disappeared"),
 			wantState:     "outcome-unknown",
+			wantOutcome:   OutcomeAwaitingDirection,
 		},
 		{
 			name:          "failure plus error is unknown",
 			returnedState: "failed",
 			executionErr:  errors.New("boundary failed"),
 			wantState:     "outcome-unknown",
+			wantOutcome:   OutcomeAwaitingDirection,
 		},
 		{
 			name:          "success plus cancellation is cancelled",
 			returnedState: "succeeded",
 			executionErr:  context.Canceled,
 			wantState:     "cancelled", wantCancelled: true,
+			wantOutcome: OutcomeCancelled,
 		},
 		{
 			name:          "failure plus deadline is cancelled",
 			returnedState: "failed",
 			executionErr:  context.DeadlineExceeded,
 			wantState:     "cancelled", wantTimedOut: true,
+			wantOutcome: OutcomeCancelled,
 		},
 		{
 			name:          "explicit trustworthy unknown is preserved",
@@ -561,6 +640,7 @@ func TestExecutionLoopExecutionErrorOverridesContradictoryResult(t *testing.T) {
 			executionErr:  errors.New("ambiguous boundary"),
 			wantState:     "outcome-unknown",
 			wantSummary:   "executor retained explicit uncertainty",
+			wantOutcome:   OutcomeAwaitingDirection,
 		},
 	}
 	for _, test := range tests {
@@ -604,7 +684,7 @@ func TestExecutionLoopExecutionErrorOverridesContradictoryResult(t *testing.T) {
 				t.Fatal(err)
 			}
 			result := harness.journal.results[0].Result
-			if outcome.Kind != OutcomeAwaitingDirection ||
+			if outcome.Kind != test.wantOutcome ||
 				result.State != test.wantState ||
 				result.Cancelled != test.wantCancelled ||
 				result.TimedOut != test.wantTimedOut ||
@@ -1215,6 +1295,10 @@ func newLoopHarness(t *testing.T) *loopHarness {
 	if err != nil {
 		t.Fatal(err)
 	}
+	approvalID, err := domain.NewApprovalID()
+	if err != nil {
+		t.Fatal(err)
+	}
 	model := providers.ModelIdentity{
 		Provider: providers.ProviderIdentity{
 			Adapter: "fake", AdapterVersion: "1",
@@ -1246,6 +1330,7 @@ func newLoopHarness(t *testing.T) *loopHarness {
 		now:         time.Now,
 		input: LoopInput{
 			TaskID: taskID, RunID: runID,
+			PlanApprovalID: approvalID,
 			WorktreePath:   filepath.Join(t.TempDir(), "worktree"),
 			PolicyRevision: 3,
 			PolicySHA256:   strings.Repeat("b", 64),
@@ -1300,7 +1385,8 @@ func (harness *loopHarness) rebuildLoop(t *testing.T) {
 		Model: harness.model, Authority: harness.authority,
 		Tools: harness.tools, Journal: harness.journal,
 		PlanSteps: harness.plan, Checkpoints: harness.checkpoints,
-		Control: harness.control, Interrupts: harness.interrupts,
+		PlanApprovalCheckpoints: harness.checkpoints,
+		Control:                 harness.control, Interrupts: harness.interrupts,
 		Now: harness.now,
 	})
 	if err != nil {
@@ -1349,6 +1435,29 @@ func approvedInspectDiffTool(t *testing.T) ApprovedTool {
 	}
 	return ApprovedTool{
 		Descriptor: descriptor, DefaultTimeout: time.Minute,
+	}
+}
+
+func approvedTestTool(t *testing.T) ApprovedTool {
+	t.Helper()
+	var descriptor executor.ToolDescriptor
+	for _, candidate := range executor.ToolCatalog() {
+		if candidate.Name == executor.ToolTest {
+			descriptor = candidate
+			break
+		}
+	}
+	if descriptor.Name == "" {
+		t.Fatal("test descriptor is unavailable")
+	}
+	return ApprovedTool{
+		Descriptor: descriptor,
+		Arguments: []ToolArgumentDefinition{
+			{Name: "executable", Required: true},
+			{Name: "arg1", Required: true},
+			{Name: "arg2", Required: true},
+		},
+		DefaultTimeout: time.Minute,
 	}
 }
 
@@ -1491,6 +1600,14 @@ func (stub *checkpointStoreStub) CreateCheckpoint(
 	return nil
 }
 
+func (stub *checkpointStoreStub) CreatePlanApprovedCheckpoint(
+	_ context.Context,
+	_ PlanApprovedCheckpointRequest,
+) error {
+	stub.order.add("plan-approved-checkpoint")
+	return nil
+}
+
 type controlReaderStub struct {
 	mu    sync.Mutex
 	state ControlState
@@ -1518,6 +1635,7 @@ func (passthroughInterruptBridge) BindActionContext(
 	parent context.Context,
 	_ domain.TaskID,
 	_ domain.RunID,
+	_ ActionDescriptor,
 ) (context.Context, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(parent)
 	return ctx, cancel, nil
@@ -1534,6 +1652,7 @@ func (stub *interruptBridgeStub) BindActionContext(
 	parent context.Context,
 	_ domain.TaskID,
 	_ domain.RunID,
+	_ ActionDescriptor,
 ) (context.Context, context.CancelFunc, error) {
 	ctx, cancel := context.WithCancel(parent)
 	stub.mu.Lock()

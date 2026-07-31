@@ -2239,66 +2239,116 @@ Milestone output: versioned checkpoints, cooperative interruption, divergence-aw
 
 ## Checkpoint Contents
 
-- [ ] `M15-001 BLOCKER` Define checkpoint schema and version.
-- [ ] `M15-002` Bind checkpoint to task, run, plan revision, base revision, and current worktree HEAD.
-- [ ] `M15-003` Record dirty file hashes and diff identity.
-- [ ] `M15-004` Record completed and pending plan steps.
-- [ ] `M15-005` Record current budget ledger position.
-- [ ] `M15-006` Record effective policy and tool schema versions.
-- [ ] `M15-007` Record last durable event sequence.
-- [ ] `M15-008` Record whether an external action may be in an ambiguous outcome state.
-- [ ] `M15-009` Never serialize provider credentials or live process handles.
+- [x] `M15-001 BLOCKER` Define checkpoint schema and version.
+- [x] `M15-002` Bind checkpoint to task, run, plan revision, base revision, and current worktree HEAD.
+- [x] `M15-003` Record dirty file hashes and diff identity.
+- [x] `M15-004` Record completed and pending plan steps.
+- [x] `M15-005` Record current budget ledger position.
+- [x] `M15-006` Record effective policy and tool schema versions.
+- [x] `M15-007` Record last durable event sequence.
+- [x] `M15-008` Record whether an external action may be in an ambiguous outcome state.
+- [x] `M15-009` Never serialize provider credentials or live process handles.
 
 ## Checkpoint Creation
 
-- [ ] `M15-010` Create a checkpoint after plan approval.
-- [ ] `M15-011` Create a checkpoint after each material edit batch.
-- [ ] `M15-012` Create a checkpoint before a risky approved action.
-- [ ] `M15-013` Create a checkpoint after successful validation.
-- [ ] `M15-014` Create a checkpoint on user pause.
-- [ ] `M15-015` Attempt a bounded checkpoint on graceful shutdown.
-- [ ] `M15-016` Commit checkpoint and event atomically where required.
-- [ ] `M15-017` Deduplicate checkpoints with identical state.
+- [x] `M15-010` Create a checkpoint after plan approval.
+- [x] `M15-011` Create a checkpoint after each material edit batch.
+- [x] `M15-012` Create a checkpoint before a risky approved action.
+- [x] `M15-013` Create a checkpoint after successful validation.
+- [x] `M15-014` Create a checkpoint on user pause.
+- [x] `M15-015` Attempt a bounded checkpoint on graceful shutdown.
+- [x] `M15-016` Commit checkpoint and event atomically where required.
+- [x] `M15-017` Deduplicate checkpoints with identical state.
 
 ## Pause and Resume
 
-- [ ] `M15-018 BLOCKER` Implement pause request from CLI and UI.
-- [ ] `M15-019` Stop starting new model and tool operations after pause.
-- [ ] `M15-020` Decide whether an in-flight safe read may finish.
-- [ ] `M15-021` Cancel in-flight long-running operations when requested.
-- [ ] `M15-022` Persist paused state and reason.
-- [ ] `M15-023` Validate repository and worktree binding before resume.
-- [ ] `M15-024` Validate policy, provider, and tool compatibility before resume.
-- [ ] `M15-025` Surface user edits made while paused.
-- [ ] `M15-026` Require reconciliation or a new plan revision after conflicting edits.
+- [x] `M15-018 BLOCKER` Implement pause request from CLI and UI.
+- [x] `M15-019` Stop starting new model and tool operations after pause.
+- [x] `M15-020` Decide whether an in-flight safe read may finish.
+- [x] `M15-021` Cancel in-flight long-running operations when requested.
+- [x] `M15-022` Persist paused state and reason.
+- [x] `M15-023` Validate repository and worktree binding before resume.
+- [x] `M15-024` Validate policy, provider, and tool compatibility before resume.
+- [x] `M15-025` Surface user edits made while paused.
+- [x] `M15-026` Require reconciliation or a new plan revision after conflicting edits.
 
 ## Crash Recovery
 
-- [ ] `M15-027 BLOCKER` Scan incomplete tasks on coordinator startup.
-- [ ] `M15-028` Verify repository path and identity.
-- [ ] `M15-029` Verify base revision availability.
-- [ ] `M15-030` Verify worktree existence and ownership.
-- [ ] `M15-031` Verify recorded file hashes and diff identity.
-- [ ] `M15-032` Verify no unresolved Git operation appeared.
-- [ ] `M15-033` Classify recovery as safe-resume, reconcile-required, patch-preservation-only, or unrecoverable.
-- [ ] `M15-034` Never auto-repeat an external action with ambiguous outcome.
-- [ ] `M15-035` Present the last checkpoint and divergence clearly.
-- [ ] `M15-036` Preserve a patch export path when direct resume is unsafe.
-- [ ] `M15-037` Record every recovery attempt and decision.
+- [x] `M15-027 BLOCKER` Scan incomplete tasks on coordinator startup.
+- [x] `M15-028` Verify repository path and identity.
+- [x] `M15-029` Verify base revision availability.
+- [x] `M15-030` Verify worktree existence and ownership.
+- [x] `M15-031` Verify recorded file hashes and diff identity.
+- [x] `M15-032` Verify no unresolved Git operation appeared.
+- [x] `M15-033` Classify recovery as safe-resume, reconcile-required, patch-preservation-only, or unrecoverable.
+- [x] `M15-034` Never auto-repeat an external action with ambiguous outcome.
+- [x] `M15-035` Present the last checkpoint and divergence clearly.
+- [x] `M15-036` Preserve a patch export path when direct resume is unsafe.
+- [x] `M15-037` Record every recovery attempt and decision.
 
 ## Tests and Gate
 
-- [ ] `M15-038 TEST` Force termination before and after every material event/checkpoint boundary.
-- [ ] `M15-039 TEST` Resume an unchanged worktree.
-- [ ] `M15-040 TEST` Resume after user edits a non-overlapping file.
-- [ ] `M15-041 TEST` Detect a conflicting user edit.
-- [ ] `M15-042 TEST` Detect a missing worktree.
-- [ ] `M15-043 TEST` Detect changed tool or policy versions.
-- [ ] `M15-044 TEST` Detect an ambiguous external-action outcome.
-- [ ] `M15-045 TEST` Verify cancellation does not become failure.
-- [ ] `M15-G01 GATE` A crash at any tested durable boundary yields a safe, explainable recovery state.
-- [ ] `M15-G02 GATE` Resume never duplicates a completed model/tool/external action.
-- [ ] `M15-G03 GATE` The user can always preserve the current patch even when normal resume is impossible.
+- [x] `M15-038 TEST` Force termination before and after every material event/checkpoint boundary.
+- [x] `M15-039 TEST` Resume an unchanged worktree.
+- [x] `M15-040 TEST` Resume after user edits a non-overlapping file.
+- [x] `M15-041 TEST` Detect a conflicting user edit.
+- [x] `M15-042 TEST` Detect a missing worktree.
+- [x] `M15-043 TEST` Detect changed tool or policy versions.
+- [x] `M15-044 TEST` Detect an ambiguous external-action outcome.
+- [x] `M15-045 TEST` Verify cancellation does not become failure.
+- [x] `M15-G01 GATE` A crash at any tested durable boundary yields a safe, explainable recovery state.
+- [x] `M15-G02 GATE` Resume never duplicates a completed model/tool/external action.
+- [x] `M15-G03 GATE` The user can always preserve the current patch even when normal resume is impossible.
+
+M15 test evidence:
+
+- Checkpoint schema version 1 canonically binds task, run, repository,
+  worktree, approved plan, base and preserved Git revisions, dirty-file and
+  diff identities, plan progress, exact budget position, policy, provider,
+  model, run configuration, tool catalog, durable event sequence, and
+  ambiguous external outcomes without credential or process-handle fields.
+- Checkpoint capture uses an isolated Git index and a private immutable ref, so
+  it preserves staged, unstaged, untracked, deleted, and binary task changes
+  without moving the task branch, HEAD, or real index. Atomic SQLite
+  checkpoint-plus-event writes enforce authoritative bindings, exact
+  idempotency aliases, state deduplication, and cleanup after failed commits.
+- The agent checkpoints the exact approved plan before its first model action,
+  after every material edit, before risky effects, and after successful
+  validation. Pause waits for complete action quiescence before checkpointing;
+  bounded graceful shutdown captures the durable checkpoint before sending its
+  exact identity to the worker.
+- The authenticated loopback TaskService and CLI expose idempotent pause,
+  resume, and cancellation commands. A durable action gate blocks new work,
+  lets only mediated safe reads finish, cancels model, write, validation, and
+  long-running operations, and records cancellation as cancellation rather
+  than failure. The same product service is the UI control boundary consumed
+  by the GWC client milestones.
+- Resume verifies exact repository path and Git identity, worktree root,
+  branch ownership, HEAD, file hashes, diff, unresolved Git operations,
+  policy, provider/model/run configuration, tool catalog, and ambiguous
+  actions. Non-overlapping paused edits are surfaced; conflicts and any
+  completed post-checkpoint action block direct resume and require an explicit
+  recovery or new-plan choice.
+- Coordinator startup scans every incomplete run before binding the product
+  server, including crashes before the first checkpoint. It persists
+  structured safe-resume, reconcile-required, patch-preservation-only, or
+  unrecoverable assessments and never automatically repeats an unresolved
+  provider, tool, command, or external-effect intent.
+- Recovery decisions and started/terminal attempts are immutable and
+  idempotent. User-authorized patch preservation verifies the checkpoint's
+  private ref and produces a binary-safe export even after the task worktree
+  is missing.
+- Real SQLite close/reopen tests cover all six required checkpoint triggers,
+  persisted actions completed after each checkpoint, idempotent recovery
+  assessment/decision/attempt replay, and a subprocess crash before the first
+  checkpoint. Real Git tests cover divergence, same-HEAD branch substitution,
+  missing worktrees, unresolved operations, and patch export without mutation.
+- Focused checkpoint, Git, storage, agent, coordinator, transport, worker, and
+  CLI suites pass. `go test ./...`, lint, deterministic generation, migration,
+  integration, security, and the complete local `test-all` gate pass. The
+  adversarial refinement loop accepts M15 after closing provider-binding,
+  unresolved-intent, event-sequence, no-repeat, branch-ownership, and
+  timestamp-idempotency findings.
 
 ---
 

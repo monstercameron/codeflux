@@ -58,6 +58,10 @@ func NewExecutionLoop(
 		return nil, errors.New("agent plan-step store is required")
 	case dependencies.Checkpoints == nil:
 		return nil, errors.New("agent checkpoint store is required")
+	case dependencies.PlanApprovalCheckpoints == nil:
+		return nil, errors.New(
+			"agent plan-approved checkpoint store is required",
+		)
 	case dependencies.Control == nil:
 		return nil, errors.New("agent control reader is required")
 	case dependencies.Interrupts == nil:
@@ -118,6 +122,20 @@ func (loop *ExecutionLoop) Run(
 	); stop {
 		return outcome, nil
 	}
+	if err := loop.dependencies.PlanApprovalCheckpoints.
+		CreatePlanApprovedCheckpoint(
+			ctx,
+			PlanApprovedCheckpointRequest{
+				TaskID: input.TaskID, RunID: input.RunID,
+				PlanRevision: input.Plan.Revision,
+				ApprovalID:   input.PlanApprovalID,
+			},
+		); err != nil {
+		return LoopOutcome{}, fmt.Errorf(
+			"capture approved plan before execution: %w",
+			err,
+		)
+	}
 
 	for rounds < input.Limits.MaximumRounds {
 		if !loop.dependencies.Now().UTC().Before(deadline) {
@@ -144,9 +162,33 @@ func (loop *ExecutionLoop) Run(
 				deadlineContext,
 				input.TaskID,
 				input.RunID,
+				ActionDescriptor{
+					Kind:        ActionModel,
+					RequestID:   fmt.Sprintf("model-round-%d", rounds),
+					LongRunning: true,
+				},
 			)
 		if err != nil {
 			cancelDeadline()
+			if errors.Is(err, ErrActionBlocked) {
+				latest, controlErr := loop.readControl(
+					context.WithoutCancel(ctx),
+					input,
+				)
+				if controlErr != nil {
+					return LoopOutcome{}, controlErr
+				}
+				if outcome, stop := controlStopOutcome(
+					latest,
+					rounds,
+					toolCalls,
+					tokens,
+					cost.amount(),
+					plan,
+				); stop {
+					return outcome, nil
+				}
+			}
 			return LoopOutcome{}, err
 		}
 		turn, turnErr := loop.dependencies.Model.ObserveThink(
@@ -387,6 +429,26 @@ func (loop *ExecutionLoop) Run(
 			); err != nil {
 				return LoopOutcome{}, err
 			}
+			requiredAuthority := executor.RequiredAuthority(decoded.request)
+			if requiredAuthority != executor.AuthorityAutomaticRead &&
+				requiredAuthority != executor.AuthorityTaskWrite {
+				if err := loop.dependencies.Checkpoints.CreateCheckpoint(
+					context.WithoutCancel(ctx),
+					CheckpointRequest{
+						TaskID: input.TaskID, RunID: input.RunID,
+						PlanRevision:   plan.Revision,
+						PlanStepID:     proposed.PlanStepID,
+						ToolRequestID:  decoded.request.ID,
+						ModelRequestID: turn.ModelRequestID,
+						Round:          rounds, Trigger: CheckpointBeforeRisky,
+						PermissionID: authorization.DecisionID,
+						ActionSHA256: executor.ActionSHA256(decoded.request),
+						Reason:       "before risky approved action",
+					},
+				); err != nil {
+					return LoopOutcome{}, err
+				}
+			}
 			if plan.Steps[stepIndex].State == StepPending {
 				err = loop.transitionStep(
 					ctx,
@@ -411,9 +473,35 @@ func (loop *ExecutionLoop) Run(
 					toolDeadlineContext,
 					input.TaskID,
 					input.RunID,
+					ActionDescriptor{
+						Kind:      ActionTool,
+						RequestID: decoded.request.ID,
+						SafeRead: executor.RequiredAuthority(
+							decoded.request,
+						) == executor.AuthorityAutomaticRead,
+					},
 				)
 			if err != nil {
 				cancelToolDeadline()
+				if errors.Is(err, ErrActionBlocked) {
+					latest, controlErr := loop.readControl(
+						context.WithoutCancel(ctx),
+						input,
+					)
+					if controlErr != nil {
+						return LoopOutcome{}, controlErr
+					}
+					if outcome, stop := controlStopOutcome(
+						latest,
+						rounds,
+						toolCalls,
+						tokens,
+						cost.amount(),
+						plan,
+					); stop {
+						return outcome, nil
+					}
+				}
 				return LoopOutcome{}, err
 			}
 			result, executeErr := loop.dependencies.Tools.ExecuteTool(
@@ -470,6 +558,7 @@ func (loop *ExecutionLoop) Run(
 						ToolRequestID:  decoded.request.ID,
 						ModelRequestID: turn.ModelRequestID,
 						Round:          rounds,
+						Trigger:        CheckpointMaterialEdit,
 						Reason:         "material edit batch completed",
 					},
 				); err != nil {
@@ -492,6 +581,25 @@ func (loop *ExecutionLoop) Run(
 			}
 			feedback := toolFeedback(result, decoded.request.Name)
 			currentResults = append(currentResults, feedback)
+			if result.State == "cancelled" {
+				control, err = loop.readControl(
+					context.WithoutCancel(ctx),
+					input,
+				)
+				if err != nil {
+					return LoopOutcome{}, err
+				}
+				if outcome, stop := controlStopOutcome(
+					control, rounds, toolCalls, tokens, cost.amount(), plan,
+				); stop {
+					return outcome, nil
+				}
+				return finishLoopOutcome(
+					OutcomeCancelled,
+					"active tool action was cancelled",
+					rounds, toolCalls, tokens, cost.amount(), plan, true,
+				), nil
+			}
 			if !succeeded {
 				fingerprint := failedActionFingerprint(
 					decoded.request,
@@ -542,8 +650,11 @@ func (loop *ExecutionLoop) Run(
 
 func validateLoopInput(input LoopInput) error {
 	switch {
-	case input.TaskID.IsZero() || input.RunID.IsZero():
-		return errors.New("agent task and run IDs are required")
+	case input.TaskID.IsZero() || input.RunID.IsZero() ||
+		input.PlanApprovalID.IsZero():
+		return errors.New(
+			"agent task, run, and plan approval IDs are required",
+		)
 	case !filepath.IsAbs(input.WorktreePath):
 		return errors.New("agent worktree path must be absolute")
 	case input.Plan.Revision == 0:
@@ -756,7 +867,8 @@ func (loop *ExecutionLoop) readControl(
 		return ControlState{}, err
 	}
 	switch state.Disposition {
-	case ControlActive, ControlPaused, ControlCancelled, ControlStopped:
+	case ControlActive, ControlPauseRequested, ControlPaused, ControlCancelled,
+		ControlStopped:
 	default:
 		return ControlState{}, errors.New("agent control state is invalid")
 	}
@@ -772,7 +884,7 @@ func controlStopOutcome(
 	plan PlanProjection,
 ) (LoopOutcome, bool) {
 	switch control.Disposition {
-	case ControlPaused:
+	case ControlPauseRequested, ControlPaused:
 		return finishLoopOutcome(
 			OutcomePaused, "task execution is paused",
 			rounds, toolCalls, tokens, cost, plan, true,
