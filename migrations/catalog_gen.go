@@ -26,5 +26,7 @@ var Catalog = []Descriptor{
 	{Number: 19, Name: "000019_session_projection_notifications.sql", SHA256: "a4292fb7fe63cc8a80185ebb2f1da830d789c62d192bb4108a42598fe3873d90"},
 	{Number: 20, Name: "000020_task_graph_storage.sql", SHA256: "4e09d6272987e6dd24c25e326abe38714701cb4b2e80e1b9c3b64f829f0f73ad"},
 	{Number: 21, Name: "000021_task_risk_classifications.sql", SHA256: "2c7b005120263d1a72efe96c6d2233beec2b9a35117a9971b77141ead39c888a"},
-	{Number: 22, Name: "000022_validation_run_records.sql", SHA256: "34ea1605194e95942f66f4a87b1629404eeb355d0d32fe5ac75b527b2ca55411"},
+	{Number: 22, Name: "000022_validation_run_records.sql", SHA256: "35888df87d1fb2da7bde5de262534253d41dc163df9bd1720571141858cd59fb"},
+	{Number: 23, Name: "000023_evidence_reports.sql", SHA256: "be11be226bfddaa4e8c73345976ec9a1572f935a020bed5b813c053fbfaad72b"},
+	{Number: 24, Name: "000024_acceptance_repair.sql", SHA256: "a756b596af8deccc6ae62e8298bdcae57e5da0f238152c0c6dc4b5447bbd0275"},
 }

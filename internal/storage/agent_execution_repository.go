@@ -299,6 +299,39 @@ type CompletionCandidate struct {
 	CreatedAt              time.Time
 }
 
+func (repositories *Repositories) GetLatestCompletionCandidateForTask(ctx context.Context, taskID domain.TaskID) (CompletionCandidate, error) {
+	var value CompletionCandidate
+	var implemented, validated int
+	var micros int64
+	err := repositories.database.sql.QueryRowContext(ctx, `SELECT task_id, run_id, plan_revision, revision,
+		expected_task_revision, expected_run_revision, event_id, event_idempotency_key,
+		repository_status_json, diff_summary_json, diff_sha256, validation_summary_json,
+		budget_summary_json, assumptions_json, limitations_json, implementation_complete,
+		validation_complete, idempotency_key, created_at_unix_micros
+		FROM completion_candidates WHERE task_id = ?
+		ORDER BY created_at_unix_micros DESC, revision DESC LIMIT 1`, taskID).Scan(
+		&value.TaskID, &value.RunID, &value.PlanRevision, &value.Revision,
+		&value.ExpectedTaskRevision, &value.ExpectedRunRevision, &value.EventID,
+		&value.EventIdempotencyKey, &value.RepositoryStatusJSON, &value.DiffSummaryJSON,
+		&value.DiffSHA256, &value.ValidationSummaryJSON, &value.BudgetSummaryJSON,
+		&value.AssumptionsJSON, &value.LimitationsJSON, &implemented, &validated,
+		&value.IdempotencyKey, &micros)
+	if err != nil {
+		return CompletionCandidate{}, repositoryReadConstraint("get latest completion candidate", err)
+	}
+	value.ImplementationComplete, value.ValidationComplete = implemented != 0, validated != 0
+	value.CreatedAt = repositoryTime(micros)
+	return value, nil
+}
+
+func (repositories *Repositories) GetRunRevision(ctx context.Context, taskID domain.TaskID, runID domain.RunID) (uint64, error) {
+	var revision uint64
+	if err := repositories.database.sql.QueryRowContext(ctx, `SELECT revision FROM runs WHERE id = ? AND task_id = ?`, runID, taskID).Scan(&revision); err != nil {
+		return 0, repositoryReadConstraint("get run revision", err)
+	}
+	return revision, nil
+}
+
 // RecordCompletionCandidate atomically records the candidate and moves the
 // task from validating to awaiting review.
 type RecordCompletionCandidate struct {

@@ -119,17 +119,23 @@ func TestAcceptTaskCommitUsesExplicitAuthorAndRejectsStaleReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.AcceptTaskChange(t.Context(), AcceptTaskChangeInput{
+	acceptedInput := AcceptTaskChangeInput{
 		TaskID: taskID, RepositoryPath: repository,
 		ExpectedDiffIdentity: reviewed.Identity, Mode: AcceptanceCommit,
-		AuthorName: "Codeflux User", AuthorEmail: "user@example.invalid",
+		AcceptanceReference: strings.Repeat("a", 64),
+		AuthorName:          "Codeflux User", AuthorEmail: "user@example.invalid",
 		CommitMessage: "Accept task change",
-	})
+	}
+	result, err := service.AcceptTaskChange(t.Context(), acceptedInput)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.CommitRevision == binding.BaseRevision || result.PatchApplied {
 		t.Fatalf("commit acceptance result = %#v", result)
+	}
+	replayed, err := service.AcceptTaskChange(t.Context(), acceptedInput)
+	if err != nil || replayed.CommitRevision != result.CommitRevision || replayed.DiffIdentity != reviewed.Identity {
+		t.Fatalf("idempotent accepted commit replay = %#v, %v", replayed, err)
 	}
 	author := runGit(
 		t,

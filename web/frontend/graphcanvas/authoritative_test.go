@@ -59,6 +59,8 @@ func TestAuthoritativeRendererEmitsCompleteAccessibleVisualContract(t *testing.T
 		`aria-atomic="true"`,
 		`data-selected="true"`,
 		`data-component="graph-selection-ring"`,
+		`width="240"`, `height="88"`,
+		`x="18"`, `y="34"`, `font-size="15"`,
 		`tabIndex="0"`,
 	} {
 		if !strings.Contains(markup, fragment) {

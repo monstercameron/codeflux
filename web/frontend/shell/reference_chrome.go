@@ -70,6 +70,11 @@ func routeFrameClass(layout state.LayoutPreferences) string {
 
 func ApplicationBar(props ApplicationBarProps) ui.Node {
 	recordRender(props.Probe, "application-bar", props.Revision)
+	shortcutHelpHandler := ui.UseCallback(func() {
+		if props.OnShortcutHelp != nil {
+			props.OnShortcutHelp()
+		}
+	})
 	tokens := props.Mode.Tokens()
 	compact := props.Viewport == state.ViewportNarrow || props.Viewport == state.ViewportMinimum
 	tracks := []css.Track{
@@ -207,7 +212,10 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			manualReconnectControl(props, connection),
 			headerIconButtonWithID("global-search-trigger", "⌕", "Search", props.Mode, props.OnSearchOpen),
 			headerIconButton("◐", "Change color theme", props.Mode, props.OnThemeChange),
-			headerIconButton("?", "Shortcut help", props.Mode, props.OnShortcutHelp),
+			primitives.Button(primitives.ButtonProps{
+				ID: "shortcut-help-trigger", Label: "?", AccessibleLabel: "Shortcut help", Mode: props.Mode,
+				Disabled: props.OnShortcutHelp == nil, OnClick: shortcutHelpHandler,
+			}),
 			html.Div(html.Props{Class: wideOnlyClass()},
 				headerIconButtonWithID(
 					"assurance-rail-toggle", "▥", "Toggle task details sidebar", props.Mode, props.OnInspectorToggle,

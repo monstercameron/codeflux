@@ -47,7 +47,15 @@ func TestMountedAuthoritativeGraphLoadsInspectorAndDispatchesActions(t *testing.
 	}
 	targetID := "nod_01890f3c-4a00-7abc-8def-000000000002"
 	graphRoot := fixture.Locator(`[data-component="authoritative-task-graph"]`)
-	if err := graphRoot.Locator(`[data-node-id="` + targetID + `"]`).Press("Enter"); err != nil {
+	targetNode := graphRoot.Locator(`[data-node-id="` + targetID + `"]`)
+	if err := browserAssertions().Locator(targetNode).ToBeVisible(); err != nil {
+		t.Fatalf("authoritative graph node is not visually rendered: %v", err)
+	}
+	shape := targetNode.Locator("polygon, rect").Last()
+	if err := browserAssertions().Locator(shape).ToHaveAttribute("stroke-width", "2"); err != nil {
+		t.Fatalf("authoritative graph shape lost numeric SVG attributes: %v", err)
+	}
+	if err := targetNode.Press("Enter"); err != nil {
 		t.Fatalf("select authoritative graph node: %v", err)
 	}
 	m19WaitForCounter(t, fixture, "data-detail-loads", 1, 2*time.Second)

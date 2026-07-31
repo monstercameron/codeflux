@@ -282,6 +282,32 @@ func productApplication() ui.Node {
 			}
 		}
 	}
+	timelineProps.ReviewContent = useMountedReview(
+		selectedThread.Get(),
+		primitives.Mode{
+			Theme: tokens.Theme, Density: tokens.Density,
+			HighContrast: tokens.Theme == design.ThemeHighContrast, ReducedMotion: tokens.ReducedMotion,
+		},
+		timelineProps.ReviewFile,
+		reviewNavigation{
+			OpenPlan: func(revision uint64, stepID string) {
+				graphMessageStableKey.Set("plan:" + strconv.FormatUint(revision, 10))
+				graphMessageNotice.Set("Showing plan step " + stepID + " from the reviewed diff.")
+			},
+			OpenEvent: func(eventID domain.EventID) {
+				if path, err := routes.TaskEventSelectionPath(taskDetailSelection.Route, eventID); err == nil {
+					navigator.Navigate(path)
+					return
+				}
+				graphMessageStableKey.Set("event:" + eventID.String())
+				graphMessageNotice.Set("Showing the reviewed tool event in the loaded timeline.")
+			},
+			OpenValidation: func(validationID domain.ValidationID) {
+				graphMessageStableKey.Set("validation:" + validationID.String())
+				graphMessageNotice.Set("Showing validation evidence linked from the reviewed diff.")
+			},
+		},
+	)
 	if authoritativeTaskControls != nil && timelineSource.TaskReady {
 		decorateTaskControlsFromProjection(authoritativeTaskControls, timelineSource.Task)
 		if taskControlSource.DecorateRecovery != nil {

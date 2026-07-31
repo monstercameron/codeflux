@@ -1379,8 +1379,11 @@ var GraphService_ServiceDesc = grpc.ServiceDesc{
 const (
 	ReviewService_GetDiffSummary_FullMethodName      = "/codeflux.v1.ReviewService/GetDiffSummary"
 	ReviewService_GetValidationReport_FullMethodName = "/codeflux.v1.ReviewService/GetValidationReport"
+	ReviewService_GetEvidenceReport_FullMethodName   = "/codeflux.v1.ReviewService/GetEvidenceReport"
 	ReviewService_AcceptChange_FullMethodName        = "/codeflux.v1.ReviewService/AcceptChange"
+	ReviewService_RequestRepair_FullMethodName       = "/codeflux.v1.ReviewService/RequestRepair"
 	ReviewService_RejectChange_FullMethodName        = "/codeflux.v1.ReviewService/RejectChange"
+	ReviewService_RollbackTask_FullMethodName        = "/codeflux.v1.ReviewService/RollbackTask"
 	ReviewService_OpenInEditor_FullMethodName        = "/codeflux.v1.ReviewService/OpenInEditor"
 )
 
@@ -1390,8 +1393,11 @@ const (
 type ReviewServiceClient interface {
 	GetDiffSummary(ctx context.Context, in *GetDiffSummaryRequest, opts ...grpc.CallOption) (*GetDiffSummaryResponse, error)
 	GetValidationReport(ctx context.Context, in *GetValidationReportRequest, opts ...grpc.CallOption) (*GetValidationReportResponse, error)
+	GetEvidenceReport(ctx context.Context, in *GetEvidenceReportRequest, opts ...grpc.CallOption) (*GetEvidenceReportResponse, error)
 	AcceptChange(ctx context.Context, in *AcceptChangeRequest, opts ...grpc.CallOption) (*AcceptChangeResponse, error)
+	RequestRepair(ctx context.Context, in *ReviewServiceRequestRepairRequest, opts ...grpc.CallOption) (*ReviewServiceRequestRepairResponse, error)
 	RejectChange(ctx context.Context, in *RejectChangeRequest, opts ...grpc.CallOption) (*RejectChangeResponse, error)
+	RollbackTask(ctx context.Context, in *ReviewServiceRollbackTaskRequest, opts ...grpc.CallOption) (*ReviewServiceRollbackTaskResponse, error)
 	OpenInEditor(ctx context.Context, in *OpenInEditorRequest, opts ...grpc.CallOption) (*OpenInEditorResponse, error)
 }
 
@@ -1423,6 +1429,16 @@ func (c *reviewServiceClient) GetValidationReport(ctx context.Context, in *GetVa
 	return out, nil
 }
 
+func (c *reviewServiceClient) GetEvidenceReport(ctx context.Context, in *GetEvidenceReportRequest, opts ...grpc.CallOption) (*GetEvidenceReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEvidenceReportResponse)
+	err := c.cc.Invoke(ctx, ReviewService_GetEvidenceReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *reviewServiceClient) AcceptChange(ctx context.Context, in *AcceptChangeRequest, opts ...grpc.CallOption) (*AcceptChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AcceptChangeResponse)
@@ -1433,10 +1449,30 @@ func (c *reviewServiceClient) AcceptChange(ctx context.Context, in *AcceptChange
 	return out, nil
 }
 
+func (c *reviewServiceClient) RequestRepair(ctx context.Context, in *ReviewServiceRequestRepairRequest, opts ...grpc.CallOption) (*ReviewServiceRequestRepairResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewServiceRequestRepairResponse)
+	err := c.cc.Invoke(ctx, ReviewService_RequestRepair_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *reviewServiceClient) RejectChange(ctx context.Context, in *RejectChangeRequest, opts ...grpc.CallOption) (*RejectChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RejectChangeResponse)
 	err := c.cc.Invoke(ctx, ReviewService_RejectChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) RollbackTask(ctx context.Context, in *ReviewServiceRollbackTaskRequest, opts ...grpc.CallOption) (*ReviewServiceRollbackTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewServiceRollbackTaskResponse)
+	err := c.cc.Invoke(ctx, ReviewService_RollbackTask_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1459,8 +1495,11 @@ func (c *reviewServiceClient) OpenInEditor(ctx context.Context, in *OpenInEditor
 type ReviewServiceServer interface {
 	GetDiffSummary(context.Context, *GetDiffSummaryRequest) (*GetDiffSummaryResponse, error)
 	GetValidationReport(context.Context, *GetValidationReportRequest) (*GetValidationReportResponse, error)
+	GetEvidenceReport(context.Context, *GetEvidenceReportRequest) (*GetEvidenceReportResponse, error)
 	AcceptChange(context.Context, *AcceptChangeRequest) (*AcceptChangeResponse, error)
+	RequestRepair(context.Context, *ReviewServiceRequestRepairRequest) (*ReviewServiceRequestRepairResponse, error)
 	RejectChange(context.Context, *RejectChangeRequest) (*RejectChangeResponse, error)
+	RollbackTask(context.Context, *ReviewServiceRollbackTaskRequest) (*ReviewServiceRollbackTaskResponse, error)
 	OpenInEditor(context.Context, *OpenInEditorRequest) (*OpenInEditorResponse, error)
 	mustEmbedUnimplementedReviewServiceServer()
 }
@@ -1478,11 +1517,20 @@ func (UnimplementedReviewServiceServer) GetDiffSummary(context.Context, *GetDiff
 func (UnimplementedReviewServiceServer) GetValidationReport(context.Context, *GetValidationReportRequest) (*GetValidationReportResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetValidationReport not implemented")
 }
+func (UnimplementedReviewServiceServer) GetEvidenceReport(context.Context, *GetEvidenceReportRequest) (*GetEvidenceReportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEvidenceReport not implemented")
+}
 func (UnimplementedReviewServiceServer) AcceptChange(context.Context, *AcceptChangeRequest) (*AcceptChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcceptChange not implemented")
 }
+func (UnimplementedReviewServiceServer) RequestRepair(context.Context, *ReviewServiceRequestRepairRequest) (*ReviewServiceRequestRepairResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestRepair not implemented")
+}
 func (UnimplementedReviewServiceServer) RejectChange(context.Context, *RejectChangeRequest) (*RejectChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RejectChange not implemented")
+}
+func (UnimplementedReviewServiceServer) RollbackTask(context.Context, *ReviewServiceRollbackTaskRequest) (*ReviewServiceRollbackTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RollbackTask not implemented")
 }
 func (UnimplementedReviewServiceServer) OpenInEditor(context.Context, *OpenInEditorRequest) (*OpenInEditorResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method OpenInEditor not implemented")
@@ -1544,6 +1592,24 @@ func _ReviewService_GetValidationReport_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReviewService_GetEvidenceReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEvidenceReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).GetEvidenceReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_GetEvidenceReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).GetEvidenceReport(ctx, req.(*GetEvidenceReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ReviewService_AcceptChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AcceptChangeRequest)
 	if err := dec(in); err != nil {
@@ -1562,6 +1628,24 @@ func _ReviewService_AcceptChange_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReviewService_RequestRepair_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewServiceRequestRepairRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).RequestRepair(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_RequestRepair_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).RequestRepair(ctx, req.(*ReviewServiceRequestRepairRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ReviewService_RejectChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RejectChangeRequest)
 	if err := dec(in); err != nil {
@@ -1576,6 +1660,24 @@ func _ReviewService_RejectChange_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ReviewServiceServer).RejectChange(ctx, req.(*RejectChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_RollbackTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewServiceRollbackTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).RollbackTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_RollbackTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).RollbackTask(ctx, req.(*ReviewServiceRollbackTaskRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1614,12 +1716,24 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ReviewService_GetValidationReport_Handler,
 		},
 		{
+			MethodName: "GetEvidenceReport",
+			Handler:    _ReviewService_GetEvidenceReport_Handler,
+		},
+		{
 			MethodName: "AcceptChange",
 			Handler:    _ReviewService_AcceptChange_Handler,
 		},
 		{
+			MethodName: "RequestRepair",
+			Handler:    _ReviewService_RequestRepair_Handler,
+		},
+		{
 			MethodName: "RejectChange",
 			Handler:    _ReviewService_RejectChange_Handler,
+		},
+		{
+			MethodName: "RollbackTask",
+			Handler:    _ReviewService_RollbackTask_Handler,
 		},
 		{
 			MethodName: "OpenInEditor",

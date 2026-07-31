@@ -232,21 +232,40 @@ message RequestRepairRequest {
   StableIdentity task_id = 2;
   string feedback = 3;
   repeated StableIdentity evidence_ids = 4;
+  string review_id = 5;
+  uint64 expected_review_revision = 6;
+  string expected_report_id = 7;
+  string expected_diff_identity = 8;
+  repeated ReviewRepairTarget targets = 9;
+  StableIdentity checkpoint_id = 10;
+  StableIdentity feedback_message_id = 11;
+}
+
+message ReviewRepairTarget {
+  string kind = 1;
+  string id = 2;
 }
 
 message RequestRepairResponse {
   TaskView task = 1;
   uint64 plan_revision = 2;
+  string repair_request_id = 3;
+  StableIdentity pre_repair_checkpoint_id = 4;
 }
 
 message RollbackTaskRequest {
   MutationControl control = 1;
   StableIdentity task_id = 2;
   StableIdentity checkpoint_id = 3;
+  string repair_request_id = 4;
+  string expected_repair_diff_identity = 5;
+  RedactedText reason = 6;
 }
 
 message RollbackTaskResponse {
   TaskView task = 1;
+  string rollback_intent_id = 2;
+  string observed_diff_identity = 3;
 }
 
 message PreserveRecoveryPatchRequest {
@@ -403,13 +422,32 @@ message CompareGraphRevisionsResponse {
 service ReviewService {
   rpc GetDiffSummary(GetDiffSummaryRequest) returns (GetDiffSummaryResponse);
   rpc GetValidationReport(GetValidationReportRequest) returns (GetValidationReportResponse);
+  rpc GetEvidenceReport(GetEvidenceReportRequest) returns (GetEvidenceReportResponse);
   rpc AcceptChange(AcceptChangeRequest) returns (AcceptChangeResponse);
+  rpc RequestRepair(ReviewServiceRequestRepairRequest) returns (ReviewServiceRequestRepairResponse);
   rpc RejectChange(RejectChangeRequest) returns (RejectChangeResponse);
+  rpc RollbackTask(ReviewServiceRollbackTaskRequest) returns (ReviewServiceRollbackTaskResponse);
   rpc OpenInEditor(OpenInEditorRequest) returns (OpenInEditorResponse);
 }
 
 message GetDiffSummaryRequest {
   StableIdentity task_id = 1;
+}
+
+message ReviewServiceRequestRepairRequest {
+  RequestRepairRequest request = 1;
+}
+
+message ReviewServiceRequestRepairResponse {
+  RequestRepairResponse result = 1;
+}
+
+message ReviewServiceRollbackTaskRequest {
+  RollbackTaskRequest request = 1;
+}
+
+message ReviewServiceRollbackTaskResponse {
+  RollbackTaskResponse result = 1;
 }
 
 message GetDiffSummaryResponse {
@@ -424,16 +462,90 @@ message GetValidationReportResponse {
   ValidationReportView report = 1;
 }
 
+// GetEvidenceReport reads one sealed structured report and, when requested,
+// the current bounded review diff. An empty report_id selects the latest
+// sealed report for the task. The response explicitly says whether the live
+// diff still matches the immutable report binding.
+message GetEvidenceReportRequest {
+  StableIdentity task_id = 1;
+  string report_id = 2;
+  bool include_diff = 3;
+}
+
+message ReviewPlanStepLinkView {
+  uint64 plan_revision = 1;
+  string step_id = 2;
+}
+
+message ReviewValidationLinkView {
+  StableIdentity validation_id = 1;
+  string state = 2;
+  RedactedText label = 3;
+  RedactedText summary = 4;
+}
+
+message ReviewDiffFileView {
+  SafePath path = 1;
+  SafePath previous_path = 2;
+  string status = 3;
+  string category = 4;
+  uint64 added_lines = 5;
+  uint64 deleted_lines = 6;
+  bool line_counts_known = 7;
+  RedactedText line_counts_unknown_reason = 8;
+  bool binary = 9;
+  bool formatting_churn = 10;
+  bool scope_known = 11;
+  bool in_scope = 12;
+  RedactedText scope_unknown_reason = 13;
+  repeated ReviewPlanStepLinkView plan_steps = 14;
+  repeated StableIdentity tool_event_ids = 15;
+  repeated ReviewValidationLinkView validations = 16;
+}
+
+message ReviewDiffView {
+  StableIdentity task_id = 1;
+  string diff_identity = 2;
+  string base_revision = 3;
+  string head_revision = 4;
+  RedactedText unified_diff = 5;
+  repeated ReviewDiffFileView files = 6;
+}
+
+message GetEvidenceReportResponse {
+  // Canonical JSON encoding of the validated evidence.Report value. It is
+  // bounded by the service and contains structured fields, never Markdown.
+  bytes structured_report_json = 1;
+  ReviewDiffView diff = 2;
+  bool diff_matches_report = 3;
+  string review_id = 4;
+  uint64 review_revision = 5;
+}
+
 message AcceptChangeRequest {
   MutationControl control = 1;
   StableIdentity task_id = 2;
   string expected_diff_identity = 3;
   uint64 expected_validation_revision = 4;
+  string review_id = 5;
+  uint64 expected_review_revision = 6;
+  string expected_report_id = 7;
+  repeated string acknowledged_check_ids = 8;
+  string acceptance_mode = 9;
+  string author_name = 10;
+  string author_email = 11;
+  RedactedText commit_message = 12;
+  RedactedText reason = 13;
 }
 
 message AcceptChangeResponse {
   TaskView task = 1;
   RedactedText acceptance_summary = 2;
+  string acceptance_id = 3;
+  string report_id = 4;
+  string diff_identity = 5;
+  string commit_revision = 6;
+  bool patch_applied = 7;
 }
 
 message RejectChangeRequest {
@@ -441,10 +553,17 @@ message RejectChangeRequest {
   StableIdentity task_id = 2;
   string reason = 3;
   bool preserve_patch = 4;
+  string review_id = 5;
+  uint64 expected_review_revision = 6;
+  string expected_report_id = 7;
+  string expected_diff_identity = 8;
+  StableIdentity checkpoint_id = 9;
 }
 
 message RejectChangeResponse {
   TaskView task = 1;
+  string rejection_id = 2;
+  string preserved_patch_path = 3;
 }
 
 message OpenInEditorRequest {

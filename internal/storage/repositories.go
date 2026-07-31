@@ -79,8 +79,9 @@ type Message struct {
 
 // Repositories implements all SQLite domain repository contracts.
 type Repositories struct {
-	database *Database
-	now      func() time.Time
+	database               *Database
+	now                    func() time.Time
+	acceptanceObservations AcceptanceObservationSource
 }
 
 // ContextManifest is one immutable, revision-bound provider-context selection.

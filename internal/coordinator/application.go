@@ -23,6 +23,7 @@ import (
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/frontendserver"
 	"codeflux.dev/codeflux/internal/gitwork"
+	"codeflux.dev/codeflux/internal/review"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
 	"codeflux.dev/codeflux/internal/worker"
@@ -51,6 +52,7 @@ type ApplicationOptions struct {
 	TaskControls            transport.TaskControlApplication
 	TaskListenAddress       string
 	FrontendAssetsDirectory string
+	EditorExecutable        string
 }
 
 type OrphanedWorkerCandidate struct {
@@ -259,6 +261,17 @@ func StartApplication(
 		return nil, err
 	}
 	application.checkpointClose = checkpointing.close
+	acceptanceObservations, err := NewAcceptanceObservationResolver(
+		repositories, checkpointing.worktrees, repositories,
+	)
+	if err != nil {
+		return nil, err
+	}
+	repositories.SetAcceptanceObservationSource(acceptanceObservations)
+	reviewMutations, err := NewReviewMutationService(repositories, checkpointing.worktrees)
+	if err != nil {
+		return nil, err
+	}
 	application.recoveryDecisions, err = NewRecoveryDecisionService(
 		repositories,
 		checkpointing.worktrees,
@@ -418,6 +431,32 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	editorWorkspaces, err := NewEditorWorkspaceResolver(repositories)
+	if err != nil {
+		return nil, err
+	}
+	editorExecutable := options.EditorExecutable
+	if editorExecutable == "" {
+		editorExecutable = "code"
+	}
+	editorLauncher, err := review.NewCLIEditorLauncher(editorExecutable)
+	if err != nil {
+		return nil, err
+	}
+	editorOpens, err := review.NewEditorOpenService(editorWorkspaces, editorLauncher)
+	if err != nil {
+		return nil, err
+	}
+	reviewEvidence, err := NewReviewEvidenceService(
+		repositories, checkpointing.worktrees, checkpointing.redactor,
+	)
+	if err != nil {
+		return nil, err
+	}
+	reviewService, err := transport.NewReviewService(editorOpens, reviewEvidence, reviewMutations)
+	if err != nil {
+		return nil, err
+	}
 	application.taskServer = grpc.NewServer(
 		grpc.UnaryInterceptor(
 			application.transport.UnaryInterceptor(),
@@ -434,6 +473,7 @@ func StartApplication(
 	codefluxv1.RegisterSessionServiceServer(application.taskServer, sessionService)
 	codefluxv1.RegisterSettingsServiceServer(application.taskServer, settingsService)
 	codefluxv1.RegisterGraphServiceServer(application.taskServer, graphService)
+	codefluxv1.RegisterReviewServiceServer(application.taskServer, reviewService)
 	application.taskServeDone = make(chan error, 1)
 	go func() {
 		application.taskServeDone <- application.taskServer.Serve(

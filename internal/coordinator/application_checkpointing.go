@@ -37,6 +37,7 @@ func (source storedCheckpointPlanRevisionSource) CurrentCheckpointPlanRevision(
 type applicationCheckpointing struct {
 	checkpoints *LaneACheckpointAdapter
 	worktrees   *gitwork.Service
+	redactor    *redact.Pipeline
 	close       func() error
 }
 
@@ -92,6 +93,7 @@ func newApplicationCheckpointing(
 	return applicationCheckpointing{
 		checkpoints: adapter,
 		worktrees:   worktrees,
+		redactor:    pipeline,
 		close: func() error {
 			pipeline.Close()
 			return nil

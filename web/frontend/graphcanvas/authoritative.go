@@ -408,7 +408,7 @@ func authoritativeEdges(edges []graph.Edge, layout graphlayout.Layout, mode prim
 			Data: map[string]string{"component": "graph-edge", "edge-id": edge.ID().String(), "relationship": string(edge.Class())},
 			Raw: map[string]any{
 				"d":    fmt.Sprintf("M %d %d C %d %d, %d %d, %d %d", startX, startY, startX+bend, startY, endX-bend, endY, endX, endY),
-				"fill": "none", "stroke": stroke, "stroke-width": width,
+				"fill": "none", "stroke": stroke, "stroke-width": strconv.Itoa(width),
 				"stroke-dasharray": dash, "vector-effect": "non-scaling-stroke",
 			},
 		}
@@ -457,12 +457,12 @@ func authoritativeNodeContents(node graph.Node, bounds graphlayout.Rect, mode pr
 	return append(result,
 		shape,
 		html.Tag("text", html.Props{Raw: map[string]any{
-			"x": 18, "y": 34, "fill": string(tokens.Colors.TextPrimary),
-			"font-size": 15, "font-weight": 600, "font-family": tokens.Fonts.UI,
+			"x": "18", "y": "34", "fill": string(tokens.Colors.TextPrimary),
+			"font-size": "15", "font-weight": "600", "font-family": tokens.Fonts.UI,
 		}}, html.Text(display)),
 		html.Tag("text", html.Props{Data: map[string]string{"component": "graph-node-status"}, Raw: map[string]any{
-			"x": 18, "y": bounds.Height - 18, "fill": string(tokens.Colors.TextSecondary),
-			"font-size": 12, "font-weight": 600, "font-family": tokens.Fonts.UI,
+			"x": "18", "y": strconv.FormatInt(bounds.Height-18, 10), "fill": string(tokens.Colors.TextSecondary),
+			"font-size": "12", "font-weight": "600", "font-family": tokens.Fonts.UI,
 		}}, html.Text(graphStatusIcon(node.Status())+" "+graphStatusLabel(node.Status()))),
 	)
 }
@@ -474,7 +474,7 @@ func authoritativeShape(
 	strokeWidth int,
 ) ui.Node {
 	common := map[string]any{
-		"fill": fill, "stroke": stroke, "stroke-width": strokeWidth,
+		"fill": fill, "stroke": stroke, "stroke-width": strconv.Itoa(strokeWidth),
 		"stroke-dasharray": dash, "vector-effect": "non-scaling-stroke",
 	}
 	switch class {
@@ -492,13 +492,14 @@ func authoritativeShape(
 		return html.Polygon(html.Props{Raw: common})
 	default:
 		if class == graph.NodeClassRequirement {
-			common["rx"] = 14
+			common["rx"] = "14"
 		} else if class == graph.NodeClassObligation {
-			common["rx"] = height / 2
+			common["rx"] = strconv.FormatInt(height/2, 10)
 		} else {
-			common["rx"] = 6
+			common["rx"] = "6"
 		}
-		common["x"], common["y"], common["width"], common["height"] = 0, 0, width, height
+		common["x"], common["y"] = "0", "0"
+		common["width"], common["height"] = strconv.FormatInt(width, 10), strconv.FormatInt(height, 10)
 		return html.Rect(html.Props{Raw: common})
 	}
 }

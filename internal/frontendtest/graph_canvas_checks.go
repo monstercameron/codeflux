@@ -169,8 +169,11 @@ func runGraphCanvasInteractionCheck(
 		err = fit.Click()
 	}
 	if err == nil {
+		// Fit is allowed to retain the existing zoom when the graph was already
+		// fitted before a pointer pan. Its contract is to restore the fitted
+		// viewport, so wait on the pan coordinate changed by the gesture.
 		err = waitForNumericAttributeChange(
-			canvas, "data-zoom", initial.Zoom, graphTransformTolerance,
+			canvas, "data-pan-x", panned.PanX, graphTransformTolerance,
 		)
 	}
 	if err == nil {

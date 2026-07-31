@@ -20,7 +20,6 @@ const (
 
 var (
 	ErrInvalidValidationRun = errors.New("invalid validation run")
-	ErrValidationRunStale   = errors.New("validation run is stale")
 )
 
 type ExecutableIdentity struct {
@@ -55,23 +54,23 @@ type RunIntent struct {
 }
 
 type RunResult struct {
-	ValidationRunID       domain.ValidationID
-	State                 domain.ValidationState
-	ExitCode              int
-	Duration              time.Duration
-	TimedOut              bool
-	Cancelled             bool
-	StdoutRedacted        string
-	StderrRedacted        string
-	StdoutTruncated       bool
-	StderrTruncated       bool
-	ParserName            string
-	ParseSucceeded        bool
-	ParsedResultJSON      string
-	RawRedactedSummary    string
-	ObservedDiffIdentity  string
-	ResultDigest          string
-	CompletedAt           time.Time
+	ValidationRunID      domain.ValidationID
+	State                domain.ValidationState
+	ExitCode             int
+	Duration             time.Duration
+	TimedOut             bool
+	Cancelled            bool
+	StdoutRedacted       string
+	StderrRedacted       string
+	StdoutTruncated      bool
+	StderrTruncated      bool
+	ParserName           string
+	ParseSucceeded       bool
+	ParsedResultJSON     string
+	RawRedactedSummary   string
+	ObservedDiffIdentity string
+	ResultDigest         string
+	CompletedAt          time.Time
 }
 
 type Invalidation struct {
@@ -83,10 +82,10 @@ type Invalidation struct {
 }
 
 type RequiredRerun struct {
-	CheckID             string
-	PreviousRunID       domain.ValidationID
+	CheckID              string
+	PreviousRunID        domain.ValidationID
 	PreviousDiffIdentity string
-	CurrentDiffIdentity string
+	CurrentDiffIdentity  string
 }
 
 func (intent RunIntent) Validate() error {
@@ -99,7 +98,7 @@ func (intent RunIntent) Validate() error {
 		return ErrInvalidValidationRun
 	case strings.TrimSpace(intent.CheckID) != intent.CheckID || intent.CheckID == "" || len(intent.CheckID) > 255:
 		return ErrInvalidValidationRun
-	case len(intent.WorktreeRevision) < 40 || len(intent.WorktreeRevision) > 255:
+	case !validGitRevision(intent.WorktreeRevision):
 		return ErrInvalidValidationRun
 	case !lowerHexDigest(intent.DiffIdentity), !lowerHexDigest(intent.CommandFingerprint):
 		return ErrInvalidValidationRun
@@ -145,7 +144,7 @@ func (intent RunIntent) computeDigest() (string, error) {
 		CheckClass: intent.CheckClass, Required: intent.Required,
 		WorktreeRevision: intent.WorktreeRevision, DiffIdentity: intent.DiffIdentity,
 		CommandDefinitionJSON: intent.CommandDefinitionJSON,
-		CommandFingerprint: intent.CommandFingerprint, Executable: intent.Executable,
+		CommandFingerprint:    intent.CommandFingerprint, Executable: intent.Executable,
 		TimeoutNanoseconds: int64(intent.Timeout),
 	}
 	encoded, err := json.Marshal(canonical)
@@ -194,7 +193,7 @@ func (result RunResult) computeDigest() (string, error) {
 		ValidationRunID      string                 `json:"validation_run_id"`
 		State                domain.ValidationState `json:"state"`
 		ExitCode             int                    `json:"exit_code"`
-		DurationNanoseconds   int64                  `json:"duration_nanoseconds"`
+		DurationNanoseconds  int64                  `json:"duration_nanoseconds"`
 		TimedOut             bool                   `json:"timed_out"`
 		Cancelled            bool                   `json:"cancelled"`
 		StdoutRedacted       string                 `json:"stdout_redacted"`
@@ -238,11 +237,11 @@ func SealRunResult(result RunResult) (RunResult, error) {
 
 func commandDefinition(check Check) (string, error) {
 	definition := struct {
-		Class             CheckClass `json:"class"`
-		Arguments         []string   `json:"arguments"`
-		Source            string     `json:"source"`
-		CommandFingerprint string    `json:"command_fingerprint"`
-		TimeoutNanoseconds int64     `json:"timeout_nanoseconds"`
+		Class              CheckClass `json:"class"`
+		Arguments          []string   `json:"arguments"`
+		Source             string     `json:"source"`
+		CommandFingerprint string     `json:"command_fingerprint"`
+		TimeoutNanoseconds int64      `json:"timeout_nanoseconds"`
 	}{
 		Class: check.Class, Arguments: slices.Clone(check.Arguments), Source: check.Source,
 		CommandFingerprint: check.CommandFingerprint, TimeoutNanoseconds: int64(check.Timeout),
@@ -256,6 +255,10 @@ func commandDefinition(check Check) (string, error) {
 
 func lowerHexDigest(value string) bool {
 	return len(value) == 64 && lowerHex(value)
+}
+
+func validGitRevision(value string) bool {
+	return (len(value) == 40 || len(value) == 64) && lowerHex(value)
 }
 
 func digestBytes(value []byte) string {

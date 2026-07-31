@@ -94,14 +94,15 @@ func TestRepairCompletionCapturesSuccessfulValidationCheckpoint(
 	}
 	service, err := NewRepairCompletionService(
 		RepairCompletionDependencies{
-			Validations: fixture.runner,
-			Checkpoints: checkpoints,
-			Repairs:     fixture.repairs,
-			Control:     fixture.control,
-			Store:       fixture.store,
-			Repository:  fixture.repository,
-			Budget:      fixture.budget,
-			Redactor:    fixture.redactor,
+			Validations:       fixture.runner,
+			CurrentValidation: fixture.currentValidation,
+			Checkpoints:       checkpoints,
+			Repairs:           fixture.repairs,
+			Control:           fixture.control,
+			Store:             fixture.store,
+			Repository:        fixture.repository,
+			Budget:            fixture.budget,
+			Redactor:          fixture.redactor,
 		},
 	)
 	if err != nil {

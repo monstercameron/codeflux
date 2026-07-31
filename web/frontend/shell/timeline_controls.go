@@ -37,6 +37,7 @@ type TimelineControlProps struct {
 	Latency                  timelinecard.LatencyPresentation
 	ReviewBindings           ReviewBindingView
 	ReviewDecisions          ReviewDecisionProps
+	ReviewContent            ui.Node
 	OnLoadOlder              func()
 	OnRetryOlder             func()
 	OnReturnLive             func()
@@ -167,6 +168,7 @@ func TimelineControls(props TimelineControlProps) ui.Node {
 					Text: reviewDescription,
 				}),
 				reviewBindingSummary(props.ReviewBindings, props.Mode),
+				props.ReviewContent,
 				reviewDecisionControls(props.ReviewDecisions, props.Mode),
 				primitives.Button(primitives.ButtonProps{
 					ID: "task-review-close", Label: "Close review", Mode: props.Mode,

@@ -26,7 +26,7 @@ func TestProductServiceMethodSurface(t *testing.T) {
 			"GetGraphSlice", "ExpandGraph", "GetNode", "SearchGraph", "ExplainNode", "CompareGraphRevisions",
 		},
 		"codeflux.v1.ReviewService": {
-			"GetDiffSummary", "GetValidationReport", "AcceptChange", "RejectChange", "OpenInEditor",
+			"GetDiffSummary", "GetValidationReport", "GetEvidenceReport", "AcceptChange", "RequestRepair", "RejectChange", "RollbackTask", "OpenInEditor",
 		},
 		"codeflux.v1.SettingsService": {
 			"GetModels", "GetPolicy", "SetPolicy", "SetBudgetDefaults", "ConfigureProvider", "TestProvider",

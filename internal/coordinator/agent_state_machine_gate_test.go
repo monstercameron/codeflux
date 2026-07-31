@@ -153,7 +153,8 @@ func TestDeterministicFakeAgentCompletesPlanEditTestReviewStateMachine(
 	completionService, err := NewRepairCompletionService(
 		RepairCompletionDependencies{
 			Validations: harness, Checkpoints: harness, Repairs: harness,
-			Control: harness, Store: harness, Repository: harness,
+			CurrentValidation: &completionValidationGateStub{},
+			Control:           harness, Store: harness, Repository: harness,
 			Budget: harness, Redactor: pipeline,
 		},
 	)

@@ -267,14 +267,15 @@ type FinalBudgetInspector interface {
 
 // RepairCompletionDependencies are the explicit effect and persistence ports.
 type RepairCompletionDependencies struct {
-	Validations ValidationCommandRunner
-	Checkpoints PreRepairCheckpointCreator
-	Repairs     RepairExecutor
-	Control     agentloop.ControlReader
-	Store       repairCompletionStore
-	Repository  FinalRepositoryInspector
-	Budget      FinalBudgetInspector
-	Redactor    *redact.Pipeline
+	Validations       ValidationCommandRunner
+	CurrentValidation CompletionValidationGate
+	Checkpoints       PreRepairCheckpointCreator
+	Repairs           RepairExecutor
+	Control           agentloop.ControlReader
+	Store             repairCompletionStore
+	Repository        FinalRepositoryInspector
+	Budget            FinalBudgetInspector
+	Redactor          *redact.Pipeline
 }
 
 // RepairCompletionService owns selected validation, bounded repair, completion
@@ -288,6 +289,7 @@ func NewRepairCompletionService(
 	dependencies RepairCompletionDependencies,
 ) (*RepairCompletionService, error) {
 	if dependencies.Validations == nil ||
+		dependencies.CurrentValidation == nil ||
 		dependencies.Checkpoints == nil ||
 		dependencies.Repairs == nil ||
 		dependencies.Control == nil ||
@@ -305,6 +307,7 @@ func NewRepairCompletionService(
 func NewStoredRepairCompletionService(
 	repositories *storage.Repositories,
 	validations ValidationCommandRunner,
+	currentValidation CompletionValidationGate,
 	checkpoints PreRepairCheckpointCreator,
 	repairs RepairExecutor,
 	control agentloop.ControlReader,
@@ -318,6 +321,7 @@ func NewStoredRepairCompletionService(
 	return newStoredRepairCompletionService(
 		repositories,
 		validations,
+		currentValidation,
 		checkpoints,
 		repairs,
 		control,
@@ -330,6 +334,7 @@ func NewStoredRepairCompletionService(
 func newStoredRepairCompletionService(
 	repositories repairCompletionRepositories,
 	validations ValidationCommandRunner,
+	currentValidation CompletionValidationGate,
 	checkpoints PreRepairCheckpointCreator,
 	repairs RepairExecutor,
 	control agentloop.ControlReader,
@@ -341,10 +346,11 @@ func newStoredRepairCompletionService(
 		return nil, errors.New("repair completion repository is required")
 	}
 	return NewRepairCompletionService(RepairCompletionDependencies{
-		Validations: validations,
-		Checkpoints: checkpoints,
-		Repairs:     repairs,
-		Control:     control,
+		Validations:       validations,
+		CurrentValidation: currentValidation,
+		Checkpoints:       checkpoints,
+		Repairs:           repairs,
+		Control:           control,
 		Store: &storageRepairCompletionStore{
 			repositories: repositories,
 		},
@@ -1252,6 +1258,11 @@ func (service *RepairCompletionService) PrepareCompletion(
 		return CompletionResult{}, errors.New(
 			"repair completion service is unavailable",
 		)
+	}
+	if err := service.dependencies.CurrentValidation.EnsureCompletionReady(
+		ctx, input.TaskID, input.RunID,
+	); err != nil {
+		return CompletionResult{}, errors.Join(ErrRequiredValidationIncomplete, err)
 	}
 	report, err := service.dependencies.Store.ReadFinalValidationReport(
 		ctx,

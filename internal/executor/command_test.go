@@ -92,6 +92,37 @@ func TestExecuteAuthorizedToolBoundsRedactsAndRecordsMetadata(t *testing.T) {
 	}
 }
 
+func TestExecuteAuthorizedToolBindsExactExecutableIdentity(t *testing.T) {
+	worktree := t.TempDir()
+	request := commandToolRequest(t, worktree, "output", 5*time.Second)
+	classification := grantedClassification(t, request)
+	pipeline := commandTestRedactor(t)
+	resolved, digest, err := ResolveExecutableIdentity(request.Arguments[0].Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := ExecuteAuthorizedTool(t.Context(), AuthorizedToolRequest{
+		Request: request, Classification: classification, WorktreePath: worktree,
+		ExpectedExecutable: resolved, ExpectedExecutableSHA256: digest,
+		Environment:        map[string]string{commandHelperMode: "output"},
+		AllowedEnvironment: []string{commandHelperMode}, Redactor: pipeline,
+	})
+	if err != nil || result.ResolvedExecutable != resolved {
+		t.Fatalf("identity-bound execution = %#v, %v", result, err)
+	}
+
+	_, err = ExecuteAuthorizedTool(t.Context(), AuthorizedToolRequest{
+		Request: request, Classification: classification, WorktreePath: worktree,
+		ExpectedExecutable: resolved, ExpectedExecutableSHA256: strings.Repeat("0", 64),
+		Environment:        map[string]string{commandHelperMode: "output"},
+		AllowedEnvironment: []string{commandHelperMode}, Redactor: pipeline,
+	})
+	if err == nil || !strings.Contains(err.Error(), "executable content differs") {
+		t.Fatalf("changed executable identity error = %v", err)
+	}
+}
+
 func TestExecuteAuthorizedToolTimeoutKillsDescendantProcessTree(t *testing.T) {
 	worktree := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "child-survived")

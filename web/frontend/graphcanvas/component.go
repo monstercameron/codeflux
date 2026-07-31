@@ -184,6 +184,31 @@ func interactiveCanvas(props interactiveProps) ui.Node {
 			props.OnViewportChange(next)
 		}
 	}
+	toolbarHandlers := viewportToolbarHandlers{
+		Fit: ui.UseEvent(func(ui.Event) {
+			setViewport(FitViewport(props.Layout.Bounds, width, measuredHeight, 28))
+		}),
+		ZoomOut: ui.UseEvent(func(ui.Event) {
+			setViewport(ZoomViewportAt(viewport.Get(), 0.8, Point{X: width / 2, Y: measuredHeight / 2}))
+		}),
+		ZoomIn: ui.UseEvent(func(ui.Event) {
+			setViewport(ZoomViewportAt(viewport.Get(), 1.25, Point{X: width / 2, Y: measuredHeight / 2}))
+		}),
+		Reset: ui.UseEvent(func(ui.Event) { setViewport(ResetViewport()) }),
+		ReturnCurrent: ui.UseEvent(func(ui.Event) {
+			currentID := strings.TrimSpace(props.CurrentID)
+			if placement, ok := placementByID(props.Layout, currentID); ok {
+				if props.OnSelect != nil {
+					props.OnSelect(currentID)
+				}
+				selected.Set(currentID)
+				setViewport(Viewport{
+					Zoom: 1, PanX: width/2 - placement.Bounds.Center().X,
+					PanY: measuredHeight/2 - placement.Bounds.Center().Y,
+				})
+			}
+		}),
+	}
 	startPan := func(event ui.Event) {
 		if pointerButton(event) != 0 {
 			return
@@ -272,7 +297,7 @@ func interactiveCanvas(props interactiveProps) ui.Node {
 			props, viewport.Get(), width, measuredHeight,
 			selected, hovered, selectNode,
 		),
-		viewportToolbar(props, viewport.Get(), width, measuredHeight, setViewport, selected),
+		viewportToolbar(props, toolbarHandlers, selected),
 		edgeTextAlternative(props.Layout.Edges, nodesByID, props.Mode),
 	)
 }
@@ -341,43 +366,39 @@ func domCompanion(
 	}, buttons...)
 }
 
-func viewportToolbar(
-	props interactiveProps,
-	current Viewport,
-	width, height float64,
-	setViewport func(Viewport),
-	selected ui.State[string],
-) ui.Node {
-	center := Point{X: width / 2, Y: height / 2}
+type viewportToolbarHandlers struct {
+	Fit, ZoomOut, ZoomIn, Reset, ReturnCurrent ui.Handler
+}
+
+func viewportToolbar(props interactiveProps, handlers viewportToolbarHandlers, selected ui.State[string]) ui.Node {
 	return html.Div(html.Props{
 		Role: "toolbar", Aria: map[string]string{"label": "Graph viewport controls"},
 		Data: map[string]string{"component": "graph-canvas-toolbar"}, Class: toolbarClass(props.Mode.Tokens()),
 	},
 		primitives.Button(primitives.ButtonProps{
 			Label: "Fit", AccessibleLabel: "Fit graph", Mode: props.Mode,
-			OnClick: func() { setViewport(FitViewport(props.Layout.Bounds, width, height, 28)) },
+			OnClickHandler: handlers.Fit, StableOnClick: true,
 		}),
 		primitives.Button(primitives.ButtonProps{
 			Label: "−", AccessibleLabel: "Zoom out", Mode: props.Mode,
-			OnClick: func() { setViewport(ZoomViewportAt(current, 0.8, center)) },
+			OnClickHandler: handlers.ZoomOut, StableOnClick: true,
 		}),
 		primitives.Button(primitives.ButtonProps{
 			Label: "+", AccessibleLabel: "Zoom in", Mode: props.Mode,
-			OnClick: func() { setViewport(ZoomViewportAt(current, 1.25, center)) },
+			OnClickHandler: handlers.ZoomIn, StableOnClick: true,
 		}),
 		primitives.Button(primitives.ButtonProps{
 			Label: "Reset", AccessibleLabel: "Reset graph view", Mode: props.Mode,
-			OnClick: func() { setViewport(ResetViewport()) },
+			OnClickHandler: handlers.Reset, StableOnClick: true,
 		}),
-		returnToCurrentControl(props, setViewport, selected, width, height),
+		returnToCurrentControl(props, handlers.ReturnCurrent, selected),
 	)
 }
 
 func returnToCurrentControl(
 	props interactiveProps,
-	setViewport func(Viewport),
+	handler ui.Handler,
 	selected ui.State[string],
-	width, height float64,
 ) ui.Node {
 	currentID := strings.TrimSpace(props.CurrentID)
 	if currentID == "" || selected.Get() == currentID {
@@ -385,18 +406,7 @@ func returnToCurrentControl(
 	}
 	return primitives.Button(primitives.ButtonProps{
 		Label: "Return to current", AccessibleLabel: "Return to current graph node", Mode: props.Mode,
-		OnClick: func() {
-			if placement, ok := placementByID(props.Layout, currentID); ok {
-				if props.OnSelect != nil {
-					props.OnSelect(currentID)
-				}
-				selected.Set(currentID)
-				setViewport(Viewport{
-					Zoom: 1, PanX: width/2 - placement.Bounds.Center().X,
-					PanY: height/2 - placement.Bounds.Center().Y,
-				})
-			}
-		},
+		OnClickHandler: handler, StableOnClick: true,
 	})
 }
 
@@ -455,7 +465,7 @@ func containerClass(tokens design.Tokens, _ int) string {
 
 func canvasClass(tokens design.Tokens, _ int) string {
 	return css.New(
-		css.W(css.Full), css.H(css.Full), css.MaxWidth(css.Full),
+		u.Block, css.W(css.Full), css.H(css.Full), css.MaxWidth(css.Full),
 		css.Cursor.Grab, css.UserSelect.None,
 		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
 		css.Keyframes("graph-canvas-paint",

@@ -13,7 +13,10 @@ CREATE TABLE validation_run_intents (
         'formatter', 'targeted-test', 'broad-test', 'build', 'static-analysis'
     )),
     required INTEGER NOT NULL CHECK (required IN (0, 1)),
-    worktree_revision TEXT NOT NULL CHECK (length(worktree_revision) BETWEEN 40 AND 255),
+    worktree_revision TEXT NOT NULL CHECK (
+        length(worktree_revision) IN (40, 64)
+        AND worktree_revision NOT GLOB '*[^0-9a-f]*'
+    ),
     diff_identity TEXT NOT NULL CHECK (
         length(diff_identity) = 64
         AND diff_identity NOT GLOB '*[^0-9a-f]*'
@@ -32,7 +35,7 @@ CREATE TABLE validation_run_intents (
         length(executable_sha256) = 64
         AND executable_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
-    timeout_millis INTEGER NOT NULL CHECK (timeout_millis BETWEEN 1000 AND 1800000),
+    timeout_nanos INTEGER NOT NULL CHECK (timeout_nanos BETWEEN 1000000000 AND 1800000000000),
     intent_digest TEXT NOT NULL UNIQUE CHECK (
         length(intent_digest) = 64
         AND intent_digest NOT GLOB '*[^0-9a-f]*'
@@ -69,7 +72,7 @@ CREATE TABLE validation_run_results (
     validation_run_id TEXT PRIMARY KEY REFERENCES validation_run_intents(id),
     state TEXT NOT NULL CHECK (state IN ('passed', 'failed', 'cancelled')),
     exit_code INTEGER NOT NULL,
-    duration_millis INTEGER NOT NULL CHECK (duration_millis >= 0),
+    duration_nanos INTEGER NOT NULL CHECK (duration_nanos >= 0),
     timed_out INTEGER NOT NULL CHECK (timed_out IN (0, 1)),
     cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1)),
     stdout_redacted TEXT NOT NULL CHECK (length(stdout_redacted) <= 65536),

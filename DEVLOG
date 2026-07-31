@@ -24,10 +24,47 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-072
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-071
+Request-or-TODO: M20-001 through M20-094 and M20-G01 through M20-G04.
+Goal: Bind change acceptance to exact risk, diff, validation, review, and evidence
+  facts and expose the complete decision path through the production Go/GWC UI.
+Assumptions: SQLite and server-observed Git state remain authoritative; caller
+  observations cannot establish freshness; unsupported external behavior remains
+  contract-checked or runtime-only; the fixed preview stays on port 63131.
+Decisions: Compose deterministic risk/profile/test selection with mediated
+  validation; invalidate evidence on any diff change; require authoritative
+  validation provenance; persist sealed claim-level reports; bind review
+  mutations to live diff/report/check observations; perform repair, rollback,
+  and patch-preservation effects before recording successful outcomes.
+Files-or-schemas: Migrations 000021 through 000024; review, validation,
+  testselection, validationbaseline, evidence, acceptance, executor, storage,
+  coordinator, transport, generated ReviewService, Go/WASM client resources,
+  and GWC diff/evidence/review-action surfaces.
+Validation: The decisive M20 package suite passes across acceptance, review,
+  validation, baseline analysis, test selection, evidence, executor, storage,
+  coordinator, transport, Git effects, all review UI packages, and web client.
+  Generation, migration, artifact, WASM, protobuf lint (focused agent gate),
+  diff checks, and fixed-port health pass. Focused regressions prove one-line
+  stale-diff invalidation, fabricated/invalidated evidence rejection, exact
+  observed-diff acceptance, real repair/rollback/preserve effects, authoritative
+  task-state events, and claim-scoped guarantee ceilings.
+Failures-or-discarded-approaches: Adversarial review rejected caller-supplied
+  observed identities, unattested validation IDs, journal-only repair/rollback,
+  isolated unmounted UI packages, and an import cycle caused by a Git-owned DTO.
+  These were replaced with authoritative observers, effect orchestration,
+  production review mounting, and a leaf review DTO.
+Known-limitations: Validation readiness intentionally fails closed after process
+  restart and must be replanned/re-executed. This is conservative, not reuse.
+Next-safe-step: Stop at M20 as requested. Begin evaluation/sample-project work
+  only in a later explicit effort; do not start M21 automatically.
+
 Dev-Log: DL-20260731-071
 Date: 2026-07-31
-Status: In progress
-Change-ID: Pending CL-20260731-070
+Status: Complete
+Change-ID: CL-20260731-070
 Request-or-TODO: M19-001 through M19-108 and M19-G01 through M19-G04;
   user required the graph to be dynamic, interactive, visually meaningful by
   node purpose, fully observable through the fixed live GWC UI, and tested.
@@ -43,24 +80,32 @@ Decisions: Normalize durable task facts through a typed semantic seam rather
   material facts; keep token deltas revision-free; use schema-versioned immutable
   revisions, typed metadata only, bounded continuation queries, deterministic
   SCC-aware left-to-right layout, and authored Go/GWC SVG interaction.
-Files-or-schemas: In progress across internal graph/domain projection, migration
-  000020, SQLite graph query repository, graph layout, typed GraphService bridge,
-  GWC authoritative graph canvas, inspector, and performance/browser evidence.
+Files-or-schemas: Graph domain and projection, migration 000020, bounded SQLite
+  graph repository, deterministic SCC-aware layout, all six authenticated
+  GraphService RPCs, Go/WASM adapters, authoritative GWC SVG viewport, graph
+  inspector, chat links, production mounting, and browser/performance evidence.
 Validation: Domain, projection, migration, storage query, layout, graphcanvas,
-  web frontend, WASM, vet, lint, generation, and artifact checks are being run
-  per tranche; repeated layout-query tests are green after deterministic fixture
-  correction. M18's fixed-port 260-check browser gate remains green.
+  inspector, coordinator, transport, client, frontend, WASM, vet, generation,
+  migration, artifact, and diff checks pass. Initial 300-node layout p95 was
+  2.49 ms; 100 sequential patches p95 was 5.53 ms. The fixed-port browser gate
+  passes completely, including pan, zoom, fit, reset, selection, responsive
+  bounds, GWC navigation, keyboard/focus, modal, and collapsed-pane journeys.
+  An ordinary production SendMessage created durable graph revision
+  grv_019fba42-a0be-789c-a7d2-eca7d32de82b and exposed the same requirement in
+  chat and graph. Mounted Chromium additionally verifies visible SVG geometry,
+  keyboard selection, inspector loading, and expansion dispatch.
 Failures-or-discarded-approaches: Adversarial review rejected topology commits
   not bound to the exact pending candidate, CSS-pixel transforms applied to a
   fixed SVG viewBox, selection strokes that erased status encoding, dangling
-  tabpanel relationships, and production-only legacy graph data. Those findings
-  now have concrete code fixes or active integration ownership.
-Known-limitations: The authoritative graph is not complete until the typed
-  service is mounted in the production shell and inspector/performance/browser
-  gates pass against the rebuilt fixed-port runtime.
-Next-safe-step: Finish GraphService mounting and inspector/benchmark tranches,
-  run combined gates, visually inspect the live authoritative graph, mark only
-  evidence-backed TODOs, commit, push, and verify public CI.
+  tabpanel relationships, production-only legacy graph data, stale GWC event
+  closures, and numeric SVG attributes that the WASM renderer omitted. The final
+  implementation uses stable event handlers and string-valued SVG geometry, with
+  mounted-browser regressions for both.
+Known-limitations: Graph projection is intentionally derived and read-only; the
+  chat journey remains fully usable when the graph pane is collapsed. Browser
+  tabs holding an older cached WASM may require a fresh application reload.
+Next-safe-step: Complete M20 validation, review, evidence, and exact-diff
+  acceptance gates; do not begin M21 until explicitly requested.
 
 Dev-Log: DL-20260731-070
 Date: 2026-07-31

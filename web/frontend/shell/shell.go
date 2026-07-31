@@ -146,7 +146,7 @@ func AppShell(props AppShellProps) ui.Node {
 	}
 	toggleRail := func() {
 		if compactViewport {
-			compactRailOpen.Set(!compactRailOpen.Get())
+			compactRailOpen.Update(toggleLocalVisibility)
 			return
 		}
 		next := layout
@@ -155,7 +155,7 @@ func AppShell(props AppShellProps) ui.Node {
 	}
 	collapseRail := func() {
 		if compactViewport {
-			compactRailOpen.Set(false)
+			compactRailOpen.Update(closeLocalVisibility)
 			focusManager.FocusByID("thread-rail-toggle")
 			return
 		}
@@ -172,14 +172,14 @@ func AppShell(props AppShellProps) ui.Node {
 		}
 	}
 	inspectorCollapsed := ui.UseState(false)
-	toggleInspector := func() { inspectorCollapsed.Set(!inspectorCollapsed.Get()) }
+	toggleInspector := func() { inspectorCollapsed.Update(toggleLocalVisibility) }
 	collapseInspector := func() {
-		inspectorCollapsed.Set(true)
+		inspectorCollapsed.Update(openLocalVisibility)
 		focusManager.FocusByID("assurance-rail-toggle")
 	}
 	helpOpen := ui.UseState(false)
-	openShortcutHelp := func() { helpOpen.Set(true) }
-	closeShortcutHelp := func() { helpOpen.Set(false) }
+	openShortcutHelp := func() { helpOpen.Update(openLocalVisibility) }
+	closeShortcutHelp := func() { helpOpen.Update(closeLocalVisibility) }
 	searchOpen := ui.UseState(false)
 	searchQuery := ui.UseState("")
 	openSearch := func() { searchOpen.Set(true) }
@@ -297,6 +297,10 @@ func AppShell(props AppShellProps) ui.Node {
 }
 
 var railWidthStops = [...]int{224, 240, 272, 304, 336, 368, 400, 432, 464, 480}
+
+func toggleLocalVisibility(current bool) bool { return !current }
+func openLocalVisibility(bool) bool           { return true }
+func closeLocalVisibility(bool) bool          { return false }
 
 // nextRailWidth walks stable width stops instead of applying a delta that
 // clamps asymmetrically around the 240px default. A narrower/wider pair is

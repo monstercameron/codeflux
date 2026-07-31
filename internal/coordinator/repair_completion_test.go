@@ -772,17 +772,32 @@ func TestRepairCompletionReportsUnresolvedFailureAtRepairLimit(t *testing.T) {
 }
 
 type repairCompletionFixture struct {
-	taskID      domain.TaskID
-	runID       domain.RunID
-	profile     agentloop.ValidationProfile
-	runner      *repairValidationRunnerStub
-	checkpoints *repairCheckpointStub
-	repairs     *repairExecutorStub
-	control     *repairControlStub
-	store       *repairCompletionStoreStub
-	repository  *repairRepositoryStub
-	budget      *repairBudgetStub
-	redactor    *redact.Pipeline
+	taskID            domain.TaskID
+	runID             domain.RunID
+	profile           agentloop.ValidationProfile
+	runner            *repairValidationRunnerStub
+	checkpoints       *repairCheckpointStub
+	repairs           *repairExecutorStub
+	control           *repairControlStub
+	store             *repairCompletionStoreStub
+	repository        *repairRepositoryStub
+	budget            *repairBudgetStub
+	redactor          *redact.Pipeline
+	currentValidation *completionValidationGateStub
+}
+
+type completionValidationGateStub struct {
+	err   error
+	calls int
+}
+
+func (stub *completionValidationGateStub) EnsureCompletionReady(
+	context.Context,
+	domain.TaskID,
+	domain.RunID,
+) error {
+	stub.calls++
+	return stub.err
 }
 
 func newRepairCompletionFixture(t *testing.T) *repairCompletionFixture {
@@ -824,7 +839,8 @@ func newRepairCompletionFixture(t *testing.T) *repairCompletionFixture {
 		budget: &repairBudgetStub{
 			summary: repairCoordinatorBudgetSummary(),
 		},
-		redactor: pipeline,
+		currentValidation: &completionValidationGateStub{},
+		redactor:          pipeline,
 	}
 	fixture.checkpoints.ids = []domain.CheckpointID{
 		repairCoordinatorCheckpointID(t, 102),
@@ -839,7 +855,8 @@ func (fixture *repairCompletionFixture) service(
 	t.Helper()
 	service, err := NewRepairCompletionService(RepairCompletionDependencies{
 		Validations: fixture.runner, Checkpoints: fixture.checkpoints,
-		Repairs: fixture.repairs, Control: fixture.control,
+		CurrentValidation: fixture.currentValidation,
+		Repairs:           fixture.repairs, Control: fixture.control,
 		Store: fixture.store, Repository: fixture.repository,
 		Budget: fixture.budget, Redactor: fixture.redactor,
 	})

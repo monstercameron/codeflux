@@ -30,6 +30,44 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-071
+Date: 2026-07-31
+Type: Exact validation, review, evidence, and acceptance
+Request-or-TODO: M20-001 through M20-094 and M20-G01 through M20-G04
+Outcome: Added risk-based validation planning and execution, immutable exact-diff
+  evidence, source-linked diff review, claim-level assurance reports, validated
+  editor opening, and authoritative accept/repair/reject/rollback workflows.
+Affected-behavior: A changed diff cannot inherit stale validation; final reports
+  distinguish every disposition and reject fabricated provenance; review actions
+  resolve live Git/report/check state server-side, perform their real effects,
+  and then publish durable task-state decisions. The production GWC review drawer
+  mounts the diff and evidence views with typed navigation and no page reload.
+Compatibility-or-migration: Adds migrations 000021 through 000024 and extends
+  ReviewService. No handwritten JavaScript, TypeScript, HTML, or CSS is added.
+Verification: Decisive M20 Go suites, storage/Git effect tests, generated contract
+  checks, migration/artifact checks, js/wasm build, focused protobuf lint, diff
+  checks, and fixed preview health on 127.0.0.1:63131 pass.
+Dev-Log: DL-20260731-072
+
+Change-ID: CL-20260731-070
+Date: 2026-07-31
+Type: Authoritative task graph
+Request-or-TODO: M19-001 through M19-108 and M19-G01 through M19-G04
+Outcome: Added immutable task-graph revisions, deterministic event projection,
+  bounded task-scoped queries, stable SCC-aware layout, authenticated GraphService
+  RPCs, and an accessible interactive Go/GWC SVG graph with a typed inspector.
+Affected-behavior: Ordinary draft-task messages now create or reuse a durable
+  requirement graph, publish only committed graph revisions, and preserve stable
+  node identity across chat links, mode changes, expansion, comparison, restart,
+  and compatible patches. The graph remains optional and collapsible.
+Compatibility-or-migration: Adds migration 000020 and the GraphService contract.
+  No handwritten JavaScript, TypeScript, HTML, or CSS source is added.
+Verification: Graph domain/storage/projection/query/layout/transport/client tests,
+  deterministic replay, restart and forged-provenance regressions, performance
+  thresholds, WASM builds, the full fixed-port browser suite, a real production
+  message-to-graph revision, and mounted visible-SVG/inspector/action checks pass.
+Dev-Log: DL-20260731-071
+
 Change-ID: CL-20260731-069
 Date: 2026-07-31
 Type: Authoritative live task workspace

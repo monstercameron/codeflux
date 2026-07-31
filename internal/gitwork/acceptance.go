@@ -26,6 +26,7 @@ type AcceptTaskChangeInput struct {
 	TaskID               domain.TaskID
 	RepositoryPath       string
 	ExpectedDiffIdentity string
+	AcceptanceReference  string
 	Mode                 AcceptanceMode
 	AuthorName           string
 	AuthorEmail          string
@@ -61,6 +62,9 @@ func (service *Service) AcceptTaskChange(
 	if input.TaskID.IsZero() || len(input.ExpectedDiffIdentity) != 64 {
 		return AcceptanceResult{}, errors.New("task and reviewed diff identity are required")
 	}
+	if input.AcceptanceReference != "" && !lowerHexIdentity(input.AcceptanceReference) {
+		return AcceptanceResult{}, errors.New("acceptance reference is invalid")
+	}
 	if input.Mode != AcceptanceCommit &&
 		input.Mode != AcceptancePatch &&
 		input.Mode != AcceptanceBoth {
@@ -80,6 +84,9 @@ func (service *Service) AcceptTaskChange(
 		return AcceptanceResult{}, err
 	}
 	if diff.Identity != input.ExpectedDiffIdentity {
+		if input.AcceptanceReference != "" {
+			return service.resumeAcceptedChange(ctx, input, diff)
+		}
 		return AcceptanceResult{}, ErrEditConflict
 	}
 	if diff.FilesChanged == 0 {
@@ -117,6 +124,43 @@ func (service *Service) AcceptTaskChange(
 			binding.BaseRevision,
 			[]byte(diff.UnifiedDiff),
 		); err != nil {
+			return AcceptanceResult{}, err
+		}
+		result.PatchApplied = true
+	}
+	return result, nil
+}
+
+func (service *Service) resumeAcceptedChange(
+	ctx context.Context,
+	input AcceptTaskChangeInput,
+	diff TaskDiff,
+) (AcceptanceResult, error) {
+	if input.Mode != AcceptanceCommit && input.Mode != AcceptanceBoth {
+		return AcceptanceResult{}, ErrEditConflict
+	}
+	binding, err := service.bindings.GetWorktreeBinding(ctx, input.TaskID)
+	if err != nil {
+		return AcceptanceResult{}, err
+	}
+	verification, err := service.VerifyTaskWorktree(ctx, input.TaskID)
+	if err != nil {
+		return AcceptanceResult{}, err
+	}
+	if verification.Dirty || binding.HeadRevision == binding.BaseRevision {
+		return AcceptanceResult{}, ErrEditConflict
+	}
+	subject, err := service.gitText(ctx, binding.WorktreePath, "log", "-1", "--format=%s")
+	if err != nil || subject != acceptanceCommitMessage(input) {
+		return AcceptanceResult{}, ErrEditConflict
+	}
+	result := AcceptanceResult{
+		TaskID: input.TaskID, BaseRevision: binding.BaseRevision,
+		DiffIdentity: input.ExpectedDiffIdentity, BranchName: binding.BranchName,
+		CommitRevision: binding.HeadRevision,
+	}
+	if input.Mode == AcceptanceBoth {
+		if err := service.applyAcceptedPatch(ctx, input.RepositoryPath, binding.BaseRevision, []byte(diff.UnifiedDiff)); err != nil {
 			return AcceptanceResult{}, err
 		}
 		result.PatchApplied = true
@@ -168,7 +212,7 @@ func (service *Service) commitAcceptedChange(
 		"--author",
 		author,
 		"-m",
-		input.CommitMessage,
+		acceptanceCommitMessage(input),
 	); err != nil {
 		_, _ = service.runner.Run(
 			context.Background(),
@@ -237,6 +281,12 @@ func (service *Service) applyAcceptedPatch(
 		"--whitespace=nowarn",
 		"-",
 	); err != nil {
+		if _, reverseErr := runner.RunInput(
+			ctx, repository, "git", patch, "apply", "--check", "--reverse",
+			"--binary", "--whitespace=nowarn", "-",
+		); reverseErr == nil {
+			return nil
+		}
 		return fmt.Errorf("check accepted patch against primary worktree: %w", err)
 	}
 	if _, err := runner.RunInput(
@@ -252,6 +302,25 @@ func (service *Service) applyAcceptedPatch(
 		return fmt.Errorf("apply accepted patch to primary worktree: %w", err)
 	}
 	return nil
+}
+
+func acceptanceCommitMessage(input AcceptTaskChangeInput) string {
+	if input.AcceptanceReference == "" {
+		return input.CommitMessage
+	}
+	return input.CommitMessage + " [codeflux-acceptance:" + input.AcceptanceReference + "]"
+}
+
+func lowerHexIdentity(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func validateCommitAttribution(name, email, message string) error {

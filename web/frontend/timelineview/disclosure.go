@@ -107,7 +107,7 @@ func OutputDisclosure(props OutputProps) ui.Node {
 		primitives.Button(primitives.ButtonProps{
 			Label:    map[bool]string{true: "Collapse redacted output", false: "Show redacted output"}[expanded.Get()],
 			Expanded: boolPointer(expanded.Get()), Controls: regionID, Mode: props.Mode,
-			OnClick: func() { expanded.Set(!expanded.Get()) },
+			OnClick: func() { expanded.Update(func(current bool) bool { return !current }) },
 		}),
 	}
 	if expanded.Get() {

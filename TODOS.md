@@ -2763,139 +2763,139 @@ Milestone output: immutable task-graph revisions in SQLite, bounded graph querie
 
 ## Minimal Graph Contract
 
-- [ ] `M19-001 BLOCKER` Define graph identity separately from graph revision identity.
-- [ ] `M19-002 BLOCKER` Define stable node and edge identity.
-- [ ] `M19-003` Define node classes: requirement, plan region, atom/operation, effect, branch/match/merge, obligation, artifact/result.
-- [ ] `M19-004` Define edge classes: control, data/provenance, evidence dependency, retry, reconciliation, compensation.
-- [ ] `M19-005` Define node statuses: pending, active, passed, warning, failed, blocked, invalidated.
-- [ ] `M19-006` Define graph modes: Program, Execution, Evidence.
-- [ ] `M19-007` Define immutable revision metadata.
-- [ ] `M19-008` Define revision parentage.
-- [ ] `M19-009` Define source event and plan-step links.
-- [ ] `M19-010` Define node contract summary without requiring deep semantic atom contracts.
-- [ ] `M19-011` Define bounded arbitrary metadata fields or prohibit them in favor of typed columns.
-- [ ] `M19-012` Version the graph schema independently from the SQLite schema.
+- [x] `M19-001 BLOCKER` Define graph identity separately from graph revision identity.
+- [x] `M19-002 BLOCKER` Define stable node and edge identity.
+- [x] `M19-003` Define node classes: requirement, plan region, atom/operation, effect, branch/match/merge, obligation, artifact/result.
+- [x] `M19-004` Define edge classes: control, data/provenance, evidence dependency, retry, reconciliation, compensation.
+- [x] `M19-005` Define node statuses: pending, active, passed, warning, failed, blocked, invalidated.
+- [x] `M19-006` Define graph modes: Program, Execution, Evidence.
+- [x] `M19-007` Define immutable revision metadata.
+- [x] `M19-008` Define revision parentage.
+- [x] `M19-009` Define source event and plan-step links.
+- [x] `M19-010` Define node contract summary without requiring deep semantic atom contracts.
+- [x] `M19-011` Define bounded arbitrary metadata fields or prohibit them in favor of typed columns.
+- [x] `M19-012` Version the graph schema independently from the SQLite schema.
 
 ## SQLite Graph Schema
 
-- [ ] `M19-013 DATA` Create graph identity table.
-- [ ] `M19-014 DATA` Create immutable graph revision table.
-- [ ] `M19-015 DATA` Create node identity table.
-- [ ] `M19-016 DATA` Create node revision table.
-- [ ] `M19-017 DATA` Create edge identity table.
-- [ ] `M19-018 DATA` Create edge revision table.
-- [ ] `M19-019 DATA` Create graph-to-task and graph-to-plan bindings.
-- [ ] `M19-020 DATA` Create graph-to-event and graph-to-message links.
-- [ ] `M19-021 DATA` Create source-location links.
-- [ ] `M19-022 DATA` Create layout-hint table scoped by graph revision and layout algorithm version.
-- [ ] `M19-023 DATA` Add uniqueness and foreign-key constraints.
-- [ ] `M19-024 DATA` Add indexes for task slice, node lookup, neighbor expansion, evidence cone, and message link.
-- [ ] `M19-025 DATA` Add migration-forward and backup/restore tests.
+- [x] `M19-013 DATA` Create graph identity table.
+- [x] `M19-014 DATA` Create immutable graph revision table.
+- [x] `M19-015 DATA` Create node identity table.
+- [x] `M19-016 DATA` Create node revision table.
+- [x] `M19-017 DATA` Create edge identity table.
+- [x] `M19-018 DATA` Create edge revision table.
+- [x] `M19-019 DATA` Create graph-to-task and graph-to-plan bindings.
+- [x] `M19-020 DATA` Create graph-to-event and graph-to-message links.
+- [x] `M19-021 DATA` Create source-location links.
+- [x] `M19-022 DATA` Create layout-hint table scoped by graph revision and layout algorithm version.
+- [x] `M19-023 DATA` Add uniqueness and foreign-key constraints.
+- [x] `M19-024 DATA` Add indexes for task slice, node lookup, neighbor expansion, evidence cone, and message link.
+- [x] `M19-025 DATA` Add migration-forward and backup/restore tests.
 
 ## Graph Projection
 
-- [ ] `M19-026 BLOCKER` Project requirement nodes from accepted user intent.
-- [ ] `M19-027` Project plan-region and plan-step nodes.
-- [ ] `M19-028` Project repository inspection operations.
-- [ ] `M19-029` Project file edit operations as atom/operation nodes.
-- [ ] `M19-030` Project command and provider calls as effect nodes.
-- [ ] `M19-031` Project approval boundaries.
-- [ ] `M19-032` Project validation obligations and results.
-- [ ] `M19-033` Project changed files/diff as artifact nodes.
-- [ ] `M19-034` Project retries with explicit retry edges.
-- [ ] `M19-035` Project checkpoint and recovery relationships where useful.
-- [ ] `M19-036` Derive Program-mode visibility.
-- [ ] `M19-037` Derive Execution-mode visibility and status.
-- [ ] `M19-038` Derive Evidence-mode visibility.
-- [ ] `M19-039` Create a new immutable graph revision after a material projection change.
-- [ ] `M19-040` Avoid a new revision for token-only text deltas.
-- [ ] `M19-041` Emit a bounded graph patch after revision commit.
-- [ ] `M19-042 TEST` Replay the same task events and compare graph revisions deterministically.
+- [x] `M19-026 BLOCKER` Project requirement nodes from accepted user intent.
+- [x] `M19-027` Project plan-region and plan-step nodes.
+- [x] `M19-028` Project repository inspection operations.
+- [x] `M19-029` Project file edit operations as atom/operation nodes.
+- [x] `M19-030` Project command and provider calls as effect nodes.
+- [x] `M19-031` Project approval boundaries.
+- [x] `M19-032` Project validation obligations and results.
+- [x] `M19-033` Project changed files/diff as artifact nodes.
+- [x] `M19-034` Project retries with explicit retry edges.
+- [x] `M19-035` Project checkpoint and recovery relationships where useful.
+- [x] `M19-036` Derive Program-mode visibility.
+- [x] `M19-037` Derive Execution-mode visibility and status.
+- [x] `M19-038` Derive Evidence-mode visibility.
+- [x] `M19-039` Create a new immutable graph revision after a material projection change.
+- [x] `M19-040` Avoid a new revision for token-only text deltas.
+- [x] `M19-041` Emit a bounded graph patch after revision commit.
+- [x] `M19-042 TEST` Replay the same task events and compare graph revisions deterministically.
 
 ## Query Service
 
-- [ ] `M19-043 BLOCKER` Implement task-scoped initial slice query.
-- [ ] `M19-044` Implement mode filtering.
-- [ ] `M19-045` Implement node lookup by stable ID and revision.
-- [ ] `M19-046` Implement one-hop neighbor expansion.
-- [ ] `M19-047` Implement bounded multi-hop expansion.
-- [ ] `M19-048` Implement evidence-cone isolation.
-- [ ] `M19-049` Implement dependency-cone isolation.
-- [ ] `M19-050` Implement text and identity search.
-- [ ] `M19-051` Implement graph revision comparison.
-- [ ] `M19-052` Return continuation tokens when node/edge bounds are reached.
-- [ ] `M19-053` Reject unbounded full-database graph requests.
-- [ ] `M19-054` Include layout hints and algorithm version.
-- [ ] `M19-055 TEST` Test cycles, missing nodes, stale revisions, and expansion limits.
+- [x] `M19-043 BLOCKER` Implement task-scoped initial slice query.
+- [x] `M19-044` Implement mode filtering.
+- [x] `M19-045` Implement node lookup by stable ID and revision.
+- [x] `M19-046` Implement one-hop neighbor expansion.
+- [x] `M19-047` Implement bounded multi-hop expansion.
+- [x] `M19-048` Implement evidence-cone isolation.
+- [x] `M19-049` Implement dependency-cone isolation.
+- [x] `M19-050` Implement text and identity search.
+- [x] `M19-051` Implement graph revision comparison.
+- [x] `M19-052` Return continuation tokens when node/edge bounds are reached.
+- [x] `M19-053` Reject unbounded full-database graph requests.
+- [x] `M19-054` Include layout hints and algorithm version.
+- [x] `M19-055 TEST` Test cycles, missing nodes, stale revisions, and expansion limits.
 
 ## Layout
 
-- [ ] `M19-056 BLOCKER` Implement or integrate a deterministic left-to-right layered layout.
-- [ ] `M19-057` Rank requirement and plan nodes before effects and artifacts.
-- [ ] `M19-058` Collapse strongly connected components before ranking.
-- [ ] `M19-059` Define stable sibling ordering by stable identity.
-- [ ] `M19-060` Reuse prior coordinates when topology permits.
-- [ ] `M19-061` Place newly added nodes near their stable neighbors.
-- [ ] `M19-062` Compute bounding boxes for viewport fitting.
-- [ ] `M19-063` Version layout algorithm changes.
-- [ ] `M19-064` Cache layout hints in SQLite.
-- [ ] `M19-065 TEST` Snapshot layout coordinates for deterministic fixtures.
-- [ ] `M19-066 TEST` Verify unrelated node additions do not move the entire graph.
+- [x] `M19-056 BLOCKER` Implement or integrate a deterministic left-to-right layered layout.
+- [x] `M19-057` Rank requirement and plan nodes before effects and artifacts.
+- [x] `M19-058` Collapse strongly connected components before ranking.
+- [x] `M19-059` Define stable sibling ordering by stable identity.
+- [x] `M19-060` Reuse prior coordinates when topology permits.
+- [x] `M19-061` Place newly added nodes near their stable neighbors.
+- [x] `M19-062` Compute bounding boxes for viewport fitting.
+- [x] `M19-063` Version layout algorithm changes.
+- [x] `M19-064` Cache layout hints in SQLite.
+- [x] `M19-065 TEST` Snapshot layout coordinates for deterministic fixtures.
+- [x] `M19-066 TEST` Verify unrelated node additions do not move the entire graph.
 
 ## Graph Viewport
 
-- [ ] `M19-067 BLOCKER UX` Implement accessible SVG graph root.
-- [ ] `M19-068 UX` Render node shapes by class.
-- [ ] `M19-069 UX` Render status icon, border, and text independently of color.
-- [ ] `M19-070 UX` Render edge style by relationship.
-- [ ] `M19-071 UX` Add a visible legend.
-- [ ] `M19-072 UX` Implement pointer pan.
-- [ ] `M19-073 UX` Implement wheel/trackpad zoom around the cursor.
-- [ ] `M19-074 UX` Implement zoom controls.
-- [ ] `M19-075 UX` Implement fit-to-slice.
-- [ ] `M19-076 UX` Implement reset view.
-- [ ] `M19-077 UX` Implement node selection.
-- [ ] `M19-078 UX` Implement keyboard traversal of visible nodes.
-- [ ] `M19-079 UX` Implement focus-visible state.
-- [ ] `M19-080 UX` Announce selected-node summary to assistive technology.
-- [ ] `M19-081 UX` Center and select a node activated from chat.
-- [ ] `M19-082 UX` Highlight messages related to the selected node.
-- [ ] `M19-083 UX` Apply graph patches without resetting viewport.
-- [ ] `M19-084 UX` Show a new-revision indicator when comparison is available.
-- [ ] `M19-085 UX` Add Program, Execution, and Evidence mode tabs.
-- [ ] `M19-086 UX` Default to Execution while running.
-- [ ] `M19-087 UX` Default to Evidence after completion.
-- [ ] `M19-088 UX` Preserve selection across compatible mode changes.
+- [x] `M19-067 BLOCKER UX` Implement accessible SVG graph root.
+- [x] `M19-068 UX` Render node shapes by class.
+- [x] `M19-069 UX` Render status icon, border, and text independently of color.
+- [x] `M19-070 UX` Render edge style by relationship.
+- [x] `M19-071 UX` Add a visible legend.
+- [x] `M19-072 UX` Implement pointer pan.
+- [x] `M19-073 UX` Implement wheel/trackpad zoom around the cursor.
+- [x] `M19-074 UX` Implement zoom controls.
+- [x] `M19-075 UX` Implement fit-to-slice.
+- [x] `M19-076 UX` Implement reset view.
+- [x] `M19-077 UX` Implement node selection.
+- [x] `M19-078 UX` Implement keyboard traversal of visible nodes.
+- [x] `M19-079 UX` Implement focus-visible state.
+- [x] `M19-080 UX` Announce selected-node summary to assistive technology.
+- [x] `M19-081 UX` Center and select a node activated from chat.
+- [x] `M19-082 UX` Highlight messages related to the selected node.
+- [x] `M19-083 UX` Apply graph patches without resetting viewport.
+- [x] `M19-084 UX` Show a new-revision indicator when comparison is available.
+- [x] `M19-085 UX` Add Program, Execution, and Evidence mode tabs.
+- [x] `M19-086 UX` Default to Execution while running.
+- [x] `M19-087 UX` Default to Evidence after completion.
+- [x] `M19-088 UX` Preserve selection across compatible mode changes.
 
 ## Node Inspector
 
-- [ ] `M19-089 UX` Display stable identity and revision.
-- [ ] `M19-090 UX` Display node class, status, and contract summary.
-- [ ] `M19-091 UX` Display inputs, outputs, and effects when known.
-- [ ] `M19-092 UX` Display supporting evidence and guarantee level.
-- [ ] `M19-093 UX` Display time, token, and cost attribution when known.
-- [ ] `M19-094 UX` List related messages and events.
-- [ ] `M19-095 UX` List related source locations.
-- [ ] `M19-096 UX` Add explain-in-chat action.
-- [ ] `M19-097 UX` Add expand-neighbors action.
-- [ ] `M19-098 UX` Add isolate-dependency-cone action.
-- [ ] `M19-099 UX` Add isolate-evidence-cone action.
-- [ ] `M19-100 UX` Add compare-revision action.
-- [ ] `M19-101 UX` Add open-in-editor action for validated repository paths.
-- [ ] `M19-102 UX` State clearly when information is unknown rather than leaving a blank.
+- [x] `M19-089 UX` Display stable identity and revision.
+- [x] `M19-090 UX` Display node class, status, and contract summary.
+- [x] `M19-091 UX` Display inputs, outputs, and effects when known.
+- [x] `M19-092 UX` Display supporting evidence and guarantee level.
+- [x] `M19-093 UX` Display time, token, and cost attribution when known.
+- [x] `M19-094 UX` List related messages and events.
+- [x] `M19-095 UX` List related source locations.
+- [x] `M19-096 UX` Add explain-in-chat action.
+- [x] `M19-097 UX` Add expand-neighbors action.
+- [x] `M19-098 UX` Add isolate-dependency-cone action.
+- [x] `M19-099 UX` Add isolate-evidence-cone action.
+- [x] `M19-100 UX` Add compare-revision action.
+- [x] `M19-101 UX` Add open-in-editor action for validated repository paths.
+- [x] `M19-102 UX` State clearly when information is unknown rather than leaving a blank.
 
 ## Performance and Gate
 
-- [ ] `M19-103 TEST` Benchmark initial 300-node layout.
-- [ ] `M19-104 TEST` Benchmark 100 sequential graph patches.
-- [ ] `M19-105 TEST` Measure SVG node, edge, label, and DOM counts.
-- [ ] `M19-106 TEST` Verify chat streaming remains responsive during patches.
-- [ ] `M19-107 TEST` Verify graph interaction remains responsive during token streaming.
-- [ ] `M19-108 TEST` Test high-contrast and color-vision-independent statuses.
-- [ ] `M19-G01 GATE` Program, Execution, and Evidence modes derive deterministically from one task history.
-- [ ] `M19-G02 GATE` Chat and graph resolve the same stable node identities in both directions.
-- [ ] `M19-G03 GATE` The viewport remains stable across normal graph revisions.
-- [ ] `M19-G04 GATE` The graph remains optional; the complete task journey still works with the pane collapsed.
+- [x] `M19-103 TEST` Benchmark initial 300-node layout.
+- [x] `M19-104 TEST` Benchmark 100 sequential graph patches.
+- [x] `M19-105 TEST` Measure SVG node, edge, label, and DOM counts.
+- [x] `M19-106 TEST` Verify chat streaming remains responsive during patches.
+- [x] `M19-107 TEST` Verify graph interaction remains responsive during token streaming.
+- [x] `M19-108 TEST` Test high-contrast and color-vision-independent statuses.
+- [x] `M19-G01 GATE` Program, Execution, and Evidence modes derive deterministically from one task history.
+- [x] `M19-G02 GATE` Chat and graph resolve the same stable node identities in both directions.
+- [x] `M19-G03 GATE` The viewport remains stable across normal graph revisions.
+- [x] `M19-G04 GATE` The graph remains optional; the complete task journey still works with the pane collapsed.
 
 ---
 
@@ -2911,128 +2911,128 @@ Milestone output: risk-based validation profiles, immutable validation evidence,
 
 ## Risk Classification
 
-- [ ] `M20-001 BLOCKER` Define routine-change signals.
-- [ ] `M20-002 BLOCKER` Define elevated-change signals.
-- [ ] `M20-003 BLOCKER` Define protected-change signals.
-- [ ] `M20-004` Include authentication, authorization, payment, migration, credential, concurrency, and external-effect signals.
-- [ ] `M20-005` Include breadth, generated-code, dependency, configuration, and test-removal signals.
-- [ ] `M20-006` Include user-selected risk override.
-- [ ] `M20-007` Version the risk-classification policy.
-- [ ] `M20-008` Persist input signals, selected risk, and explanation.
-- [ ] `M20-009` Allow risk escalation after new evidence.
-- [ ] `M20-010` Prohibit automatic risk demotion during a task.
-- [ ] `M20-011 TEST` Build positive and negative fixtures for every protected signal.
+- [x] `M20-001 BLOCKER` Define routine-change signals.
+- [x] `M20-002 BLOCKER` Define elevated-change signals.
+- [x] `M20-003 BLOCKER` Define protected-change signals.
+- [x] `M20-004` Include authentication, authorization, payment, migration, credential, concurrency, and external-effect signals.
+- [x] `M20-005` Include breadth, generated-code, dependency, configuration, and test-removal signals.
+- [x] `M20-006` Include user-selected risk override.
+- [x] `M20-007` Version the risk-classification policy.
+- [x] `M20-008` Persist input signals, selected risk, and explanation.
+- [x] `M20-009` Allow risk escalation after new evidence.
+- [x] `M20-010` Prohibit automatic risk demotion during a task.
+- [x] `M20-011 TEST` Build positive and negative fixtures for every protected signal.
 
 ## Validation Profiles
 
-- [ ] `M20-012 BLOCKER` Define routine validation requirements.
-- [ ] `M20-013 BLOCKER` Define elevated validation requirements.
-- [ ] `M20-014 BLOCKER` Define protected validation requirements.
-- [ ] `M20-015` Map repository-discovered formatter commands to profiles.
-- [ ] `M20-016` Map targeted test commands to profiles.
-- [ ] `M20-017` Map broader package or repository tests to profiles.
-- [ ] `M20-018` Map build commands to profiles.
-- [ ] `M20-019` Map static-analysis commands to profiles.
-- [ ] `M20-020` Require user approval before a discovered command first runs if policy requires it.
-- [ ] `M20-021` Define required versus advisory checks.
-- [ ] `M20-022` Define timeout and retry behavior per check.
-- [ ] `M20-023` Define skip reasons.
-- [ ] `M20-024` Require explicit user authority to waive a required check.
-- [ ] `M20-025` Record a waived check as waived, never passed.
-- [ ] `M20-026` Version each validation profile.
+- [x] `M20-012 BLOCKER` Define routine validation requirements.
+- [x] `M20-013 BLOCKER` Define elevated validation requirements.
+- [x] `M20-014 BLOCKER` Define protected validation requirements.
+- [x] `M20-015` Map repository-discovered formatter commands to profiles.
+- [x] `M20-016` Map targeted test commands to profiles.
+- [x] `M20-017` Map broader package or repository tests to profiles.
+- [x] `M20-018` Map build commands to profiles.
+- [x] `M20-019` Map static-analysis commands to profiles.
+- [x] `M20-020` Require user approval before a discovered command first runs if policy requires it.
+- [x] `M20-021` Define required versus advisory checks.
+- [x] `M20-022` Define timeout and retry behavior per check.
+- [x] `M20-023` Define skip reasons.
+- [x] `M20-024` Require explicit user authority to waive a required check.
+- [x] `M20-025` Record a waived check as waived, never passed.
+- [x] `M20-026` Version each validation profile.
 
 ## Test Selection
 
-- [ ] `M20-027` Select tests in changed packages.
-- [ ] `M20-028` Select tests linked through deterministic file-to-test mappings.
-- [ ] `M20-029` Select tests implicated by failing baseline commands.
-- [ ] `M20-030` Select repository-wide tests for protected changes when feasible.
-- [ ] `M20-031` Preserve user-provided acceptance commands.
-- [ ] `M20-032` Deduplicate equivalent test commands.
-- [ ] `M20-033` Order cheap high-signal checks before expensive broad checks.
-- [ ] `M20-034` Record why each check was selected.
-- [ ] `M20-035` Record which changed files each check covers when known.
+- [x] `M20-027` Select tests in changed packages.
+- [x] `M20-028` Select tests linked through deterministic file-to-test mappings.
+- [x] `M20-029` Select tests implicated by failing baseline commands.
+- [x] `M20-030` Select repository-wide tests for protected changes when feasible.
+- [x] `M20-031` Preserve user-provided acceptance commands.
+- [x] `M20-032` Deduplicate equivalent test commands.
+- [x] `M20-033` Order cheap high-signal checks before expensive broad checks.
+- [x] `M20-034` Record why each check was selected.
+- [x] `M20-035` Record which changed files each check covers when known.
 
 ## Validation Execution
 
-- [ ] `M20-036 BLOCKER` Create an immutable validation-run record before execution.
-- [ ] `M20-037` Bind the run to exact worktree revision and dirty diff identity.
-- [ ] `M20-038` Bind the run to command definition and executable identity.
-- [ ] `M20-039` Emit validation-start event.
-- [ ] `M20-040` Execute through the mediated command runner.
-- [ ] `M20-041` Capture exit status, duration, timeout, cancellation, and truncation.
-- [ ] `M20-042` Redact output before persistence.
-- [ ] `M20-043` Parse Go test package/test names when possible.
-- [ ] `M20-044` Parse formatter changes.
-- [ ] `M20-045` Parse build and vet diagnostics.
-- [ ] `M20-046` Preserve the raw redacted summary when parsing fails.
-- [ ] `M20-047` Emit validation-result event after commit.
-- [ ] `M20-048` Invalidate validation when the underlying diff changes.
-- [ ] `M20-049` Rerun invalidated required checks before completion.
-- [ ] `M20-050 TEST` Test invalidation after a one-line post-test edit.
+- [x] `M20-036 BLOCKER` Create an immutable validation-run record before execution.
+- [x] `M20-037` Bind the run to exact worktree revision and dirty diff identity.
+- [x] `M20-038` Bind the run to command definition and executable identity.
+- [x] `M20-039` Emit validation-start event.
+- [x] `M20-040` Execute through the mediated command runner.
+- [x] `M20-041` Capture exit status, duration, timeout, cancellation, and truncation.
+- [x] `M20-042` Redact output before persistence.
+- [x] `M20-043` Parse Go test package/test names when possible.
+- [x] `M20-044` Parse formatter changes.
+- [x] `M20-045` Parse build and vet diagnostics.
+- [x] `M20-046` Preserve the raw redacted summary when parsing fails.
+- [x] `M20-047` Emit validation-result event after commit.
+- [x] `M20-048` Invalidate validation when the underlying diff changes.
+- [x] `M20-049` Rerun invalidated required checks before completion.
+- [x] `M20-050 TEST` Test invalidation after a one-line post-test edit.
 
 ## Baseline Failure Handling
 
-- [ ] `M20-051` Run or record a baseline check before changes when affordable.
-- [ ] `M20-052` Distinguish pre-existing failure from introduced failure.
-- [ ] `M20-053` Bind comparison to exact revisions and command.
-- [ ] `M20-054` Avoid claiming non-regression when baseline evidence is unavailable.
-- [ ] `M20-055` Surface flaky or nondeterministic results.
-- [ ] `M20-056` Require repeated evidence before labeling a failure flaky.
-- [ ] `M20-057` Record unresolved baseline failures in the final report.
+- [x] `M20-051` Run or record a baseline check before changes when affordable.
+- [x] `M20-052` Distinguish pre-existing failure from introduced failure.
+- [x] `M20-053` Bind comparison to exact revisions and command.
+- [x] `M20-054` Avoid claiming non-regression when baseline evidence is unavailable.
+- [x] `M20-055` Surface flaky or nondeterministic results.
+- [x] `M20-056` Require repeated evidence before labeling a failure flaky.
+- [x] `M20-057` Record unresolved baseline failures in the final report.
 
 ## Diff Review
 
-- [ ] `M20-058 BLOCKER UX` Render changed-file list with status and line counts.
-- [ ] `M20-059 UX` Filter source, test, generated, dependency, and configuration files.
-- [ ] `M20-060 UX` Render a safe unified diff view for selected files.
-- [ ] `M20-061 UX` Preserve whitespace visibility controls.
-- [ ] `M20-062 UX` Link diff hunks to plan steps.
-- [ ] `M20-063 UX` Link diff hunks to tool/edit events.
-- [ ] `M20-064 UX` Link diff hunks to validation evidence.
-- [ ] `M20-065 UX` Flag files outside proposed plan scope.
-- [ ] `M20-066 UX` Flag broad formatting churn.
-- [ ] `M20-067 UX` Flag binary or generated changes.
-- [ ] `M20-068 UX` Open a validated source location in the external editor.
-- [ ] `M20-069 SECURITY` Reject editor-open requests outside the bound repository.
+- [x] `M20-058 BLOCKER UX` Render changed-file list with status and line counts.
+- [x] `M20-059 UX` Filter source, test, generated, dependency, and configuration files.
+- [x] `M20-060 UX` Render a safe unified diff view for selected files.
+- [x] `M20-061 UX` Preserve whitespace visibility controls.
+- [x] `M20-062 UX` Link diff hunks to plan steps.
+- [x] `M20-063 UX` Link diff hunks to tool/edit events.
+- [x] `M20-064 UX` Link diff hunks to validation evidence.
+- [x] `M20-065 UX` Flag files outside proposed plan scope.
+- [x] `M20-066 UX` Flag broad formatting churn.
+- [x] `M20-067 UX` Flag binary or generated changes.
+- [x] `M20-068 UX` Open a validated source location in the external editor.
+- [x] `M20-069 SECURITY` Reject editor-open requests outside the bound repository.
 
 ## Evidence Report
 
-- [ ] `M20-070 BLOCKER` Define final evidence-report schema.
-- [ ] `M20-071` Include requirement and accepted plan revision.
-- [ ] `M20-072` Include base revision and final diff identity.
-- [ ] `M20-073` Include changed-file summary.
-- [ ] `M20-074` Include every required validation and status.
-- [ ] `M20-075` Include waived, skipped, unavailable, failed, and invalidated checks.
-- [ ] `M20-076` Include risk level and classification explanation.
-- [ ] `M20-077` Include user approvals and authority used.
-- [ ] `M20-078` Include model/provider/tool/policy versions.
-- [ ] `M20-079` Include forecast and actual time/tokens/cost.
-- [ ] `M20-080` Include assumptions and unresolved limitations.
-- [ ] `M20-081` Include graph revision and evidence-node links.
-- [ ] `M20-082` Assign guarantee level per claim instead of one global badge.
-- [ ] `M20-083` Mark external-system behavior as contract-checked or runtime-only.
-- [ ] `M20-084` Persist the report as structured SQLite rows, not a Markdown sidecar.
-- [ ] `M20-085` Render a readable report card from the structured data.
+- [x] `M20-070 BLOCKER` Define final evidence-report schema.
+- [x] `M20-071` Include requirement and accepted plan revision.
+- [x] `M20-072` Include base revision and final diff identity.
+- [x] `M20-073` Include changed-file summary.
+- [x] `M20-074` Include every required validation and status.
+- [x] `M20-075` Include waived, skipped, unavailable, failed, and invalidated checks.
+- [x] `M20-076` Include risk level and classification explanation.
+- [x] `M20-077` Include user approvals and authority used.
+- [x] `M20-078` Include model/provider/tool/policy versions.
+- [x] `M20-079` Include forecast and actual time/tokens/cost.
+- [x] `M20-080` Include assumptions and unresolved limitations.
+- [x] `M20-081` Include graph revision and evidence-node links.
+- [x] `M20-082` Assign guarantee level per claim instead of one global badge.
+- [x] `M20-083` Mark external-system behavior as contract-checked or runtime-only.
+- [x] `M20-084` Persist the report as structured SQLite rows, not a Markdown sidecar.
+- [x] `M20-085` Render a readable report card from the structured data.
 
 ## Acceptance and Repair
 
-- [ ] `M20-086 UX` Disable accept while required validations are running.
-- [ ] `M20-087 UX` Require explicit acknowledgement before accepting failed or waived required checks.
-- [ ] `M20-088` Persist acceptance with report and diff revision.
-- [ ] `M20-089` Detect a diff change between review and acceptance.
-- [ ] `M20-090` Require renewed review after a diff change.
-- [ ] `M20-091 UX` Allow a repair request tied to selected failures or hunks.
-- [ ] `M20-092` Create a new plan/checkpoint lineage for repair.
-- [ ] `M20-093 UX` Allow rollback to the pre-repair checkpoint.
-- [ ] `M20-094 UX` Allow rejection/abandonment without destroying the patch.
+- [x] `M20-086 UX` Disable accept while required validations are running.
+- [x] `M20-087 UX` Require explicit acknowledgement before accepting failed or waived required checks.
+- [x] `M20-088` Persist acceptance with report and diff revision.
+- [x] `M20-089` Detect a diff change between review and acceptance.
+- [x] `M20-090` Require renewed review after a diff change.
+- [x] `M20-091 UX` Allow a repair request tied to selected failures or hunks.
+- [x] `M20-092` Create a new plan/checkpoint lineage for repair.
+- [x] `M20-093 UX` Allow rollback to the pre-repair checkpoint.
+- [x] `M20-094 UX` Allow rejection/abandonment without destroying the patch.
 
 ## Gate
 
-- [ ] `M20-G01 GATE` No changed diff can inherit stale passed validation.
-- [ ] `M20-G02 GATE` The final report distinguishes passed, failed, waived, skipped, unavailable, runtime-only, and invalidated evidence.
-- [ ] `M20-G03 GATE` Acceptance is bound to the exact reviewed diff and report.
-- [ ] `M20-G04 GATE` The UI makes unsupported external guarantees impossible to mistake for verified claims.
+- [x] `M20-G01 GATE` No changed diff can inherit stale passed validation.
+- [x] `M20-G02 GATE` The final report distinguishes passed, failed, waived, skipped, unavailable, runtime-only, and invalidated evidence.
+- [x] `M20-G03 GATE` Acceptance is bound to the exact reviewed diff and report.
+- [x] `M20-G04 GATE` The UI makes unsupported external guarantees impossible to mistake for verified claims.
 
 ---
 

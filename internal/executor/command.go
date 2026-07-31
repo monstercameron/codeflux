@@ -10,10 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
-	"runtime"
 
 	"codeflux.dev/codeflux/internal/redact"
 )
@@ -22,15 +22,15 @@ const redactedProgressChunkBytes = 4 << 10
 
 // AuthorizedToolRequest is the worker-owned executable command boundary.
 type AuthorizedToolRequest struct {
-	Request            ToolRequest
-	Classification     AuthorityClassification
-	WorktreePath       string
-	ExpectedExecutable string
+	Request                  ToolRequest
+	Classification           AuthorityClassification
+	WorktreePath             string
+	ExpectedExecutable       string
 	ExpectedExecutableSHA256 string
-	Environment        map[string]string
-	AllowedEnvironment []string
-	Redactor           *redact.Pipeline
-	Progress           ToolProgressSink
+	Environment              map[string]string
+	AllowedEnvironment       []string
+	Redactor                 *redact.Pipeline
+	Progress                 ToolProgressSink
 }
 
 // ToolProgress is a bounded redacted lifecycle or output update.

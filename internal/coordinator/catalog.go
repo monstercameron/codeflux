@@ -227,14 +227,23 @@ var rpcContracts = []RPCContract{
 
 	rpcQuery("ReviewService/GetDiffSummary", "WorktreeService.GetTaskDiff", "tasks", "worktrees"),
 	rpcQuery("ReviewService/GetValidationReport", "ValidationService.GetValidationReport", "validations", "evidence"),
+	rpcQuery("ReviewService/GetEvidenceReport", "ReviewService.BuildReviewBundle", "tasks", "plans", "validations", "evidence", "worktrees", "graphs"),
 	rpcEffect("ReviewService/AcceptChange", "ReviewService.AcceptChange",
 		"explicit-user-authority", "task/accept/key", "required-task-diff-validation-evidence",
 		[]string{"tasks", "acceptance-decisions", "episodes", "session-events"},
 		[]string{"task_state_changed", "graph_patch"}, "git-acceptance"),
+	rpcTypes(rpcEffect("ReviewService/RequestRepair", "ReviewService.RequestRepair",
+		"explicit-user-authority", "task/review-repair/key", "required-current-review-report-diff",
+		[]string{"acceptance-reviews", "checkpoints", "messages", "plans", "repair-requests"},
+		[]string{"task_state_changed"}, "git-checkpoint"), "ReviewServiceRequestRepairRequest", "ReviewServiceRequestRepairResponse"),
 	rpcMutation("ReviewService/RejectChange", "ReviewService.RejectChange",
 		"explicit-user-authority", "task/reject/key", "required-current-task-and-diff",
 		"rejection transaction", []string{"tasks", "review-decisions", "session-events"},
 		[]string{"task_state_changed"}, "none"),
+	rpcTypes(rpcEffect("ReviewService/RollbackTask", "ReviewService.RollbackTask",
+		"explicit-user-authority", "task/review-rollback/key", "required-repair-checkpoint-diff",
+		[]string{"repair-requests", "checkpoints", "rollback-intents", "rollback-outcomes"},
+		[]string{"task_state_changed"}, "git-restore"), "ReviewServiceRollbackTaskRequest", "ReviewServiceRollbackTaskResponse"),
 	rpcEffect("ReviewService/OpenInEditor", "ReviewService.OpenInEditor",
 		"explicit-user-action", "workspace/editor-open/key", "required-current-workspace",
 		[]string{"workspaces", "effect-intents", "effect-outcomes"},
@@ -606,6 +615,12 @@ func newRPC(method, function string, contract FunctionContract) RPCContract {
 		HandlerSteps:        cloneStrings(thinHandlerSteps),
 		Function:            contract,
 	}
+}
+
+func rpcTypes(contract RPCContract, command, result string) RPCContract {
+	contract.CommandOrQueryType = "codeflux.v1." + command
+	contract.ResultType = "codeflux.v1." + result
+	return contract
 }
 
 func pureFunction(category, name string) FunctionContract {
