@@ -30,6 +30,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-003
+Date: 2026-08-01
+Type: Command line, first run, doctor, application logging, and packaging
+Request-or-TODO: M23-001 through M23-085 and M23-G01 through M23-G04;
+  completes Milestone 23
+Outcome: Added the codeflux command line with five exit codes and a declared
+  command registry, the start and provider commands, the redacted diagnostic
+  bundle, the nine-step first-run journey with a ten-minute target, ten
+  doctor checks where every non-ok result must carry a remediation, four-level
+  application logging over sixteen stable event names with rotation,
+  retention, and clear, the release and update model across five platforms
+  with checksums, signatures, compatibility, and migration preparation, the
+  embedded web assets, and docs/using.md with the test that keeps it true
+Affected-behavior: A person who did not build CodeFlux can install it, run
+  first-run, configure a provider by piping the credential on stdin, start
+  the local interface, diagnose the installation with doctor, and collect a
+  diagnostic bundle that is asserted to carry no credential. Interaction
+  policy is explicit per command, and a command that needs an answer nobody
+  can give exits 4 rather than hanging
+Compatibility-or-migration: No schema change. Update compatibility and
+  migration preparation are declared and tested but no release has been
+  published against them
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass at this
+  commit
+Dev-Log: DL-20260801-003
+
 Change-ID: CL-20260801-002
 Date: 2026-08-01
 Type: Test harness, security and abuse suites, benchmarks, and observability

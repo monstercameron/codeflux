@@ -41,10 +41,24 @@ func TestDoctorIsHonestAboutUnavailableSubsystems(t *testing.T) {
 	if code != exitUnavailable {
 		t.Fatalf("doctor exit = %d, want %d", code, exitUnavailable)
 	}
-	for _, subsystem := range []string{"storage: missing", "credential-store:", "browser-transport: unavailable"} {
+	// The intent is unchanged from when this test was written: the doctor must
+	// name what is unavailable rather than glossing over it. The strings moved
+	// when the checks became a declared set, and the stale
+	// "browser-transport: unavailable" line was dropped because the browser
+	// transport is implemented and the message had become untrue.
+	for _, subsystem := range []string{
+		"Database integrity and schema",
+		"no database has been created yet",
+		"Credential store",
+		"Provider connectivity",
+	} {
 		if !strings.Contains(stdout.String(), subsystem) {
 			t.Errorf("doctor output omits %q: %s", subsystem, stdout.String())
 		}
+	}
+	// Every unavailable subsystem must come with a next step.
+	if !strings.Contains(stdout.String(), "->") {
+		t.Errorf("doctor output offers no remediation: %s", stdout.String())
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("doctor stderr = %q, want empty", stderr.String())
@@ -61,14 +75,11 @@ func TestDoctorReportsSafeDatabaseDiagnostics(t *testing.T) {
 		t.Fatalf("doctor exit = %d, want %d; stderr=%q", code, exitUnavailable, stderr.String())
 	}
 	for _, field := range []string{
-		"storage: ok",
-		"git: ok",
-		"database-bytes:",
-		"sqlite-total-bytes:",
-		"schema-version:",
-		"supported-schema-version:",
-		"successful-migrations:",
-		"failed-migrations:",
+		"Database integrity and schema",
+		"Git",
+		"schema",
+		"Worktree root and disk space",
+		"Loopback port",
 	} {
 		if !strings.Contains(stdout.String(), field) {
 			t.Errorf("doctor output omits %q: %s", field, stdout.String())

@@ -6,18 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 
 	"codeflux.dev/codeflux/internal/buildinfo"
-	"codeflux.dev/codeflux/internal/credentials"
 	"codeflux.dev/codeflux/internal/storage"
-)
-
-const (
-	exitOK          = 0
-	exitFailure     = 1
-	exitUsage       = 2
-	exitUnavailable = 3
 )
 
 func main() {
@@ -25,43 +16,61 @@ func main() {
 }
 
 func run(stdout, stderr io.Writer, args []string) int {
+	return dispatch(context.Background(), stdout, stderr, os.Stdin, args, openInBrowser)
+}
+
+// dispatch routes one invocation. Its dependencies are parameters so a test
+// can drive the whole CLI without a terminal, a browser, or a real key store.
+func dispatch(
+	ctx context.Context,
+	stdout, stderr io.Writer,
+	stdin *os.File,
+	args []string,
+	openURL func(string) error,
+) int {
 	if len(args) == 0 {
 		printHelp(stderr)
 		return exitUsage
 	}
 	switch args[0] {
 	case "help", "--help", "-h":
+		// Contextual help: `help <command>` explains one command (M23-013).
+		if len(args) > 1 {
+			spec, ok := lookupCommand(args[1])
+			if !ok {
+				fmt.Fprintln(stderr, "codeflux help: "+unknownCommandMessage(args[1]))
+				return exitUsage
+			}
+			printCommandHelp(stdout, spec)
+			return exitOK
+		}
 		printHelp(stdout)
 		return exitOK
+	case "start":
+		return runStart(ctx, stdout, stderr, stdin, args[1:], openURL)
 	case "version":
 		printVersion(stdout, buildinfo.Current())
 		return exitOK
 	case "doctor":
-		return runDoctor(stdout, stderr, args[1:])
+		return runDoctorChecks(ctx, stdout, stderr, args[1:])
 	case "backup":
 		return runBackup(stdout, stderr, args[1:])
-	case "integrity":
+	// "integrity" is retained as an alias. The plan names this command
+	// integrity-check, but the shorter name already shipped, and silently
+	// breaking a command someone has scripted is worse than carrying an alias.
+	case "integrity-check", "integrity":
 		return runIntegrity(stdout, stderr, args[1:])
+	case "diagnostics":
+		return runDiagnostics(ctx, stdout, stderr, args[1:])
+	case "provider":
+		return runProvider(ctx, stdout, stderr, stdin, args[1:], nil)
 	case "pause", "resume", "cancel":
 		return runTaskControl(stdout, stderr, args[0], args[1:])
 	default:
-		fmt.Fprintf(stderr, "codeflux: unknown command %q\n", args[0])
+		fmt.Fprintln(stderr, "codeflux: "+unknownCommandMessage(args[0]))
 		printHelp(stderr)
 		return exitUsage
 	}
-}
-
-func printHelp(output io.Writer) {
-	fmt.Fprintln(output, "Usage: codeflux <command>")
-	fmt.Fprintln(output)
-	fmt.Fprintln(output, "Commands:")
-	fmt.Fprintln(output, "  version  Print executable and schema identity")
-	fmt.Fprintln(output, "  doctor   Check available local prerequisites")
-	fmt.Fprintln(output, "  backup   Create an explicit SQLite recovery snapshot")
-	fmt.Fprintln(output, "  integrity  Run a full SQLite integrity check")
-	fmt.Fprintln(output, "  pause    Pause an active task at a safe checkpoint")
-	fmt.Fprintln(output, "  resume   Resume a compatible paused task")
-	fmt.Fprintln(output, "  cancel   Cancel an active or paused task")
 }
 
 func printVersion(output io.Writer, info buildinfo.Info) {
@@ -71,75 +80,6 @@ func printVersion(output io.Writer, info buildinfo.Info) {
 	fmt.Fprintf(output, "go-version: %s\n", info.GoVersion)
 	fmt.Fprintf(output, "schema-version: %d\n", info.SchemaVersion)
 	fmt.Fprintf(output, "frontend-version: %s\n", info.FrontendVersion)
-}
-
-func runDoctor(output, errorsOutput io.Writer, args []string) int {
-	arguments, err := parseMaintenanceArguments(args, false)
-	if err != nil {
-		fmt.Fprintf(errorsOutput, "codeflux doctor: %v\n", err)
-		return exitUsage
-	}
-	info := buildinfo.Current()
-	fmt.Fprintf(output, "executable: ok (%s, %s)\n", info.Version, info.Commit)
-	fmt.Fprintf(output, "go-runtime: ok (%s)\n", info.GoVersion)
-	if _, err := exec.LookPath("git"); err == nil {
-		fmt.Fprintln(output, "git: ok")
-	} else {
-		fmt.Fprintln(output, "git: missing")
-	}
-	path := arguments.database
-	if path == "" {
-		path, err = storage.DefaultDatabasePath()
-		if err != nil {
-			fmt.Fprintln(output, "storage: error (default location unavailable)")
-			printCredentialStoreStatus(output)
-			fmt.Fprintln(output, "browser-transport: unavailable (Milestone 06 not implemented)")
-			return exitFailure
-		}
-	}
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		fmt.Fprintln(output, "storage: missing (database has not been created)")
-	} else if err != nil {
-		fmt.Fprintln(output, "storage: error (database cannot be inspected)")
-	} else {
-		database, openErr := storage.Open(context.Background(), storage.OpenOptions{Path: path})
-		if openErr != nil {
-			fmt.Fprintln(output, "storage: error (database open failed)")
-		} else {
-			diagnostics, diagnosticErr := database.Diagnose(context.Background())
-			closeErr := database.Close(context.Background())
-			if diagnosticErr != nil || closeErr != nil {
-				fmt.Fprintln(output, "storage: error (database checks failed)")
-			} else {
-				fmt.Fprintln(output, "storage: ok")
-				fmt.Fprintf(output, "database-bytes: %d\n", diagnostics.DatabaseBytes)
-				fmt.Fprintf(output, "sqlite-total-bytes: %d\n", diagnostics.TotalSQLiteBytes)
-				fmt.Fprintf(output, "schema-version: %d\n", diagnostics.SchemaVersion)
-				fmt.Fprintf(
-					output,
-					"supported-schema-version: %d\n",
-					diagnostics.SupportedSchemaVersion,
-				)
-				fmt.Fprintf(
-					output,
-					"successful-migrations: %d\n",
-					diagnostics.SuccessfulMigrations,
-				)
-				fmt.Fprintf(output, "failed-migrations: %d\n", diagnostics.FailedMigrations)
-			}
-		}
-	}
-	printCredentialStoreStatus(output)
-	fmt.Fprintln(output, "browser-transport: unavailable (Milestone 06 not implemented)")
-	return exitUnavailable
-}
-
-func printCredentialStoreStatus(output io.Writer) {
-	if available, backend := credentials.PlatformStatus(); available {
-		fmt.Fprintf(output, "credential-store: ok (%s)\n", backend)
-	} else {
-		fmt.Fprintf(output, "credential-store: unavailable (%s)\n", backend)
-	}
 }
 
 func runBackup(output, errorsOutput io.Writer, args []string) int {

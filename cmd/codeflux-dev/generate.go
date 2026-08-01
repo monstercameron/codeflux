@@ -109,6 +109,13 @@ func frontendAssetDescriptors(root string) ([]assetDescriptor, string, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		// The manifest describes what a browser loads, and the frontend
+		// version is its digest. Documentation living beside the assets — the
+		// placeholder that lets Go embed the directory at all — would change
+		// that version without changing anything a browser ever sees.
+		if strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
+			return nil
+		}
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err

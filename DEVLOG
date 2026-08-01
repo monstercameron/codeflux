@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-003
+Date: 2026-08-01
+Status: Complete; Milestone 23 is finished and its four gates are marked
+Change-ID: CL-20260801-003
+Request-or-TODO: M23-001 through M23-085 and M23-G01 through M23-G04
+Goal: Make the product installable, startable, and diagnosable by somebody
+  who did not build it, and make its own documentation something a test can
+  keep honest
+Assumptions: A diagnostic bundle is the artifact a user attaches to a bug
+  report, so it must be asserted to carry no credential rather than believed
+  to
+Decisions: Take the provider credential only from stdin, never from an
+  argument, so it cannot reach a shell history or a process listing. Give
+  every non-ok doctor result a required remediation field, because a check
+  that reports a problem without a next action moves the problem rather than
+  solving it. Normalize whitespace before comparing documentation to the
+  behavior it describes, so a rewrapped paragraph does not fail a test and
+  teach people to stop rewrapping. Exclude Markdown from the embedded asset
+  manifest: the manifest describes what a browser loads, and documentation
+  beside the assets would change the frontend version without changing
+  anything a browser sees
+Files-or-schemas: cmd/codeflux commands, start, provider, doctor,
+  diagnostics, and per-platform disk reporting; internal/firstrun;
+  internal/doctor; internal/applog; internal/release; web/assets embed;
+  docs/using.md; cmd/codeflux-dev generate and m23 documentation test
+Validation: Full build, js/wasm build, vet, gofmt, the complete test suite,
+  lint, generate-check, migration-check, and artifact-check pass
+Failures-or-discarded-approaches: `codeflux start --non-interactive` was
+  initially gated from creating a database, which broke the ordinary
+  `codeflux start >log 2>&1 &` invocation; the gate was removed, because
+  creating the database is what start means. Three helper functions left dead
+  by refactors were caught by staticcheck U1000 and removed rather than
+  parked
+Known-limitations: The packaged end-to-end run has never been attempted with
+  a real provider, which remains the largest unmeasured risk in the project.
+  The release and update paths are declared and tested against fixtures; no
+  release has been published, so the signature and migration paths have not
+  been exercised end to end
+Next-safe-step: Build M24, the vertical slice and prototype exit protocol,
+  as executable structure rather than prose, so an exit run's conditions can
+  be checked rather than asserted
+
 Dev-Log: DL-20260801-002
 Date: 2026-08-01
 Status: Complete; Milestone 22 is finished and its six gates are marked

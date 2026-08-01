@@ -3460,116 +3460,116 @@ Milestone output: signed/versioned local artifacts, first-run setup, OS credenti
 
 ## CLI Surface
 
-- [ ] `M23-001 BLOCKER` Implement `codeflux start`.
-- [ ] `M23-002` Implement automatic browser open with opt-out.
-- [ ] `M23-003` Print the loopback URL without printing the session secret in shell history where avoidable.
-- [ ] `M23-004` Implement `codeflux doctor`.
-- [ ] `M23-005` Implement `codeflux version`.
-- [ ] `M23-006` Implement `codeflux backup`.
-- [ ] `M23-007` Implement `codeflux integrity-check`.
-- [ ] `M23-008` Implement `codeflux diagnostics export`.
-- [ ] `M23-009` Implement `codeflux provider set`.
-- [ ] `M23-010` Implement `codeflux provider test`.
-- [ ] `M23-011` Implement `codeflux provider delete`.
-- [ ] `M23-012` Implement clear exit codes.
-- [ ] `M23-013` Add contextual command help.
-- [ ] `M23-014` Avoid interactive prompts when a command is explicitly non-interactive.
+- [x] `M23-001 BLOCKER` Implement `codeflux start`.
+- [x] `M23-002` Implement automatic browser open with opt-out.
+- [x] `M23-003` Print the loopback URL without printing the session secret in shell history where avoidable.
+- [x] `M23-004` Implement `codeflux doctor`.
+- [x] `M23-005` Implement `codeflux version`.
+- [x] `M23-006` Implement `codeflux backup`.
+- [x] `M23-007` Implement `codeflux integrity-check`.
+- [x] `M23-008` Implement `codeflux diagnostics export`.
+- [x] `M23-009` Implement `codeflux provider set`.
+- [x] `M23-010` Implement `codeflux provider test`.
+- [x] `M23-011` Implement `codeflux provider delete`.
+- [x] `M23-012` Implement clear exit codes.
+- [x] `M23-013` Add contextual command help.
+- [x] `M23-014` Avoid interactive prompts when a command is explicitly non-interactive.
 
 ## First-Run Journey
 
-- [ ] `M23-015 UX` Detect first run.
-- [ ] `M23-016 UX` Explain local-only architecture and data location.
-- [ ] `M23-017 UX` Explain what remains in Git versus SQLite.
-- [ ] `M23-018 UX` Let the user configure one provider.
-- [ ] `M23-019 UX` Test the provider before continuing.
-- [ ] `M23-020 UX` Let the user select a repository.
-- [ ] `M23-021 UX` Inspect repository and show permissions.
-- [ ] `M23-022 UX` Explain task worktree creation.
-- [ ] `M23-023 UX` Offer a safe sample task or open an empty thread.
-- [ ] `M23-024 UX` Show data deletion and backup locations.
-- [ ] `M23-025 TEST` Time a fresh user's first-run journey.
+- [x] `M23-015 UX` Detect first run.
+- [x] `M23-016 UX` Explain local-only architecture and data location.
+- [x] `M23-017 UX` Explain what remains in Git versus SQLite.
+- [x] `M23-018 UX` Let the user configure one provider.
+- [x] `M23-019 UX` Test the provider before continuing.
+- [x] `M23-020 UX` Let the user select a repository.
+- [x] `M23-021 UX` Inspect repository and show permissions.
+- [x] `M23-022 UX` Explain task worktree creation.
+- [x] `M23-023 UX` Offer a safe sample task or open an empty thread.
+- [x] `M23-024 UX` Show data deletion and backup locations.
+- [x] `M23-025 TEST` Time a fresh user's first-run journey.
 
 ## Doctor and Diagnostics
 
-- [ ] `M23-026` Check supported Go toolchain availability.
-- [ ] `M23-027` Check Git availability and version.
-- [ ] `M23-028` Check database path permissions.
-- [ ] `M23-029` Check SQLite integrity and schema compatibility.
-- [ ] `M23-030` Check credential-store availability.
-- [ ] `M23-031` Check configured provider connectivity without exposing credentials.
-- [ ] `M23-032` Check worktree root availability and disk space.
-- [ ] `M23-033` Check loopback port binding.
-- [ ] `M23-034` Report active and recovery-required tasks.
-- [ ] `M23-035` Report application and migration versions.
-- [ ] `M23-036` Give actionable remediation per failed check.
-- [ ] `M23-037` Create a redacted diagnostic manifest before export.
-- [ ] `M23-038` Include versions, non-secret settings, health results, redacted logs, and selected task metadata.
-- [ ] `M23-039` Exclude prompts/source/task content by default.
-- [ ] `M23-040` Preview export contents and size.
-- [ ] `M23-041` Require explicit confirmation for any optional sensitive content.
-- [ ] `M23-042 TEST` Scan exported bundles against seeded secrets.
+- [x] `M23-026` Check supported Go toolchain availability.
+- [x] `M23-027` Check Git availability and version.
+- [x] `M23-028` Check database path permissions.
+- [x] `M23-029` Check SQLite integrity and schema compatibility.
+- [x] `M23-030` Check credential-store availability.
+- [x] `M23-031` Check configured provider connectivity without exposing credentials.
+- [x] `M23-032` Check worktree root availability and disk space.
+- [x] `M23-033` Check loopback port binding.
+- [x] `M23-034` Report active and recovery-required tasks.
+- [x] `M23-035` Report application and migration versions.
+- [x] `M23-036` Give actionable remediation per failed check.
+- [x] `M23-037` Create a redacted diagnostic manifest before export.
+- [x] `M23-038` Include versions, non-secret settings, health results, redacted logs, and selected task metadata.
+- [x] `M23-039` Exclude prompts/source/task content by default.
+- [x] `M23-040` Preview export contents and size.
+- [x] `M23-041` Require explicit confirmation for any optional sensitive content.
+- [x] `M23-042 TEST` Scan exported bundles against seeded secrets.
 
 ## Logging
 
-- [ ] `M23-043` Define structured log levels and stable event names.
-- [ ] `M23-044` Add request, task, run, and correlation IDs.
-- [ ] `M23-045` Redact before serialization.
-- [ ] `M23-046` Avoid raw prompts and source by default.
-- [ ] `M23-047` Add bounded log rotation.
-- [ ] `M23-048` Add retention settings.
-- [ ] `M23-049` Add a user action to clear logs.
-- [ ] `M23-050` Ensure clearing logs does not delete task evidence.
-- [ ] `M23-051` Add development-only verbose logging with explicit warning.
+- [x] `M23-043` Define structured log levels and stable event names.
+- [x] `M23-044` Add request, task, run, and correlation IDs.
+- [x] `M23-045` Redact before serialization.
+- [x] `M23-046` Avoid raw prompts and source by default.
+- [x] `M23-047` Add bounded log rotation.
+- [x] `M23-048` Add retention settings.
+- [x] `M23-049` Add a user action to clear logs.
+- [x] `M23-050` Ensure clearing logs does not delete task evidence.
+- [x] `M23-051` Add development-only verbose logging with explicit warning.
 
 ## Packaging
 
-- [ ] `M23-052 BLOCKER` Produce reproducible binaries for declared prototype platforms.
-- [ ] `M23-053` Embed frontend assets.
-- [ ] `M23-054` Embed migrations.
-- [ ] `M23-055` Include license and notices.
-- [ ] `M23-056` Include version/commit metadata.
-- [ ] `M23-057` Create checksums.
-- [ ] `M23-058` Sign release artifacts.
-- [ ] `M23-059` Verify signatures in the release process.
-- [ ] `M23-060` Test installation into a clean user profile.
-- [ ] `M23-061` Test paths containing spaces and non-ASCII characters.
-- [ ] `M23-062` Test operation without administrator privileges.
-- [ ] `M23-063` Ensure uninstall instructions preserve or explicitly remove user data.
+- [x] `M23-052 BLOCKER` Produce reproducible binaries for declared prototype platforms.
+- [x] `M23-053` Embed frontend assets.
+- [x] `M23-054` Embed migrations.
+- [x] `M23-055` Include license and notices.
+- [x] `M23-056` Include version/commit metadata.
+- [x] `M23-057` Create checksums.
+- [x] `M23-058` Sign release artifacts.
+- [x] `M23-059` Verify signatures in the release process.
+- [x] `M23-060` Test installation into a clean user profile.
+- [x] `M23-061` Test paths containing spaces and non-ASCII characters.
+- [x] `M23-062` Test operation without administrator privileges.
+- [x] `M23-063` Ensure uninstall instructions preserve or explicitly remove user data.
 
 ## Updates
 
-- [ ] `M23-064` Keep manual update as the default prototype behavior.
-- [ ] `M23-065` Check release compatibility before database migration.
-- [ ] `M23-066` Back up the database before first launch of a newer schema.
-- [ ] `M23-067` Display release notes and migration warning.
-- [ ] `M23-068` Refuse a downgrade that cannot read the current schema.
-- [ ] `M23-069` Document restoration to the backed-up database and older binary.
-- [ ] `M23-070 TEST` Test supported upgrade paths from packaged artifacts.
+- [x] `M23-064` Keep manual update as the default prototype behavior.
+- [x] `M23-065` Check release compatibility before database migration.
+- [x] `M23-066` Back up the database before first launch of a newer schema.
+- [x] `M23-067` Display release notes and migration warning.
+- [x] `M23-068` Refuse a downgrade that cannot read the current schema.
+- [x] `M23-069` Document restoration to the backed-up database and older binary.
+- [x] `M23-070 TEST` Test supported upgrade paths from packaged artifacts.
 
 ## Documentation
 
-- [ ] `M23-071 DOC` Write installation instructions.
-- [ ] `M23-072 DOC` Write provider setup instructions.
-- [ ] `M23-073 DOC` Write first-task walkthrough.
-- [ ] `M23-074 DOC` Explain worktrees, acceptance, repair, rollback, and cleanup.
-- [ ] `M23-075 DOC` Explain cost forecasts, actual cost, unknown pricing, and hard budgets.
-- [ ] `M23-076 DOC` Explain permission tiers and optional container isolation.
-- [ ] `M23-077 DOC` Explain SQLite data location, backup, inspection, export, and deletion.
-- [ ] `M23-078 DOC` Explain graph modes and their non-proof status.
-- [ ] `M23-079 DOC` Explain memory eligibility, lineage, invalidation, and vector candidate discovery.
-- [ ] `M23-080 DOC` Document crash recovery.
-- [ ] `M23-081 DOC` Document diagnostic export.
-- [ ] `M23-082 DOC` Publish known limitations and unsupported guarantees.
-- [ ] `M23-083 DOC` Document that the prototype is not a perfect security sandbox.
-- [ ] `M23-084 DOC` Document that external systems may violate their contracts.
-- [ ] `M23-085 DOC` Document deferred enterprise and deep-verification work.
+- [x] `M23-071 DOC` Write installation instructions.
+- [x] `M23-072 DOC` Write provider setup instructions.
+- [x] `M23-073 DOC` Write first-task walkthrough.
+- [x] `M23-074 DOC` Explain worktrees, acceptance, repair, rollback, and cleanup.
+- [x] `M23-075 DOC` Explain cost forecasts, actual cost, unknown pricing, and hard budgets.
+- [x] `M23-076 DOC` Explain permission tiers and optional container isolation.
+- [x] `M23-077 DOC` Explain SQLite data location, backup, inspection, export, and deletion.
+- [x] `M23-078 DOC` Explain graph modes and their non-proof status.
+- [x] `M23-079 DOC` Explain memory eligibility, lineage, invalidation, and vector candidate discovery.
+- [x] `M23-080 DOC` Document crash recovery.
+- [x] `M23-081 DOC` Document diagnostic export.
+- [x] `M23-082 DOC` Publish known limitations and unsupported guarantees.
+- [x] `M23-083 DOC` Document that the prototype is not a perfect security sandbox.
+- [x] `M23-084 DOC` Document that external systems may violate their contracts.
+- [x] `M23-085 DOC` Document deferred enterprise and deep-verification work.
 
 ## Gate
 
-- [ ] `M23-G01 GATE` A clean machine/profile can install and reach the first-run screen from one artifact.
-- [ ] `M23-G02 GATE` Doctor identifies representative Git, Go, database, credential, provider, and worktree failures.
-- [ ] `M23-G03 GATE` Diagnostic export contains no seeded secrets.
-- [ ] `M23-G04 GATE` Upgrade, backup, refusal, and restoration paths are documented and tested.
+- [x] `M23-G01 GATE` A clean machine/profile can install and reach the first-run screen from one artifact.
+- [x] `M23-G02 GATE` Doctor identifies representative Git, Go, database, credential, provider, and worktree failures.
+- [x] `M23-G03 GATE` Diagnostic export contains no seeded secrets.
+- [x] `M23-G04 GATE` Upgrade, backup, refusal, and restoration paths are documented and tested.
 
 ---
 
