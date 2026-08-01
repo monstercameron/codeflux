@@ -287,9 +287,13 @@ func cloneDurableMessage(message DurableMessage) DurableMessage {
 }
 
 func cloneMessageFeed(feed MessageFeed) MessageFeed {
-	feed.Messages = make([]DurableMessage, len(feed.Messages))
+	// The destination is a separate slice: assigning to feed.Messages before
+	// ranging would range over the fresh zero-valued slice instead of the
+	// source, silently replacing every loaded message with a zero value.
+	messages := make([]DurableMessage, len(feed.Messages))
 	for index, message := range feed.Messages {
-		feed.Messages[index] = cloneDurableMessage(message)
+		messages[index] = cloneDurableMessage(message)
 	}
+	feed.Messages = messages
 	return feed
 }

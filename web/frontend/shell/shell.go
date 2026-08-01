@@ -1805,6 +1805,11 @@ func routeRegion(mode primitives.Mode, name, title string, children ...ui.Node) 
 	tokens := mode.Tokens()
 	return html.Section(html.Props{
 		DataAttr: html.DataAttribute{Name: "region", Value: name},
+		// A section without an accessible name is not exposed as a landmark,
+		// so its heading labels the visible box but not the region a screen
+		// reader navigates. Naming it with the same title keeps the two in
+		// step and makes every route region reachable by name.
+		Aria: map[string]string{"label": title},
 		Class: css.New(
 			u.Flex, u.FlexCol,
 			css.Gap(css.Px(tokens.Spacing.SM)),

@@ -8,10 +8,22 @@ import (
 	"path/filepath"
 )
 
-var benchmarkPatterns = map[string]string{
-	"all":        ".",
-	"atom-names": "SplitGoIdentifier",
-	"generation": "RenderMigrationCatalog",
+// benchmarkTarget is one named benchmark selection: which package to run and
+// which benchmarks within it.
+type benchmarkTarget struct {
+	packagePath string
+	pattern     string
+}
+
+var benchmarkPatterns = map[string]benchmarkTarget{
+	"all":        {packagePath: "./cmd/codeflux-dev", pattern: "."},
+	"atom-names": {packagePath: "./cmd/codeflux-dev", pattern: "SplitGoIdentifier"},
+	"generation": {packagePath: "./cmd/codeflux-dev", pattern: "RenderMigrationCatalog"},
+	// M22-076..087. The performance suite lives in its own package so every
+	// measurement shares one environment capture and one set of recorded
+	// dimensions; see docs/benchmarks.md.
+	"performance": {packagePath: "./internal/benchmarks", pattern: "."},
+	"graph":       {packagePath: "./internal/graphlayout", pattern: "BenchmarkM19"},
 }
 
 func runBenchmark(
@@ -34,9 +46,13 @@ func runBenchmark(
 	if len(invocation.Positional) == 1 {
 		name = invocation.Positional[0]
 	}
-	pattern, ok := benchmarkPatterns[name]
+	target, ok := benchmarkPatterns[name]
 	if !ok {
-		fmt.Fprintf(stderr, "codeflux-dev benchmark: unknown benchmark %q; choose all, atom-names, or generation\n", name)
+		fmt.Fprintf(
+			stderr,
+			"codeflux-dev benchmark: unknown benchmark %q; choose all, atom-names, generation, performance, or graph\n",
+			name,
+		)
 		return exitUsage
 	}
 	if err := os.MkdirAll(outputRoot, 0o755); err != nil {
@@ -56,11 +72,11 @@ func runBenchmark(
 		writer,
 		stderr,
 		"test",
-		"./cmd/codeflux-dev",
+		target.packagePath,
 		"-run",
 		"^$",
 		"-bench",
-		pattern,
+		target.pattern,
 		"-benchmem",
 	)
 	if err := file.Close(); err != nil {

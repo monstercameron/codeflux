@@ -250,6 +250,9 @@ func validateAppendMessageInput(input AppendMessage) error {
 	case !input.Role.IsValid():
 		return errors.New("message role is invalid")
 	}
+	if len(input.BodyRedacted) > MaximumMessageBodyBytes {
+		return errors.New("message body exceeds maximum length")
+	}
 	if err := validateBounded("message idempotency key", input.IdempotencyKey, 255); err != nil {
 		return err
 	}
@@ -268,6 +271,10 @@ func appendMessageTransaction(
 		return Message{}, err
 	}
 	if found {
+		// The message ID is deliberately NOT compared: a client mints a fresh
+		// ID per attempt, so the idempotency key is the deduplication identity
+		// and the stored row is returned as canonical. Content mismatch is the
+		// conflict, because that is a different message wearing the same key.
 		if existing.Role != input.Role || existing.BodyRedacted != input.BodyRedacted ||
 			!sameArtifactIDs(existing.AttachmentIDs, input.AttachmentIDs) {
 			return Message{}, typedError(ErrConflict, "append idempotent message",

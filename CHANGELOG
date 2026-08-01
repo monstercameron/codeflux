@@ -30,6 +30,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-002
+Date: 2026-08-01
+Type: Test harness, security and abuse suites, benchmarks, and observability
+Request-or-TODO: M22-001 through M22-130 and M22-G01 through M22-G06;
+  completes Milestone 22
+Outcome: Added the deterministic provider, repository, database, event, and
+  fault fixtures; the coordinator, browser, and replay harnesses with twelve
+  named scenarios; security and abuse suites for the frontend server, Git
+  workspace, review editor, executor, storage, redaction, and graph; fuzz
+  targets for identity, replay, path resolution, and transport conversion;
+  the thirteen-journey browser and accessibility matrix bound to its render
+  fixture; twelve declared benchmarks with a recorded environment; the
+  metrics, scorecard, and read-only inspection repositories; developer
+  diagnostics for logs, profiling, and marks; and an artifact secret scan
+  wired into artifact-check
+Affected-behavior: Four product defects the new suites found are fixed. The
+  HTTP guard now accepts "localhost", which internal/config accepts as a bind
+  host and which RFC 6761 reserves for loopback, so a supported configuration
+  is no longer locked out of its own interface with a 421. The Git workspace
+  and review editor guards now refuse os.ModeIrregular, because Windows
+  reports a directory junction that way and filepath.EvalSymlinks returns a
+  junction unchanged, so a junction escaped the worktree boundary. Upward
+  message pagination no longer replaces every loaded message with a zero
+  value. Every routed region now carries an accessible name
+Compatibility-or-migration: No schema change. Message bodies are now bounded
+  at 64 KiB on append; longer bodies are refused rather than truncated
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass at this
+  commit; the thirteen mounted browser journeys were additionally run for
+  real in headless Chromium and pass; the benchmark suite was run and its
+  measured figures recorded in docs/benchmarks.md
+Dev-Log: DL-20260801-002
+
 Change-ID: CL-20260801-001
 Date: 2026-08-01
 Type: Project-memory retrieval, chronological episodes, and atom identity

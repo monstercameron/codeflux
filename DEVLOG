@@ -24,6 +24,57 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-002
+Date: 2026-08-01
+Status: Complete; Milestone 22 is finished and its six gates are marked
+Change-ID: CL-20260801-002
+Request-or-TODO: M22-001 through M22-130 and M22-G01 through M22-G06
+Goal: Make the claims the product makes about itself measurable, and give the
+  security boundaries suites that attack them rather than describe them
+Assumptions: A suite that only exercises the supported path measures nothing,
+  so each security suite was written to find a way through first and assert
+  the refusal second
+Decisions: Bind the browser journey matrix to the render fixture's own source
+  by reading it, so a renamed stage fails the matrix instead of silently
+  testing nothing. Size benchmark batches from the measured platform clock
+  granularity rather than a constant, because a single append is below
+  resolution here and reported +Inf operations per second. Report peak heap
+  from HeapAlloc and allocations per operation rather than HeapSys, which is
+  whole-process reservation and read as 2.79 GB. Write the artifact secret
+  rule around routability, using reserved TLDs and the net package's own
+  loopback, private, link-local, and unspecified predicates, rather than an
+  allowlist of hostnames
+Files-or-schemas: internal/testfixtures and internal/testharness;
+  internal/benchmarks with docs/benchmarks.md; internal/devdiag;
+  internal/storage metrics, scorecard, and inspection repositories;
+  security_abuse suites across seven packages; fuzz targets in domain,
+  events, gitwork, and transport; internal/frontendtest m22 matrix and
+  browser checks; cmd/codeflux-dev artifact_secrets, benchmark targets,
+  command graph and documentation tests; docs/developing.md; the four
+  product fixes in frontendserver/handler.go, gitwork/file.go,
+  review/editor.go, shell/shell.go, and timeline/client.go
+Validation: Full build, js/wasm build, vet, gofmt, the complete test suite,
+  lint, generate-check, migration-check, and artifact-check pass. The mounted
+  browser suite was run for real under CODEFLUX_RUN_MOUNTED_RENDER_ISOLATION
+  in headless Chromium and all thirteen journeys pass; it uses its own
+  httptest port and does not touch the operator's live server on 63131
+Failures-or-discarded-approaches: A first attempt at message idempotency
+  added an identity comparison and broke two existing tests that deliberately
+  assert the ID is per-attempt while the idempotency key is the deduplication
+  identity; the change was reverted and the contract documented instead. The
+  artifact secret scan initially flagged a negative fixture of its own, which
+  is what prompted the routability rule; three real hostnames that the
+  product never dials are documented as exceptions. Four SQL column names in
+  the metrics repository were wrong and were caught by its own tests
+Known-limitations: About 131 end-to-end cases read an empty localStorage
+  after the IndexedDB migration; this is pre-existing and not introduced
+  here. The benchmark environment is classified above-target for this
+  machine, so the recorded figures are an upper bound on what a target
+  machine would show, not a prediction of it
+Next-safe-step: Build the M23 command line, first-run journey, doctor,
+  application logging, packaging, and update path so the product can be
+  installed and diagnosed by somebody who did not build it
+
 Dev-Log: DL-20260801-001
 Date: 2026-08-01
 Status: Complete; Milestone 21 is finished and its eight gates are marked

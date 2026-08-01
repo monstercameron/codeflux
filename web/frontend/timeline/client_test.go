@@ -221,3 +221,54 @@ func parseMessageIDFixture(t *testing.T, raw string) domain.MessageID {
 	}
 	return value
 }
+
+// TestBeginOlderMessagePagePreservesLoadedMessages is a regression guard.
+//
+// BeginOlderMessagePage clones the feed before marking it loading. A clone
+// that rebuilt the slice before copying from it would replace every loaded
+// message with a zero value, and the user would watch the whole thread
+// collapse to one blank row the moment they scrolled up. The existing
+// begin/exhausted test uses an empty feed, so it cannot see this.
+func TestBeginOlderMessagePagePreservesLoadedMessages(t *testing.T) {
+	threadID := parseThreadIDFixture(t, "thr_018f0123-4567-789a-8bcd-ef0123456789")
+	first := parseMessageIDFixture(t, "msg_018f0123-4567-789a-8bcd-ef0123456781")
+	second := parseMessageIDFixture(t, "msg_018f0123-4567-789a-8bcd-ef0123456782")
+
+	loaded := []DurableMessage{
+		{
+			ID: first, ThreadID: threadID, Role: "user",
+			Body: RedactedBody{Text: "first"}, Sequence: 1, Revision: 1,
+			CreatedAt: time.UnixMicro(1).UTC(),
+		},
+		{
+			ID: second, ThreadID: threadID, Role: "assistant",
+			Body: RedactedBody{Text: "second"}, Sequence: 2, Revision: 2,
+			CreatedAt: time.UnixMicro(2).UTC(),
+		},
+	}
+	feed := MessageFeed{
+		ThreadID: threadID, Messages: loaded,
+		OlderCursor: "older-page", HasOlder: true,
+	}
+
+	loading, err := BeginOlderMessagePage(feed)
+	if err != nil {
+		t.Fatalf("begin older page: %v", err)
+	}
+	if len(loading.Messages) != len(loaded) {
+		t.Fatalf("begin kept %d messages, want %d", len(loading.Messages), len(loaded))
+	}
+	for index, message := range loading.Messages {
+		if message.ID != loaded[index].ID ||
+			message.Body.Text != loaded[index].Body.Text ||
+			message.Sequence != loaded[index].Sequence {
+			t.Fatalf("message %d was not preserved: %#v", index, message)
+		}
+	}
+	// The clone must be independent: mutating the source afterwards must not
+	// reach the feed the UI is now rendering.
+	loaded[0].Body.Text = "mutated after clone"
+	if loading.Messages[0].Body.Text != "first" {
+		t.Fatal("begin returned a feed sharing the caller's message slice")
+	}
+}

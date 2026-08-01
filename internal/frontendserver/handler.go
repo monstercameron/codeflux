@@ -307,6 +307,14 @@ func isLoopbackHost(hostPort string) bool {
 		host = parsed
 	}
 	host = strings.Trim(host, "[]")
+	// "localhost" is accepted because internal/config accepts it as a bind
+	// host, and a browser pointed at a supported configuration must not be
+	// refused by its own server. It is the only name accepted: RFC 6761
+	// reserves it for loopback and forbids resolvers from sending it to DNS,
+	// so unlike an ordinary hostname it cannot be rebound to another address.
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
 	address := net.ParseIP(host)
 	return address != nil && address.IsLoopback()
 }

@@ -46,6 +46,15 @@ type Thread struct {
 	Revision     uint64
 }
 
+// MaximumMessageBodyBytes bounds one durable thread message body.
+//
+// Assistant and tool text is already redaction-bounded before it reaches this
+// layer, but the store is the last place an oversized body can be stopped, and
+// a bound enforced only upstream is a bound a hostile or defective client can
+// skip. It is sized above the task requirement bound so a legitimate long turn
+// is never truncated by it.
+const MaximumMessageBodyBytes = 64 << 10
+
 // MessageRole is the durable bounded message author class.
 type MessageRole string
 

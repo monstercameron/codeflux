@@ -160,6 +160,14 @@ func runArtifactCheck(
 		fmt.Fprintf(stderr, "codeflux-dev artifact-check: %v\n", err)
 		return exitFailure
 	}
+	// M22-122: retained artifacts are what a developer attaches to a bug
+	// report, so a seeded credential surviving into one is a leak with a
+	// delivery mechanism.
+	if err := checkArtifactSecrets(root); err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev artifact-check: %v\n", err)
+		return exitFailure
+	}
 	fmt.Fprintln(stdout, "codeflux-dev artifact-check: no repository-local artifact escaped .artifacts")
+	fmt.Fprintln(stdout, "codeflux-dev artifact-check: no seeded credential reached a retained artifact")
 	return exitSuccess
 }

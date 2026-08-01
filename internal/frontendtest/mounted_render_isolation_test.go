@@ -125,6 +125,9 @@ func TestMountedGWCInteractionsPreserveRenderIsolation(t *testing.T) {
 	t.Run("M18SessionConnectionAcceptance", func(t *testing.T) {
 		exerciseMountedM18SessionAcceptance(t, page)
 	})
+	t.Run("M22BrowserAndAccessibilityJourneys", func(t *testing.T) {
+		exerciseMountedM22Journeys(t, page)
+	})
 
 	encoded, err := json.MarshalIndent(evidence, "", "  ")
 	if err != nil {

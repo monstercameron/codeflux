@@ -88,7 +88,13 @@ func ResolveTaskPath(
 		if statErr != nil {
 			return ResolvedTaskPath{}, fmt.Errorf("inspect task path: %w", statErr)
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
+		// ModeIrregular is included because Windows reports a directory
+		// junction that way rather than as a symlink, and filepath.EvalSymlinks
+		// returns a junction unchanged. Neither the symlink bit nor the
+		// resolution check below sees one, so an unprivileged attacker (a
+		// junction needs no privilege, unlike a symlink) could otherwise plant
+		// a reparse point in the worktree that redirects outside it.
+		if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
 			return ResolvedTaskPath{}, ErrUnsafeTaskPath
 		}
 		resolved, resolveErr := filepath.EvalSymlinks(current)

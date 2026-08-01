@@ -3280,171 +3280,171 @@ Milestone output: deterministic fakes, integration fixtures, fault injection, se
 
 ## Test Pyramid and Fixtures
 
-- [ ] `M22-001 BLOCKER` Define fast unit, real-SQLite integration, process integration, browser component, and end-to-end suites.
-- [ ] `M22-002` Define suite naming and build tags.
-- [ ] `M22-003` Define deterministic clocks and ID generators for tests.
-- [ ] `M22-004` Define deterministic fake model provider.
-- [ ] `M22-005` Define scripted tool-call responses.
-- [ ] `M22-006` Define fake pricing and usage.
-- [ ] `M22-007` Define temporary Git repository fixture builder.
-- [ ] `M22-008` Define representative clean Go repository fixture.
-- [ ] `M22-009` Define dirty-worktree fixture.
-- [ ] `M22-010` Define malicious-repository fixture.
-- [ ] `M22-011` Define failing-test fixture.
-- [ ] `M22-012` Define dependency/configuration-change fixture.
-- [ ] `M22-013` Define protected-workflow fixture without claiming deep proof.
-- [ ] `M22-014` Ensure fixtures contain no real credentials or private code.
+- [x] `M22-001 BLOCKER` Define fast unit, real-SQLite integration, process integration, browser component, and end-to-end suites.
+- [x] `M22-002` Define suite naming and build tags.
+- [x] `M22-003` Define deterministic clocks and ID generators for tests.
+- [x] `M22-004` Define deterministic fake model provider.
+- [x] `M22-005` Define scripted tool-call responses.
+- [x] `M22-006` Define fake pricing and usage.
+- [x] `M22-007` Define temporary Git repository fixture builder.
+- [x] `M22-008` Define representative clean Go repository fixture.
+- [x] `M22-009` Define dirty-worktree fixture.
+- [x] `M22-010` Define malicious-repository fixture.
+- [x] `M22-011` Define failing-test fixture.
+- [x] `M22-012` Define dependency/configuration-change fixture.
+- [x] `M22-013` Define protected-workflow fixture without claiming deep proof.
+- [x] `M22-014` Ensure fixtures contain no real credentials or private code.
 
 ## Unit and Property Tests
 
-- [ ] `M22-015 TEST` Cover domain transition validators.
-- [ ] `M22-016 TEST` Cover exact money and budget arithmetic.
-- [ ] `M22-017 TEST` Cover task fingerprints and canonicalization.
-- [ ] `M22-018 TEST` Cover context ranking determinism.
-- [ ] `M22-019 TEST` Cover permission matching and expiration.
-- [ ] `M22-020 TEST` Cover graph projection determinism.
-- [ ] `M22-021 TEST` Cover graph layout stability.
-- [ ] `M22-022 TEST` Cover assurance and evidence invalidation.
-- [ ] `M22-023 TEST` Cover retrieval applicability predicates.
-- [ ] `M22-024 TEST` Fuzz ID and cursor parsers.
-- [ ] `M22-025 TEST` Fuzz protobuf/domain conversion.
-- [ ] `M22-026 TEST` Fuzz safe path resolution.
-- [ ] `M22-027 TEST` Fuzz event replay/projection.
+- [x] `M22-015 TEST` Cover domain transition validators.
+- [x] `M22-016 TEST` Cover exact money and budget arithmetic.
+- [x] `M22-017 TEST` Cover task fingerprints and canonicalization.
+- [x] `M22-018 TEST` Cover context ranking determinism.
+- [x] `M22-019 TEST` Cover permission matching and expiration.
+- [x] `M22-020 TEST` Cover graph projection determinism.
+- [x] `M22-021 TEST` Cover graph layout stability.
+- [x] `M22-022 TEST` Cover assurance and evidence invalidation.
+- [x] `M22-023 TEST` Cover retrieval applicability predicates.
+- [x] `M22-024 TEST` Fuzz ID and cursor parsers.
+- [x] `M22-025 TEST` Fuzz protobuf/domain conversion.
+- [x] `M22-026 TEST` Fuzz safe path resolution.
+- [x] `M22-027 TEST` Fuzz event replay/projection.
 
 ## Real SQLite Integration
 
-- [ ] `M22-028 TEST` Run every repository test against real SQLite.
-- [ ] `M22-029 TEST` Run foreign-key and check-constraint failure cases.
-- [ ] `M22-030 TEST` Run concurrent writer/read replay cases.
-- [ ] `M22-031 TEST` Run WAL recovery after forced termination.
-- [ ] `M22-032 TEST` Run every migration upgrade path.
-- [ ] `M22-033 TEST` Run backup and restore.
-- [ ] `M22-034 TEST` Run deletion and project-boundary isolation.
-- [ ] `M22-035 TEST` Scan database bytes for seeded secrets after end-to-end use.
+- [x] `M22-028 TEST` Run every repository test against real SQLite.
+- [x] `M22-029 TEST` Run foreign-key and check-constraint failure cases.
+- [x] `M22-030 TEST` Run concurrent writer/read replay cases.
+- [x] `M22-031 TEST` Run WAL recovery after forced termination.
+- [x] `M22-032 TEST` Run every migration upgrade path.
+- [x] `M22-033 TEST` Run backup and restore.
+- [x] `M22-034 TEST` Run deletion and project-boundary isolation.
+- [x] `M22-035 TEST` Scan database bytes for seeded secrets after end-to-end use.
 
 ## Process and Fault Injection
 
-- [ ] `M22-036 TEST` Kill worker during repository read.
-- [ ] `M22-037 TEST` Kill worker during file edit.
-- [ ] `M22-038 TEST` Kill worker during command execution.
-- [ ] `M22-039 TEST` Kill worker during model streaming.
-- [ ] `M22-040 TEST` Kill coordinator before event commit.
-- [ ] `M22-041 TEST` Kill coordinator after event commit but before client delivery.
-- [ ] `M22-042 TEST` Disconnect browser during approval.
-- [ ] `M22-043 TEST` Disconnect browser during budget increase.
-- [ ] `M22-044 TEST` Exhaust disk space during event append.
-- [ ] `M22-045 TEST` Simulate database busy timeout.
-- [ ] `M22-046 TEST` Simulate corrupted or missing worktree.
-- [ ] `M22-047 TEST` Simulate provider rate limit.
-- [ ] `M22-048 TEST` Simulate provider partial stream then failure.
-- [ ] `M22-049 TEST` Simulate delayed provider usage.
-- [ ] `M22-050 TEST` Simulate command timeout with child processes.
+- [x] `M22-036 TEST` Kill worker during repository read.
+- [x] `M22-037 TEST` Kill worker during file edit.
+- [x] `M22-038 TEST` Kill worker during command execution.
+- [x] `M22-039 TEST` Kill worker during model streaming.
+- [x] `M22-040 TEST` Kill coordinator before event commit.
+- [x] `M22-041 TEST` Kill coordinator after event commit but before client delivery.
+- [x] `M22-042 TEST` Disconnect browser during approval.
+- [x] `M22-043 TEST` Disconnect browser during budget increase.
+- [x] `M22-044 TEST` Exhaust disk space during event append.
+- [x] `M22-045 TEST` Simulate database busy timeout.
+- [x] `M22-046 TEST` Simulate corrupted or missing worktree.
+- [x] `M22-047 TEST` Simulate provider rate limit.
+- [x] `M22-048 TEST` Simulate provider partial stream then failure.
+- [x] `M22-049 TEST` Simulate delayed provider usage.
+- [x] `M22-050 TEST` Simulate command timeout with child processes.
 
 ## Security and Abuse Cases
 
-- [ ] `M22-051 SECURITY TEST` Attempt path traversal in every file API.
-- [ ] `M22-052 SECURITY TEST` Attempt symlink escape.
-- [ ] `M22-053 SECURITY TEST` Attempt unsafe editor-open target.
-- [ ] `M22-054 SECURITY TEST` Attempt approval bypass through alternate tool.
-- [ ] `M22-055 SECURITY TEST` Attempt repeated idempotency-key mutation.
-- [ ] `M22-056 SECURITY TEST` Attempt repository prompt injection.
-- [ ] `M22-057 SECURITY TEST` Attempt credential exfiltration through command output.
-- [ ] `M22-058 SECURITY TEST` Attempt credential exfiltration through diagnostic export.
-- [ ] `M22-059 SECURITY TEST` Attempt non-loopback browser connection.
-- [ ] `M22-060 SECURITY TEST` Attempt cross-origin session use.
-- [ ] `M22-061 SECURITY TEST` Attempt old per-launch session-secret reuse.
-- [ ] `M22-062 SECURITY TEST` Attempt oversized message, tool output, and graph payloads.
+- [x] `M22-051 SECURITY TEST` Attempt path traversal in every file API.
+- [x] `M22-052 SECURITY TEST` Attempt symlink escape.
+- [x] `M22-053 SECURITY TEST` Attempt unsafe editor-open target.
+- [x] `M22-054 SECURITY TEST` Attempt approval bypass through alternate tool.
+- [x] `M22-055 SECURITY TEST` Attempt repeated idempotency-key mutation.
+- [x] `M22-056 SECURITY TEST` Attempt repository prompt injection.
+- [x] `M22-057 SECURITY TEST` Attempt credential exfiltration through command output.
+- [x] `M22-058 SECURITY TEST` Attempt credential exfiltration through diagnostic export.
+- [x] `M22-059 SECURITY TEST` Attempt non-loopback browser connection.
+- [x] `M22-060 SECURITY TEST` Attempt cross-origin session use.
+- [x] `M22-061 SECURITY TEST` Attempt old per-launch session-secret reuse.
+- [x] `M22-062 SECURITY TEST` Attempt oversized message, tool output, and graph payloads.
 
 ## Browser and Accessibility Tests
 
-- [ ] `M22-063 TEST` Automate the empty-shell journey.
-- [ ] `M22-064 TEST` Automate create-thread and send-message.
-- [ ] `M22-065 TEST` Automate plan approval.
-- [ ] `M22-066 TEST` Automate command approval and denial.
-- [ ] `M22-067 TEST` Automate pause and resume.
-- [ ] `M22-068 TEST` Automate reconnect/replay.
-- [ ] `M22-069 TEST` Automate graph-node/chat-message cross-selection.
-- [ ] `M22-070 TEST` Automate diff review and acceptance.
-- [ ] `M22-071 TEST` Automate crash recovery choice.
-- [ ] `M22-072 TEST` Run automated accessibility scans for every major route/state.
-- [ ] `M22-073 TEST` Run a keyboard-only end-to-end journey.
-- [ ] `M22-074 TEST` Run a screen-reader smoke journey.
-- [ ] `M22-075 TEST` Run reduced-motion and high-contrast journeys.
+- [x] `M22-063 TEST` Automate the empty-shell journey.
+- [x] `M22-064 TEST` Automate create-thread and send-message.
+- [x] `M22-065 TEST` Automate plan approval.
+- [x] `M22-066 TEST` Automate command approval and denial.
+- [x] `M22-067 TEST` Automate pause and resume.
+- [x] `M22-068 TEST` Automate reconnect/replay.
+- [x] `M22-069 TEST` Automate graph-node/chat-message cross-selection.
+- [x] `M22-070 TEST` Automate diff review and acceptance.
+- [x] `M22-071 TEST` Automate crash recovery choice.
+- [x] `M22-072 TEST` Run automated accessibility scans for every major route/state.
+- [x] `M22-073 TEST` Run a keyboard-only end-to-end journey.
+- [x] `M22-074 TEST` Run a screen-reader smoke journey.
+- [x] `M22-075 TEST` Run reduced-motion and high-contrast journeys.
 
 ## Performance Benchmarks
 
-- [ ] `M22-076` Benchmark cold coordinator startup.
-- [ ] `M22-077` Benchmark warm coordinator startup.
-- [ ] `M22-078` Benchmark database migration from the prior schema.
-- [ ] `M22-079` Benchmark repository map on small, medium, and large Go fixtures.
-- [ ] `M22-080` Benchmark context selection.
-- [ ] `M22-081` Benchmark event append throughput and tail latency.
-- [ ] `M22-082` Benchmark reconnect replay for 100, 1,000, and 10,000 events.
-- [ ] `M22-083` Benchmark thread initial render and upward pagination.
-- [ ] `M22-084` Benchmark simultaneous token and cost updates.
-- [ ] `M22-085` Benchmark 300-node graph layout and render.
-- [ ] `M22-086` Benchmark 100 graph patches without viewport reset.
-- [ ] `M22-087` Benchmark SQLite vector search at expected prototype scale if enabled.
-- [ ] `M22-088` Record CPU, memory, wall time, and allocation data.
-- [ ] `M22-089` Run benchmarks on an ordinary target hobbyist laptop.
-- [ ] `M22-090` Store benchmark methodology and results in Git-tracked documentation, not runtime SQLite.
+- [x] `M22-076` Benchmark cold coordinator startup.
+- [x] `M22-077` Benchmark warm coordinator startup.
+- [x] `M22-078` Benchmark database migration from the prior schema.
+- [x] `M22-079` Benchmark repository map on small, medium, and large Go fixtures.
+- [x] `M22-080` Benchmark context selection.
+- [x] `M22-081` Benchmark event append throughput and tail latency.
+- [x] `M22-082` Benchmark reconnect replay for 100, 1,000, and 10,000 events.
+- [x] `M22-083` Benchmark thread initial render and upward pagination.
+- [x] `M22-084` Benchmark simultaneous token and cost updates.
+- [x] `M22-085` Benchmark 300-node graph layout and render.
+- [x] `M22-086` Benchmark 100 graph patches without viewport reset.
+- [x] `M22-087` Benchmark SQLite vector search at expected prototype scale if enabled.
+- [x] `M22-088` Record CPU, memory, wall time, and allocation data.
+- [x] `M22-089` Run benchmarks on an ordinary target hobbyist laptop.
+- [x] `M22-090` Store benchmark methodology and results in Git-tracked documentation, not runtime SQLite.
 
 ## Metrics and Scorecard
 
-- [ ] `M22-091` Implement queries for task success and user acceptance.
-- [ ] `M22-092` Implement queries for regressions and unresolved failures.
-- [ ] `M22-093` Implement queries for time-to-plan, first action, first diff, validation, and completion.
-- [ ] `M22-094` Implement queries for tokens, cost, retries, and repairs.
-- [ ] `M22-095` Implement queries for forecast error and interval coverage.
-- [ ] `M22-096` Implement queries for approvals and denied actions.
-- [ ] `M22-097` Implement queries for pause, cancel, recovery, and resume.
-- [ ] `M22-098` Implement queries for retrieved and influential memory.
-- [ ] `M22-099` Implement queries for graph usage and collapse rate.
-- [ ] `M22-100` Build a redacted local prototype scorecard.
-- [ ] `M22-101` Compare the frozen Codeflux run against the frozen baseline.
-- [ ] `M22-102` Record failures and surprises, not only aggregate success.
+- [x] `M22-091` Implement queries for task success and user acceptance.
+- [x] `M22-092` Implement queries for regressions and unresolved failures.
+- [x] `M22-093` Implement queries for time-to-plan, first action, first diff, validation, and completion.
+- [x] `M22-094` Implement queries for tokens, cost, retries, and repairs.
+- [x] `M22-095` Implement queries for forecast error and interval coverage.
+- [x] `M22-096` Implement queries for approvals and denied actions.
+- [x] `M22-097` Implement queries for pause, cancel, recovery, and resume.
+- [x] `M22-098` Implement queries for retrieved and influential memory.
+- [x] `M22-099` Implement queries for graph usage and collapse rate.
+- [x] `M22-100` Build a redacted local prototype scorecard.
+- [x] `M22-101` Compare the frozen Codeflux run against the frozen baseline.
+- [x] `M22-102` Record failures and surprises, not only aggregate success.
 
 ## Developer Harness and Replay
 
 Plan: §27D Deterministic Test Kit; Replay and Debugging; Logging, Tracing, and Profiling; Test Layers and Ownership; CI and Local Parity.
 
-- [ ] `M22-103 BLOCKER` Implement deterministic test clock with manual advance and no wall-clock sleeps in state-machine tests.
-- [ ] `M22-104 BLOCKER` Implement deterministic typed-ID sequence for repeatable snapshots and event fixtures.
-- [ ] `M22-105 BLOCKER` Implement real temporary SQLite test database with migrations, integrity assertion, and registered cleanup.
-- [ ] `M22-106 BLOCKER` Implement temporary Git repository/worktree fixture builder for clean, dirty, detached, conflicted, nested, and malicious cases.
-- [ ] `M22-107 BLOCKER` Implement scripted provider with text, tool, usage, partial stream, delay, rate limit, authentication failure, and cancellation steps.
-- [ ] `M22-108` Implement fake credential store that can assert no secret crosses a requested boundary.
-- [ ] `M22-109` Implement event recorder with sequence, causation, transaction, replay, and wait-with-timeout assertions.
-- [ ] `M22-110` Implement coordinator harness with isolated database, repository, worker, provider, port, clock, and IDs.
-- [ ] `M22-111` Implement browser scenario harness with session bootstrap, event fixture, keyboard actions, accessibility checks, and screenshot-on-failure.
-- [ ] `M22-112 SECURITY` Validate every test cleanup target before recursive deletion and preserve artifacts only behind an explicit failure flag.
-- [ ] `M22-113` Implement named interactive fake scenarios for success, plan revision, approval, denial, repair, budget cap, provider failure, reconnect, worker crash, coordinator crash, concurrent edit, and recovery.
-- [ ] `M22-114` Implement event replay from named fixture and redacted exported session.
-- [ ] `M22-115` Implement replay stop-at-sequence, step-event, duplicate-delivery, gap, reconnect, and snapshot-repair controls.
-- [ ] `M22-116` Implement server/client projection comparison during replay.
-- [ ] `M22-117` Implement graph revision rebuild and comparison during replay.
-- [ ] `M22-118` Implement safe read-only database inspection by domain entity, sequence, revision, lineage, and invalidation.
-- [ ] `M22-119` Add development-only structured logs for transaction, event append/publish, worker lease, provider, tool, reducer, render, graph, and retrieval timing.
-- [ ] `M22-120` Add authenticated loopback-only CPU, heap, goroutine, mutex, and block profiling in development builds.
-- [ ] `M22-121` Add browser performance marks correlating event sequence with reducer and render duration.
-- [ ] `M22-122 SECURITY` Verify replay, logs, profiles, screenshots, and failure artifacts contain no seeded credentials.
-- [ ] `M22-123 TEST` Run each named fake scenario through backend-only, generated-client, and browser layers where applicable.
-- [ ] `M22-124 TEST` Verify local and CI invoke the same development-helper command graph.
-- [ ] `M22-125 TEST` Verify event schema additions fail CI without reducer and presentation/grouping coverage.
-- [ ] `M22-126 TEST` Verify generated drift fails before tests that depend on generated output.
-- [ ] `M22-127 TEST` Verify ordinary local and CI tests perform no external network request.
-- [ ] `M22-128 DOC` Document failure-artifact locations, replay commands, safe database inspection, and profiling.
-- [ ] `M22-129 DOC` Document golden paths for adding a backend use case, event/card, frontend component, graph projection, atom, migration, and provider.
-- [ ] `M22-130 TEST` Give the golden-path documentation to a clean contributor/agent session and verify it can identify the correct plan section, TODO, test layer, event, and transaction for a sample vertical change.
+- [x] `M22-103 BLOCKER` Implement deterministic test clock with manual advance and no wall-clock sleeps in state-machine tests.
+- [x] `M22-104 BLOCKER` Implement deterministic typed-ID sequence for repeatable snapshots and event fixtures.
+- [x] `M22-105 BLOCKER` Implement real temporary SQLite test database with migrations, integrity assertion, and registered cleanup.
+- [x] `M22-106 BLOCKER` Implement temporary Git repository/worktree fixture builder for clean, dirty, detached, conflicted, nested, and malicious cases.
+- [x] `M22-107 BLOCKER` Implement scripted provider with text, tool, usage, partial stream, delay, rate limit, authentication failure, and cancellation steps.
+- [x] `M22-108` Implement fake credential store that can assert no secret crosses a requested boundary.
+- [x] `M22-109` Implement event recorder with sequence, causation, transaction, replay, and wait-with-timeout assertions.
+- [x] `M22-110` Implement coordinator harness with isolated database, repository, worker, provider, port, clock, and IDs.
+- [x] `M22-111` Implement browser scenario harness with session bootstrap, event fixture, keyboard actions, accessibility checks, and screenshot-on-failure.
+- [x] `M22-112 SECURITY` Validate every test cleanup target before recursive deletion and preserve artifacts only behind an explicit failure flag.
+- [x] `M22-113` Implement named interactive fake scenarios for success, plan revision, approval, denial, repair, budget cap, provider failure, reconnect, worker crash, coordinator crash, concurrent edit, and recovery.
+- [x] `M22-114` Implement event replay from named fixture and redacted exported session.
+- [x] `M22-115` Implement replay stop-at-sequence, step-event, duplicate-delivery, gap, reconnect, and snapshot-repair controls.
+- [x] `M22-116` Implement server/client projection comparison during replay.
+- [x] `M22-117` Implement graph revision rebuild and comparison during replay.
+- [x] `M22-118` Implement safe read-only database inspection by domain entity, sequence, revision, lineage, and invalidation.
+- [x] `M22-119` Add development-only structured logs for transaction, event append/publish, worker lease, provider, tool, reducer, render, graph, and retrieval timing.
+- [x] `M22-120` Add authenticated loopback-only CPU, heap, goroutine, mutex, and block profiling in development builds.
+- [x] `M22-121` Add browser performance marks correlating event sequence with reducer and render duration.
+- [x] `M22-122 SECURITY` Verify replay, logs, profiles, screenshots, and failure artifacts contain no seeded credentials.
+- [x] `M22-123 TEST` Run each named fake scenario through backend-only, generated-client, and browser layers where applicable.
+- [x] `M22-124 TEST` Verify local and CI invoke the same development-helper command graph.
+- [x] `M22-125 TEST` Verify event schema additions fail CI without reducer and presentation/grouping coverage.
+- [x] `M22-126 TEST` Verify generated drift fails before tests that depend on generated output.
+- [x] `M22-127 TEST` Verify ordinary local and CI tests perform no external network request.
+- [x] `M22-128 DOC` Document failure-artifact locations, replay commands, safe database inspection, and profiling.
+- [x] `M22-129 DOC` Document golden paths for adding a backend use case, event/card, frontend component, graph projection, atom, migration, and provider.
+- [x] `M22-130 TEST` Give the golden-path documentation to a clean contributor/agent session and verify it can identify the correct plan section, TODO, test layer, event, and transaction for a sample vertical change.
 
 ## Gate
 
-- [ ] `M22-G01 GATE` Fast tests are reliable enough to run on every change.
-- [ ] `M22-G02 GATE` Full integration and browser suites pass from a fresh database.
-- [ ] `M22-G03 GATE` Fault injection demonstrates zero duplicated correctness-bearing actions.
-- [ ] `M22-G04 GATE` Secret, path, origin, authority, and payload abuse suites pass.
-- [ ] `M22-G05 GATE` The prototype scorecard can be reproduced from documented commands.
-- [ ] `M22-G06 GATE` Deterministic fakes, replay, projection comparison, diagnostics, profiling, and golden-path documentation make every vertical flow locally reproducible without paid providers or manual database mutation.
+- [x] `M22-G01 GATE` Fast tests are reliable enough to run on every change.
+- [x] `M22-G02 GATE` Full integration and browser suites pass from a fresh database.
+- [x] `M22-G03 GATE` Fault injection demonstrates zero duplicated correctness-bearing actions.
+- [x] `M22-G04 GATE` Secret, path, origin, authority, and payload abuse suites pass.
+- [x] `M22-G05 GATE` The prototype scorecard can be reproduced from documented commands.
+- [x] `M22-G06 GATE` Deterministic fakes, replay, projection comparison, diagnostics, profiling, and golden-path documentation make every vertical flow locally reproducible without paid providers or manual database mutation.
 
 ---
 

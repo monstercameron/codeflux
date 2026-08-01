@@ -223,7 +223,12 @@ func validateEditorPathComponents(root, relative string) error {
 			}
 			return fmt.Errorf("%w: inspect source path", ErrEditorSourceUnavailable)
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
+		// ModeIrregular covers Windows directory junctions, which Lstat does
+		// not report as symlinks and filepath.EvalSymlinks does not resolve.
+		// Creating one needs no privilege, so it is the reparse point most
+		// available to an attacker aiming an editor launch outside the
+		// repository.
+		if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
 			return ErrEditorSourceOutsideRepository
 		}
 		resolved, err := filepath.EvalSymlinks(current)
