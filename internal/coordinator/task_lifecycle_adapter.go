@@ -25,6 +25,19 @@ type TaskLifecycleAdapter struct {
 	preflight *TaskPreflightService
 	store     taskLifecycleStore
 	launcher  RunLauncher
+	// environment observes the facts intake requires and a caller cannot know:
+	// the base revision, the toolchain, the validation profile, the baseline
+	// model. Without it every client had to supply four values it would have
+	// been guessing, which is precisely what intake refuses.
+	environment *TaskEnvironmentObserver
+}
+
+// SetEnvironmentObserver installs the observer that fills what a caller left
+// unstated.
+func (adapter *TaskLifecycleAdapter) SetEnvironmentObserver(
+	observer *TaskEnvironmentObserver,
+) {
+	adapter.environment = observer
 }
 
 // RunLauncher starts the subprocess that executes one prepared run.
@@ -48,6 +61,12 @@ type taskLifecycleStore interface {
 	GetTask(context.Context, domain.TaskID) (storage.Task, error)
 	GetTaskExecutionPreflight(context.Context, domain.TaskID, uint64) (storage.ExecutionPreflight, error)
 	GetTaskExecutionPolicy(context.Context, domain.TaskID, uint64) (storage.ExecutionPolicyRevision, error)
+	// Approving a plan walks the task to Ready and binds the exact forecast
+	// that was reviewed. Both are declared here rather than reached through a
+	// type assertion, so a store that cannot do it fails to compile instead of
+	// failing at the moment somebody presses the button.
+	GetCurrentTaskForecast(context.Context, domain.TaskID) (storage.TaskForecastRevisions, error)
+	TransitionTask(context.Context, storage.TransitionTask) (storage.TransitionedTask, error)
 }
 
 // NewTaskLifecycleAdapter builds the adapter.
@@ -82,7 +101,7 @@ func (adapter *TaskLifecycleAdapter) CreateTaskFromRequirement(
 	ctx context.Context,
 	command transport.CreateTaskCommand,
 ) (transport.CreatedTaskView, error) {
-	result, err := adapter.preflight.IntakeTask(ctx, TaskIntakeRequest{
+	request := TaskIntakeRequest{
 		ThreadID:                 command.ThreadID,
 		RequestMessageID:         command.RequestMessageID,
 		Requirement:              command.Requirement,
@@ -95,7 +114,15 @@ func (adapter *TaskLifecycleAdapter) CreateTaskFromRequirement(
 		AffectedPackages:         command.AffectedPackages,
 		AffectedSymbols:          command.AffectedSymbols,
 		IdempotencyKey:           command.IdempotencyKey,
-	})
+	}
+	if adapter.environment != nil {
+		observed, observeErr := adapter.environment.Observe(ctx, command.ThreadID)
+		if observeErr != nil {
+			return transport.CreatedTaskView{}, observeErr
+		}
+		request = observed.applyTo(request)
+	}
+	result, err := adapter.preflight.IntakeTask(ctx, request)
 	if err != nil {
 		return transport.CreatedTaskView{}, err
 	}

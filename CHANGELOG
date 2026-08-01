@@ -30,6 +30,53 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-013
+Date: 2026-08-01
+Type: Reachable plan approval, so a typed request reaches a running worker
+Request-or-TODO: User: "does it look like the app is working to you????? e2e
+  test it ffs"
+Outcome: A request typed into the browser now creates a task, records the
+  approval of its forecast and budget, binds what was reviewed, starts it, and
+  spawns a worker against a real Git worktree
+Affected-behavior: Sending a request recorded a message and a bare draft task
+  with no policy, forecast, or budget, and stopped there. Of the five steps
+  between a request and a worker, three could not be reached by any client:
+  CreateTask and StartTask existed as RPCs the interface never called, and plan
+  approval and preflight binding had no RPC at all, so a created task could
+  never leave Draft. Every test passed while this was true, because the suite
+  proved the page mounts, connects, and does not lie, and never proved the
+  product does its job. TaskService gains ApprovePlan, which the plan catalog
+  had declared and nothing had implemented; it walks a task through
+  Forecasting and AwaitingPlanApproval to Ready with the approval recorded on
+  the transition that means "a person said run this", then binds the exact
+  policy and forecast that were reviewed and returns the binding for StartTask
+  to name back. Intake's four environment requirements — base revision,
+  toolchain, validation profile, baseline model — are now observed by the
+  coordinator instead of demanded from the caller, because they are facts
+  about the machine rather than decisions and a browser supplying them would
+  have been guessing. The kind of change is the one thing nothing can observe,
+  so the composer asks for it and refuses to start a task without it. Two
+  failures this exposed are also fixed: Git's own explanation of a failed
+  command was discarded, so every worktree failure read "exit status 128" —
+  the actual message was "Filename too long", Windows refusing a path past 260
+  characters, which left runs recorded as started with no worktree and no
+  worker; and the workspace read "No task yet" against a live worker because
+  the session snapshot it drew from was fetched before the task existed and
+  nothing refetched it
+Compatibility-or-migration: One added RPC, TaskService.ApprovePlan, already
+  present in the backend function catalog. CreateTaskRequest's environment
+  fields become optional and are filled by the coordinator when empty; a caller
+  that names them keeps them. SendMessage no longer asks for a draft task.
+  storage gains GetCurrentTaskForecast; gitwork worktree creation sets
+  core.longpaths and surfaces Git's stderr in its errors
+Verification: `go build ./...`, `go test ./...`, and `codeflux-dev lint` pass.
+  New coordinator tests drive intake, approval, and start against a booted
+  application and assert a worktree exists. A new end-to-end test types a
+  request into a real browser, declares a kind of change, sends it, and fails
+  unless the database shows a running task with a worktree holding a checkout
+  and the workspace stops reporting that nothing is running
+Dev-Log: DL-20260801-013
+
 Change-ID: CL-20260801-012
 Date: 2026-08-01
 Type: Local repository bootstrap, live session publication, and removal of

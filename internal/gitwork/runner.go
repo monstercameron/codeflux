@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 )
 
 const maximumGitOutputBytes = 1 << 20
@@ -90,6 +91,14 @@ func runCommand(
 		return result, errors.New("command output exceeded the bounded capture limit")
 	}
 	if err != nil {
+		// Git states why it refused, and that sentence is the whole diagnosis.
+		// Reporting only the exit status turned every failure into "exit status
+		// 128", which is the same message for a locked worktree, a branch that
+		// already exists, and a path that cannot be written — and it left a run
+		// stuck in starting with nothing anywhere to say what happened.
+		if reason := strings.TrimSpace(string(result.Stderr)); reason != "" {
+			return result, fmt.Errorf("%s failed: %w: %s", executable, err, reason)
+		}
 		return result, fmt.Errorf("%s failed: %w", executable, err)
 	}
 	return result, nil

@@ -133,6 +133,7 @@ message ArchiveThreadResponse {
 service TaskService {
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc ApprovePlan(ApprovePlanRequest) returns (ApprovePlanResponse);
   rpc StartTask(StartTaskRequest) returns (StartTaskResponse);
   rpc PauseTask(PauseTaskRequest) returns (PauseTaskResponse);
   rpc ResumeTask(ResumeTaskRequest) returns (ResumeTaskResponse);
@@ -158,6 +159,13 @@ message CreateTaskRequest {
   // gates project-memory retrieval and routing. See
   // coordinator.TaskIntakeRequest.
   string task_class = 5;
+
+  // repository_revision, baseline_model_revision, tool_configuration_version,
+  // and validation_profile_version pin the environment a forecast is made
+  // against. They are OBSERVED, not chosen, so a caller that leaves them empty
+  // gets the coordinator's own reading rather than a refusal: a browser
+  // inventing a toolchain version would be exactly the guess this contract
+  // exists to prevent. task_class has no such source and stays required.
   string repository_revision = 6;
   string baseline_model_revision = 7;
   string tool_configuration_version = 8;
@@ -180,6 +188,27 @@ message GetTaskRequest {
 
 message GetTaskResponse {
   TaskView task = 1;
+}
+
+// ApprovePlanRequest records the person's decision to run a created task.
+//
+// A created task is Draft: it has a policy, an effort forecast, and a hard
+// budget to review, and nothing binds it to execution. Reaching Ready requires
+// a granted approval, and binding the reviewed policy/forecast/budget requires
+// Ready. Both were reachable only from inside the process, so no client could
+// start anything: a request became a draft task and stopped there.
+message ApprovePlanRequest {
+  MutationControl control = 1;
+  StableIdentity task_id = 2;
+}
+
+message ApprovePlanResponse {
+  TaskView task = 1;
+
+  // The immutable policy/forecast/budget binding this approval produced.
+  // StartTask names it back, which is what makes "start exactly what was
+  // reviewed" enforceable rather than advisory.
+  uint64 preflight_revision = 2;
 }
 
 message StartTaskRequest {

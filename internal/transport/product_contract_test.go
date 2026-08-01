@@ -18,7 +18,7 @@ func TestProductServiceMethodSurface(t *testing.T) {
 			"CreateThread", "ListThreads", "GetThreadPage", "SendMessage", "RenameThread", "ArchiveThread",
 		},
 		"codeflux.v1.TaskService": {
-			"CreateTask", "GetTask", "StartTask", "PauseTask", "ResumeTask", "CancelTask",
+			"CreateTask", "GetTask", "ApprovePlan", "StartTask", "PauseTask", "ResumeTask", "CancelTask",
 			"ApproveAction", "SetBudget", "RequestRepair", "RollbackTask",
 			"PreserveRecoveryPatch", "ReconcileRecovery", "SafeResumeRecovery",
 		},

@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
@@ -26,7 +27,21 @@ func sendComposerCommand(
 		return domain.MessageID{}, err
 	}
 	defer connection.Close()
-	return (generatedComposerTransport{
+	messageID, err := (generatedComposerTransport{
 		client: codefluxv1.NewThreadServiceClient(connection),
 	}).Send(ctx, command)
+	if err != nil {
+		return domain.MessageID{}, err
+	}
+	// Recording the request is the durable part and it has already happened.
+	// Starting a task from it is a second thing that can fail on its own, and
+	// when it does the message must still stand: a person who typed a request
+	// and saw it vanish because a task could not start has lost their work for
+	// a reason that has nothing to do with what they wrote.
+	if _, startErr := startRequestedTask(
+		ctx, codefluxv1.NewTaskServiceClient(connection), command, messageID,
+	); startErr != nil && !errors.Is(startErr, errNoDeclaredTaskClass) {
+		return messageID, startErr
+	}
+	return messageID, nil
 }

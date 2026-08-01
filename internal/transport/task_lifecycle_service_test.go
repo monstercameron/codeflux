@@ -15,6 +15,10 @@ import (
 // storage. Application behaviour is covered end to end over real SQLite in
 // coordinator's TestLifecycleAdapter* tests.
 type lifecycleApplicationStub struct {
+	approved          ApprovePlanCommand
+	approveErr        error
+	preflightRevision uint64
+
 	created      CreateTaskCommand
 	started      StartTaskCommand
 	createErr    error
@@ -32,6 +36,21 @@ func (stub *lifecycleApplicationStub) CreateTaskFromRequirement(
 	stub.createCalled = true
 	stub.created = command
 	return stub.createdView, stub.createErr
+}
+
+func (stub *lifecycleApplicationStub) ApproveTaskPlan(
+	_ context.Context, command ApprovePlanCommand,
+) (ApprovedPlanView, error) {
+	stub.approved = command
+	if stub.approveErr != nil {
+		return ApprovedPlanView{}, stub.approveErr
+	}
+	return ApprovedPlanView{
+		TaskControlView: TaskControlView{
+			TaskID: command.TaskID, State: "ready", Revision: command.ExpectedRevision + 3,
+		},
+		PreflightRevision: stub.preflightRevision,
+	}, nil
 }
 
 func (stub *lifecycleApplicationStub) StartPreparedTask(

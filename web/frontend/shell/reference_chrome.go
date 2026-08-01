@@ -1330,7 +1330,12 @@ func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor d
 		css.GridCols(css.Repeat(3, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
 	)...)
 	return html.Section(html.Props{
-		Aria:  map[string]string{"label": "Task metrics"},
+		Aria: map[string]string{"label": "Task metrics"},
+		// The state distinguishes a strip reporting measurements from one
+		// reporting that there is nothing to measure. Both are this component,
+		// and something checking that the interface agrees with the coordinator
+		// has to be able to tell them apart.
+		Data:  map[string]string{"component": "task-metrics", "state": "measured"},
 		Class: css.New(rules...).String(),
 	}, nodes...)
 }

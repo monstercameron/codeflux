@@ -16,6 +16,11 @@ type composerSendCommand struct {
 	ExpectedRevision uint64
 	Key              composer.IdempotencyKey
 	Draft            composer.Draft
+	// TaskClass is what kind of work the person declared. Empty means they
+	// declared none, and then the request is recorded without starting
+	// anything: intake refuses to guess a class, because the guess would land
+	// inside the fingerprint that gates memory retrieval and routing.
+	TaskClass string
 }
 
 type generatedMessageClient interface {
@@ -45,7 +50,11 @@ func (transport generatedComposerTransport) Send(
 			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
 			Value: command.ThreadID.String(),
 		},
-		Body: command.Draft.Text(), CreateDraftTask: true,
+		// The task is created by CreateTask rather than by this flag. A task
+		// made here is a bare draft with no policy, forecast, or budget, so
+		// nothing could ever start it — which is exactly what happened: a
+		// request became a draft task and stopped there.
+		Body: command.Draft.Text(), CreateDraftTask: false,
 		AttachmentIds: attachmentIDs,
 	})
 	if err != nil {

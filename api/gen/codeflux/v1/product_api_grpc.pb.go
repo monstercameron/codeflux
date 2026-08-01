@@ -529,6 +529,7 @@ var ThreadService_ServiceDesc = grpc.ServiceDesc{
 const (
 	TaskService_CreateTask_FullMethodName            = "/codeflux.v1.TaskService/CreateTask"
 	TaskService_GetTask_FullMethodName               = "/codeflux.v1.TaskService/GetTask"
+	TaskService_ApprovePlan_FullMethodName           = "/codeflux.v1.TaskService/ApprovePlan"
 	TaskService_StartTask_FullMethodName             = "/codeflux.v1.TaskService/StartTask"
 	TaskService_PauseTask_FullMethodName             = "/codeflux.v1.TaskService/PauseTask"
 	TaskService_ResumeTask_FullMethodName            = "/codeflux.v1.TaskService/ResumeTask"
@@ -548,6 +549,7 @@ const (
 type TaskServiceClient interface {
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
+	ApprovePlan(ctx context.Context, in *ApprovePlanRequest, opts ...grpc.CallOption) (*ApprovePlanResponse, error)
 	StartTask(ctx context.Context, in *StartTaskRequest, opts ...grpc.CallOption) (*StartTaskResponse, error)
 	PauseTask(ctx context.Context, in *PauseTaskRequest, opts ...grpc.CallOption) (*PauseTaskResponse, error)
 	ResumeTask(ctx context.Context, in *ResumeTaskRequest, opts ...grpc.CallOption) (*ResumeTaskResponse, error)
@@ -583,6 +585,16 @@ func (c *taskServiceClient) GetTask(ctx context.Context, in *GetTaskRequest, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetTaskResponse)
 	err := c.cc.Invoke(ctx, TaskService_GetTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ApprovePlan(ctx context.Context, in *ApprovePlanRequest, opts ...grpc.CallOption) (*ApprovePlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApprovePlanResponse)
+	err := c.cc.Invoke(ctx, TaskService_ApprovePlan_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -705,6 +717,7 @@ func (c *taskServiceClient) SafeResumeRecovery(ctx context.Context, in *SafeResu
 type TaskServiceServer interface {
 	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
 	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
+	ApprovePlan(context.Context, *ApprovePlanRequest) (*ApprovePlanResponse, error)
 	StartTask(context.Context, *StartTaskRequest) (*StartTaskResponse, error)
 	PauseTask(context.Context, *PauseTaskRequest) (*PauseTaskResponse, error)
 	ResumeTask(context.Context, *ResumeTaskRequest) (*ResumeTaskResponse, error)
@@ -731,6 +744,9 @@ func (UnimplementedTaskServiceServer) CreateTask(context.Context, *CreateTaskReq
 }
 func (UnimplementedTaskServiceServer) GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTask not implemented")
+}
+func (UnimplementedTaskServiceServer) ApprovePlan(context.Context, *ApprovePlanRequest) (*ApprovePlanResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApprovePlan not implemented")
 }
 func (UnimplementedTaskServiceServer) StartTask(context.Context, *StartTaskRequest) (*StartTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartTask not implemented")
@@ -818,6 +834,24 @@ func _TaskService_GetTask_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).GetTask(ctx, req.(*GetTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ApprovePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApprovePlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ApprovePlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ApprovePlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ApprovePlan(ctx, req.(*ApprovePlanRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1034,6 +1068,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTask",
 			Handler:    _TaskService_GetTask_Handler,
+		},
+		{
+			MethodName: "ApprovePlan",
+			Handler:    _TaskService_ApprovePlan_Handler,
 		},
 		{
 			MethodName: "StartTask",

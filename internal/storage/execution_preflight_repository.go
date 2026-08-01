@@ -1318,3 +1318,48 @@ func findForecastOutcome(
 	value.CreatedAt = repositoryTime(micros)
 	return value, true, nil
 }
+
+// TaskForecastRevisions names the newest policy and effort forecast recorded
+// for a task.
+//
+// The two are returned together, read from one row, because a forecast is made
+// against a specific policy. Reading the newest of each independently could
+// pair a forecast with a policy it was never computed under, and that pair is
+// what a person approves and what execution is then bound to.
+type TaskForecastRevisions struct {
+	PolicyRevision   uint64
+	ForecastRevision uint64
+}
+
+// GetCurrentTaskForecast returns the newest policy and forecast pair.
+//
+// It exists because approving a plan has to bind the exact policy and forecast
+// the person was shown, and nothing could read them: they were returned once by
+// intake and then only reachable by a caller who had held onto the numbers.
+func (repositories *Repositories) GetCurrentTaskForecast(
+	ctx context.Context,
+	taskID domain.TaskID,
+) (TaskForecastRevisions, error) {
+	if repositories == nil || repositories.database == nil {
+		return TaskForecastRevisions{}, errors.New("repositories are unavailable")
+	}
+	var revisions TaskForecastRevisions
+	row := repositories.database.sql.QueryRowContext(ctx,
+		`SELECT policy_revision, revision
+		 FROM effort_forecast_revisions
+		 WHERE task_id = ?
+		 ORDER BY revision DESC
+		 LIMIT 1`, taskID)
+	if err := row.Scan(&revisions.PolicyRevision, &revisions.ForecastRevision); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// A task with no forecast has nothing to approve. Saying so is
+			// better than binding execution to a zero revision, which would
+			// pass every check and mean nothing.
+			return TaskForecastRevisions{}, typedError(ErrNotFound,
+				"read current task forecast",
+				errors.New("the task has no recorded effort forecast"))
+		}
+		return TaskForecastRevisions{}, classify("read current task forecast", err)
+	}
+	return revisions, nil
+}

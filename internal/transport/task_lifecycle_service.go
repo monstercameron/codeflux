@@ -67,7 +67,26 @@ type StartTaskCommand struct {
 // delegate to.
 type TaskLifecycleApplication interface {
 	CreateTaskFromRequirement(context.Context, CreateTaskCommand) (CreatedTaskView, error)
+	ApproveTaskPlan(context.Context, ApprovePlanCommand) (ApprovedPlanView, error)
 	StartPreparedTask(context.Context, StartTaskCommand) (TaskControlView, error)
+}
+
+// ApprovePlanCommand records one person's decision to run a created task.
+type ApprovePlanCommand struct {
+	TaskID           domain.TaskID
+	ExpectedRevision uint64
+	IdempotencyKey   string
+}
+
+// ApprovedPlanView is the approved task and the binding the approval produced.
+//
+// The preflight revision is returned rather than looked up again because it
+// names the exact policy, forecast, and budget the person saw. Re-reading it at
+// start time would let a settings change between the two silently substitute a
+// different binding for the one that was approved.
+type ApprovedPlanView struct {
+	TaskControlView
+	PreflightRevision uint64
 }
 
 // ConfigureTaskLifecycle installs the lifecycle application. Until it is
@@ -127,6 +146,52 @@ func (service *TaskService) CreateTask(
 		return nil, err
 	}
 	return &codefluxv1.CreateTaskResponse{Task: task}, nil
+}
+
+// ApprovePlan records the decision to run a created task and binds what was
+// reviewed.
+//
+// A created task is Draft: it carries a policy, an effort forecast, and a hard
+// budget to look at, and nothing binds it to execution. Reaching Ready needs a
+// granted approval and binding the preflight needs Ready, and neither step was
+// reachable from any client — so a request became a draft task and stopped
+// there, with the interface correctly reporting that no task was running.
+func (service *TaskService) ApprovePlan(
+	ctx context.Context,
+	request *codefluxv1.ApprovePlanRequest,
+) (*codefluxv1.ApprovePlanResponse, error) {
+	if service.lifecycle == nil {
+		return nil, unavailableLifecycleError()
+	}
+	command, err := taskControlCommand(
+		request.GetControl(),
+		request.GetTaskId(),
+		"task plan approval",
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	view, err := service.lifecycle.ApproveTaskPlan(ctx, ApprovePlanCommand{
+		TaskID:           command.TaskID,
+		ExpectedRevision: command.ExpectedRevision,
+		IdempotencyKey:   command.IdempotencyKey,
+	})
+	if err != nil {
+		return nil, mapTaskControlError(err, command.TaskID)
+	}
+	task, err := taskControlViewToProto(view.TaskControlView)
+	if err != nil {
+		return nil, err
+	}
+	if err := service.notifyProjectionInvalidated(
+		ctx, command.TaskID, "task", view.Revision, command.IdempotencyKey,
+	); err != nil {
+		return nil, err
+	}
+	return &codefluxv1.ApprovePlanResponse{
+		Task: task, PreflightRevision: view.PreflightRevision,
+	}, nil
 }
 
 // StartTask begins an approved, prepared task.

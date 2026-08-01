@@ -259,12 +259,19 @@ func productApplication() ui.Node {
 			switch event.Kind {
 			case events.KindMessageFinal, events.KindThreadRenamed, events.KindThreadArchived,
 				events.KindTaskStateChanged, events.KindBudgetUpdated, events.KindValidationUpdated,
-				events.KindRecoveryRequired, events.KindChangeAcceptanceUpdated:
+				events.KindRecoveryRequired, events.KindChangeAcceptanceUpdated,
+				events.KindTaskProjectionInvalidated:
 				threadRailSource.Reload()
 			}
 			switch event.Kind {
 			case events.KindTaskStateChanged, events.KindForecastUpdated,
-				events.KindUsageUpdated, events.KindBudgetUpdated, events.KindRecoveryRequired:
+				events.KindUsageUpdated, events.KindBudgetUpdated,
+				events.KindRecoveryRequired,
+				// The coordinator emits this when a task is created, approved,
+				// or started. Ignoring it meant a worker could be running with a
+				// real worktree while the workspace still read "No task yet" —
+				// the interface disagreeing with the machine it supervises.
+				events.KindTaskProjectionInvalidated:
 				if reloadTaskControls != nil {
 					reloadTaskControls()
 				}

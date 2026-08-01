@@ -52,8 +52,15 @@ func TestGeneratedComposerTransportSendsRetainedIdentityAndReturnsCommittedMessa
 		fake.request.GetControl().ExpectedRevision == nil ||
 		fake.request.GetControl().GetExpectedRevision() != 0 ||
 		fake.request.GetThreadId().GetValue() != threadID.String() ||
-		fake.request.GetBody() != "authoritative send" || !fake.request.GetCreateDraftTask() {
+		fake.request.GetBody() != "authoritative send" {
 		t.Fatalf("generated send mapping = message %s request %#v", messageID, fake.request)
+	}
+	// The task is created by CreateTask, which gives it a policy, a forecast,
+	// and a budget. A task made by this flag is a bare draft that nothing can
+	// ever start, which is exactly what used to happen: a request became a
+	// draft task and stopped there.
+	if fake.request.GetCreateDraftTask() {
+		t.Error("sending a message still asks for a bare draft task")
 	}
 }
 

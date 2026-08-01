@@ -24,6 +24,63 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-013
+Date: 2026-08-01
+Status: A typed request reaches a running worker; the interface reports it
+Change-ID: CL-20260801-013
+Request-or-TODO: User: "does it look like the app is working to you????? e2e
+  test it ffs"
+Goal: Drive the product the way a person would, find where it stops, and close
+  every gap between a typed request and a running agent
+Assumptions: The backend chain was already correct and only unreachable. This
+  held: an existing in-process test reached a spawned worker, so the work was
+  exposing the two missing steps rather than inventing lifecycle behaviour
+Decisions: Add ApprovePlan rather than let StartTask approve implicitly,
+  because the approval gate is a real safety property and pressing Start in the
+  interface IS the person's approval — it should be recorded as one, not
+  bypassed. Return the preflight revision from the approval rather than
+  re-reading it at start, so a settings change between the two cannot
+  substitute a different binding for the one that was seen. Walk the three
+  lifecycle transitions individually rather than collapsing them, because each
+  is a durable event the session timeline reads. Observe the environment in the
+  coordinator rather than accepting it from the browser: a client-supplied
+  toolchain version is a guess, and it lands inside the fingerprint that gates
+  memory retrieval and routing. Ask for the kind of change in the composer and
+  refuse to start without one, for the same reason
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto,
+  internal/transport/task_lifecycle_service.go,
+  internal/coordinator/task_plan_approval.go,
+  internal/coordinator/task_environment.go,
+  internal/coordinator/task_lifecycle_adapter.go,
+  internal/coordinator/catalog.go,
+  internal/storage/execution_preflight_repository.go,
+  internal/gitwork/runner.go, internal/gitwork/worktree.go,
+  web/frontend/composer/component.go, web/client/task_start_chain.go,
+  web/client/composer_transport.go, web/client/composer_bridge_wasm.go,
+  web/client/composer_preview.go, web/client/timeline_mounted.go,
+  web/client/main.go, web/frontend/shell/reference_chrome.go
+Validation: Coordinator tests cover the happy path to a worktree, a stale
+  approval, an already-approved task, and intake with no caller-supplied
+  environment. Client tests cover the three-call chain, its revision threading,
+  an undeclared kind, a refused approval, and an approval that binds nothing.
+  Composer tests bind the offered kinds to the classes intake accepts, in both
+  directions. An end-to-end test drives a real browser to a running worker
+Failures-or-discarded-approaches: Driving the browser was the only thing that
+  found this. The unit suite was green, the console suite was green, and the
+  product recorded requests and did nothing. The first browser run stopped at
+  a draft task; the second reached a run that never produced a worktree; that
+  turned out to be Git refusing a path over 260 characters, invisible because
+  runCommand reported the exit status and discarded the sentence Git wrote.
+  Reloading task controls on the projection-invalidated event was not enough on
+  its own — the session snapshot is scoped to a task and fetched once, so the
+  timeline also had to remount when a thread gains one
+Known-limitations: The worker starts and holds its worktree; what it then does
+  with a provider is the next thing to verify end to end. The run stays in
+  starting until the worker reports, and nothing in the interface distinguishes
+  starting from running yet. Money is still displayed in minor units
+Next-safe-step: Watch a worker through a full attempt and report its progress
+  in the execution panels, and format money as currency rather than minor units
+
 Dev-Log: DL-20260801-012
 Date: 2026-08-01
 Status: The interface reaches the coordinator, reports live, and presents

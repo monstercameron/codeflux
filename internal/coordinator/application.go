@@ -384,6 +384,18 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	// Intake requires a base revision, a toolchain version, a validation
+	// profile, and a baseline model. Every one is a fact about this machine and
+	// this build rather than a decision, so the coordinator reads them here. A
+	// client supplying them would be guessing, and the guess would land inside
+	// the fingerprint that gates memory retrieval and routing.
+	environment, err := NewTaskEnvironmentObserver(
+		repositories, checkpointing.worktrees, buildinfo.Current(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	application.taskLifecycle.SetEnvironmentObserver(environment)
 
 	if taskControls == nil {
 		return nil, errors.New(

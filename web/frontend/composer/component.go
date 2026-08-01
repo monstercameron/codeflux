@@ -48,15 +48,22 @@ type ModelOption struct {
 }
 
 type Props struct {
-	View                      ViewModel
-	Mode                      primitives.Mode
-	Disabled                  bool
-	DisabledReason            string
-	MutationDisabled          bool
-	MutationDisabledReason    string
-	TransportMode             string
-	BudgetCurrency            domain.CurrencyCode
-	ModelOptions              []ModelOption
+	View                   ViewModel
+	Mode                   primitives.Mode
+	Disabled               bool
+	DisabledReason         string
+	MutationDisabled       bool
+	MutationDisabledReason string
+	TransportMode          string
+	BudgetCurrency         domain.CurrencyCode
+	ModelOptions           []ModelOption
+	// TaskClass is what kind of work this request is. It is the one thing
+	// about a task that nothing can observe: no requirement classifier exists,
+	// and a guess would land inside the fingerprint that gates project-memory
+	// retrieval and routing. Everything else a task needs — the base revision,
+	// the toolchain, the validation profile — the coordinator reads for itself.
+	TaskClass                 string
+	OnTaskClassChange         func(string)
 	OnTextChange              func(string)
 	OnSubmitRequested         func()
 	OnRetryRequested          func(IdempotencyKey)
@@ -304,6 +311,17 @@ func composerOverrideControls(props Props, disabled bool) ui.Node {
 	if hasPolicy {
 		policyValue = string(policy)
 	}
+	classProps := html.PropsOf(html.OnChange(func(event ui.ChangeEvent) {
+		if props.OnTaskClassChange != nil {
+			props.OnTaskClassChange(event.GetValue())
+		}
+	}))
+	classProps.ID = "composer-task-class"
+	classProps.Value = props.TaskClass
+	classProps.Disabled = disabled || props.OnTaskClassChange == nil
+	classProps.Aria = map[string]string{"label": "What kind of change this is"}
+	classProps.Class = composerInputClass(props.Mode.Tokens(), false)
+
 	policyProps := html.PropsOf(html.OnChange(func(event ui.ChangeEvent) {
 		value := domain.PolicyPreset(event.GetValue())
 		if props.OnPolicyChange != nil {
@@ -399,6 +417,8 @@ func composerOverrideControls(props Props, disabled bool) ui.Node {
 			Role: "group", Aria: map[string]string{"label": "Composer policy and budget overrides"},
 			Class: composerOverrideGridClass(props.Mode.Tokens()),
 		},
+			composerLabeledControl(props.Mode.Tokens(), "composer-task-class", "Kind of change",
+				html.Select(classProps, composerTaskClassOptions()...)),
 			composerLabeledControl(props.Mode.Tokens(), "composer-policy", "Policy", html.Select(policyProps,
 				html.Option(html.Props{Value: "", Text: "Use default policy"}),
 				html.Option(html.Props{Value: string(domain.PolicyPresetCorrectness), Text: "Correctness"}),
@@ -442,6 +462,34 @@ func composerLabeledControl(tokens design.Tokens, id, label string, control ui.N
 	return html.Div(html.Props{Class: composerStackClass(tokens)},
 		html.Label(html.Props{For: id, Text: label}), control,
 	)
+}
+
+// TaskClassChoices are the kinds of change a person can declare, in the order
+// they are offered.
+//
+// The order is by how often the choice is made rather than alphabetical, so the
+// common answer is the short reach. Nothing here is a default: the first entry
+// is an explicit prompt, because a silently pre-selected class would be a guess
+// wearing a person's authority.
+var TaskClassChoices = []struct{ Value, Label string }{
+	{"", "Choose a kind"},
+	{"small-change", "Small change"},
+	{"bug-fix", "Bug fix"},
+	{"feature", "Feature"},
+	{"refactor", "Refactor"},
+	{"documentation", "Documentation"},
+	{"migration", "Migration"},
+	{"security", "Security"},
+}
+
+func composerTaskClassOptions() []ui.Node {
+	nodes := make([]ui.Node, 0, len(TaskClassChoices))
+	for _, choice := range TaskClassChoices {
+		nodes = append(nodes, html.Option(html.Props{
+			Value: choice.Value, Text: choice.Label,
+		}))
+	}
+	return nodes
 }
 
 func composerModelOptions(options []ModelOption) []ui.Node {

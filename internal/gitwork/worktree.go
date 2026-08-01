@@ -277,6 +277,15 @@ func (service *Service) createWorktree(
 			"git",
 			"-c",
 			"core.hooksPath="+service.disabledHooksPath(),
+			// Windows refuses paths past 260 characters through the ANSI API,
+			// and a task worktree path is a data directory plus a repository
+			// identifier plus a task identifier plus whatever the repository
+			// itself nests. Checking out this repository into one failed on
+			// four files with "Filename too long", which left the run recorded
+			// as started with no worktree and no worker. core.longpaths makes
+			// Git use the Unicode API that has no such limit.
+			"-c",
+			"core.longpaths=true",
 			"worktree",
 			"add",
 			"-b",

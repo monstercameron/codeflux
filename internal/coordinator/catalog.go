@@ -174,6 +174,15 @@ var rpcContracts = []RPCContract{
 		"local-session", "thread/task-create/key", "required-current-thread",
 		"task transaction", []string{"tasks", "session-events"}, []string{"task_state_changed"}, "none"),
 	rpcQuery("TaskService/GetTask", "TaskService.GetTask", "tasks", "budgets"),
+	// The plan declared this function long before anything implemented it, and
+	// its absence is what left a created task with no way to reach Ready. The
+	// row matches the declaration rather than restating it: approving a plan is
+	// the user's own authority, not the session's.
+	rpcMutation("TaskService/ApprovePlan", "TaskService.ApprovePlan",
+		"explicit-user-authority", "task/plan-approval/key", "required-current-plan",
+		"approval transaction",
+		[]string{"tasks", "plans", "approvals", "session-events"},
+		[]string{"approval_resolved", "task_state_changed"}, "none"),
 	rpcEffect("TaskService/StartTask", "TaskService.StartTask",
 		"local-session", "task/start/key", "required-current-task",
 		[]string{"tasks", "plans", "runs", "workers", "session-events"},

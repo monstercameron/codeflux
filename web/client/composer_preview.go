@@ -27,6 +27,9 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 	latestEvent := ui.UseRef(latest)
 	latestEvent.Set(latest)
 	transportMode := ui.UseState(composerTransportAuthoritative)
+	// The kind of change is the one thing about a task nothing can observe, so
+	// it is held here and sent with the request rather than defaulted anywhere.
+	taskClass := ui.UseState("")
 	usd, currencyErr := domain.ParseCurrencyCode("USD")
 	providerID, providerErr := domain.ParseProviderID("prv_" + previewComposerUUID)
 	modelOptions, modelOptionsErr := previewModelOptions(providerID)
@@ -103,6 +106,10 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 		BudgetCurrency: usd,
 		TransportMode:  transportMode.Get(),
 		ModelOptions:   modelOptions,
+		TaskClass:      taskClass.Get(),
+		OnTaskClassChange: func(value string) {
+			taskClass.Set(value)
+		},
 		OnTextChange: func(value string) {
 			apply(composer.DraftTextChanged{ThreadID: threadID, Text: value})
 		},
@@ -117,7 +124,7 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 			}
 			complete(composerSendCommand{
 				ThreadID: threadID, ExpectedRevision: thread.Revision(),
-				Key: key, Draft: draft,
+				Key: key, Draft: draft, TaskClass: taskClass.Get(),
 			})
 		},
 		OnRetryRequested: func(key composer.IdempotencyKey) {
@@ -126,7 +133,7 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 				if ok {
 					complete(composerSendCommand{
 						ThreadID: threadID, ExpectedRevision: thread.Revision(),
-						Key: key, Draft: attempt.Request(),
+						Key: key, Draft: attempt.Request(), TaskClass: taskClass.Get(),
 					})
 				}
 			}

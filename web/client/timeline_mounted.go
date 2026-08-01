@@ -80,7 +80,14 @@ func mountedAuthoritativeTimeline(
 		thread.TaskID().String(),
 	)
 
+	// The task is part of the dependency because the session snapshot is
+	// scoped to one, and it is fetched once when this mounts. A thread that
+	// gained a task afterwards kept the snapshot taken before the task existed,
+	// so a worker could be running with a real worktree while the workspace
+	// still read "No task yet" — the interface disagreeing with the machine it
+	// supervises.
 	dependency := thread.ID().String() + "|" + thread.SessionID().String() + "|" +
+		thread.TaskID().String() + "|" +
 		strconv.FormatUint(reconnectVersion, 10)
 	ui.UseEffectOf(func() func() {
 		if thread.ID().IsZero() || thread.SessionID().IsZero() {
