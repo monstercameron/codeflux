@@ -26,6 +26,30 @@ type reviewResource struct {
 	Report            reportevidence.Report
 	Diff              *reviewDiffResource
 	DiffMatchesReport bool
+	// ReviewID and ReviewRevision identify exactly what was loaded. A
+	// decision has to name them, because the coordinator refuses one whose
+	// bindings no longer match -- which is what makes it safe to act on a
+	// screen that may have gone stale while it was being read.
+	ReviewID       string
+	ReviewRevision uint64
+}
+
+// DecisionScope returns the identity a review decision must carry.
+//
+// It is empty unless the diff loaded and matches the report. A decision made
+// against a report whose diff could not be shown would be a decision about
+// material the user never saw.
+func (resource reviewResource) DecisionScope(taskID domain.TaskID) reviewMutationScope {
+	if resource.Diff == nil || !resource.DiffMatchesReport {
+		return reviewMutationScope{}
+	}
+	return reviewMutationScope{
+		TaskID:         taskID,
+		ReviewID:       resource.ReviewID,
+		ReviewRevision: resource.ReviewRevision,
+		ReportID:       resource.Report.ID,
+		DiffIdentity:   resource.Diff.Identity,
+	}
 }
 
 type reviewDiffResource struct {
@@ -83,7 +107,12 @@ func decodeReviewResource(response *codefluxv1.GetEvidenceReportResponse, taskID
 	if err := report.Validate(); err != nil || report.TaskID != taskID {
 		return reviewResource{}, fmt.Errorf("%w: invalid report binding", errReviewResourceMalformed)
 	}
-	result := reviewResource{Report: report, DiffMatchesReport: response.GetDiffMatchesReport()}
+	result := reviewResource{
+		Report:            report,
+		DiffMatchesReport: response.GetDiffMatchesReport(),
+		ReviewID:          response.GetReviewId(),
+		ReviewRevision:    response.GetReviewRevision(),
+	}
 	if response.GetDiff() == nil {
 		return result, nil
 	}

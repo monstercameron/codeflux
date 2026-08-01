@@ -18,6 +18,7 @@ import (
 	"codeflux.dev/codeflux/web/frontend/taskprojection"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 	"codeflux.dev/codeflux/web/frontend/timeline"
+	"github.com/monstercameron/GoWebComponents/v5/fetch"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 )
 
@@ -46,6 +47,34 @@ func mountedAuthoritativeTimeline(
 	reviewOpen := ui.UseState(false)
 	streamStatus := ui.UseState(sessionclient.Status{})
 	projectionState := ui.UseState(sessionprojection.New())
+	decisionState := ui.UseState(mountedReviewMutationState{})
+	decisionRef := ui.UseRef(mountedReviewMutationState{})
+	// The review material is loaded here as well as in the drawer, because the
+	// decision controls live in the timeline and must carry the exact review,
+	// report, and diff identity a decision is bound to. The hook is called
+	// unconditionally and returns nothing when the task is not in review: GWC
+	// hooks are positional, so a conditional call would misalign every hook
+	// after it.
+	decisionResource := fetch.UseResource(
+		func(parent context.Context) (reviewMutationScope, error) {
+			if thread.TaskID().IsZero() {
+				return reviewMutationScope{}, nil
+			}
+			ctx, cancel := context.WithTimeout(parent, mountedTimelineTimeout)
+			defer cancel()
+			resource, err := loadReviewResource(
+				ctx, openBrowserReviewResourceClient, thread.TaskID())
+			if err != nil {
+				// A review that cannot be loaded leaves the decisions refused,
+				// which is what the projection already says. Surfacing the load
+				// error here would replace an accurate refusal with a transient
+				// one.
+				return reviewMutationScope{}, nil
+			}
+			return resource.DecisionScope(thread.TaskID()), nil
+		},
+		thread.TaskID().String(),
+	)
 
 	dependency := thread.ID().String() + "|" + thread.SessionID().String() + "|" +
 		strconv.FormatUint(reconnectVersion, 10)
@@ -262,6 +291,10 @@ func mountedAuthoritativeTimeline(
 		props = bindAuthoritativeTimelineActions(
 			props, task, taskprojection.ConnectionProjection(projection.Connection().State),
 			func() { reviewOpen.Set(true) }, func() { reviewOpen.Set(false) },
+			mountedReviewDecisionBinder(
+				decisionResource.Get().Value, decisionState, decisionRef,
+				decisionResource.Reload,
+			),
 		)
 		props.ReviewOpen = reviewOpen.Get()
 	}

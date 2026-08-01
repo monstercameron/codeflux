@@ -43,8 +43,13 @@ func TestPassiveRouteShellsHaveNoFetchOrNetworkAuthority(t *testing.T) {
 		markup := render(t, component(shell.SimpleRouteProps{
 			Title: name, State: state.DataReady,
 		}))
-		if strings.Contains(markup, "http://") || strings.Contains(markup, "https://") ||
-			strings.Contains(markup, "<script") {
+		// The SVG namespace is an XML identifier, not a location: no browser
+		// ever fetches it, and inline drawn icons carry it because the markup
+		// builder emits it unconditionally. Everything else that looks like a
+		// URL in a passive route is a network reference and is refused.
+		inert := strings.ReplaceAll(markup, `xmlns="http://www.w3.org/2000/svg"`, "")
+		if strings.Contains(inert, "http://") || strings.Contains(inert, "https://") ||
+			strings.Contains(inert, "<script") {
 			t.Fatalf("%s route emitted network-capable markup: %s", name, markup)
 		}
 	}

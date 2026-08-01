@@ -19,12 +19,22 @@ const (
 	reviewRollbackDependency     = "Rollback is unavailable until ReviewService can verify and restore the bound checkpoint and publish the resulting task and worktree revisions."
 )
 
+// reviewDecisionBinder turns projected review refusals into live commands.
+//
+// It is a parameter rather than a direct call because the identity a decision
+// must carry -- the review, its revision, the report, the diff -- comes from
+// the loaded review material, not from the task projection. Only the caller
+// that has loaded that material can supply it, and a caller that has not must
+// leave the refusals in place.
+type reviewDecisionBinder func(shell.ReviewDecisionProps) shell.ReviewDecisionProps
+
 func bindAuthoritativeTimelineActions(
 	props shell.TimelineControlProps,
 	task taskprojection.TaskProjection,
 	connection taskprojection.ConnectionProjection,
 	onOpenReview func(),
 	onCloseReview func(),
+	bindDecisions reviewDecisionBinder,
 ) shell.TimelineControlProps {
 	props.Actions.OnApproval = nil
 	props.Actions.OnApprovePlan = nil
@@ -103,6 +113,9 @@ func bindAuthoritativeTimelineActions(
 		Rollback: projectedUnavailableTimelineCommand(
 			task, connection, taskprojection.ActionRollback, reviewRollbackDependency,
 		),
+	}
+	if bindDecisions != nil {
+		props.ReviewDecisions = bindDecisions(props.ReviewDecisions)
 	}
 	return props
 }

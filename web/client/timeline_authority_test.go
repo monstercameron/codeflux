@@ -26,6 +26,7 @@ func TestAuthoritativeTimelineApprovalActionsRemainDisabledWithExactDependency(t
 	}
 	props := bindAuthoritativeTimelineActions(
 		shell.TimelineControlProps{}, task, taskprojection.ConnectionLive, nil, nil,
+		nil,
 	)
 	for _, action := range []timelinecard.ApprovalAction{
 		timelinecard.ApprovalAllowOnce, timelinecard.ApprovalAllowForTask, timelinecard.ApprovalDeny,
@@ -55,6 +56,7 @@ func TestAuthoritativeTimelineApprovalActionsRemainDisabledWithExactDependency(t
 
 	disconnected := bindAuthoritativeTimelineActions(
 		shell.TimelineControlProps{}, task, taskprojection.ConnectionDisconnected, nil, nil,
+		nil,
 	)
 	if reason := disconnected.Actions.ApprovalActionCommand(
 		approvalID.String(), timelinecard.ApprovalDeny,
@@ -72,6 +74,7 @@ func TestAuthoritativeTimelinePlanActionsBindCurrentRevisionAndStayDisabled(t *t
 	}
 	props := bindAuthoritativeTimelineActions(
 		shell.TimelineControlProps{}, task, taskprojection.ConnectionLive, nil, nil,
+		nil,
 	)
 	if got := props.Actions.ApprovePlanCommand(7).DisabledReason; got != planApprovalDependency {
 		t.Fatalf("approve reason = %q", got)
@@ -113,6 +116,7 @@ func TestAuthoritativeReviewOpensReadOnlyAndShowsExactDisabledDecisionBindings(t
 	props := bindAuthoritativeTimelineActions(
 		shell.TimelineControlProps{Enabled: true}, task, taskprojection.ConnectionLive,
 		func() { opened++ }, func() { closed++ },
+		nil,
 	)
 	if props.OnOpenReview == nil || props.OnCloseReview == nil || props.Actions.OnOpenReview == nil {
 		t.Fatal("authoritative read-only review callbacks are unavailable")
@@ -156,6 +160,7 @@ func TestAuthoritativeReviewUsesStaleDecisionBeforeMissingBackendReason(t *testi
 	}
 	props := bindAuthoritativeTimelineActions(
 		shell.TimelineControlProps{}, task, taskprojection.ConnectionLive, func() {}, func() {},
+		nil,
 	)
 	if reason := props.ReviewDecisions.Accept.DisabledReason; !strings.Contains(reason, "changed") {
 		t.Fatalf("stale acceptance reason = %q", reason)
@@ -187,4 +192,46 @@ func renderAuthoritativeTimelineControls(t *testing.T, props shell.TimelineContr
 		t.Fatal(err)
 	}
 	return markup
+}
+
+// TestASuppliedBinderMakesReviewDecisionsLive proves the seam is connected.
+//
+// The four review decisions were presented as permanently unavailable against
+// a coordinator that implements all four. This asserts that a caller which has
+// loaded the review material can replace those refusals, and that a caller
+// which has not still cannot.
+func TestASuppliedBinderMakesReviewDecisionsLive(t *testing.T) {
+	task := taskprojection.TaskProjection{
+		Revision: 7,
+		Review:   taskprojection.ReviewProjection{Present: true, Revision: 4},
+	}
+	connection := taskprojection.ConnectionProjection("live")
+
+	withoutBinder := bindAuthoritativeTimelineActions(
+		shell.TimelineControlProps{}, task, connection, nil, nil, nil,
+	)
+	if withoutBinder.ReviewDecisions.OnAccept != nil {
+		t.Fatal("a decision was actionable with no review material loaded")
+	}
+	if withoutBinder.ReviewDecisions.Accept.DisabledReason == "" {
+		t.Fatal("an unbound decision gave no reason for being unavailable")
+	}
+
+	called := 0
+	withBinder := bindAuthoritativeTimelineActions(
+		shell.TimelineControlProps{}, task, connection, nil, nil,
+		func(decisions shell.ReviewDecisionProps) shell.ReviewDecisionProps {
+			called++
+			decisions.Accept = timelineview.ActionCommandState{TransportMode: "authoritative"}
+			decisions.OnAccept = func() {}
+			return decisions
+		},
+	)
+	if called != 1 {
+		t.Fatalf("the binder was called %d times, want once", called)
+	}
+	if withBinder.ReviewDecisions.OnAccept == nil ||
+		withBinder.ReviewDecisions.Accept.DisabledReason != "" {
+		t.Fatalf("the binder did not reach the decisions: %+v", withBinder.ReviewDecisions)
+	}
 }

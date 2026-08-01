@@ -1632,33 +1632,51 @@ func FirstRunInteractiveShell(props FirstRunProps) ui.Node {
 
 func firstRunLayout(props FirstRunProps) ui.Node {
 	stateProps := SimpleRouteProps{Title: props.Title, State: props.State, Mode: props.Mode}
-	content := routeMain("first-run-shell", props.Title, props.Mode,
-		routeRegion(props.Mode, "local-promise", "01  /  Local boundary",
-			routeStateContent(stateProps, "local-first setup",
-				firstRunStep(props, "⌂", "Ready",
-					"Your coordinator, durable state, and task evidence stay on this machine.", "", ""),
-			)),
-		routeRegion(props.Mode, "provider", "02  /  Model provider",
-			routeStateContent(stateProps, "provider setup",
-				firstRunStep(props, "◈", "Needs connection",
-					"Authorize the model provider used for planning and execution.", "Review providers", "/settings?section=providers"),
-			)),
-		routeRegion(props.Mode, "repository", "03  /  Repository",
-			routeStateContent(stateProps, "repository setup",
-				firstRunStep(props, "▤", "Choose a scope",
-					"Select the repository CodeFlux may inspect and change.", "Choose repository", "/?setup=repository"),
-			)),
-		routeRegion(props.Mode, "worktree-permissions", "04  /  Boundaries",
-			routeStateContent(stateProps, "worktree permissions",
-				firstRunStep(props, "⬡", "Review required",
-					"Confirm file, command, network, and worktree authority.", "Review permissions", "/settings?section=policy"),
-			)),
-		routeRegion(props.Mode, "first-thread", "05  /  First thread",
-			routeStateContent(stateProps, "first Thread setup",
-				firstRunStep(props, "⌁", "Ready after setup",
-					"Start with a concrete outcome. CodeFlux will plan, execute, and preserve evidence.", "Open tasks", "/tasks"),
-			)),
-	)
+	// Each step is one card carrying its own position, name, state, meaning,
+	// and action. The previous arrangement wrapped a generic region around a
+	// separate content block, which read as a tall empty box with a heading.
+	cards := []firstRunCard{
+		{
+			Step: 1, Icon: primitives.IconDatabase, Title: "Local boundary",
+			Status: "Ready", Tone: design.StatusSuccess,
+			Body: "Your coordinator, durable state, and task evidence stay on this machine.",
+		},
+		{
+			Step: 2, Icon: primitives.IconModel, Title: "Model provider",
+			Status: "Needs connection", Tone: design.StatusWarning,
+			Body:        "Authorize the model provider used for planning and execution.",
+			ActionLabel: "Review providers", Path: "/settings?section=providers",
+		},
+		{
+			Step: 3, Icon: primitives.IconRepositories, Title: "Repository",
+			Status: "Choose a scope", Tone: design.StatusPending,
+			Body:        "Select the repository CodeFlux may inspect and change.",
+			ActionLabel: "Choose repository", Path: "/?setup=repository",
+		},
+		{
+			Step: 4, Icon: primitives.IconSettings, Title: "Boundaries",
+			Status: "Review required", Tone: design.StatusWarning,
+			Body:        "Confirm file, command, network, and worktree authority.",
+			ActionLabel: "Review permissions", Path: "/settings?section=policy",
+		},
+		{
+			Step: 5, Icon: primitives.IconTasks, Title: "First thread",
+			Status: "Ready after setup", Tone: design.StatusNeutral,
+			Body: "Start with a concrete outcome. CodeFlux will plan, execute, " +
+				"and preserve evidence.",
+			ActionLabel: "Open tasks", Path: "/tasks", Primary: true,
+		},
+	}
+	// Each card carries its own data-state wrapper, so a route that is loading,
+	// failed, or not requested says so per step rather than showing a
+	// confident setup sequence built from nothing.
+	regions := make([]ui.Node, 0, len(cards))
+	for _, card := range cards {
+		regions = append(regions, routeStateContent(
+			stateProps, firstRunSubject(card.Title), renderFirstRunCard(props, card),
+		))
+	}
+	content := routeMain("first-run-shell", props.Title, props.Mode, regions...)
 	// The application frame deliberately clips route content so task routes can
 	// own their pane scrolling. Static first-run content instead needs one
 	// explicit route-level scroll owner; without it, the cards extend beneath
@@ -1677,68 +1695,6 @@ func firstRunLayout(props FirstRunProps) ui.Node {
 	return html.Div(scrollOwnerProps,
 		content,
 	)
-}
-
-func firstRunStep(
-	props FirstRunProps,
-	glyph, status, body, actionLabel, path string,
-) ui.Node {
-	tokens := props.Mode.Tokens()
-	children := []ui.Node{
-		html.Div(html.Props{
-			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String(),
-		},
-			html.Span(html.Props{
-				Aria: map[string]string{"hidden": "true"},
-				Class: css.New(
-					u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-					css.W(css.Px(44)), css.H(css.Px(44)),
-					css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-					css.Bg(css.Hex(string(tokens.Colors.Selection))),
-					css.TextColor(css.Hex(string(tokens.Colors.Accent))),
-					css.FontSize(css.Px(20)), css.FontWeight.Bold,
-				).String(),
-				Text: glyph,
-			}),
-			html.Span(html.Props{
-				Class: css.New(
-					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-					css.FontWeight.Semibold,
-				).String(),
-				Text: status,
-			}),
-		),
-		html.P(html.Props{
-			Class: css.New(
-				css.Margin(css.Zero),
-				css.MaxWidth(css.Px(420)),
-				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-				css.FontSize(css.Px(tokens.Typography.Body.Size)),
-				css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
-			).String(),
-			Text: body,
-		}),
-	}
-	if actionLabel != "" {
-		target := path
-		children = append(children, primitives.Button(primitives.ButtonProps{
-			Label: actionLabel, Primary: target == "/tasks",
-			Mode: props.Mode, Disabled: props.OnNavigatePath == nil,
-			OnClick: func() {
-				if props.OnNavigatePath != nil {
-					props.OnNavigatePath(target)
-				}
-			},
-		}))
-	}
-	return html.Div(html.Props{
-		Class: css.New(
-			u.Flex, u.FlexCol, u.JustifyBetween,
-			css.Gap(css.Px(tokens.Spacing.LG)),
-			css.FlexGrow(css.Num(1)),
-		).String(),
-	}, children...)
 }
 
 func routeMain(component, title string, mode primitives.Mode, regions ...ui.Node) ui.Node {

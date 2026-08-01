@@ -27,6 +27,10 @@ type ButtonProps struct {
 	// weakening the ordinary callback contract used by stateless callers.
 	OnClickHandler ui.Handler
 	StableOnClick  bool
+	// Icon replaces the visible label with a drawn mark. The accessible name
+	// still comes from Label or AccessibleLabel, so an icon-only control is
+	// never nameless: it looks like an icon and reads like a sentence.
+	Icon IconName
 }
 
 func Button(props ButtonProps) ui.Node {
@@ -64,6 +68,13 @@ func Button(props ButtonProps) ui.Node {
 	label := props.Label
 	if props.Busy {
 		label = "Working… " + props.Label
+	}
+	if props.Icon != "" && !props.Busy {
+		// The mark is hidden from assistive technology because the button
+		// already carries an accessible name. Announcing both would read the
+		// control twice.
+		htmlProps.Aria["label"] = name
+		return html.Button(htmlProps, Icon(IconProps{Name: props.Icon, Size: 18}))
 	}
 	return html.Button(htmlProps, html.Text(label))
 }

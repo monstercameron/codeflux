@@ -78,15 +78,15 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 	tokens := props.Mode.Tokens()
 	compact := props.Viewport == state.ViewportNarrow || props.Viewport == state.ViewportMinimum
 	tracks := []css.Track{
-		css.TrackLen(css.Px(410)),
+		css.TrackLen(css.Px(250)),
 		css.MinMax(css.TrackLen(css.Zero), css.Fr(1)),
-		css.TrackLen(css.Px(390)),
+		css.TrackLen(css.Px(430)),
 	}
 	if props.Viewport == state.ViewportWide {
 		tracks = []css.Track{
-			css.TrackLen(css.Px(350)),
+			css.TrackLen(css.Px(250)),
 			css.MinMax(css.TrackLen(css.Zero), css.Fr(1)),
-			css.TrackLen(css.Px(560)),
+			css.TrackLen(css.Px(620)),
 		}
 	}
 	if compact {
@@ -149,33 +149,23 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			}),
 			html.Div(html.Props{},
 				primitives.Button(primitives.ButtonProps{
-					ID: "thread-rail-toggle", Label: "☰", AccessibleLabel: "Toggle thread rail",
-					Expanded: &props.RailOpen, Controls: "product-sidebar-navigation",
+					ID: "thread-rail-toggle", Icon: primitives.IconMenu,
+					AccessibleLabel: "Toggle thread rail",
+					Expanded:        &props.RailOpen, Controls: "product-sidebar-navigation",
 					Mode: props.Mode, Disabled: props.OnRailToggle == nil, OnClick: props.OnRailToggle,
 				}),
 			),
-			html.Span(html.Props{
-				Hidden: compact,
-				Class: desktopOnlyClass(
-					css.H(css.Px(24)),
-					css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-				),
-				Aria: map[string]string{"hidden": "true"},
-			}),
-			html.Span(html.Props{
-				Hidden: compact,
-				Class: desktopOnlyClass(
-					css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
-					css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-				),
-				Text: "Correctness. Evidence. Progress.",
-			}),
 		),
 		html.Div(html.Props{
 			Hidden: compact,
 			Aria:   map[string]string{"label": "Repository context"},
 			Class: desktopOnlyClass(
-				u.Flex, u.ItemsCenter, u.JustifyCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+				// The chips keep their natural size and the row gives way
+				// instead. Squeezing them truncated every label to two
+				// characters, which told the reader nothing about which
+				// repository or branch they were pointed at.
+				u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+				css.MinWidth(css.Zero), css.Overflow.Hidden,
 			),
 		},
 			contextControl("repository", "▣", repository, "/", props.Mode, props.OnNavigatePath),
@@ -184,6 +174,14 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			html.Div(html.Props{Class: wideOnlyClass()},
 				contextControl("model", "◈", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
+			costReadoutPlaceholder(),
+		),
+		html.Div(html.Props{
+			Aria: map[string]string{"label": "Session controls"},
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyEnd, css.Gap(css.Px(tokens.Spacing.SM)),
+			).String(),
+		},
 			html.Div(html.Props{Class: wideOnlyClass()},
 				// The header carries the two figures that decide whether to
 				// intervene: what this has cost, and what is left of the cap.
@@ -205,11 +203,6 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 					TargetPath: "/settings",
 				}),
 			),
-		),
-		html.Div(html.Props{
-			Aria:  map[string]string{"label": "Session controls"},
-			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyEnd, css.Gap(css.Px(tokens.Spacing.SM))).String(),
-		},
 			html.Span(html.Props{
 				Hidden: compact,
 				Data:   map[string]string{"connection": connection},
@@ -224,15 +217,16 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				Text: "●  Local " + humanize(connection),
 			}),
 			manualReconnectControl(props, connection),
-			headerIconButtonWithID("global-search-trigger", "⌕", "Search", props.Mode, props.OnSearchOpen),
-			headerIconButton("◐", "Change color theme", props.Mode, props.OnThemeChange),
+			headerIconButtonWithID("global-search-trigger", primitives.IconSearch, "Search", props.Mode, props.OnSearchOpen),
+			headerIconButton(primitives.IconTheme, "Change color theme", props.Mode, props.OnThemeChange),
 			primitives.Button(primitives.ButtonProps{
-				ID: "shortcut-help-trigger", Label: "?", AccessibleLabel: "Shortcut help", Mode: props.Mode,
+				ID: "shortcut-help-trigger", Icon: primitives.IconHelp,
+				AccessibleLabel: "Shortcut help", Mode: props.Mode,
 				Disabled: props.OnShortcutHelp == nil, OnClick: shortcutHelpHandler,
 			}),
 			html.Div(html.Props{Class: wideOnlyClass()},
 				headerIconButtonWithID(
-					"assurance-rail-toggle", "▥", "Toggle task details sidebar", props.Mode, props.OnInspectorToggle,
+					"assurance-rail-toggle", primitives.IconMemory, "Toggle task details sidebar", props.Mode, props.OnInspectorToggle,
 				),
 			),
 			html.Span(html.Props{
@@ -341,17 +335,25 @@ func contextControl(
 			Aria: map[string]string{"label": label},
 			Class: css.New(
 				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-				css.MinHeight(css.Px(34)),
+				// One fixed height and one line. These chips previously took
+				// whatever height their text wanted and wrapped mid-phrase, so
+				// the row read as four differently sized boxes.
+				css.H(css.Px(32)),
+				css.FlexShrink(css.Num(0)),
 				css.PaddingX(css.Px(tokens.Spacing.MD)),
 				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 				css.Bg(css.Hex(string(tokens.Colors.Surface2))),
 				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-				css.Border(css.Px(1), css.Transparent),
+				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 				css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+				css.WhiteSpace.NoWrap,
 				css.Cursor.Pointer,
 			).String(),
-			Text: icon + "  " + label + "  ⌄",
-		}),
+		},
+			primitives.Icon(primitives.IconProps{Name: contextIcon(kind), Size: 14}),
+			html.Span(html.Props{Text: label}),
+			primitives.Icon(primitives.IconProps{Name: primitives.IconChevronDown, Size: 12}),
+		),
 		html.Div(html.Props{
 			Role: "group", Aria: map[string]string{"label": label + " options"},
 			Data: map[string]string{"component": "context-option-panel"},
@@ -463,22 +465,32 @@ func costReadout(props costReadoutProps) ui.Node {
 	)
 }
 
-func headerIconButton(label, accessible string, mode primitives.Mode, handler func()) ui.Node {
+// headerIconButton renders a drawn control in the application bar or a rail.
+//
+// The marks were Unicode glyphs — × ‹ › ⌕ ◐ ? — which rendered at six
+// different weights and sizes and made a row of controls look like a row of
+// accidents.
+func headerIconButton(
+	icon primitives.IconName,
+	accessible string,
+	mode primitives.Mode,
+	handler func(),
+) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		Label: label, AccessibleLabel: accessible, Mode: mode,
+		Icon: icon, AccessibleLabel: accessible, Mode: mode,
 		Disabled: handler == nil, OnClick: handler,
 	})
 }
 
 func headerIconButtonWithID(
 	id string,
-	label string,
+	icon primitives.IconName,
 	accessible string,
 	mode primitives.Mode,
 	handler func(),
 ) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		ID: id, Label: label, AccessibleLabel: accessible, Mode: mode,
+		ID: id, Icon: icon, AccessibleLabel: accessible, Mode: mode,
 		Disabled: handler == nil, OnClick: handler,
 	})
 }
@@ -628,16 +640,16 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 		navigationLabel = "Threads"
 	}
 	navItems := []struct {
-		icon  string
+		icon  primitives.IconName
 		label string
 		path  string
 	}{
-		{"⌂", "Home", "/"},
-		{"▣", "Tasks", "/tasks"},
-		{"⌘", "Graphs", "/graphs"},
-		{"◫", "Memory", "/memory"},
-		{"▤", "Repositories", "/"},
-		{"⚙", "Settings", "/settings"},
+		{primitives.IconHome, "Home", "/"},
+		{primitives.IconTasks, "Tasks", "/tasks"},
+		{primitives.IconGraph, "Graphs", "/graphs"},
+		{primitives.IconMemory, "Memory", "/memory"},
+		{primitives.IconRepositories, "Repositories", "/"},
+		{primitives.IconSettings, "Settings", "/settings"},
 	}
 	items := make([]ui.Node, 0, len(navItems))
 	for _, item := range navItems {
@@ -656,9 +668,17 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 		buttonProps.Aria = map[string]string{"current": selectedAria(selected)}
 		buttonProps.Data = map[string]string{"component": "client-route-control", "path": path}
 		buttonProps.Class = sidebarLinkClass(tokens, selected)
-		buttonProps.Text = item.icon + "   " + item.label
-		items = append(items, html.Div(html.Props{},
-			html.Button(buttonProps),
+		icon := item.icon
+		label := item.label
+		items = append(items, html.Button(buttonProps,
+			html.Span(html.Props{
+				Class: css.New(
+					u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
+					css.W(css.Px(20)), css.H(css.Px(20)),
+					css.FlexShrink(css.Num(0)),
+				).String(),
+			}, primitives.Icon(primitives.IconProps{Name: icon, Size: 18})),
+			html.Span(html.Props{Text: label}),
 		))
 	}
 	navigation := html.Nav(html.Props{
@@ -676,9 +696,9 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 			Aria:  map[string]string{"label": "Thread rail layout controls"},
 			Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS))).String(),
 		},
-			headerIconButtonWithID("product-sidebar-close", "×", "Collapse thread rail", props.Mode, props.OnCollapse),
-			headerIconButton("‹", "Narrow thread rail", props.Mode, props.OnNarrower),
-			headerIconButton("›", "Widen thread rail", props.Mode, props.OnWider),
+			headerIconButtonWithID("product-sidebar-close", primitives.IconClose, "Collapse thread rail", props.Mode, props.OnCollapse),
+			headerIconButton(primitives.IconChevronLeft, "Narrow thread rail", props.Mode, props.OnNarrower),
+			headerIconButton(primitives.IconChevronRight, "Widen thread rail", props.Mode, props.OnWider),
 		),
 		html.H2(html.Props{
 			ID: "product-sidebar-title", Text: navigationLabel,
@@ -803,10 +823,12 @@ func selectedAria(selected bool) string {
 func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 	rules := []css.Rule{
 		u.Flex, u.ItemsCenter,
+		css.Gap(css.Px(tokens.Spacing.MD)),
 		css.W(css.Full),
-		css.MinHeight(css.Px(44)),
-		css.MarginY(css.Px(2)),
-		css.PaddingX(css.Px(tokens.Spacing.LG)),
+		css.MinHeight(css.Px(42)),
+		css.MarginY(css.Px(1)),
+		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.TextAlign.Left,
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.Bg(css.Transparent),
 		css.Border(css.Zero, css.Transparent),
@@ -820,7 +842,13 @@ func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 		rules = append(rules,
 			css.Bg(css.Hex(string(tokens.Colors.Selection))),
 			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-			css.BorderLeft(css.Px(3), css.Hex(string(tokens.Colors.Accent))),
+			css.FontWeight.Semibold,
+			// An inset shadow draws the accent edge without adding a border,
+			// so selecting a route does not shift its label sideways.
+			css.Shadow(css.ShadowInset(
+				css.Px(3), css.Zero, css.Zero, css.Zero,
+				css.Hex(string(tokens.Colors.Accent)),
+			)),
 		)
 	}
 	return css.New(rules...).String()
@@ -867,7 +895,7 @@ func AssuranceRail(props AssuranceRailProps) ui.Node {
 			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
 		},
 			html.Strong(html.Props{Text: "Task details"}),
-			headerIconButton("×", "Collapse task details sidebar", props.Mode, props.OnCollapse),
+			headerIconButton(primitives.IconClose, "Collapse task details sidebar", props.Mode, props.OnCollapse),
 		),
 		inspectorCard("Identity and plan", []detailRow{
 			{"Milestone", "M16"},
@@ -1713,4 +1741,33 @@ func statusDot(status string) string {
 	default:
 		return "○"
 	}
+}
+
+// contextIcon maps a context chip to its drawn mark.
+//
+// The chips previously carried Unicode glyphs — ▣ ⑂ ✓ ◈ — which rendered at
+// four different weights and pushed their labels out of alignment with each
+// other.
+func contextIcon(kind string) primitives.IconName {
+	switch kind {
+	case "repository":
+		return primitives.IconRepositories
+	case "branch":
+		return primitives.IconBranch
+	case "worktree":
+		return primitives.IconCheck
+	case "model":
+		return primitives.IconModel
+	default:
+		return primitives.IconTasks
+	}
+}
+
+// costReadoutPlaceholder closes the repository-context group.
+//
+// The group ends where the cost readout used to be; this keeps the element
+// list explicit rather than leaving a bare closing brace whose meaning depends
+// on counting parentheses.
+func costReadoutPlaceholder() ui.Node {
+	return html.Span(html.Props{Hidden: true})
 }

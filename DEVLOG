@@ -24,6 +24,49 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-007
+Date: 2026-08-01
+Status: Improved and inspected; the interface is not finished
+Change-ID: CL-20260801-007
+Request-or-TODO: AUDIT-024, and the user's direction that the design was bad
+  and needed visual inspection
+Goal: Make the running interface something worth looking at, and make the
+  review controls do what the server can already do
+Assumptions: The mockups in design/ are the visual direction. The earlier pass
+  changed type and colour without touching composition, which is why the
+  result still looked wrong: the parts were better and the arrangement was not
+Decisions: Draw the icons rather than type them. Unicode glyphs used as an
+  icon set render at different weights and optical sizes on every platform and
+  several fall back to a box on Windows, so a row of controls read as a row of
+  accidents. Remove the slogan from the application bar: it was the only thing
+  in that row saying nothing about current state, and it was pushing the
+  controls that do off the edge. Move the cost readout in with the session
+  state, because spend and remaining are state rather than repository context.
+  Let the context chips keep their natural width and let the row give way
+  instead -- a chip truncated to two characters removes the only thing it was
+  for
+Files-or-schemas: web/frontend/primitives icon and controls; web/frontend/shell
+  reference_chrome, shell, first_run_card; web/client review_mutations and its
+  wasm wiring, review_resource, timeline_authority, timeline_mounted
+Validation: Full build, js/wasm build, vet, gofmt, the complete suite, lint,
+  and the repository checks pass. Each pass was rendered in headless Chromium
+  against the running server and inspected before the next change
+Failures-or-discarded-approaches: The first three inspection passes showed no
+  change at all, because the frontend server reads its assets once at startup
+  and the running process was serving the previous build. Rebuilding without
+  restarting proves nothing, which is worth knowing before trusting a
+  screenshot. A first attempt at chip truncation made the bar worse rather
+  than better: bounding each chip cut every label to two characters, which is
+  why the row now gives way instead of its contents
+Known-limitations: The icon-only buttons in the application bar still read
+  faint at their rendered size. The three rail controls at the top left are a
+  cluster of small buttons rather than a considered control. The right rail
+  still uses a text caret for its collapse affordance. None of the streaming
+  execution surfaces in the mockups -- the live graph, the execution timeline,
+  the streaming log -- exist yet
+Next-safe-step: Drive each newly live control in a browser test against a real
+  coordinator, then build the execution surfaces the mockups show
+
 Dev-Log: DL-20260801-006
 Date: 2026-08-01
 Status: Complete for the two blockers and the typographic reset; the control

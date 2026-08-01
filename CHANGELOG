@@ -30,6 +30,36 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-007
+Date: 2026-08-01
+Type: Interface composition, drawn icon set, and live review decisions
+Request-or-TODO: AUDIT-024; user direction to make the interface much better
+  after visual inspection of the running server
+Outcome: Replaced every Unicode glyph used as an icon with a drawn set,
+  rebuilt the application bar so its controls fit and stay legible, rebuilt the
+  first-run steps as single coherent cards, and connected the four review
+  decisions to the coordinator that already implements them
+Affected-behavior: The application bar previously truncated its context chips
+  to two characters -- "co", "m", "uncom", "provid" -- because a slogan and a
+  cost readout shared a track with them; the slogan is gone, the readout moved
+  in with the session state, and every chip now shows its full label at one
+  height. Navigation, context, and control icons are drawn rather than typed,
+  so they render at one weight instead of six. A first-run step is one card
+  carrying its position, name, state, meaning, and action, replacing a tall box
+  with a heading and a lot of nothing. Accept, request repair, reject, and
+  rollback are dispatchable where the review material is loaded; they were
+  presented as permanently unavailable against a server that implements all
+  four
+Compatibility-or-migration: No schema change. primitives.ButtonProps gains an
+  Icon field; headerIconButton and its ID variant now take an IconName;
+  bindAuthoritativeTimelineActions takes a review decision binder
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass. The result
+  was inspected in a real browser at each step and rebuilt against the running
+  server between passes
+Dev-Log: DL-20260801-007
+
 Change-ID: CL-20260801-006
 Date: 2026-08-01
 Type: Frontend asset pipeline, worker launch, and typographic direction
