@@ -24,6 +24,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-011
+Date: 2026-08-01
+Status: Three of the four RPCs serve; OpenWorkspace refuses by design
+Change-ID: CL-20260801-011
+Request-or-TODO: AUDIT-010, AUDIT-016
+Goal: Make the last unregistered service reachable
+Assumptions: A picker reads; it does not grant authority. Everything a
+  repository summary carries has to be safe for a client to hold
+Decisions: Refuse OpenWorkspace rather than half-implement it. Opening a
+  workspace grants a coordinator authority to read and change a directory
+  somebody named, and the durable approval identity that decision needs does
+  not exist yet; returning a workspace would be the coordinator claiming an
+  authority nobody granted. Carry no absolute path in any view: a path in a
+  response is a path a client could act on. Name a repository by its own
+  directory rather than by its whole path, because a picker showing four
+  absolute paths differing in their last segment is unreadable. Bound the list
+  at two hundred, ordered by canonical path: somebody choosing a repository is
+  looking for a name they know, not the one they added most recently
+Files-or-schemas: internal/transport/workspace_service and its tests;
+  internal/storage ListRepositories; internal/coordinator registration
+Validation: Full build, js/wasm build, vet, gofmt, the complete suite, lint,
+  and the repository checks pass. A compile-time assertion binds the concrete
+  repositories to the narrow surface, so the service cannot drift from what
+  storage offers
+Failures-or-discarded-approaches: None in this change
+Known-limitations: OpenWorkspace refuses until a durable repository approval
+  exists, which is AUDIT-011's subject. The workspace view reports no observed
+  time, because the workspace scope storage returns does not carry one
+Next-safe-step: Record a durable repository approval bound to project,
+  revision, scope, and consumption, then let OpenWorkspace consume it
+
 Dev-Log: DL-20260801-010
 Date: 2026-08-01
 Status: Complete for a single-platform release; cross-platform binaries,

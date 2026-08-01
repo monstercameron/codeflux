@@ -30,6 +30,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-011
+Date: 2026-08-01
+Type: Workspace service registration
+Request-or-TODO: AUDIT-010 and AUDIT-016
+Outcome: Implemented and registered WorkspaceService, and added the repository
+  listing it reads
+Affected-behavior: The repository picker, the workspace state surface, and the
+  repository inspection surface are reachable. Every call to WorkspaceService
+  previously returned Unimplemented because the service was declared in the API
+  and never registered, against a coordinator that held the data for all three.
+  Inspection now warns about a repository with no recorded Git identity, whose
+  changes cannot be bound to a base revision, and about a non-absolute recorded
+  path, which resolves differently depending on where the coordinator started
+Compatibility-or-migration: No schema change. storage gains ListRepositories,
+  bounded at 200 and ordered by canonical path
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`, and the
+  repository checks pass
+Dev-Log: DL-20260801-011
+
 Change-ID: CL-20260801-010
 Date: 2026-08-01
 Type: Self-contained release build

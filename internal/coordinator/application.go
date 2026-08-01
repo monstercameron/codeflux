@@ -514,6 +514,15 @@ func StartApplication(
 	codefluxv1.RegisterSettingsServiceServer(application.taskServer, settingsService)
 	codefluxv1.RegisterGraphServiceServer(application.taskServer, graphService)
 	codefluxv1.RegisterReviewServiceServer(application.taskServer, reviewService)
+	// The workspace service was declared in the API and never registered, so
+	// every call to it returned Unimplemented: the repository picker, the
+	// workspace state, and the inspection surface were all unreachable against
+	// a coordinator that had the data for each.
+	workspaceService, err := transport.NewWorkspaceService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	codefluxv1.RegisterWorkspaceServiceServer(application.taskServer, workspaceService)
 	application.taskServeDone = make(chan error, 1)
 	go func() {
 		application.taskServeDone <- application.taskServer.Serve(

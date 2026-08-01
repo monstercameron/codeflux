@@ -175,3 +175,60 @@ func repositoryWriteError(operation string, err error) error {
 	}
 	return classify(operation, err)
 }
+
+// MaximumRepositoryPage bounds one page of repositories.
+//
+// A list with no bound is a list that eventually returns everything at once,
+// which for a workspace picker means a page that takes longer to render the
+// longer somebody has used the product.
+const MaximumRepositoryPage = 200
+
+// ListRepositories returns the repositories a workspace picker can offer.
+//
+// Ordering is by canonical path rather than by creation time: a person
+// choosing a repository is looking for a name they know, not for the one they
+// added most recently.
+func (repositories *Repositories) ListRepositories(
+	ctx context.Context,
+	limit int,
+) ([]Repository, error) {
+	if limit <= 0 || limit > MaximumRepositoryPage {
+		limit = MaximumRepositoryPage
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		`SELECT id, project_id, canonical_path, git_identity,
+		        created_at_unix_micros, updated_at_unix_micros, revision
+		 FROM repositories
+		 WHERE deleted_at_unix_micros IS NULL
+		 ORDER BY canonical_path, id
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, classify("list repositories", err)
+	}
+	defer rows.Close()
+
+	listed := make([]Repository, 0, limit)
+	for rows.Next() {
+		var (
+			repository    Repository
+			createdMicros int64
+			updatedMicros int64
+		)
+		if err := rows.Scan(
+			&repository.ID, &repository.ProjectID, &repository.CanonicalPath,
+			&repository.GitIdentity, &createdMicros, &updatedMicros, &repository.Revision,
+		); err != nil {
+			return nil, classify("list repositories", err)
+		}
+		repository.CreatedAt = repositoryTime(createdMicros)
+		repository.UpdatedAt = repositoryTime(updatedMicros)
+		listed = append(listed, repository)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("list repositories", err)
+	}
+	return listed, nil
+}
