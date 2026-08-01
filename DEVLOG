@@ -24,6 +24,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-010
+Date: 2026-08-01
+Status: Complete for a single-platform release; cross-platform binaries,
+  checksums, and signing are not built
+Change-ID: CL-20260801-010
+Request-or-TODO: AUDIT-021, AUDIT-030, and the single-command part of
+  AUDIT-003
+Goal: Produce something a person can be handed, and prove it by handing it to
+  an empty directory
+Assumptions: The client belongs in the executable rather than in history. It
+  is tens of megabytes and changes with every frontend edit; committing it
+  would make every visual change a binary commit
+Decisions: Stage the built assets into the embed directory, build, and remove
+  them, rather than committing them or generating a Go file full of bytes.
+  Bound the removal by construction: nothing outside the embed directory can
+  be removed whatever the caller passes, because that step deletes files from
+  a source tree. Refuse to stage an empty client -- it passes an existence
+  check and produces an executable that starts, serves a page, and fails in
+  the browser. Verify generated output before building anything, so a release
+  can never carry a contract that disagrees with its source
+Files-or-schemas: cmd/codeflux-dev/release_build and its registry entry;
+  cmd/codeflux-dev/frontend_assets_test;
+  internal/frontendtest/production_console_test
+Validation: The release was built and run. Its executable, copied outside the
+  repository into an empty directory and started with no asset flag, served
+  the console and reported the assets as compiled in. The browser loaded it
+  with no console error and made no off-machine request
+Failures-or-discarded-approaches: None in this change
+Known-limitations: One platform, the host's. There are no cross-platform
+  binaries, no checksums, no signatures, and no install into a clean profile,
+  so AUDIT-030 is only partly closed. The release is not reproducible in the
+  strict sense: it has not been built twice and compared
+Next-safe-step: Cross-compile the declared platforms from one invocation and
+  checksum the results, then compare two builds of the same revision
+
 Dev-Log: DL-20260801-009
 Date: 2026-08-01
 Status: Complete

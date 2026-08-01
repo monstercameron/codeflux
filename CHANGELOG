@@ -30,6 +30,31 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-010
+Date: 2026-08-01
+Type: Self-contained release build
+Request-or-TODO: AUDIT-021, AUDIT-030, and the part of AUDIT-003 covering one
+  command that produces everything
+Outcome: Added `codeflux-dev release`, which verifies generated output, builds
+  the browser client, compiles it into the executable, and produces
+  self-contained binaries; added the end-to-end proof that one such executable,
+  alone in an empty directory, serves the whole console
+Affected-behavior: A released `codeflux start` reports "serving the interface
+  from compiled into this executable" and needs nothing beside it. Previously
+  web/assets/static held only a README, so nothing was ever embedded and the
+  release path validated synthetic artifacts
+Compatibility-or-migration: No schema change. The compiled client is staged
+  into web/assets/static during the build and removed afterwards, so the source
+  tree is unchanged and the tens-of-megabytes client never enters history
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass. A release was
+  built, its executable copied to an empty directory outside the repository,
+  and started with no asset flag: index, runtime shim, 36 MB client, and
+  bootstrap all served, the client mounted in headless Chromium with no error,
+  and nothing was fetched from off the machine
+Dev-Log: DL-20260801-010
+
 Change-ID: CL-20260801-009
 Date: 2026-08-01
 Type: Disabled-control accountability and control coverage

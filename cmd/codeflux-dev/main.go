@@ -99,6 +99,8 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runBuild(ctx, stdout, stderr, invocation)
 	case "build-frontend":
 		return runBuildFrontend(ctx, stdout, stderr, invocation)
+	case "release":
+		return runRelease(ctx, stdout, stderr, invocation)
 	case "serve":
 		return runServe(ctx, stdout, stderr, invocation)
 	case "build-spike":

@@ -511,3 +511,103 @@ func numericValue(value any) float64 {
 		return 0
 	}
 }
+
+// TestASelfContainedExecutableServesItsOwnInterface is the release proof.
+//
+// It builds through `codeflux-dev release`, copies the single executable into
+// an otherwise empty directory, starts it with no asset flag, and loads the
+// console. This is what distinguishes something a person can be handed from a
+// development checkout: the assets are inside the binary, and the browser
+// fetches nothing from off the machine.
+func TestASelfContainedExecutableServesItsOwnInterface(t *testing.T) {
+	if os.Getenv(productionConsoleEnvironment) == "" {
+		t.Skipf("set %s=1 to run the end-to-end console suite", productionConsoleEnvironment)
+	}
+	repository := repositoryRootForConsole(t)
+	release := exec.CommandContext(t.Context(), "go", "run", "./cmd/codeflux-dev", "release")
+	release.Dir = repository
+	if output, err := release.CombinedOutput(); err != nil {
+		t.Skipf("cannot build a release in this environment: %v\n%s", err, output)
+	}
+
+	name := "codeflux"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	// The executable is copied out of the repository entirely, so nothing it
+	// finds beside it could be mistaken for a compiled-in asset.
+	isolated := t.TempDir()
+	executable := filepath.Join(isolated, name)
+	source, err := os.ReadFile(filepath.Join(repository, ".artifacts", "release", name))
+	if err != nil {
+		t.Fatalf("read the released executable: %v", err)
+	}
+	if err := os.WriteFile(executable, source, 0o700); err != nil {
+		t.Fatalf("place the released executable: %v", err)
+	}
+
+	port := freeLoopbackPort(t)
+	address := fmt.Sprintf("127.0.0.1:%d", port)
+	ctx, cancel := context.WithCancel(context.Background())
+	// No --assets. That absence is the whole point.
+	command := exec.CommandContext(ctx, executable,
+		"start", "--no-browser",
+		"--database", filepath.Join(isolated, "codeflux.sqlite3"),
+		"--address", address,
+	)
+	command.Dir = isolated
+	output := &syncBuffer{}
+	command.Stdout = output
+	command.Stderr = output
+	if err := command.Start(); err != nil {
+		cancel()
+		t.Fatalf("start the released executable: %v", err)
+	}
+	t.Cleanup(func() {
+		cancel()
+		_ = command.Wait()
+	})
+
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) && !strings.Contains(output.String(), "codeflux is running at") {
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !strings.Contains(output.String(), "codeflux is running at") {
+		t.Fatalf("the released executable never served:\n%s", output.String())
+	}
+	// It must say the assets came from inside itself, not from a directory it
+	// happened to find.
+	if !strings.Contains(output.String(), "compiled into this executable") {
+		t.Fatalf("the release served assets from outside itself:\n%s", output.String())
+	}
+
+	pw, err := playwright.Run()
+	if err != nil {
+		t.Fatalf("start playwright: %v", err)
+	}
+	t.Cleanup(func() { _ = pw.Stop() })
+	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
+		Headless: playwright.Bool(true),
+	})
+	if err != nil {
+		t.Fatalf("launch chromium: %v", err)
+	}
+	t.Cleanup(func() { _ = browser.Close() })
+
+	page, problems, external := openConsolePage(t, browser, "http://"+address+"/")
+	if err := page.Locator(`[data-testid="app-root"]`).WaitFor(
+		playwright.LocatorWaitForOptions{
+			State: playwright.WaitForSelectorStateAttached, Timeout: playwright.Float(60000),
+		},
+	); err != nil {
+		t.Fatalf("the released client never mounted: %v", err)
+	}
+	if len(*problems) > 0 {
+		t.Errorf("the released client mounted with %d error(s):\n%s",
+			len(*problems), strings.Join(*problems, "\n"))
+	}
+	if len(*external) > 0 {
+		t.Errorf("the released console requested %d off-machine resource(s):\n%s",
+			len(*external), strings.Join(*external, "\n"))
+	}
+}
