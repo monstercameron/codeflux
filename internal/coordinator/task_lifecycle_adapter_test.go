@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestLifecycleAdapterCreatesAForecastedTaskFromARequirement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := NewTaskLifecycleAdapter(preflight, repositories)
+	adapter, err := NewTaskLifecycleAdapter(preflight, repositories, &recordingRunLauncher{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func TestLifecycleAdapterRefusesStartWithoutAnApprovedPreflight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := NewTaskLifecycleAdapter(preflight, repositories)
+	adapter, err := NewTaskLifecycleAdapter(preflight, repositories, &recordingRunLauncher{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +123,7 @@ func TestLifecycleAdapterRejectsUndeclaredTaskShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter, err := NewTaskLifecycleAdapter(preflight, repositories)
+	adapter, err := NewTaskLifecycleAdapter(preflight, repositories, &recordingRunLauncher{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,12 +141,22 @@ func TestLifecycleAdapterRejectsUndeclaredTaskShape(t *testing.T) {
 // TestLifecycleAdapterRequiresItsDependencies keeps a half-constructed
 // adapter from reporting success.
 func TestLifecycleAdapterRequiresItsDependencies(t *testing.T) {
-	if _, err := NewTaskLifecycleAdapter(nil, nil); err == nil {
+	if _, err := NewTaskLifecycleAdapter(nil, nil, nil); err == nil {
 		t.Fatal("an adapter with no preflight service must be rejected")
 	}
 	var store taskLifecycleStore
-	if _, err := NewTaskLifecycleAdapter(&TaskPreflightService{}, store); err == nil {
+	if _, err := NewTaskLifecycleAdapter(
+		&TaskPreflightService{}, store, &recordingRunLauncher{},
+	); err == nil {
 		t.Fatal("an adapter with no store must be rejected")
+	}
+	// An adapter with no launcher would record that a run started and start
+	// nothing, which is the exact defect this argument was added to prevent.
+	repositories, _ := mustOpenRetrievalRepositories(t)
+	if _, err := NewTaskLifecycleAdapter(
+		&TaskPreflightService{}, repositories, nil,
+	); err == nil {
+		t.Fatal("an adapter with no run launcher must be rejected")
 	}
 }
 
@@ -154,3 +165,140 @@ var _ transport.TaskLifecycleApplication = (*TaskLifecycleAdapter)(nil)
 
 // compile-time proof the concrete repositories satisfy the narrow store.
 var _ taskLifecycleStore = (*storage.Repositories)(nil)
+
+// TestStartingATaskAsksForAWorker is the regression guard for the defect this
+// path was built to fix.
+//
+// StartPreparedTask used to record a run and return. The task read as running,
+// no subprocess existed, and no provider request was ever made. Asserting the
+// recorded launch — not just the returned state — is what makes that
+// impossible to reintroduce, because the state was correct even when nothing
+// ran.
+func TestStartingATaskAsksForAWorker(t *testing.T) {
+	ctx := context.Background()
+	repositories, retrievalService := mustOpenRetrievalRepositories(t)
+	preflightService, err := NewTaskPreflightService(repositories, retrievalService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	launcher := &recordingRunLauncher{}
+	adapter, err := NewTaskLifecycleAdapter(preflightService, repositories, launcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread := mustIntakeFixtureThread(t, repositories)
+
+	created, err := adapter.CreateTaskFromRequirement(ctx, transport.CreateTaskCommand{
+		ThreadID:                 thread.ID,
+		Requirement:              "Add a readiness probe.",
+		TaskClass:                string(fingerprint.TaskClassFeature),
+		RepositoryRevision:       strings.Repeat("a", 40),
+		BaselineModelRevision:    "fixture-model-2026-08-01",
+		ToolConfigurationVersion: "tools-v1",
+		ValidationProfileVersion: "profile-v1",
+		AffectedPackages:         []string{"internal/server"},
+		IdempotencyKey:           "launch-assert-create",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyRevision := driveTaskToReady(t, repositories, created.TaskID, created.Revision)
+	preflight, err := preflightService.BindExecution(
+		ctx, created.TaskID, readyRevision,
+		ForecastedTask{
+			Policy:   storage.ExecutionPolicyRevision{Revision: created.PolicyRevision},
+			Forecast: storage.EffortForecastRevision{Revision: created.ForecastRevision},
+		},
+		"launch-assert-bind",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := adapter.StartPreparedTask(ctx, transport.StartTaskCommand{
+		TaskID:            created.TaskID,
+		ExpectedRevision:  readyRevision,
+		PreflightRevision: preflight.Revision,
+		IdempotencyKey:    "launch-assert-start",
+	}); err != nil {
+		t.Fatalf("starting the approved task failed: %v", err)
+	}
+
+	recorded := launcher.recorded()
+	if len(recorded) != 1 {
+		t.Fatalf("start asked for %d worker(s), want exactly 1", len(recorded))
+	}
+	launch := recorded[0]
+	if launch.TaskID != created.TaskID {
+		t.Errorf("launched task = %s, want %s", launch.TaskID, created.TaskID)
+	}
+	if launch.RunID.IsZero() {
+		t.Error("the launch carries no run identity")
+	}
+	if launch.PolicyRevision != created.PolicyRevision {
+		t.Errorf("launched policy revision = %d, want the approved %d",
+			launch.PolicyRevision, created.PolicyRevision)
+	}
+	// The provider comes from the reviewed policy, not from a current default:
+	// a run approved against one provider must not be queued against another.
+	if launch.ProviderKey == "" {
+		t.Error("the launch names no provider, so the queue cannot schedule it")
+	}
+}
+
+// TestAFailedLaunchIsReportedNotSwallowed keeps a start that could not run
+// from reading as a success.
+func TestAFailedLaunchIsReportedNotSwallowed(t *testing.T) {
+	ctx := context.Background()
+	repositories, retrievalService := mustOpenRetrievalRepositories(t)
+	preflightService, err := NewTaskPreflightService(repositories, retrievalService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	launcher := &recordingRunLauncher{err: errors.New("no worker executable")}
+	adapter, err := NewTaskLifecycleAdapter(preflightService, repositories, launcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread := mustIntakeFixtureThread(t, repositories)
+
+	created, err := adapter.CreateTaskFromRequirement(ctx, transport.CreateTaskCommand{
+		ThreadID:                 thread.ID,
+		Requirement:              "Add a readiness probe.",
+		TaskClass:                string(fingerprint.TaskClassFeature),
+		RepositoryRevision:       strings.Repeat("b", 40),
+		BaselineModelRevision:    "fixture-model-2026-08-01",
+		ToolConfigurationVersion: "tools-v1",
+		ValidationProfileVersion: "profile-v1",
+		AffectedPackages:         []string{"internal/server"},
+		IdempotencyKey:           "launch-failure-create",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyRevision := driveTaskToReady(t, repositories, created.TaskID, created.Revision)
+	preflight, err := preflightService.BindExecution(
+		ctx, created.TaskID, readyRevision,
+		ForecastedTask{
+			Policy:   storage.ExecutionPolicyRevision{Revision: created.PolicyRevision},
+			Forecast: storage.EffortForecastRevision{Revision: created.ForecastRevision},
+		},
+		"launch-failure-bind",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = adapter.StartPreparedTask(ctx, transport.StartTaskCommand{
+		TaskID:            created.TaskID,
+		ExpectedRevision:  readyRevision,
+		PreflightRevision: preflight.Revision,
+		IdempotencyKey:    "launch-failure-start",
+	})
+	if err == nil {
+		t.Fatal("a start whose worker never launched was reported as success")
+	}
+	if !strings.Contains(err.Error(), "worker did not start") {
+		t.Errorf("the error does not say what failed: %v", err)
+	}
+}

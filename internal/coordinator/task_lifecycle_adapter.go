@@ -2,10 +2,14 @@ package coordinator
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/fingerprint"
+	"codeflux.dev/codeflux/internal/policy"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
 )
@@ -20,6 +24,22 @@ import (
 type TaskLifecycleAdapter struct {
 	preflight *TaskPreflightService
 	store     taskLifecycleStore
+	launcher  RunLauncher
+}
+
+// RunLauncher starts the subprocess that executes one prepared run.
+//
+// It is an interface so a caller that only exercises durable state can supply
+// a recording double, and so the adapter cannot reach past it into process
+// management.
+type RunLauncher interface {
+	Launch(
+		ctx context.Context,
+		taskID domain.TaskID,
+		runID domain.RunID,
+		policyRevision uint64,
+		providerKey string,
+	) error
 }
 
 // taskLifecycleStore is the narrow read/write surface starting a task needs
@@ -27,12 +47,19 @@ type TaskLifecycleAdapter struct {
 type taskLifecycleStore interface {
 	GetTask(context.Context, domain.TaskID) (storage.Task, error)
 	GetTaskExecutionPreflight(context.Context, domain.TaskID, uint64) (storage.ExecutionPreflight, error)
+	GetTaskExecutionPolicy(context.Context, domain.TaskID, uint64) (storage.ExecutionPolicyRevision, error)
 }
 
 // NewTaskLifecycleAdapter builds the adapter.
+//
+// launcher is required. An adapter without one records that a run started and
+// then starts nothing, which is exactly the failure this argument exists to
+// make impossible to reintroduce: the task read as running, no subprocess ever
+// existed, and no provider request was ever made.
 func NewTaskLifecycleAdapter(
 	preflight *TaskPreflightService,
 	store taskLifecycleStore,
+	launcher RunLauncher,
 ) (*TaskLifecycleAdapter, error) {
 	if preflight == nil {
 		return nil, errors.New("task preflight service must not be nil")
@@ -40,7 +67,12 @@ func NewTaskLifecycleAdapter(
 	if store == nil {
 		return nil, errors.New("task lifecycle store must not be nil")
 	}
-	return &TaskLifecycleAdapter{preflight: preflight, store: store}, nil
+	if launcher == nil {
+		return nil, errors.New(
+			"a run launcher is required; without one, starting a task would record a run " +
+				"and execute nothing")
+	}
+	return &TaskLifecycleAdapter{preflight: preflight, store: store, launcher: launcher}, nil
 }
 
 // CreateTaskFromRequirement turns a submitted requirement into a forecasted
@@ -115,6 +147,24 @@ func (adapter *TaskLifecycleAdapter) StartPreparedTask(
 	}); err != nil {
 		return transport.TaskControlView{}, err
 	}
+	// The run is durable before the subprocess exists. A crash between the two
+	// leaves a row RecoverUnownedTaskRuns can see and reconcile, which is a
+	// state somebody can act on; the reverse order would leave a running
+	// process nobody recorded.
+	providerKey, err := adapter.providerKeyForPolicy(ctx, command.TaskID, preflight.PolicyRevision)
+	if err != nil {
+		return transport.TaskControlView{}, err
+	}
+	if err := adapter.launcher.Launch(
+		ctx, command.TaskID, runID, preflight.PolicyRevision, providerKey,
+	); err != nil {
+		// The failure is reported rather than swallowed. The run row stays, and
+		// the recovery path owns it: a task that reads as started while nothing
+		// runs is the condition this whole path exists to prevent.
+		return transport.TaskControlView{}, fmt.Errorf(
+			"the run was recorded but its worker did not start: %w", err)
+	}
+
 	started, err := adapter.store.GetTask(ctx, command.TaskID)
 	if err != nil {
 		return transport.TaskControlView{}, err
@@ -125,4 +175,29 @@ func (adapter *TaskLifecycleAdapter) StartPreparedTask(
 		Revision:  started.Revision,
 		UpdatedAt: started.UpdatedAt,
 	}, nil
+}
+
+// providerKeyForPolicy reads the provider the approved policy named.
+//
+// The provider comes from the policy revision that was reviewed, not from a
+// current default. A run that was approved against one provider must not be
+// queued against another because a preference changed in between.
+func (adapter *TaskLifecycleAdapter) providerKeyForPolicy(
+	ctx context.Context,
+	taskID domain.TaskID,
+	policyRevision uint64,
+) (string, error) {
+	record, err := adapter.store.GetTaskExecutionPolicy(ctx, taskID, policyRevision)
+	if err != nil {
+		return "", fmt.Errorf("read the approved execution policy: %w", err)
+	}
+	var snapshot policy.Snapshot
+	if err := json.Unmarshal([]byte(record.CanonicalJSON), &snapshot); err != nil {
+		return "", fmt.Errorf("decode the approved execution policy: %w", err)
+	}
+	key := strings.TrimSpace(snapshot.Model.Provider.Provider)
+	if key == "" {
+		return "", errors.New("the approved execution policy names no provider")
+	}
+	return key, nil
 }

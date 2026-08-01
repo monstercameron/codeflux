@@ -217,6 +217,7 @@ func statePanel(component, role, title, body, actionLabel string, mode Mode, onA
 	tokens := mode.Tokens()
 	children := []ui.Node{html.H2(html.Props{
 		Class: css.New(
+			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.Margin(css.Zero),
 			css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
 			css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),

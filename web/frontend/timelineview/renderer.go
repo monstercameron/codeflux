@@ -233,7 +233,7 @@ func invalidCard(mode primitives.Mode, err error) ui.Node {
 		Data:  map[string]string{"component": "timeline-card", "card-kind": "invalid", "status": "invalid"},
 		Class: cardClass(mode.Tokens(), design.StatusWarning, true, false),
 	},
-		html.H2(html.Props{}, html.Text("Timeline item unavailable")),
+		html.H2(html.Props{Class: design.HeadingClass(mode.Tokens(), design.HeadingSection)}, html.Text("Timeline item unavailable")),
 		html.P(html.Props{}, html.Text("This item could not be presented safely.")),
 		html.Details(html.Props{},
 			html.Summary(html.Props{}, html.Text("Diagnostic detail")),
@@ -343,11 +343,18 @@ func eyebrowClass(tokens design.Tokens) string {
 	).String()
 }
 
+// titleClass names a typed timeline card: Forecast, Plan, Execution,
+// Validation, Evidence.
+//
+// The card names a kind of claim, so it takes the serif with the claim itself
+// rather than the sans used for the controls beside it.
 func titleClass(tokens design.Tokens) string {
-	return css.New(
-		css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
-		css.LineHeightLen(css.Px(tokens.Typography.PanelHeading.LineHeight)),
-		css.FontWeight.Semibold,
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Margin(css.Zero),
+		css.Font(css.FontStack(tokens.Fonts.Display)),
+		css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+		css.FontWeight.Normal,
 	).String()
 }
 

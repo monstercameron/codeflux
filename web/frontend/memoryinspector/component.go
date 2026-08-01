@@ -1100,11 +1100,11 @@ func sectionClass(tokens design.Tokens) string {
 }
 
 func sectionHeadingClass(tokens design.Tokens) string {
-	return css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)), css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)), css.FontWeight.Semibold).String()
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))), css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)), css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)), css.FontWeight.Semibold).String()
 }
 
 func subheadingClass(tokens design.Tokens) string {
-	return css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.CompactBody.Size)), css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)), css.FontWeight.Semibold).String()
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))), css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.CompactBody.Size)), css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)), css.FontWeight.Semibold).String()
 }
 
 func secondaryTextClass(tokens design.Tokens) string {
@@ -1156,5 +1156,5 @@ func filterRowClass(tokens design.Tokens) string {
 }
 
 func filterHeadingClass(tokens design.Tokens) string {
-	return css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.Metadata.Size)), css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)), css.FontWeight.Semibold).String()
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))), css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.Metadata.Size)), css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)), css.FontWeight.Semibold).String()
 }

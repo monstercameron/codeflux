@@ -62,6 +62,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkAtomDocumentationObligations(root, tracked); err != nil {
 		return err
 	}
+	if err := checkHeadingContrast(root, tracked); err != nil {
+		return err
+	}
 	if err := checkPackageDependencies(root, tracked); err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/shortcuts"
@@ -165,6 +166,7 @@ type ShortcutHelpDialogProps struct {
 // ShortcutHelpDialog renders the accessible help model through GWC's modal
 // overlay primitive.
 func ShortcutHelpDialog(props ShortcutHelpDialogProps) ui.Node {
+	tokens := props.Mode.Tokens()
 	model := shortcuts.DefaultPolicy().HelpDialog(props.Platform)
 	groups := make([]ui.Node, 0, len(model.Groups))
 	for _, group := range model.Groups {
@@ -178,12 +180,12 @@ func ShortcutHelpDialog(props ShortcutHelpDialogProps) ui.Node {
 			))
 		}
 		groups = append(groups, html.Section(html.Props{Aria: map[string]string{"labelledby": group.ID}},
-			html.H3(html.Props{ID: group.ID, Text: group.Heading}),
+			html.H3(html.Props{Class: design.HeadingClass(tokens, design.HeadingPanel), ID: group.ID, Text: group.Heading}),
 			html.Ul(html.Props{}, entries...),
 		))
 	}
 	content := html.Div(html.Props{},
-		html.H2(html.Props{ID: model.TitleID, Text: model.Title}),
+		html.H2(html.Props{Class: design.HeadingClass(tokens, design.HeadingSection), ID: model.TitleID, Text: model.Title}),
 		html.P(html.Props{ID: model.DescriptionID, Text: model.Description}),
 		html.Div(html.Props{}, groups...),
 		primitives.Button(primitives.ButtonProps{

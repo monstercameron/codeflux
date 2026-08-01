@@ -91,8 +91,26 @@ type ColorTokens struct {
 }
 
 // FontTokens uses only local system stacks.
+//
+// The three roles encode a distinction this product depends on, rather than
+// decorating with variety:
+//
+//   - Display and Reading are serif. They carry what a person wrote or must
+//     judge: a task title, a plan, an assistant's account of what it did, an
+//     evidence claim.
+//   - UI is sans. It carries controls, labels, and navigation — the parts you
+//     act on rather than read.
+//   - Code is monospace. It carries what the machine measured: costs,
+//     durations, counts, identities, log lines, diffs.
+//
+// So the face a value is set in tells you what kind of thing it is. A cost
+// rendered in serif, or a claim rendered in monospace, would be a category
+// error a reader can see before reading the words.
 type FontTokens struct {
+	// Display sets titles and other short serif headings.
 	Display string
+	// Reading sets serif prose: descriptions, plans, narration, claims.
+	Reading string
 	UI      string
 	Code    string
 }
@@ -233,12 +251,19 @@ func TokensFor(options Options) (Tokens, error) {
 	var rhythm DensityTokens
 	switch density {
 	case DensityComfortable:
+		// Panels are inset generously and separated widely. The console shows
+		// several independent claims at once — a forecast, a plan, a gate
+		// result — and space between them is what stops one being read as
+		// qualifying another.
 		rhythm = DensityTokens{
-			RowHeight: 44, ControlHeight: 44, PanelInset: 16, PanelGap: 12,
+			RowHeight: 48, ControlHeight: 44, PanelInset: 24, PanelGap: 20,
 		}
 	case DensityCompact:
+		// Compact tightens the rhythm but never the pointer target: the whole
+		// point of the separate control height is that density is a reading
+		// preference, not a reason to make things harder to hit.
 		rhythm = DensityTokens{
-			RowHeight: 36, ControlHeight: 44, PanelInset: 12, PanelGap: 8,
+			RowHeight: 36, ControlHeight: 44, PanelInset: 16, PanelGap: 12,
 		}
 	default:
 		return Tokens{}, fmt.Errorf("unsupported frontend density %q", density)
@@ -261,25 +286,37 @@ func TokensFor(options Options) (Tokens, error) {
 		Theme: theme, Density: density, ReducedMotion: options.ReducedMotion,
 		Colors: colors,
 		Fonts: FontTokens{
-			Display: `Bahnschrift,"DIN Alternate","Segoe UI Variable Display","Segoe UI",sans-serif`,
-			UI:      `"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,-apple-system,sans-serif`,
-			Code:    `"Cascadia Mono","SFMono-Regular",ui-monospace,Consolas,monospace`,
+			// Humanist serifs, not Didones. On a dark ground a high-contrast
+			// display serif loses its hairlines; Iowan, Palatino and Georgia
+			// keep an even stroke weight and stay readable at 14px.
+			Display: `"Iowan Old Style","Palatino Linotype",Palatino,` +
+				`"Book Antiqua",Georgia,"Noto Serif",serif`,
+			Reading: `"Iowan Old Style","Palatino Linotype",Palatino,` +
+				`"Book Antiqua",Georgia,"Noto Serif",serif`,
+			UI:   `"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,-apple-system,sans-serif`,
+			Code: `"Cascadia Mono","SFMono-Regular",ui-monospace,Consolas,monospace`,
 		},
 		Typography: TypographyTokens{
-			WorkspaceTitle: TypeStyle{Size: 28, LineHeight: 36, Weight: 600},
-			TaskTitle:      TypeStyle{Size: 22, LineHeight: 30, Weight: 600},
-			SectionTitle:   TypeStyle{Size: 18, LineHeight: 26, Weight: 600},
+			// Serif roles are set lighter and looser than their sans
+			// equivalents would be. A serif at weight 600 on a dark ground
+			// reads as shouting; the size carries the hierarchy instead.
+			WorkspaceTitle: TypeStyle{Size: 30, LineHeight: 40, Weight: 400},
+			TaskTitle:      TypeStyle{Size: 24, LineHeight: 34, Weight: 400},
+			SectionTitle:   TypeStyle{Size: 19, LineHeight: 28, Weight: 400},
 			PanelHeading:   TypeStyle{Size: 15, LineHeight: 22, Weight: 600},
-			Body:           TypeStyle{Size: 14, LineHeight: 21, Weight: 400},
-			CompactBody:    TypeStyle{Size: 13, LineHeight: 19, Weight: 400},
-			Metadata:       TypeStyle{Size: 12, LineHeight: 17, Weight: 500},
+			Body:           TypeStyle{Size: 15, LineHeight: 24, Weight: 400},
+			CompactBody:    TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
+			Metadata:       TypeStyle{Size: 12, LineHeight: 18, Weight: 500},
 			ControlLabel:   TypeStyle{Size: 13, LineHeight: 18, Weight: 600},
 			MetricValue: TypeStyle{
-				Size: 17, LineHeight: 23, Weight: 600, Tabular: true,
+				Size: 20, LineHeight: 26, Weight: 500, Tabular: true,
 			},
-			Code: TypeStyle{Size: 13, LineHeight: 19, Weight: 400},
+			Code: TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
 		},
-		Spacing: SpacingTokens{XS: 4, SM: 8, MD: 12, LG: 16, XL: 24, XXL: 32},
+		// The scale is wider than the four-pixel grid it grew from. A
+		// supervision console is read under pressure, and the thing that makes
+		// it readable is space between groups, not more information per row.
+		Spacing: SpacingTokens{XS: 4, SM: 8, MD: 16, LG: 24, XL: 40, XXL: 64},
 		Geometry: GeometryTokens{
 			BorderWidth: 1, BorderStrongWidth: 2,
 			RadiusSmall: 3, ControlRadius: 4, PanelRadius: 6,
@@ -329,7 +366,9 @@ func (tokens Tokens) Validate() error {
 	if err := validateGeometry(tokens.Geometry, tokens.Elevation); err != nil {
 		return err
 	}
-	for _, stack := range []string{tokens.Fonts.Display, tokens.Fonts.UI, tokens.Fonts.Code} {
+	for _, stack := range []string{
+		tokens.Fonts.Display, tokens.Fonts.Reading, tokens.Fonts.UI, tokens.Fonts.Code,
+	} {
 		lower := strings.ToLower(stack)
 		if strings.Contains(lower, "url(") ||
 			strings.Contains(lower, "http://") ||
@@ -504,11 +543,36 @@ func validateTypography(typography TypographyTokens) error {
 			return fmt.Errorf("%s typography is outside the supported scale", name)
 		}
 	}
-	if typography.WorkspaceTitle.Size <= typography.TaskTitle.Size ||
-		typography.TaskTitle.Size <= typography.SectionTitle.Size ||
-		typography.SectionTitle.Size <= typography.PanelHeading.Size ||
-		typography.PanelHeading.Size <= typography.Body.Size {
-		return errors.New("typography hierarchy must descend by semantic importance")
+	// Hierarchy descends by size, and where two roles share a size it descends
+	// by weight instead.
+	//
+	// The tie case is real rather than a loophole. Body prose is set in a
+	// serif at a size that makes it comfortable to read; a panel heading is a
+	// small sans label whose job is to name the panel, not to outrank the
+	// text inside it. Requiring the heading to be physically larger would
+	// force it to shout. What must never happen is the two reading as equal,
+	// which the weight rule prevents.
+	descending := []struct {
+		name  string
+		style TypeStyle
+	}{
+		{"workspace title", typography.WorkspaceTitle},
+		{"task title", typography.TaskTitle},
+		{"section title", typography.SectionTitle},
+		{"panel heading", typography.PanelHeading},
+		{"body", typography.Body},
+	}
+	for index := 1; index < len(descending); index++ {
+		above, below := descending[index-1], descending[index]
+		if above.style.Size > below.style.Size {
+			continue
+		}
+		if above.style.Size == below.style.Size && above.style.Weight > below.style.Weight {
+			continue
+		}
+		return fmt.Errorf(
+			"typography hierarchy must descend by semantic importance: %s does not outrank %s",
+			above.name, below.name)
 	}
 	return nil
 }

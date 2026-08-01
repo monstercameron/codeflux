@@ -28,7 +28,21 @@ type DurableScheduler struct {
 	store      TaskQueueStore
 	entries    map[domain.TaskID]storage.TaskQueueEntry
 	dispatched map[domain.TaskID]storage.TaskQueueEntry
+	sequence   uint64
 	closed     bool
+}
+
+// NextEnqueueSequence returns the next queue ordering number.
+//
+// It is seeded from the highest sequence already durable, so a coordinator
+// restart continues the ordering rather than restarting it. Reusing a sequence
+// would make two runs compare equal for dispatch order, and which one ran
+// first would then depend on map iteration.
+func (scheduler *DurableScheduler) NextEnqueueSequence() uint64 {
+	scheduler.mu.Lock()
+	defer scheduler.mu.Unlock()
+	scheduler.sequence++
+	return scheduler.sequence
 }
 
 func NewDurableScheduler(
@@ -56,6 +70,9 @@ func NewDurableScheduler(
 			return nil, err
 		}
 		durable.entries[entry.TaskID] = entry
+		if entry.EnqueueSequence > durable.sequence {
+			durable.sequence = entry.EnqueueSequence
+		}
 	}
 	return durable, nil
 }

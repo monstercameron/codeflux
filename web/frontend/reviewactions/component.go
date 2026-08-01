@@ -80,7 +80,7 @@ func Component(props Props) ui.Node {
 			"stale":           strconv.FormatBool(gate.Stale),
 		},
 	},
-		html.H2(html.Props{Text: "Accept or request repair"}),
+		html.H2(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingSection), Text: "Accept or request repair"}),
 		bindingSummary(props),
 		acceptanceControls(props, gate),
 		repairControls(props),
@@ -98,7 +98,7 @@ func bindingSummary(props Props) ui.Node {
 }
 
 func acceptanceControls(props Props, gate acceptance.Gate) ui.Node {
-	children := []ui.Node{html.H3(html.Props{Text: "Acceptance"})}
+	children := []ui.Node{html.H3(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), Text: "Acceptance"})}
 	checks := props.LiveRequiredChecks
 	if checks == nil {
 		checks = props.Review.RequiredChecks
@@ -136,7 +136,7 @@ func acceptanceControls(props Props, gate acceptance.Gate) ui.Node {
 }
 
 func repairControls(props Props) ui.Node {
-	children := []ui.Node{html.H3(html.Props{Text: "Request a bounded repair"})}
+	children := []ui.Node{html.H3(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), Text: "Request a bounded repair"})}
 	selected := 0
 	for _, target := range props.RepairTargets {
 		target := target
@@ -177,7 +177,7 @@ func repairControls(props Props) ui.Node {
 func rollbackControls(props Props) ui.Node {
 	if props.Rollback == nil {
 		return html.Div(html.Props{Data: map[string]string{"section": "rollback", "available": "false"}},
-			html.H3(html.Props{Text: "Rollback"}),
+			html.H3(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), Text: "Rollback"}),
 			html.P(html.Props{Text: "No pre-repair checkpoint is available."}),
 		)
 	}
@@ -186,7 +186,7 @@ func rollbackControls(props Props) ui.Node {
 		"repair-request-id": props.Rollback.RepairRequestID.String(),
 		"checkpoint-id":     props.Rollback.CheckpointID.String(),
 	}},
-		html.H3(html.Props{Text: "Rollback"}),
+		html.H3(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), Text: "Rollback"}),
 		html.P(html.Props{Text: "Pre-repair checkpoint: " + props.Rollback.CheckpointID.String()}),
 		primitives.Button(primitives.ButtonProps{
 			Label:    "Roll back to pre-repair checkpoint",
@@ -200,7 +200,7 @@ func rejectionControls(props Props) ui.Node {
 	return html.Div(html.Props{Data: map[string]string{
 		"section": "rejection", "preserve-patch": "true",
 	}},
-		html.H3(html.Props{Text: "Reject this candidate"}),
+		html.H3(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), Text: "Reject this candidate"}),
 		html.P(html.Props{Text: "The patch and its evidence remain available for inspection."}),
 		primitives.Button(primitives.ButtonProps{
 			Label:    "Reject and preserve patch",

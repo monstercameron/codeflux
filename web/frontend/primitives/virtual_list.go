@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"codeflux.dev/codeflux/web/frontend/design"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/html"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
@@ -333,11 +334,18 @@ func virtualListState[T any](props VirtualListProps[T], state VirtualListState) 
 	case VirtualListError:
 		content = ErrorState(ErrorStateProps{Title: props.ErrorTitle, Body: props.ErrorBody, ActionLabel: props.RetryLabel, Mode: props.Mode, OnAction: props.OnRetry})
 	case VirtualListDisconnected:
+		disconnectedTokens := props.Mode.Tokens()
 		children := []ui.Node{
-			html.H2(html.Props{Text: props.DisconnectedTitle}),
+			html.H2(html.Props{
+				Class: design.HeadingClass(disconnectedTokens, design.HeadingPanel),
+				Text:  props.DisconnectedTitle,
+			}),
 		}
 		if props.DisconnectedBody != "" {
-			children = append(children, html.P(html.Props{Text: props.DisconnectedBody}))
+			children = append(children, html.P(html.Props{
+				Class: design.ProseClass(disconnectedTokens),
+				Text:  props.DisconnectedBody,
+			}))
 		}
 		if props.RetryLabel != "" {
 			children = append(children, Button(ButtonProps{Label: props.RetryLabel, Mode: props.Mode, OnClick: props.OnRetry}))

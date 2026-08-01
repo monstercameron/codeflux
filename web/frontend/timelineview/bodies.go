@@ -764,14 +764,27 @@ func definitionValueClass(mode primitives.Mode) string {
 }
 
 func subheadingClass(mode primitives.Mode) string {
-	return css.New(
+	return css.New(css.TextColor(css.Hex(string(mode.Tokens().Colors.TextPrimary))),
 		css.Margin(css.Zero), css.FontSize(css.Px(mode.Tokens().Typography.Body.Size)),
 		css.LineHeightLen(css.Px(mode.Tokens().Typography.Body.LineHeight)), css.FontWeight.Semibold,
 	).String()
 }
 
+// bodyTextClass sets a typed card's prose.
+//
+// This is narration a person reads and judges -- what the agent proposes, what
+// it did, what it claims -- so it takes the reading serif and a measured line
+// length. A claim set in the interface sans reads like a control label.
 func bodyTextClass(mode primitives.Mode) string {
-	return css.New(css.Margin(css.Zero), css.OverflowWrap.Anywhere).String()
+	tokens := mode.Tokens()
+	return css.New(
+		css.Margin(css.Zero), css.OverflowWrap.Anywhere,
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Font(css.FontStack(tokens.Fonts.Reading)),
+		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
+		css.MaxWidth(css.Ch(80)),
+	).String()
 }
 
 func listClass(mode primitives.Mode) string {
@@ -828,12 +841,20 @@ func forecastMetricLabelClass(mode primitives.Mode) string {
 	).String()
 }
 
+// forecastMetricValueClass sets a measured readout.
+//
+// A cost, a duration, or a confidence is something the machine measured, so it
+// takes the monospace face. Reading it in the same serif as the narration
+// beside it would make an estimate look like a statement.
 func forecastMetricValueClass(mode primitives.Mode) string {
 	tokens := mode.Tokens()
 	return css.New(
 		css.Margin(css.Zero), css.MinWidth(css.Zero), css.OverflowWrap.Anywhere,
-		css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
-		css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)), css.FontWeight.Semibold,
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Font(css.FontStack(tokens.Fonts.Code)),
+		css.FontSize(css.Px(tokens.Typography.MetricValue.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.MetricValue.LineHeight)),
+		css.FontWeight.Medium,
 	).String()
 }
 

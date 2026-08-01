@@ -265,10 +265,15 @@ func composerAttachmentPicker(props Props, disabled bool) ui.Node {
 				Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String(),
 			},
 				html.Div(html.Props{},
-					html.H2(html.Props{ID: "composer-attachment-picker-title", Text: "Attach repository context"}),
+					html.H2(html.Props{
+						ID:    "composer-attachment-picker-title",
+						Class: composerDialogTitleClass(tokens),
+						Text:  "Attach repository context",
+					}),
 					html.P(html.Props{
-						ID:   "composer-attachment-picker-description",
-						Text: "Choose a server-resolved file or symbol. Browser file paths are never accepted.",
+						ID:    "composer-attachment-picker-description",
+						Class: composerDialogDescriptionClass(tokens),
+						Text:  "Choose a server-resolved file or symbol. Browser file paths are never accepted.",
 					}),
 				),
 				primitives.Button(primitives.ButtonProps{
@@ -732,4 +737,31 @@ func taskActionLabel(action TaskAction) string {
 		return label
 	}
 	return string(action)
+}
+
+// composerDialogTitleClass names the attachment picker.
+//
+// The dialog title is set in the serif with the rest of the material a person
+// reads, at the section-title size rather than the browser's own heading size.
+func composerDialogTitleClass(tokens design.Tokens) string {
+	return css.New(
+		css.Margin(css.Zero),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Font(css.FontStack(tokens.Fonts.Display)),
+		css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+		css.FontWeight.Normal,
+	).String()
+}
+
+// composerDialogDescriptionClass sets the sentence under that title.
+func composerDialogDescriptionClass(tokens design.Tokens) string {
+	return css.New(
+		css.Margin(css.Zero),
+		css.MaxWidth(css.Ch(74)),
+		css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+		css.Font(css.FontStack(tokens.Fonts.Reading)),
+		css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)),
+	).String()
 }

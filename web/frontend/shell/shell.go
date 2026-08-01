@@ -960,9 +960,12 @@ func legacyTaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 			html.H1(html.Props{
 				Class: css.New(
 					css.Margin(css.Zero),
+					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					css.Font(css.FontStack(tokens.Fonts.Display)),
 					css.FontSize(css.Px(tokens.Typography.WorkspaceTitle.Size)),
 					css.LineHeightLen(css.Px(tokens.Typography.WorkspaceTitle.LineHeight)),
-					css.FontWeight.Semibold,
+					css.FontWeight.Normal,
+					css.Tracking(css.Ems(0.004)),
 				).String(),
 				Text: title,
 			}),
@@ -1079,6 +1082,7 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 				}),
 				html.H2(html.Props{
 					Class: css.New(
+						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 						css.Margin(css.Zero),
 						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 					).String(),
@@ -1218,6 +1222,7 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 				}),
 				html.H2(html.Props{
 					Class: css.New(
+						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 						css.Margin(css.Zero),
 						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 						css.FontWeight.Semibold,
@@ -1361,6 +1366,7 @@ func legacyGraphPane(props GraphPaneProps) ui.Node {
 		}),
 		html.H2(html.Props{
 			Class: css.New(
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 				css.Margin(css.Zero),
 				css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
 			).String(),
@@ -1782,17 +1788,28 @@ func routeMain(component, title string, mode primitives.Mode, regions ...ui.Node
 					css.MarginY(css.Px(tokens.Spacing.SM)),
 					css.FontSize(css.Px(38)),
 					css.LineHeightLen(css.Px(46)),
-					css.FontWeight.Semibold,
+					// The colour is set rather than inherited. Without it this
+					// heading took whatever an ancestor happened to supply,
+					// which in the light theme was near-white on near-white:
+					// the largest text on the page was invisible.
+					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					// Natural weight and open tracking: the serif carries the
+					// size, and semibold with negative tracking closes its
+					// counters.
+					css.FontWeight.Normal,
 					css.Font(css.FontStack(tokens.Fonts.Display)),
-					css.Tracking(css.Ems(-0.025)),
+					css.Tracking(css.Ems(0.004)),
 				).String(),
 				Text: title,
 			}),
 			html.P(html.Props{
 				Class: css.New(
 					css.Margin(css.Zero),
+					css.MaxWidth(css.Ch(72)),
 					css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+					css.Font(css.FontStack(tokens.Fonts.Reading)),
 					css.FontSize(css.Px(tokens.Typography.Body.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
 				).String(),
 				Text: "Private by default. Explicit at every boundary. Built for focused technical work.",
 			}),
@@ -1827,10 +1844,15 @@ func routeRegion(mode primitives.Mode, name, title string, children ...ui.Node) 
 		).String(),
 	}, append([]ui.Node{html.H2(html.Props{
 		Class: css.New(
+			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.Margin(css.Zero),
+			// A region heading names something a person reads and judges, so
+			// it takes the serif with the rest of that material rather than
+			// the interface sans used for controls.
+			css.Font(css.FontStack(tokens.Fonts.Display)),
 			css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
 			css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
-			css.FontWeight.Semibold,
+			css.FontWeight.Normal,
 		).String(),
 		Text: title,
 	})}, children...)...)
@@ -1846,8 +1868,9 @@ type TopLevelStateProps struct {
 }
 
 func TopLevelState(props TopLevelStateProps) ui.Node {
+	tokens := props.Mode.Tokens()
 	children := []ui.Node{
-		html.H1(html.Props{Text: props.Title}),
+		html.H1(html.Props{Class: design.HeadingClass(tokens, design.HeadingPage), Text: props.Title}),
 		html.P(html.Props{Role: "alert", Text: fallback(props.Body, "Try again or open diagnostics.")}),
 	}
 	if props.ActionLabel != "" {

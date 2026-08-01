@@ -97,6 +97,10 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runBootstrap(ctx, stdout, stderr, invocation)
 	case "build":
 		return runBuild(ctx, stdout, stderr, invocation)
+	case "build-frontend":
+		return runBuildFrontend(ctx, stdout, stderr, invocation)
+	case "serve":
+		return runServe(ctx, stdout, stderr, invocation)
 	case "build-spike":
 		return runBuildSpike(ctx, stdout, stderr, invocation)
 	case "generate":

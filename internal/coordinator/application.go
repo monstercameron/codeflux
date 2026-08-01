@@ -53,7 +53,19 @@ type ApplicationOptions struct {
 	TaskControls            transport.TaskControlApplication
 	TaskListenAddress       string
 	FrontendAssetsDirectory string
-	EditorExecutable        string
+	// FrontendAssets is the resolved asset set a released executable serves
+	// from inside itself. It and FrontendAssetsDirectory are alternatives;
+	// supplying either mounts the browser interface.
+	FrontendAssets   frontendserver.AssetSource
+	EditorExecutable string
+	// WorktreeRoot is where per-task Git worktrees are created. It defaults
+	// to a directory beside the database, because the worktrees and the rows
+	// describing them are one unit.
+	WorktreeRoot string
+	// WorkerExecutable is the subprocess entry point a started run spawns. It
+	// defaults to codeflux-worker beside the running executable, never a PATH
+	// lookup: that process receives the worktree and the coordinator endpoint.
+	WorkerExecutable string
 }
 
 type OrphanedWorkerCandidate struct {
@@ -181,10 +193,6 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	taskLifecycle, err := NewTaskLifecycleAdapter(taskPreflight, repositories)
-	if err != nil {
-		return nil, err
-	}
 	credentialStore := credentials.NewPlatformStore()
 	providerDependencies, err := newProviderDependencies(
 		credentialStore, repositories,
@@ -223,9 +231,8 @@ func StartApplication(
 		lock: instanceLock, database: database, repos: repositories,
 		credentials: credentialStore, providers: providerDependencies,
 		workspace: workspaceDependencies, preflight: taskPreflight,
-		taskLifecycle: taskLifecycle,
-		scheduler:     scheduler,
-		listener:      listener, workers: options.Workers,
+		scheduler: scheduler,
+		listener:  listener, workers: options.Workers,
 		secret:    base64.RawURLEncoding.EncodeToString(secretBytes),
 		serveDone: make(chan error, 1),
 		heartbeat: options.HeartbeatTimeout, now: options.Now,
@@ -257,8 +264,11 @@ func StartApplication(
 		return nil, err
 	}
 	application.transport, err = transport.NewBoundary(transport.BoundaryOptions{
-		SessionToken:         application.secret,
-		TrustBridgeRequestID: options.FrontendAssetsDirectory != "",
+		SessionToken: application.secret,
+		// The bridge request ID is trusted only when this process is also the
+		// one serving the browser assets, because only then did the request
+		// identity originate at a boundary this process controls.
+		TrustBridgeRequestID: options.FrontendAssetsDirectory != "" || options.FrontendAssets != nil,
 		Now:                  options.Now,
 	})
 	if err != nil {
@@ -359,6 +369,22 @@ func StartApplication(
 		}
 		application.workers = application.supervisor
 	}
+
+	// The lifecycle adapter is built here, after the worker runtime exists,
+	// because starting a task must be able to start a worker. Building it
+	// earlier is what produced a start path that recorded a run and executed
+	// nothing.
+	launcher, err := buildRunLauncher(options, repositories, application)
+	if err != nil {
+		return nil, err
+	}
+	application.taskLifecycle, err = NewTaskLifecycleAdapter(
+		taskPreflight, repositories, launcher,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	if taskControls == nil {
 		return nil, errors.New(
 			"task control service is required with a custom worker controller",
@@ -552,7 +578,7 @@ func StartApplication(
 		"POST /internal/worker/heartbeat",
 		application.gateway.Handler(),
 	)
-	if options.FrontendAssetsDirectory != "" {
+	if options.FrontendAssetsDirectory != "" || options.FrontendAssets != nil {
 		routeAccess, routeAccessErr := repositories.ReadFrontendRouteAccess(ctx)
 		if routeAccessErr != nil {
 			return nil, routeAccessErr
@@ -600,6 +626,7 @@ func StartApplication(
 		info := buildinfo.Current()
 		frontend, frontendErr := frontendserver.NewHandler(
 			frontendserver.Options{
+				Assets:          options.FrontendAssets,
 				AssetsDirectory: options.FrontendAssetsDirectory,
 				GRPCServer:      application.taskServer,
 				SessionToken:    application.secret,

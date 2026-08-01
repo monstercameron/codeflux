@@ -52,10 +52,28 @@ type RouteAccess struct {
 	ArchivedThreads        []*codefluxv1.StableIdentity `json:"archived_threads,omitempty"`
 }
 
+// AssetSource supplies one browser asset by its slash-separated relative path.
+//
+// It exists so a released executable can serve assets compiled into itself
+// while a development checkout serves the same files from a build directory,
+// without this package needing to know which happened. web/assets.Resolved
+// satisfies it structurally, so nothing here depends on that package.
+type AssetSource interface {
+	Get(relative string) ([]byte, error)
+}
+
 // Options binds generated assets and a product gRPC server to one local HTTP
 // origin. SessionToken is retained only by the native process and an HttpOnly
 // same-site cookie; it is never returned in bootstrap data.
+//
+// Exactly one of Assets and AssetsDirectory must be supplied. Accepting both
+// would leave the precedence between an embedded release build and somebody's
+// working tree to be discovered later, which is the kind of ambiguity that
+// ships stale files.
 type Options struct {
+	// Assets is the resolved asset set, preferred when present.
+	Assets AssetSource
+	// AssetsDirectory reads the assets from disk.
 	AssetsDirectory string
 	GRPCServer      *grpc.Server
 	SessionToken    string
@@ -64,8 +82,14 @@ type Options struct {
 
 // NewHandler builds the production local frontend boundary.
 func NewHandler(options Options) (http.Handler, error) {
-	if options.AssetsDirectory == "" ||
-		!filepath.IsAbs(options.AssetsDirectory) {
+	switch {
+	case options.Assets != nil && options.AssetsDirectory != "":
+		return nil, errors.New(
+			"frontend assets were supplied both resolved and as a directory; supply one, " +
+				"so which files are served is never a matter of precedence")
+	case options.Assets == nil && options.AssetsDirectory == "":
+		return nil, errors.New("frontend assets are required")
+	case options.Assets == nil && !filepath.IsAbs(options.AssetsDirectory):
 		return nil, errors.New("absolute frontend assets directory is required")
 	}
 	if options.GRPCServer == nil {
@@ -93,7 +117,11 @@ func NewHandler(options Options) (http.Handler, error) {
 	if err := validateRouteAccess(options.Bootstrap.RouteAccess); err != nil {
 		return nil, err
 	}
-	assets, err := loadAssets(options.AssetsDirectory)
+	source := options.Assets
+	if source == nil {
+		source = directoryAssets(options.AssetsDirectory)
+	}
+	assets, err := loadAssets(source)
 	if err != nil {
 		return nil, err
 	}
@@ -186,15 +214,20 @@ type generatedAssets struct {
 	inlineScriptSources string
 }
 
-func loadAssets(directory string) (generatedAssets, error) {
-	load := func(relative string) ([]byte, error) {
-		path := filepath.Join(directory, filepath.FromSlash(relative))
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read generated frontend asset %s: %w", relative, err)
-		}
-		return content, nil
+// directoryAssets reads the generated assets from a build directory.
+type directoryAssets string
+
+func (directory directoryAssets) Get(relative string) ([]byte, error) {
+	path := filepath.Join(string(directory), filepath.FromSlash(relative))
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read generated frontend asset %s: %w", relative, err)
 	}
+	return content, nil
+}
+
+func loadAssets(source AssetSource) (generatedAssets, error) {
+	load := source.Get
 	index, err := load("index.html")
 	if err != nil {
 		return generatedAssets{}, err

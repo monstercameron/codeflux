@@ -642,7 +642,7 @@ func headerClass(tokens design.Tokens) string {
 }
 
 func headingClass(tokens design.Tokens) string {
-	return css.New(
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 		css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
 		css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)), css.FontWeight.Semibold,
 	).String()

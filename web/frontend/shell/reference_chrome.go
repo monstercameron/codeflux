@@ -185,11 +185,25 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				contextControl("model", "◈", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl(
-					"budget", "$",
-					forecast+" / "+tokensUsed+" / "+actual+" / "+pricing+" / "+budget+" / "+remaining+" / "+warning,
-					"/settings", props.Mode, props.OnNavigatePath,
-				),
+				// The header carries the two figures that decide whether to
+				// intervene: what this has cost, and what is left of the cap.
+				// The forecast, token count, pricing snapshot and warning
+				// threshold used to be concatenated into the same control with
+				// slashes, which produced an unreadable run of seven values and
+				// meant neither number could be found at a glance. They are
+				// still reachable — the control opens the settings page, and the
+				// full breakdown is its accessible name.
+				costReadout(costReadoutProps{
+					Spent:     actual,
+					Remaining: remaining,
+					Breakdown: "forecast " + forecast + ", usage " + tokensUsed +
+						", actual " + actual + ", pricing " + pricing +
+						", budget " + budget + ", remaining " + remaining +
+						", warning threshold " + warning,
+					Mode:       props.Mode,
+					OnNavigate: props.OnNavigatePath,
+					TargetPath: "/settings",
+				}),
 			),
 		),
 		html.Div(html.Props{
@@ -376,6 +390,79 @@ func contextControl(
 	)
 }
 
+// costReadoutProps configures the header's money readout.
+type costReadoutProps struct {
+	Spent      string
+	Remaining  string
+	Breakdown  string
+	Mode       primitives.Mode
+	OnNavigate func(string)
+	TargetPath string
+}
+
+// costReadout renders spend against the remaining cap.
+//
+// Both figures are measurements, so they are set in the monospace face with
+// tabular figures: they change while you watch them, and digits that shift
+// their own width as they change are hard to read at a glance. The labels are
+// sans, because a label is chrome rather than a value.
+func costReadout(props costReadoutProps) ui.Node {
+	tokens := props.Mode.Tokens()
+	pair := func(label, value string, tone design.Color) ui.Node {
+		return html.Span(html.Props{
+			Class: css.New(
+				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
+			).String(),
+		},
+			html.Span(html.Props{
+				Class: css.New(
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				).String(),
+				Text: label,
+			}),
+			html.Span(html.Props{
+				Class: css.New(
+					css.TextColor(css.Hex(string(tone))),
+					css.Font(css.FontStack(tokens.Fonts.Code)),
+					css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+					css.FontWeight.Medium,
+				).String(),
+				Text: value,
+			}),
+		)
+	}
+	return html.Button(html.Props{
+		Type: "button",
+		Data: map[string]string{"component": "cost-readout"},
+		Aria: map[string]string{"label": "Cost and budget: " + props.Breakdown},
+		Class: css.New(
+			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.MD)),
+			css.MinHeight(css.Px(34)),
+			css.PaddingX(css.Px(tokens.Spacing.MD)),
+			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+			css.Border(css.Px(1), css.Transparent),
+			css.Cursor.Pointer,
+		).String(),
+		OnClick: ui.WrapHandler(func() {
+			if props.OnNavigate != nil {
+				props.OnNavigate(props.TargetPath)
+			}
+		}),
+	},
+		pair("spent", props.Spent, tokens.Colors.TextPrimary),
+		html.Span(html.Props{
+			Aria: map[string]string{"hidden": "true"},
+			Class: css.New(
+				css.H(css.Px(16)),
+				css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			).String(),
+		}),
+		pair("left", props.Remaining, tokens.Colors.Accent),
+	)
+}
+
 func headerIconButton(label, accessible string, mode primitives.Mode, handler func()) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
 		Label: label, AccessibleLabel: accessible, Mode: mode,
@@ -477,7 +564,7 @@ func SearchDialog(props SearchDialogProps) ui.Node {
 		},
 			html.Div(html.Props{Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String()},
 				html.Div(html.Props{},
-					html.H2(html.Props{ID: "global-search-title", Text: "Search Codeflux"}),
+					html.H2(html.Props{Class: design.HeadingClass(tokens, design.HeadingPanel), ID: "global-search-title", Text: "Search Codeflux"}),
 					html.P(html.Props{
 						ID: "global-search-description", Text: "Choose a scoped search destination. Your query stays local.",
 						Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
@@ -844,6 +931,7 @@ func inspectorCard(title string, rows []detailRow, tokens design.Tokens) ui.Node
 	},
 		html.H2(html.Props{
 			Class: css.New(
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 				css.MarginY(css.Px(tokens.Spacing.SM)),
 				css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 			).String(),
@@ -913,7 +1001,11 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 					).String(),
 					Text: "⌁",
 				}),
-				html.Div(html.Props{},
+				html.Div(html.Props{
+					Class: css.New(
+						u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)),
+					).String(),
+				},
 					html.Div(html.Props{
 						Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 					},
@@ -922,8 +1014,13 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 								css.Margin(css.Zero),
 								css.FontSize(css.Px(tokens.Typography.WorkspaceTitle.Size)),
 								css.LineHeightLen(css.Px(tokens.Typography.WorkspaceTitle.LineHeight)),
-								css.FontWeight.Semibold,
-								css.Tracking(css.Ems(-0.025)),
+								// The serif carries the title at its natural
+								// weight with a hair of positive tracking.
+								// Semibold and negative tracking are a sans
+								// treatment; on a serif they close the counters
+								// and the title reads cramped.
+								css.FontWeight.Normal,
+								css.Tracking(css.Ems(0.004)),
 								css.Font(css.FontStack(tokens.Fonts.Display)),
 								css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 							).String(),
@@ -933,9 +1030,18 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 					),
 					html.P(html.Props{
 						Class: css.New(
+							// The requirement is prose a person wrote and must
+							// judge, so it is set in the reading serif rather
+							// than in the interface sans.
 							css.Margin(css.Zero),
+							// Prose is measured, not stretched. A serif line
+							// past about 80 characters loses the reader between
+							// the end of one line and the start of the next.
+							css.MaxWidth(css.Ch(78)),
 							css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-							css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+							css.Font(css.FontStack(tokens.Fonts.Reading)),
+							css.FontSize(css.Px(tokens.Typography.Body.Size)),
+							css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
 						).String(),
 						Text: taskSummary,
 					}),
@@ -1024,7 +1130,11 @@ func TaskActionsPopover(props TaskActionsPopoverProps) ui.Node {
 		},
 			html.H2(html.Props{
 				ID: "task-actions-title", Text: "Task actions",
-				Class: css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.PanelHeading.Size))).String(),
+				Class: css.New(
+					css.Margin(css.Zero),
+					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
+				).String(),
 			}),
 			html.P(html.Props{
 				ID: "task-actions-description", Text: "Inspect, review, pause, or stop the current task.",
@@ -1237,6 +1347,7 @@ func GraphPane(props GraphPaneProps) ui.Node {
 			},
 				html.H2(html.Props{
 					Class: css.New(
+						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 						css.Margin(css.Zero),
 						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 					).String(),

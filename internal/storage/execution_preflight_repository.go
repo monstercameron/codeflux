@@ -450,6 +450,28 @@ func (repositories *Repositories) GetTaskExecutionPreflight(
 		taskID, revision), "get task execution preflight")
 }
 
+// GetTaskExecutionPolicy reads one immutable approved policy revision.
+//
+// Starting a run needs the provider the reviewed policy named, not a current
+// default: a run approved against one provider must not be queued against
+// another because a preference changed in between.
+func (repositories *Repositories) GetTaskExecutionPolicy(
+	ctx context.Context,
+	taskID domain.TaskID,
+	revision uint64,
+) (ExecutionPolicyRevision, error) {
+	if taskID.IsZero() || revision == 0 {
+		return ExecutionPolicyRevision{}, errors.New("task and policy revision are required")
+	}
+	return scanExecutionPolicy(repositories.database.sql.QueryRowContext(ctx,
+		`SELECT task_id, revision, policy_version, selection_source,
+		        canonical_json, content_sha256, idempotency_key,
+		        created_at_unix_micros
+		 FROM execution_policy_revisions
+		 WHERE task_id = ? AND revision = ?`,
+		taskID, revision), "get task execution policy")
+}
+
 // GetTaskExecutionPresentation preserves the immutable prepared policy and
 // forecast while refreshing exact reserved, actual, remaining, and unknown
 // budget state.

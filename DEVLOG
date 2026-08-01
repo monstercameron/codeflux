@@ -24,6 +24,61 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-006
+Date: 2026-08-01
+Status: Complete for the two blockers and the typographic reset; the control
+  audit and its browser coverage are not done
+Change-ID: CL-20260801-006
+Request-or-TODO: AUDIT-020, AUDIT-021, and the user's request to wire the
+  development server and redesign around serif typography and negative space
+Goal: Make the product something a person can start and watch, and make its
+  typography carry meaning rather than variety
+Assumptions: The PNG mockups the user supplied in design/ are the client's own
+  visual direction and were treated as the brief for palette, layout, and
+  information architecture. The serif and negative-space instruction is the
+  part that is genuinely new, so it was resolved against the mockups rather
+  than over them
+Decisions: Split the type roles by what a value IS. Serif for what a person
+  wrote or must judge -- titles, plans, narration, claims; sans for what you
+  act on -- controls, labels, navigation; monospace for what the machine
+  measured -- costs, durations, counts, log lines. The face then tells a
+  reader the category before they read the words, which is why it is enforced
+  by a test rather than left as taste. Resolve assets explicit-then-embedded-
+  then-development: a typed path wins because somebody meant it, embedded
+  comes next so a release never reads a working tree, and the development
+  directory is last and only when complete. Queue a run under its own
+  identity rather than the task's, because a retried start mints a new run and
+  keying by task would read as a duplicate. Check the coordinator endpoint
+  before creating the worktree, so a launch that cannot proceed does not leave
+  a directory and a branch behind
+Files-or-schemas: cmd/codeflux-dev frontend_assets and heading_contrast;
+  cmd/codeflux assets and start; internal/frontendserver asset source;
+  internal/coordinator task_run_launcher, run_launcher_wiring, lifecycle
+  adapter, durable scheduler; internal/storage GetTaskExecutionPolicy;
+  internal/gitwork ResolveRevision; web/frontend design tokens and the new
+  headings role table, plus every component whose headings were unstyled
+Validation: Full build, js/wasm build, vet, gofmt, the complete test suite,
+  lint, generate-check, migration-check, and artifact-check pass. The
+  end-to-end coordinator test now builds the real worker executable and a real
+  Git repository and asserts the task worktree exists on disk, so it fails if
+  the launch stops happening
+Failures-or-discarded-approaches: The first pass at the typographic hierarchy
+  hit an invariant requiring each role to be strictly larger than the one
+  below. That forced a panel heading to be larger than the serif body text it
+  labels, which would make it shout; the invariant now allows a tie broken by
+  weight, which preserves the guarantee it existed for. A first attempt to
+  assert the type rule by inspecting generated class strings failed because
+  the css package returns a content hash; the role table was restructured to
+  return inspectable decisions, which is both testable and better
+Known-limitations: The interface still follows the operating system colour
+  scheme, so the mockups' dark identity only appears when the machine is set
+  to dark. Several controls remain unaudited for reachability, the streaming
+  execution surfaces in the mockups are not built, and the mockups' node-state
+  animation is absent. The dark palette predates this change and was not
+  altered
+Next-safe-step: Audit every declared control for a live binding, then extend
+  the browser suite to drive each one against a real coordinator
+
 Dev-Log: DL-20260801-005
 Date: 2026-08-01
 Status: Recorded; the items themselves are open

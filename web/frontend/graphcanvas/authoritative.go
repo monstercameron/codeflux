@@ -276,8 +276,14 @@ func authoritativeSVG(props AuthoritativeProps) ui.Node {
 	return html.Section(sectionProps,
 		html.Header(html.Props{Class: authoritativeHeaderClass(tokens, props.ResponsiveMode)},
 			html.Div(html.Props{},
-				html.H2(html.Props{Text: "Task graph"}),
-				html.P(html.Props{Text: graphModeDescription(modeValue)}),
+				html.H2(html.Props{
+					Class: graphPanelTitleClass(tokens),
+					Text:  "Task graph",
+				}),
+				html.P(html.Props{
+					Class: graphPanelDescriptionClass(tokens),
+					Text:  graphModeDescription(modeValue),
+				}),
 			),
 			modeTabs,
 		),
@@ -808,5 +814,33 @@ func authoritativeLegendClass(tokens design.Tokens, responsiveMode string) strin
 		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+	).String()
+}
+
+// graphPanelTitleClass names the task graph panel.
+//
+// It is set on the product's own type scale rather than left to the browser's
+// default heading size, which would render it larger than the page title it
+// sits beneath.
+func graphPanelTitleClass(tokens design.Tokens) string {
+	return css.New(
+		css.Margin(css.Zero),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Font(css.FontStack(tokens.Fonts.Display)),
+		css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+		css.FontWeight.Normal,
+	).String()
+}
+
+// graphPanelDescriptionClass sets the sentence explaining the current mode.
+func graphPanelDescriptionClass(tokens design.Tokens) string {
+	return css.New(
+		css.Margin(css.Zero),
+		css.MaxWidth(css.Ch(74)),
+		css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+		css.Font(css.FontStack(tokens.Fonts.Reading)),
+		css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)),
 	).String()
 }

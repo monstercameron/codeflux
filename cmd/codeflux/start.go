@@ -22,6 +22,7 @@ import (
 type startArguments struct {
 	database       string
 	address        string
+	assets         string
 	openBrowser    bool
 	nonInteractive bool
 }
@@ -40,7 +41,7 @@ func parseStartArguments(args []string) (startArguments, error) {
 
 	for index := 0; index < len(remaining); index++ {
 		switch remaining[index] {
-		case "--database", "--address":
+		case "--database", "--address", "--assets":
 			name := remaining[index]
 			if index+1 >= len(remaining) {
 				return startArguments{}, fmt.Errorf("%s requires a value", name)
@@ -50,9 +51,12 @@ func parseStartArguments(args []string) (startArguments, error) {
 			if strings.TrimSpace(value) == "" {
 				return startArguments{}, fmt.Errorf("%s requires a non-empty value", name)
 			}
-			if name == "--database" {
+			switch name {
+			case "--database":
 				arguments.database = value
-			} else {
+			case "--assets":
+				arguments.assets = value
+			default:
 				arguments.address = value
 			}
 		default:
@@ -138,11 +142,25 @@ func runStart(
 	// codeflux command without special-casing this one.
 	_ = policy
 
+	// The assets are resolved before anything is started. A coordinator that
+	// came up and then served 404 at its own URL is the failure this command
+	// used to have: the process looked healthy and the product was not there.
+	workingDirectory, _ := os.Getwd()
+	resolved, origin, err := resolveFrontendAssets(arguments.assets, os.LookupEnv, workingDirectory)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux start: %v\n", err)
+		if errors.Is(err, ErrNoFrontendAssets) {
+			return exitUnavailable
+		}
+		return exitFailure
+	}
+
 	application, err := coordinator.StartApplication(ctx, coordinator.ApplicationOptions{
 		DatabasePath:      databasePath,
 		BackupDirectory:   filepath.Join(filepath.Dir(databasePath), "backups"),
 		ListenAddress:     arguments.address,
 		TaskListenAddress: "127.0.0.1:0",
+		FrontendAssets:    resolved,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux start: %v\n", err)
@@ -160,6 +178,7 @@ func runStart(
 	// browser receives it as an HttpOnly cookie without ever needing to be
 	// typed.
 	fmt.Fprintf(stdout, "codeflux is running at %s\n", url)
+	fmt.Fprintf(stdout, "serving the interface from %s\n", origin)
 	fmt.Fprintln(stdout, "the session secret is held by this process and sent to the browser as a cookie; it is not printed")
 
 	if arguments.openBrowser {

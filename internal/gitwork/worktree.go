@@ -117,6 +117,33 @@ func (service *Service) WorktreePath(
 	return path, nil
 }
 
+// ResolveRevision returns the full Git object ID a revision names.
+//
+// CreateTaskWorktree requires the full resolved object ID rather than a name,
+// so that what a task is based on cannot move between the moment it was chosen
+// and the moment the worktree is created. This is how a caller obtains one.
+func (service *Service) ResolveRevision(
+	ctx context.Context,
+	repositoryPath string,
+	revision string,
+) (string, error) {
+	if strings.TrimSpace(revision) == "" {
+		return "", errors.New("a revision is required")
+	}
+	directory, err := canonicalDirectory(repositoryPath)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := service.gitText(ctx, directory, "rev-parse", "--verify", revision+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("resolve revision %s: %w", revision, err)
+	}
+	if err := validateObjectID(resolved); err != nil {
+		return "", err
+	}
+	return resolved, nil
+}
+
 // CreateTaskWorktree creates and verifies a dedicated branch/worktree before
 // recording all binding fields in one SQLite transaction.
 func (service *Service) CreateTaskWorktree(

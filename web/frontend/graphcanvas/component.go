@@ -434,7 +434,7 @@ func edgeTextAlternative(edges []EdgePlacement, nodes map[string]state.GraphNode
 		items = append(items, html.Li(html.Props{Text: edgeLabel(placement.Edge, nodes)}))
 	}
 	return html.Div(html.Props{Class: screenReaderOnlyClass(), Data: map[string]string{"component": "graph-edge-text"}},
-		html.H2(html.Props{Text: "Graph relationships"}), html.Ul(html.Props{}, items...),
+		html.H2(html.Props{Class: design.HeadingClass(mode.Tokens(), design.HeadingSection), Text: "Graph relationships"}), html.Ul(html.Props{}, items...),
 	)
 }
 

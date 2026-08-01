@@ -30,6 +30,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-006
+Date: 2026-08-01
+Type: Frontend asset pipeline, worker launch, and typographic direction
+Request-or-TODO: AUDIT-020, AUDIT-021; user request to wire the development
+  server and redesign the interface around serif typography and negative space
+Outcome: Added `codeflux-dev build-frontend` and `codeflux-dev serve`, taught
+  `codeflux start` to resolve browser assets and refuse to run without them,
+  gave the frontend server a resolved-asset source so a released executable can
+  serve from inside itself, connected a started task to a real worker
+  subprocess through a new run launcher, and reset the typographic direction so
+  the face a value is set in says what kind of thing it is
+Affected-behavior: `codeflux start` now serves the interface. It previously
+  started the coordinator, printed a URL, and returned 404 there, because
+  nothing ever passed it an asset directory and nothing ever built one.
+  Starting a task now creates its Git worktree, queues the run, and launches
+  the worker; it previously wrote a run row and returned, so the task read as
+  running while no subprocess existed and no provider request was ever made.
+  Headings across the frontend now set their own colour and size: the
+  first-run title had no colour of its own and rendered near-white on
+  near-white in the light theme, and a rail heading had no class at all and
+  rendered larger than the page title beside it
+Compatibility-or-migration: No schema change. `codeflux start` gains
+  `--assets` and honours `CODEFLUX_ASSETS`; with neither, it uses the
+  development build directory and otherwise exits 3 naming the build command.
+  frontendserver.Options gains an Assets source and refuses both inputs at
+  once. coordinator.NewTaskLifecycleAdapter now requires a run launcher
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass. The built
+  executable was started and its URL fetched: index, runtime shim, client, and
+  bootstrap all serve. The real client was loaded in headless Chromium and
+  mounts with no console or page errors
+Dev-Log: DL-20260801-006
+
 Change-ID: CL-20260801-005
 Date: 2026-08-01
 Type: Backlog record

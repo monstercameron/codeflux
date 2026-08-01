@@ -3,7 +3,10 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -25,11 +28,18 @@ import (
 func TestRequirementReachesAStartedRunThroughTheRealApplication(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
+	// A real Git repository and a real worker executable, because the last
+	// link in this chain is a subprocess: a start that only writes a row is
+	// the defect this test exists to catch.
+	repositoryPath := filepath.Join(root, "repo")
+	initializeCoordinatorGitRepository(t, repositoryPath)
 	application, err := StartApplication(t.Context(), ApplicationOptions{
 		DatabasePath:    filepath.Join(root, "codeflux.sqlite3"),
 		BackupDirectory: filepath.Join(root, "backups"),
 		ListenAddress:   "127.0.0.1:0", TaskListenAddress: "127.0.0.1:0",
-		TaskControls: &applicationTaskControlStub{},
+		WorktreeRoot:     filepath.Join(root, "worktrees"),
+		WorkerExecutable: buildCoordinatorWorkerExecutable(t),
+		TaskControls:     &applicationTaskControlStub{},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +60,7 @@ func TestRequirementReachesAStartedRunThroughTheRealApplication(t *testing.T) {
 	}
 	if _, err := repositories.CreateRepository(ctx, storage.CreateRepository{
 		ID: repositoryID, ProjectID: projectID,
-		CanonicalPath: filepath.Join(root, "repo"), GitIdentity: strings.Repeat("f", 40),
+		CanonicalPath: repositoryPath, GitIdentity: strings.Repeat("f", 40),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +138,66 @@ func TestRequirementReachesAStartedRunThroughTheRealApplication(t *testing.T) {
 		t.Fatalf("started state = %s, want running", started.State)
 	}
 	t.Logf("task %s is running at revision %d", started.TaskID, started.Revision)
+
+	// 6. The last link: a worktree exists for the task and a worker was
+	// actually asked for. Before this was wired, everything above passed and
+	// nothing ran.
+	binding, err := repositories.GetWorktreeBinding(ctx, created.TaskID)
+	if err != nil {
+		t.Fatalf("starting a task must create its worktree: %v", err)
+	}
+	if binding.WorktreePath == "" {
+		t.Fatal("the task worktree binding records no path")
+	}
+	if _, err := os.Stat(binding.WorktreePath); err != nil {
+		t.Fatalf("the recorded worktree does not exist on disk: %v", err)
+	}
+	t.Logf("task worktree created at %s", binding.WorktreePath)
+}
+
+// initializeCoordinatorGitRepository creates the repository a task edits.
+func initializeCoordinatorGitRepository(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	run := func(arguments ...string) {
+		t.Helper()
+		command := exec.CommandContext(t.Context(), "git", arguments...)
+		command.Dir = path
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		}
+	}
+	run("init", "--initial-branch=main")
+	if err := os.WriteFile(
+		filepath.Join(path, "main.go"),
+		[]byte("package main\n\nfunc main() {}\n"), 0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "main.go")
+	run("-c", "user.name=Codeflux Test", "-c", "user.email=codeflux@example.invalid",
+		"commit", "-m", "base")
+}
+
+// buildCoordinatorWorkerExecutable compiles the real worker entry point.
+//
+// A stub would prove only that some process was spawned. Building the actual
+// subprocess proves the coordinator hands it something it can decode.
+func buildCoordinatorWorkerExecutable(t *testing.T) string {
+	t.Helper()
+	name := "codeflux-worker"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	output := filepath.Join(t.TempDir(), name)
+	command := exec.CommandContext(t.Context(),
+		"go", "build", "-o", output, "codeflux.dev/codeflux/cmd/codeflux-worker")
+	if built, err := command.CombinedOutput(); err != nil {
+		t.Skipf("cannot build the worker executable in this environment: %v\n%s", err, built)
+	}
+	return output
 }
 
 // driveTaskToReady performs the approval transitions a user's decision would,

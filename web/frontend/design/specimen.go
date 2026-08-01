@@ -306,6 +306,8 @@ func specimenHeadingClass(tokens Tokens) string {
 	style := tokens.Typography.TaskTitle
 	return css.New(
 		css.Margin(css.Zero),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Font(css.FontStack(tokens.Fonts.Display)),
 		css.FontSize(css.Px(style.Size)),
 		css.LineHeightLen(css.Px(style.LineHeight)),
 		specimenFontWeight(style.Weight),
@@ -316,6 +318,7 @@ func specimenPanelHeadingClass(tokens Tokens) string {
 	style := tokens.Typography.PanelHeading
 	return css.New(
 		css.Margin(css.Zero),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 		css.FontSize(css.Px(style.Size)),
 		css.LineHeightLen(css.Px(style.LineHeight)),
 		specimenFontWeight(style.Weight),

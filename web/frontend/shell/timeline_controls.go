@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/timeline"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
@@ -162,7 +163,7 @@ func TimelineControls(props TimelineControlProps) ui.Node {
 					"review-file": props.ReviewFile,
 				},
 			},
-				html.H2(html.Props{ID: "task-review-title", Text: "Review file"}),
+				html.H2(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), ID: "task-review-title", Text: "Review file"}),
 				html.P(html.Props{
 					ID:   "task-review-description",
 					Text: reviewDescription,

@@ -60,7 +60,22 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 		html.Header(html.Props{
 			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 		},
-			html.H2(html.Props{Text: map[bool]string{true: "Recent tasks", false: "Threads"}[props.Embedded]}),
+			// A rail heading names a list rather than introducing something to
+			// read, so it is set as a small tracked label in the interface
+			// sans. Left unstyled it took the browser's default heading size
+			// and read as the most important thing on the page.
+			html.H2(html.Props{
+				Class: css.New(
+					css.Margin(css.Zero),
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+					css.FontWeight.Semibold,
+					css.TextTransform.Uppercase,
+					css.Tracking(css.Ems(0.09)),
+				).String(),
+				Text: map[bool]string{true: "Recent tasks", false: "Threads"}[props.Embedded],
+			}),
 			ui.CreateElement(threadRailButton, primitives.ButtonProps{
 				ID: "thread-rail-new", Label: "New thread", AccessibleLabel: "Create new thread",
 				Primary: true, Busy: props.NewThreadBusy, Disabled: props.OnNewThread == nil,
@@ -319,7 +334,7 @@ func archiveConfirmationActions(props ThreadRailProps, row Row) ui.Node {
 			Data:  map[string]string{"component": "archive-confirmation", "thread-id": row.ThreadID().String()},
 			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(props.Mode.Tokens().Spacing.SM))).String(),
 		},
-			html.H2(html.Props{ID: "thread-rail-archive-title", Text: "Archive this thread?"}),
+			html.H2(html.Props{Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel), ID: "thread-rail-archive-title", Text: "Archive this thread?"}),
 			html.P(html.Props{
 				ID:   "thread-rail-archive-description",
 				Text: "Archive " + row.Title() + "? You can restore it from Past threads.",

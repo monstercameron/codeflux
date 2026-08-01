@@ -144,6 +144,12 @@ func TestM23_003_StartNeverPrintsTheSessionSecret(t *testing.T) {
 	// Starting on an ephemeral loopback port must print the URL and say
 	// explicitly that the secret is withheld.
 	root := t.TempDir()
+	// The assets are supplied explicitly rather than discovered. Left to
+	// discovery this test passed only in a tree that happened to have a built
+	// frontend beside it, and failed in a clean checkout — which is a test
+	// depending on a build output nobody had asked for.
+	assetDirectory := filepath.Join(root, "assets")
+	writeAssetSet(t, assetDirectory)
 	stdin := nonTerminalStdin(t)
 	var opened []string
 	done := make(chan struct{})
@@ -154,6 +160,7 @@ func TestM23_003_StartNeverPrintsTheSessionSecret(t *testing.T) {
 		_ = runStart(ctx, &stdout, &stderr, stdin, []string{
 			"--database", filepath.Join(root, "codeflux.sqlite3"),
 			"--address", "127.0.0.1:0",
+			"--assets", assetDirectory,
 			"--no-browser",
 		}, func(url string) error {
 			opened = append(opened, url)
@@ -610,4 +617,76 @@ func waitForOutput(t *testing.T, buffer *bytes.Buffer, marker string) {
 
 func waitBriefly() {
 	time.Sleep(10 * time.Millisecond)
+}
+
+// TestStartRefusesToRunWithoutAnInterface is the regression guard for the
+// defect that made the product unusable.
+//
+// codeflux start used to bring the coordinator up, print a URL, and serve 404
+// there: nothing built the browser assets and nothing passed them to the
+// server. The process looked healthy and the product was not present. Refusing
+// to start is the honest outcome, and the exit code has to say the problem is
+// a missing prerequisite rather than a failure worth retrying.
+func TestStartRefusesToRunWithoutAnInterface(t *testing.T) {
+	root := t.TempDir()
+	stdin := nonTerminalStdin(t)
+	var stdout, stderr bytes.Buffer
+
+	// An --assets path that holds nothing. Discovery cannot fall back to a
+	// development build directory from here, because this temporary root has
+	// no module at all.
+	code := runStart(t.Context(), &stdout, &stderr, stdin, []string{
+		"--database", filepath.Join(root, "codeflux.sqlite3"),
+		"--address", "127.0.0.1:0",
+		"--assets", filepath.Join(root, "empty"),
+		"--no-browser",
+	}, func(string) error {
+		t.Error("a browser was opened for a server that never started")
+		return nil
+	})
+
+	if code == exitOK {
+		t.Fatalf("start reported success with no interface to serve:\n%s", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "codeflux is running at") {
+		t.Errorf("start announced a URL it could not serve:\n%s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "index.html") {
+		t.Errorf("the refusal does not name what was missing:\n%s", stderr.String())
+	}
+}
+
+// TestStartExitsUnavailableWhenNothingIsBuilt keeps the exit code meaningful.
+//
+// Exit 3 means a prerequisite is missing and retrying will not help, which is
+// exactly the case here: the remedy is a build, not another attempt.
+func TestStartExitsUnavailableWhenNothingIsBuilt(t *testing.T) {
+	root := t.TempDir()
+	stdin := nonTerminalStdin(t)
+	var stdout, stderr bytes.Buffer
+
+	// Run from a directory with no module above it, so development discovery
+	// finds nothing and the resolver reaches its final refusal.
+	original, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(original) })
+	if err := os.Chdir(root); err != nil {
+		t.Skipf("cannot change directory in this environment: %v", err)
+	}
+
+	code := runStart(t.Context(), &stdout, &stderr, stdin, []string{
+		"--database", filepath.Join(root, "codeflux.sqlite3"),
+		"--address", "127.0.0.1:0",
+		"--no-browser",
+	}, func(string) error { return nil })
+
+	if code != exitUnavailable {
+		t.Fatalf("start exited %d with nothing built, want %d: %s",
+			code, exitUnavailable, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "build-frontend") {
+		t.Errorf("the refusal does not name the command that fixes it:\n%s", stderr.String())
+	}
 }

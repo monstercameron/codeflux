@@ -640,11 +640,11 @@ func reviewToggleClass(tokens design.Tokens, pressed bool) string {
 }
 
 func titleClass(tokens design.Tokens) string {
-	return css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)), css.MinWidth(css.Zero)).String()
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))), u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)), css.MinWidth(css.Zero)).String()
 }
 
 func headingClass(tokens design.Tokens) string {
-	return css.New(css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)), css.LineHeightLen(css.Px(tokens.Typography.PanelHeading.LineHeight)), css.FontWeight.Semibold).String()
+	return css.New(css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))), css.Margin(css.Zero), css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)), css.LineHeightLen(css.Px(tokens.Typography.PanelHeading.LineHeight)), css.FontWeight.Semibold).String()
 }
 
 func eyebrowClass(tokens design.Tokens) string {
