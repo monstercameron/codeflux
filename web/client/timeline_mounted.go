@@ -25,9 +25,13 @@ import (
 const mountedTimelineTimeout = 5 * time.Second
 
 type mountedTimelineSource struct {
-	Props              shell.TimelineControlProps
-	Task               taskprojection.TaskProjection
-	TaskReady          bool
+	Props     shell.TimelineControlProps
+	Task      taskprojection.TaskProjection
+	TaskReady bool
+	// Events is the ordered durable event state, which the execution panels
+	// project into steps and log lines. It is exposed rather than re-fetched
+	// so both surfaces read the same events in the same order.
+	Events             timeline.State
 	SessionReady       bool
 	SessionConnection  sessionprojection.ConnectionProjection
 	SessionDiagnostics sessionprojection.Diagnostics
@@ -301,7 +305,7 @@ func mountedAuthoritativeTimeline(
 	trusted := projection.Snapshot().Session
 	sessionReady := trusted.SessionID == thread.SessionID() && trusted.ThreadID == thread.ID()
 	return mountedTimelineSource{
-		Props: props, Task: task, TaskReady: taskReady,
+		Props: props, Task: task, TaskReady: taskReady, Events: eventState.Get(),
 		SessionReady: sessionReady, SessionConnection: projection.Connection(),
 		SessionDiagnostics: projection.Diagnostics(),
 	}

@@ -24,6 +24,50 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-008
+Date: 2026-08-01
+Status: The execution surfaces exist and are covered end to end; they are fed
+  by the events the coordinator publishes today, which is less than the
+  mockups show
+Change-ID: CL-20260801-008
+Request-or-TODO: The streaming execution surfaces from the mockups and
+  end-to-end coverage of the wired console
+Goal: Show what a run is doing while it does it, and prove the console works
+  by driving the real one rather than a fixture
+Assumptions: The mockups show a richer stream than the coordinator currently
+  publishes -- per-test results, a remaining-time forecast, per-step progress.
+  Those are built as typed inputs the view already accepts, so they appear the
+  moment the coordinator reports them, rather than being faked here
+Decisions: Keep the whole package pure. It performs no transport, holds no
+  hooks, and reads no browser state, so every presentation decision in it is
+  exercised natively rather than through a browser. Mark an unreported figure
+  unknown rather than zero: "no cost yet" and "costs nothing" are different
+  claims and only one is safe. Order steps by the coordinator's event
+  sequence rather than by timestamp, because two events can share a
+  millisecond and sorting by time would show a run doing things in an order it
+  did not. Report what a filter hid rather than silently showing a shorter
+  log. Invent no remaining-time estimate: a number this layer made up would be
+  one nobody could check
+Files-or-schemas: web/frontend/executionview model and components;
+  web/client/execution_projection; web/frontend/shell workspace mounting;
+  internal/frontendtest/production_console_test
+Validation: Full build, js/wasm build, vet, gofmt, the complete suite, lint,
+  and the repository checks pass. Twelve view tests and ten projection tests
+  are native. The end-to-end suite builds the assets, compiles the executable,
+  starts it on a reserved port, and drives the console in headless Chromium
+Failures-or-discarded-approaches: The end-to-end suite failed first on its own
+  assertion rather than on the product: the browser bridge returns a whole
+  number as an int and a fractional one as a float, and reading only the float
+  failed every heading whose size happened to be round. Worth remembering
+  before trusting a browser-side numeric assertion
+Known-limitations: The execution timeline is derived from session events, so
+  its labels are event kinds rather than the sentences the mockups show; that
+  needs the coordinator to publish a step vocabulary. There is no per-step
+  progress and no remaining-time estimate, because nothing measures them. The
+  live graph animation in codeflux-execution-streaming.png does not exist
+Next-safe-step: Publish a typed execution-step vocabulary from the coordinator
+  so the timeline can carry sentences rather than event kinds
+
 Dev-Log: DL-20260801-007
 Date: 2026-08-01
 Status: Improved and inspected; the interface is not finished

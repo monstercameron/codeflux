@@ -74,7 +74,9 @@ func Button(props ButtonProps) ui.Node {
 		// already carries an accessible name. Announcing both would read the
 		// control twice.
 		htmlProps.Aria["label"] = name
-		return html.Button(htmlProps, Icon(IconProps{Name: props.Icon, Size: 18}))
+		// A mark alone in a 44-pixel target needs to be large enough to read
+		// as a shape rather than as a speck in a box.
+		return html.Button(htmlProps, Icon(IconProps{Name: props.Icon, Size: 20}))
 	}
 	return html.Button(htmlProps, html.Text(label))
 }

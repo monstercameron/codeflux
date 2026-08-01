@@ -168,11 +168,11 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				css.MinWidth(css.Zero), css.Overflow.Hidden,
 			),
 		},
-			contextControl("repository", "▣", repository, "/", props.Mode, props.OnNavigatePath),
-			contextControl("branch", "⑂", branch, "/settings", props.Mode, props.OnNavigatePath),
-			contextControl("worktree", "✓", worktree, "/settings", props.Mode, props.OnNavigatePath),
+			contextControl("repository", repository, "/", props.Mode, props.OnNavigatePath),
+			contextControl("branch", branch, "/settings", props.Mode, props.OnNavigatePath),
+			contextControl("worktree", worktree, "/settings", props.Mode, props.OnNavigatePath),
 			html.Div(html.Props{Class: wideOnlyClass()},
-				contextControl("model", "◈", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
+				contextControl("model", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
 			costReadoutPlaceholder(),
 		),
@@ -214,7 +214,7 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 					css.FontWeight.Medium,
 				),
-				Text: "●  Local " + humanize(connection),
+				Text: "Local " + humanize(connection),
 			}),
 			manualReconnectControl(props, connection),
 			headerIconButtonWithID("global-search-trigger", primitives.IconSearch, "Search", props.Mode, props.OnSearchOpen),
@@ -320,7 +320,6 @@ func brandMark(tokens design.Tokens) ui.Node {
 
 func contextControl(
 	kind string,
-	icon string,
 	label string,
 	targetPath string,
 	mode primitives.Mode,
@@ -740,7 +739,7 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 					css.TextColor(css.Hex(string(tokens.Colors.Success))),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 				).String(),
-				Text: "● Coordinator available",
+				Text: "Coordinator available",
 			}),
 			html.P(html.Props{
 				Class: css.New(
@@ -957,22 +956,38 @@ func inspectorCard(title string, rows []detailRow, tokens design.Tokens) ui.Node
 			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 		).String(),
 	},
-		html.H2(html.Props{
+		// The heading and its collapse affordance sit on one row with the mark
+		// drawn rather than appended as a glyph. Concatenating "⌃" onto the
+		// title also put it into the accessible name, so a screen reader
+		// announced the section as "Identity and plan up-arrowhead".
+		html.Div(html.Props{
 			Class: css.New(
-				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.SM)),
 				css.MarginY(css.Px(tokens.Spacing.SM)),
-				css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
 			).String(),
-			Text: title + "  ⌃",
-		}),
+		},
+			html.H2(html.Props{
+				Class: design.HeadingClass(tokens, design.HeadingPanel),
+				Text:  title,
+			}),
+			html.Span(html.Props{
+				Aria: map[string]string{"hidden": "true"},
+				Class: css.New(
+					u.InlineFlex, css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+			}, primitives.Icon(primitives.IconProps{
+				Name: primitives.IconChevronDown, Size: 14,
+			})),
+		),
 		html.Div(html.Props{}, nodes...),
 	)
 }
 
 func gatesCard(tokens design.Tokens) ui.Node {
 	rows := []detailRow{
-		{"Route bootstrap", "Passed ✓"},
-		{"Origin boundary", "Passed ✓"},
+		{"Route bootstrap", "Passed"},
+		{"Origin boundary", "Passed"},
 		{"Visual fidelity", "Running ◌"},
 		{"Browser matrix", "Pending ○"},
 	}
@@ -1054,7 +1069,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 							).String(),
 							Text: taskTitle,
 						}),
-						statusPill("● "+taskStateLabel, taskStateColor, tokens),
+						statusPill(taskStateLabel, taskStateColor, tokens),
 					),
 					html.P(html.Props{
 						Class: css.New(
@@ -1089,7 +1104,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 					OnClick:  props.OnStopRequested,
 				}),
 				primitives.Button(primitives.ButtonProps{
-					Label: "◇  Request review", AccessibleLabel: "Request review", Mode: props.Mode,
+					Label: "Request review", AccessibleLabel: "Request review", Mode: props.Mode,
 					Disabled: props.OnReviewRequested == nil, OnClick: props.OnReviewRequested,
 				}),
 				html.Div(html.Props{Class: css.New(u.Relative).String()},
@@ -1173,7 +1188,7 @@ func TaskActionsPopover(props TaskActionsPopoverProps) ui.Node {
 				Disabled: props.OnNavigatePath == nil, OnClick: navigate("/graphs"),
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: "◇  Request review", AccessibleLabel: "Request review from task actions", Mode: props.Mode,
+				Label: "Request review", AccessibleLabel: "Request review from task actions", Mode: props.Mode,
 				Disabled: props.OnReviewRequested == nil, OnClick: invoke(props.OnReviewRequested),
 			}),
 			primitives.Button(primitives.ButtonProps{
@@ -1381,7 +1396,7 @@ func GraphPane(props GraphPaneProps) ui.Node {
 					).String(),
 					Text: "⌘  Project graph",
 				}),
-				statusPill("● Live", tokens.Colors.Active, tokens),
+				statusPill("Live", tokens.Colors.Active, tokens),
 			),
 			html.Div(html.Props{
 				Class: css.New(

@@ -14,6 +14,7 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/executionview"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/preferences"
 	"codeflux.dev/codeflux/web/frontend/primitives"
@@ -66,6 +67,7 @@ func productApplication() ui.Node {
 	preferredScheme := ui.UsePrefersColorScheme()
 	activeTheme, setTheme := ui.UseTheme(string(preferredScheme))
 	layoutState := ui.UseState(frontendstate.DefaultLayoutPreferences())
+	logSeverities := ui.UseState(map[executionview.Severity]bool{})
 	selectedGraphID := ui.UseState("")
 	graphMessageStableKey := ui.UseState("")
 	graphMessageNotice := ui.UseState("")
@@ -411,8 +413,33 @@ func productApplication() ui.Node {
 		}
 		navigator.Navigate(path)
 	}
+	// The execution panels read the same durable events the timeline does, so
+	// what a person sees happening and what the log says cannot disagree.
+	execution := projectExecution(
+		timelineSource.Task, timelineSource.TaskReady, timelineSource.Events,
+		executionview.Filter{Selected: logSeverities.Get()},
+		// The log is streaming while the session is live or replaying; a
+		// reconnecting session is not receiving, and saying it is would make a
+		// stalled run look busy.
+		streamStatus.Get().State == sessionclient.StateLive ||
+			streamStatus.Get().State == sessionclient.StateReplaying,
+	)
+	if execution != nil {
+		execution.OnToggleSeverity = func(severity executionview.Severity) {
+			next := map[executionview.Severity]bool{}
+			for key, selected := range logSeverities.Get() {
+				next[key] = selected
+			}
+			next[severity] = !next[severity]
+			logSeverities.Set(next)
+		}
+		execution.OnClearSeverities = func() {
+			logSeverities.Set(map[executionview.Severity]bool{})
+		}
+	}
 	root := shell.RootProps{
 		Snapshot:     store.Snapshot(),
+		Execution:    execution,
 		Composer:     composerProps,
 		Timeline:     timelineProps,
 		TaskControls: authoritativeTaskControls,

@@ -135,8 +135,8 @@ func strokeWidthFor(size int) float64 {
 	switch {
 	case size <= 14:
 		return 1.9
-	case size <= 18:
-		return 1.75
+	case size <= 20:
+		return 1.7
 	default:
 		return 1.5
 	}

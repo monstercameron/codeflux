@@ -8,6 +8,7 @@ import (
 
 	frontendcomposer "codeflux.dev/codeflux/web/frontend/composer"
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/executionview"
 	"codeflux.dev/codeflux/web/frontend/graphcanvas"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/primitives"
@@ -45,6 +46,8 @@ type RootProps struct {
 	OnRetry              func()
 	OnPauseRequested     func()
 	OnStopRequested      func()
+	// Execution carries the live run surfaces down to the workspace.
+	Execution *ExecutionPanelProps
 }
 
 // AppRoot keeps bootstrap failure states outside authenticated route shells.
@@ -93,6 +96,7 @@ func AppRoot(props RootProps) ui.Node {
 				OnThemeChange:        props.OnThemeChange,
 				OnReconnectRequested: props.OnReconnectRequested,
 				OnPauseRequested:     props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+				Execution: props.Execution,
 			}),
 		})
 	default:
@@ -123,6 +127,8 @@ type AppShellProps struct {
 	OnReconnectRequested func()
 	OnPauseRequested     func()
 	OnStopRequested      func()
+	// Execution carries the live run surfaces down to the workspace.
+	Execution *ExecutionPanelProps
 }
 
 // AppShell composes independent render boundaries for chrome and route content.
@@ -278,6 +284,7 @@ func AppShell(props AppShellProps) ui.Node {
 							OnNavigatePath:     props.OnNavigatePath,
 							OnPauseRequested:   props.OnPauseRequested,
 							OnStopRequested:    props.OnStopRequested,
+							Execution:          props.Execution,
 						}),
 					),
 					ui.CreateElement(AssuranceRail, AssuranceRailProps{
@@ -595,6 +602,12 @@ type RouteShellProps struct {
 	OnNavigatePath     func(string)
 	OnPauseRequested   func()
 	OnStopRequested    func()
+	// Execution is what the run is doing right now: the measurements that
+	// decide whether to intervene, the steps it has taken, the lines it is
+	// emitting, and what is in flight. It is optional because a task that has
+	// not started has none of it, and showing an empty execution panel would
+	// suggest a run that produced nothing rather than one that has not begun.
+	Execution *ExecutionPanelProps
 }
 
 func RouteShell(props RouteShellProps) ui.Node {
@@ -616,6 +629,7 @@ func RouteShell(props RouteShellProps) ui.Node {
 			OnGraphSelect:      props.OnGraphSelect,
 			OnNavigatePath:     props.OnNavigatePath,
 			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			Execution: props.Execution,
 		})
 	case routes.Graphs:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
@@ -629,6 +643,7 @@ func RouteShell(props RouteShellProps) ui.Node {
 			OnGraphSelect:      props.OnGraphSelect,
 			OnNavigatePath:     props.OnNavigatePath,
 			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			Execution: props.Execution,
 		})
 	case routes.Memory:
 		return ui.CreateElement(MemoryShell, SimpleRouteProps{
@@ -672,6 +687,24 @@ type TaskWorkspaceProps struct {
 	OnNavigatePath     func(string)
 	OnPauseRequested   func()
 	OnStopRequested    func()
+	// Execution is what the run is doing right now: the measurements that
+	// decide whether to intervene, the steps it has taken, the lines it is
+	// emitting, and what is in flight. It is optional because a task that has
+	// not started has none of it, and an empty execution panel would suggest a
+	// run that produced nothing rather than one that has not begun.
+	Execution *ExecutionPanelProps
+}
+
+// ExecutionPanelProps binds the execution surfaces into the workspace.
+type ExecutionPanelProps struct {
+	Measurements      []executionview.Measurement
+	Steps             []executionview.Step
+	Lines             []executionview.LogLine
+	Filter            executionview.Filter
+	Streaming         bool
+	Current           executionview.CurrentWork
+	OnToggleSeverity  func(executionview.Severity)
+	OnClearSeverities func()
 }
 
 func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
@@ -731,6 +764,25 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 		},
 		First: conversation, Second: graph,
 	})
+	if props.Execution != nil {
+		// The execution surfaces sit under the conversation, where a reader
+		// already looking at what the agent said finds what it is doing.
+		conversation = html.Main(html.Props{
+			ID: "main-content", TabIndex: -1,
+			Data: map[string]string{"focus-region": "conversation", "focus-order": "2"},
+			Class: css.New(
+				css.MinWidth(css.Zero), css.W(css.Full), css.H(css.Full), css.Overflow.Auto,
+			).String(),
+		},
+			ui.CreateElement(ConversationPane, ConversationPaneProps{
+				State: props.Snapshot.ConversationState, Messages: props.Snapshot.Messages(),
+				Revision: props.Snapshot.ConversationRevision(), Mode: mode, Probe: props.Probe,
+				Composer: composerProps, Timeline: props.Timeline,
+				OnGraphSelect: props.OnGraphSelect,
+			}),
+			executionPanels(*props.Execution, mode),
+		)
+	}
 	workspace := responsiveWorkspace(
 		layout, rail, conversation, graph, split, mode, props.OnLayoutChange,
 	)
@@ -1925,4 +1977,59 @@ func humanize(value string) string {
 		return "Unknown"
 	}
 	return strings.ToUpper(value[:1]) + value[1:]
+}
+
+// executionPanels lays out what the run is doing.
+//
+// The measurement strip runs full width above the rest, because those figures
+// are what a person scans first to decide whether to intervene. Below it the
+// timeline and the live log sit side by side: one answers "how far has this
+// got", the other "what is it saying", and reading either without the other
+// gives a misleading picture.
+func executionPanels(props ExecutionPanelProps, mode primitives.Mode) ui.Node {
+	tokens := mode.Tokens()
+	columns := []css.Rule{
+		u.Grid,
+		css.GridCols(css.MinMax(css.TrackLen(css.Zero), css.Fr(1))),
+		css.Gap(css.Px(tokens.Rhythm.PanelGap)),
+	}
+	columns = append(columns, css.Media(
+		css.MinW(1100),
+		css.GridCols(
+			css.MinMax(css.TrackLen(css.Zero), css.Fr(3)),
+			css.MinMax(css.TrackLen(css.Zero), css.Fr(2)),
+		),
+	)...)
+	return html.Div(html.Props{
+		Data: map[string]string{"component": "execution-panels"},
+		Class: css.New(
+			u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Rhythm.PanelGap)),
+			css.PaddingY(css.Px(tokens.Rhythm.PanelGap)),
+			css.MinWidth(css.Zero),
+		).String(),
+	},
+		executionview.MetricStrip(executionview.MetricStripProps{
+			Measurements: props.Measurements, Mode: mode,
+		}),
+		html.Div(html.Props{Class: css.New(columns...).String()},
+			executionview.StreamingLog(executionview.LogProps{
+				Lines: props.Lines, Filter: props.Filter, Streaming: props.Streaming,
+				Mode: mode, OnToggle: props.OnToggleSeverity,
+				OnClearAll: props.OnClearSeverities,
+			}),
+			html.Div(html.Props{
+				Class: css.New(
+					u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Rhythm.PanelGap)),
+					css.MinWidth(css.Zero),
+				).String(),
+			},
+				executionview.CurrentlyExecuting(executionview.CurrentWorkProps{
+					Work: props.Current, Mode: mode,
+				}),
+				executionview.ExecutionTimeline(executionview.TimelineProps{
+					Steps: props.Steps, Mode: mode,
+				}),
+			),
+		),
+	)
 }

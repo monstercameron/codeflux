@@ -30,6 +30,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-008
+Date: 2026-08-01
+Type: Execution surfaces, glyph removal, and end-to-end console coverage
+Request-or-TODO: The streaming execution surfaces shown in the design mockups,
+  and end-to-end browser coverage of the wired console
+Outcome: Added web/frontend/executionview -- a measurement strip with
+  sparklines, an ordered execution timeline, a severity-filtered streaming log,
+  and a currently-executing panel -- projected from durable events and mounted
+  in the task workspace. Removed the last decorative glyphs from accessible
+  names. Added an end-to-end suite that builds the assets, starts the real
+  executable, and drives the console it serves
+Affected-behavior: A running task now shows what it is doing: the figures that
+  decide whether to intervene, the steps it has taken in the coordinator's own
+  order, the lines it is emitting with severity filters, and the unit of work
+  in flight. A figure the coordinator has not reported reads as unknown rather
+  than as a zero. Decorative glyphs no longer reach assistive technology: a
+  section previously announced as "Identity and plan up-arrowhead" and a
+  control as "white diamond Request review"
+Compatibility-or-migration: No schema change. RootProps, AppShellProps,
+  RouteShellProps and TaskWorkspaceProps gain an optional Execution field;
+  contextControl no longer takes a glyph
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass. The new
+  end-to-end suite ran against the real executable and passed every check:
+  the client mounts with no console error, nothing is fetched from off the
+  machine, every heading resolves a colour and a size, the title resolves to
+  the reading serif, the navigation rail draws its icons, every primary route
+  navigates, keyboard focus is visible, and the page does not scroll sideways
+Dev-Log: DL-20260801-008
+
 Change-ID: CL-20260801-007
 Date: 2026-08-01
 Type: Interface composition, drawn icon set, and live review decisions
