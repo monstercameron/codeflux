@@ -225,6 +225,9 @@ func TestControlAndContentPrimitivesExposeSemanticState(t *testing.T) {
 	badge := render(t, Badge(BadgeProps{Label: "Blocked", Status: design.StatusBlocked}))
 	requireContains(t, badge, `data-status="blocked"`, `data-shape="lock"`, "Blocked")
 
+	chip := render(t, IconChip(IconChipProps{Label: "Plan", Kind: design.KindPlan}))
+	requireContains(t, chip, `data-component="icon-chip"`, `data-kind="plan"`, "Plan")
+
 	disclosure := render(t, Disclosure(DisclosureProps{
 		ID: "evidence", Label: "Evidence", Expanded: true, Content: html.Text("Proof"),
 	}))

@@ -73,6 +73,21 @@ type ColorTokens struct {
 	Evidence      Color
 	OnEvidence    Color
 	FocusRing     Color
+
+	// Kind accents color-code timeline cards and graph nodes by the typed
+	// content category they represent, independent from workflow Status.
+	Code         Color
+	OnCode       Color
+	Test         Color
+	OnTest       Color
+	Memory       Color
+	OnMemory     Color
+	Forecast     Color
+	OnForecast   Color
+	Execution    Color
+	OnExecution  Color
+	Validation   Color
+	OnValidation Color
 }
 
 // FontTokens uses only local system stacks.
@@ -348,49 +363,61 @@ func (tokens Tokens) Validate() error {
 
 func darkColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#071018", Shell: "#0a1621",
-		Surface1: "#101c28", Surface2: "#142332", Surface3: "#1a2c3e",
-		SurfaceRaised: "#172738", SurfaceInset: "#08131d",
-		BorderSubtle: "#2a3d4d", BorderStrong: "#607b8f",
-		TextPrimary: "#edf5f8", TextSecondary: "#b5c5d0", TextMuted: "#899daa",
-		TextDisabled: "#718491",
-		Accent:       "#28b8d2", AccentHover: "#55c9dc", AccentPressed: "#149ab5",
-		OnAccent: "#06151c", Link: "#79bfff",
-		Selection: "#123d52", OnSelection: "#ddf8ff",
-		Success: "#45b982", OnSuccess: "#06160f",
-		Warning: "#d9aa4e", OnWarning: "#1a1204",
-		Failure: "#e36b72", OnFailure: "#1b0709",
-		Active: "#58a8f8", OnActive: "#071522",
-		Blocked: "#d97891", OnBlocked: "#1b080f",
-		Invalidated: "#b49aa3", OnInvalidated: "#180d11",
-		Pending: "#91a3ae", OnPending: "#0a1116",
-		Plan: "#7897f2", OnPlan: "#081127",
-		Evidence: "#d2b15f", OnEvidence: "#181303",
-		FocusRing: "#80def1",
+		Canvas: "#0a0f0d", Shell: "#0d1614",
+		Surface1: "#111e1a", Surface2: "#16241f", Surface3: "#1c2c26",
+		SurfaceRaised: "#223530", SurfaceInset: "#070c0a",
+		BorderSubtle: "#253530", BorderStrong: "#6a8a7c",
+		TextPrimary: "#eaf3ee", TextSecondary: "#aec4ba", TextMuted: "#86988e",
+		TextDisabled: "#5e7268",
+		Accent:       "#29c46a", AccentHover: "#4fda88", AccentPressed: "#1c9a52",
+		OnAccent: "#05170d", Link: "#6fd1ff",
+		Selection: "#163a28", OnSelection: "#dffbea",
+		Success: "#34d399", OnSuccess: "#052015",
+		Warning: "#e3b341", OnWarning: "#1d1400",
+		Failure: "#f0667a", OnFailure: "#240509",
+		Active: "#4fa8ff", OnActive: "#041526",
+		Blocked: "#f0708a", OnBlocked: "#240509",
+		Invalidated: "#c79aa8", OnInvalidated: "#1d0f14",
+		Pending: "#93a79c", OnPending: "#0a1310",
+		Plan: "#a78bfa", OnPlan: "#170b2e",
+		Evidence: "#e3a83e", OnEvidence: "#1d1200",
+		FocusRing: "#66e3a0",
+		Code:      "#2fe0a0", OnCode: "#04160f",
+		Test: "#4c9efa", OnTest: "#041526",
+		Memory: "#93a0b0", OnMemory: "#0b1218",
+		Forecast: "#d7cb4a", OnForecast: "#201c02",
+		Execution: "#23b563", OnExecution: "#04160d",
+		Validation: "#2bc8cb", OnValidation: "#02191a",
 	}
 }
 
 func lightColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#edf2f4", Shell: "#e2eaee",
-		Surface1: "#f9fbfb", Surface2: "#f1f5f6", Surface3: "#e6eef1",
-		SurfaceRaised: "#ffffff", SurfaceInset: "#dce7eb",
-		BorderSubtle: "#c2d0d7", BorderStrong: "#60788a",
-		TextPrimary: "#152836", TextSecondary: "#344c5c", TextMuted: "#5d7281",
-		TextDisabled: "#71838f",
-		Accent:       "#007d99", AccentHover: "#006c86", AccentPressed: "#005c73",
-		OnAccent: "#ffffff", Link: "#075fae",
-		Selection: "#c8edf5", OnSelection: "#123645",
-		Success: "#20704f", OnSuccess: "#ffffff",
-		Warning: "#825700", OnWarning: "#ffffff",
-		Failure: "#a83245", OnFailure: "#ffffff",
-		Active: "#1b66b3", OnActive: "#ffffff",
-		Blocked: "#9c3b58", OnBlocked: "#ffffff",
-		Invalidated: "#75545f", OnInvalidated: "#ffffff",
-		Pending: "#526671", OnPending: "#ffffff",
-		Plan: "#3f5fae", OnPlan: "#ffffff",
-		Evidence: "#745b12", OnEvidence: "#ffffff",
-		FocusRing: "#006a85",
+		Canvas: "#f4f7f5", Shell: "#eef3ef",
+		Surface1: "#ffffff", Surface2: "#f6f9f7", Surface3: "#eaf0ec",
+		SurfaceRaised: "#ffffff", SurfaceInset: "#e3ebe6",
+		BorderSubtle: "#d3e0d8", BorderStrong: "#5c7568",
+		TextPrimary: "#10201a", TextSecondary: "#33453d", TextMuted: "#4c5f56",
+		TextDisabled: "#71847a",
+		Accent:       "#178246", AccentHover: "#146c3a", AccentPressed: "#0f5730",
+		OnAccent: "#ffffff", Link: "#0b6fae",
+		Selection: "#d6f3e2", OnSelection: "#0d3822",
+		Success: "#167a41", OnSuccess: "#ffffff",
+		Warning: "#8a5c00", OnWarning: "#ffffff",
+		Failure: "#b23347", OnFailure: "#ffffff",
+		Active: "#1c66c2", OnActive: "#ffffff",
+		Blocked: "#a23a55", OnBlocked: "#ffffff",
+		Invalidated: "#7a4f5c", OnInvalidated: "#ffffff",
+		Pending: "#44584f", OnPending: "#ffffff",
+		Plan: "#6748c7", OnPlan: "#ffffff",
+		Evidence: "#8a6110", OnEvidence: "#ffffff",
+		FocusRing: "#14824a",
+		Code:      "#0e6f42", OnCode: "#ffffff",
+		Test: "#1a63c9", OnTest: "#ffffff",
+		Memory: "#4c5e6b", OnMemory: "#ffffff",
+		Forecast: "#7a6c00", OnForecast: "#ffffff",
+		Execution: "#106b3f", OnExecution: "#ffffff",
+		Validation: "#0f7f83", OnValidation: "#ffffff",
 	}
 }
 
@@ -415,6 +442,12 @@ func highContrastColors() ColorTokens {
 		Plan: "#9eb7ff", OnPlan: "#000000",
 		Evidence: "#ffe27a", OnEvidence: "#000000",
 		FocusRing: "#ffff00",
+		Code:      "#63ffbe", OnCode: "#000000",
+		Test: "#7fc4ff", OnTest: "#000000",
+		Memory: "#d6dfe9", OnMemory: "#000000",
+		Forecast: "#fff176", OnForecast: "#000000",
+		Execution: "#74ffb8", OnExecution: "#000000",
+		Validation: "#6ff5ff", OnValidation: "#000000",
 	}
 }
 
@@ -443,6 +476,12 @@ func tokenColorMap(colors ColorTokens) map[string]Color {
 		"plan": colors.Plan, "on-plan": colors.OnPlan,
 		"evidence": colors.Evidence, "on-evidence": colors.OnEvidence,
 		"focus-ring": colors.FocusRing,
+		"code":       colors.Code, "on-code": colors.OnCode,
+		"test": colors.Test, "on-test": colors.OnTest,
+		"memory": colors.Memory, "on-memory": colors.OnMemory,
+		"forecast": colors.Forecast, "on-forecast": colors.OnForecast,
+		"execution": colors.Execution, "on-execution": colors.OnExecution,
+		"validation": colors.Validation, "on-validation": colors.OnValidation,
 	}
 }
 

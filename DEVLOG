@@ -24,6 +24,46 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-073
+Date: 2026-07-31
+Status: Complete
+Change-ID: CL-20260731-072
+Request-or-TODO: User request to extract the styling from the six
+  design/references/ui mockups and move the shipped frontend toward it using
+  the existing theming and i18n systems, without breaking changes
+Goal: Close the gap between the shipped navy/teal dashboard and the mockups'
+  near-black ground with an emerald accent and a typed per-kind palette, at
+  the token layer so every surface inherits it without component edits
+Assumptions: The mockups are authoritative for visual direction; design/ is
+  user-owned and read-only; shell, graphcanvas, and timelineview were held by
+  other lanes and could not be edited in this pass
+Decisions: Change tokens rather than components, so unowned surfaces inherit
+  the palette with no merge surface; extend ColorTokens additively so nothing
+  downstream stops compiling; leave GeometryTokens radii alone because an
+  existing exact-equality test pins them, and record the divergence from the
+  mockups rather than editing an assertion to match
+Files-or-schemas: web/frontend/design/tokens.go, contrast.go, kind.go;
+  web/frontend/primitives/chip.go, contracts.go;
+  web/frontend/timelinecard/presentation.go; matching tests. No schema.
+Validation: 76 fixed contrast pairs verified against WCAG AA in dark, light,
+  and high-contrast; design, primitives, timelinecard, and i18n tests pass;
+  go build, go vet, gofmt, and the js/wasm web build clean; screenshots taken
+  at 1920, 1440, 1280, 1024, and 820 wide in both themes and inspected, with
+  one grid overflow at 820 found and corrected before acceptance
+Failures-or-discarded-approaches: An initial fixed-column verification grid
+  overflowed at 820 px and was replaced with RepeatFit/MinMax. Fixing the
+  light theme by mechanically inverting dark tokens was rejected; each
+  text/surface pair was measured instead, which is how the roughly 1.1:1
+  panel-header contrast was found.
+Known-limitations: The IconChip primitive is built and tested but not yet
+  rendered anywhere, because timelineview was owned by another lane; the
+  mapping hook timelinecard.Card.DesignKind() exists for that wiring. Card
+  radii remain tighter than the mockups. The running app will not show the new
+  palette until it is rebuilt and redeployed.
+Next-safe-step: Wire primitives.IconChip into timelineview using
+  Card.DesignKind() and the MsgKind* catalog entries, then revisit
+  GeometryTokens radii with its pinning test.
+
 Dev-Log: DL-20260731-072
 Date: 2026-07-31
 Status: Complete

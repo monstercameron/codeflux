@@ -30,6 +30,32 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-072
+Date: 2026-07-31
+Type: Frontend design tokens and presentation primitives
+Request-or-TODO: User request to align the shipped interface with the
+  design/references/ui mockups using the existing theming and i18n systems
+Outcome: Retuned the dark, light, and high-contrast palettes from the prior
+  navy/teal system to the mockups' near-black ground with an emerald accent,
+  added eight typed kind colors with their On* pairs to ColorTokens, added the
+  design.Kind presentation contract, added the primitives.IconChip primitive,
+  and added a renderer-neutral timelinecard-to-design kind mapping.
+Affected-behavior: Every themed surface inherits the retuned palette without
+  component edits. The light theme no longer renders panel header text at
+  approximately 1.1:1 against its surface. Components may now distinguish
+  artifact kinds by color instead of rendering identical bordered cards.
+Compatibility-or-migration: Additive token and primitive changes only; no
+  exported token, field, or function was renamed or removed, and no runtime
+  schema or migration is involved. GeometryTokens radii remain unchanged
+  because an existing exact-equality test pins them. No handwritten
+  JavaScript, TypeScript, HTML, or CSS source is added.
+Verification: All 76 fixed contrast pairs meet WCAG AA in the dark, light, and
+  high-contrast themes; design, primitives, timelinecard, and i18n package
+  tests pass; go build, go vet, gofmt, and the js/wasm web build are clean.
+  Rendered output was inspected as screenshots at five viewport widths in both
+  themes before acceptance.
+Dev-Log: DL-20260731-073
+
 Change-ID: CL-20260731-071
 Date: 2026-07-31
 Type: Exact validation, review, evidence, and acceptance

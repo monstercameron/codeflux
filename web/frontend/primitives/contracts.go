@@ -29,6 +29,7 @@ func AccessibilityContracts() []AccessibilityContract {
 		{Component: "tooltip", Keyboard: []string{"Escape"}, FocusPolicy: "none", NameRequired: true, SupportsHighContrast: true, SupportsReducedMotion: true},
 		{Component: "text-field", Keyboard: []string{"native text editing"}, FocusPolicy: "native", NameRequired: true, SupportsDisabled: true, SupportsHighContrast: true, SupportsReducedMotion: true, MinimumPointerTarget: 44},
 		{Component: "badge", Keyboard: []string{"none"}, FocusPolicy: "none", NameRequired: true, SupportsHighContrast: true, SupportsReducedMotion: true},
+		{Component: "icon-chip", Keyboard: []string{"none"}, FocusPolicy: "none", NameRequired: true, SupportsHighContrast: true, SupportsReducedMotion: true},
 		{Component: "resizable-split", Keyboard: []string{"ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Pointer drag"}, FocusPolicy: "separator", NameRequired: true, SupportsHighContrast: true, SupportsReducedMotion: true, MinimumPointerTarget: 44},
 		{Component: "disclosure", Keyboard: []string{"Enter", "Space"}, FocusPolicy: "native", NameRequired: true, SupportsDisabled: true, SupportsHighContrast: true, SupportsReducedMotion: true, MinimumPointerTarget: 44},
 		{Component: "copy-button", Keyboard: []string{"Enter", "Space"}, FocusPolicy: "native", NameRequired: true, SupportsDisabled: true, SupportsBusy: true, SupportsHighContrast: true, SupportsReducedMotion: true, MinimumPointerTarget: 44},
