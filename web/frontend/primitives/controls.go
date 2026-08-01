@@ -31,6 +31,12 @@ type ButtonProps struct {
 	// still comes from Label or AccessibleLabel, so an icon-only control is
 	// never nameless: it looks like an icon and reads like a sentence.
 	Icon IconName
+	// DisabledReason says why a control cannot be used. A control that is
+	// neither actionable nor explained is the worst state an interface can be
+	// in, because it looks like it works; the reason reaches both a pointer
+	// user, through the native tooltip, and assistive technology, through the
+	// description.
+	DisabledReason string
 }
 
 func Button(props ButtonProps) ui.Node {
@@ -64,6 +70,11 @@ func Button(props ButtonProps) ui.Node {
 		"reduced-motion":  boolARIA(props.Mode.ReducedMotion),
 		"high-contrast":   boolARIA(props.Mode.HighContrast),
 		"pointer-minimum": "44",
+	}
+	if props.Disabled && strings.TrimSpace(props.DisabledReason) != "" {
+		htmlProps.Title = props.DisabledReason
+		htmlProps.Aria["description"] = props.DisabledReason
+		htmlProps.Data["disabled-reason"] = props.DisabledReason
 	}
 	label := props.Label
 	if props.Busy {

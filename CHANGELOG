@@ -30,6 +30,27 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-009
+Date: 2026-08-01
+Type: Disabled-control accountability and control coverage
+Request-or-TODO: The requirement that every control be functional or explain
+  itself
+Outcome: Every button can carry the reason it is disabled, and the end-to-end
+  suite refuses a control that is neither actionable nor explained
+Affected-behavior: A disabled control now states why through its native
+  tooltip and its accessible description. The telemetry deletion control,
+  which was disabled with no stated reason, now distinguishes the two cases
+  that disable it: nothing to delete, and a disconnected session
+Compatibility-or-migration: primitives.ButtonProps gains DisabledReason. The
+  attribute is emitted only when a reason exists, so unchanged controls
+  produce unchanged markup
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`, and the
+  repository checks pass. The end-to-end console suite passes with both new
+  checks: no control is inert or nameless, and every control meets a usable
+  target size
+Dev-Log: DL-20260801-009
+
 Change-ID: CL-20260801-008
 Date: 2026-08-01
 Type: Execution surfaces, glyph removal, and end-to-end console coverage

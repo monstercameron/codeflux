@@ -24,6 +24,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-009
+Date: 2026-08-01
+Status: Complete
+Change-ID: CL-20260801-009
+Request-or-TODO: Every control functional or explained
+Goal: Remove the state where a control looks like it works and does nothing
+Assumptions: Some controls are legitimately unavailable. The requirement is
+  not that every control always works; it is that one which does not says why
+Decisions: Put the reason on the control rather than in a separate notice, so
+  it reaches a pointer user through the native tooltip and assistive
+  technology through the description without a second element to keep in
+  step. Emit the attribute only when a reason exists: an empty one on every
+  button is noise, and it broke three component tests that read markup, which
+  was the markup telling me it was noise
+Files-or-schemas: web/frontend/primitives/controls;
+  web/frontend/telemetryview/component;
+  internal/frontendtest/production_console_test
+Validation: Full build, js/wasm build, vet, gofmt, the complete suite, lint,
+  and the repository checks pass. The browser suite found exactly one inert
+  control on the first run, which is what a check is for
+Failures-or-discarded-approaches: The first version emitted the attribute
+  unconditionally and broke three markup assertions. Those tests were right
+  and the change was wrong
+Known-limitations: The check covers the routes the suite visits. A control
+  behind a state the suite cannot reach -- a running task, a pending approval
+  -- is not yet covered, because reaching those needs a live provider
+Next-safe-step: Drive the suite through a started task so the controls that
+  only exist during a run are covered too
+
 Dev-Log: DL-20260801-008
 Date: 2026-08-01
 Status: The execution surfaces exist and are covered end to end; they are fed

@@ -82,10 +82,21 @@ func Component(props Props) ui.Node {
 			}),
 		)
 	} else {
+		// The two ways this control can be unusable are different, and a
+		// reader deciding what to do next needs to know which one applies.
+		reason := ""
+		switch {
+		case len(props.Rows) == 0:
+			reason = "There is no local telemetry to delete."
+		case props.OnDeleteRequest == nil:
+			reason = "Telemetry deletion is unavailable while the session is disconnected."
+		}
 		children = append(children, primitives.Button(primitives.ButtonProps{
 			Label: "Delete all local telemetry", AccessibleLabel: "Delete all local product telemetry",
-			Mode: props.Mode, Busy: props.Busy, Disabled: props.OnDeleteRequest == nil || len(props.Rows) == 0,
-			OnClick: props.OnDeleteRequest,
+			Mode: props.Mode, Busy: props.Busy,
+			Disabled:       props.OnDeleteRequest == nil || len(props.Rows) == 0,
+			DisabledReason: reason,
+			OnClick:        props.OnDeleteRequest,
 		}))
 	}
 	return html.Div(html.Props{Data: map[string]string{"component": "telemetry-settings"}}, children...)

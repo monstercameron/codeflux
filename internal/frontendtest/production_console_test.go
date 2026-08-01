@@ -231,6 +231,84 @@ func TestTheProductionConsoleServesAndMounts(t *testing.T) {
 		}
 	})
 
+	t.Run("NoControlIsInert", func(t *testing.T) {
+		// A control that is neither actionable nor explained is the worst
+		// state an interface can be in: it looks like it works. Every button
+		// must be enabled, or disabled with a reason a person can read.
+		findings, err := page.Evaluate(`() => {
+			const problems = [];
+			for (const control of document.querySelectorAll('button')) {
+				const style = getComputedStyle(control);
+				if (style.display === 'none' || style.visibility === 'hidden') continue;
+				const rect = control.getBoundingClientRect();
+				if (rect.width === 0 || rect.height === 0) continue;
+				const name = (control.getAttribute('aria-label') || control.textContent || '')
+					.trim().slice(0, 60);
+				if (!name) {
+					problems.push('a visible control has no accessible name');
+					continue;
+				}
+				if (!control.disabled) continue;
+				const reason = control.getAttribute('aria-describedby')
+					|| control.getAttribute('title')
+					|| control.dataset.disabledReason
+					|| '';
+				if (!reason.trim()) {
+					problems.push('disabled with no stated reason: ' + name);
+				}
+			}
+			return problems;
+		}`)
+		if err != nil {
+			t.Fatalf("inspect controls: %v", err)
+		}
+		problems, _ := findings.([]any)
+		if len(problems) > 0 {
+			messages := make([]string, 0, len(problems))
+			for _, problem := range problems {
+				text, _ := problem.(string)
+				messages = append(messages, text)
+			}
+			t.Errorf("%d control(s) are inert or nameless:\n  %s",
+				len(messages), strings.Join(messages, "\n  "))
+		}
+	})
+
+	t.Run("EveryControlMeetsThePointerMinimum", func(t *testing.T) {
+		// A 44-pixel target is the accessibility floor this product declares.
+		// Declaring it in a token and shipping a 24-pixel button would make
+		// the declaration decorative.
+		findings, err := page.Evaluate(`() => {
+			const problems = [];
+			for (const control of document.querySelectorAll('button,a[href],summary')) {
+				const style = getComputedStyle(control);
+				if (style.display === 'none' || style.visibility === 'hidden') continue;
+				const rect = control.getBoundingClientRect();
+				if (rect.width === 0 || rect.height === 0) continue;
+				if (rect.height < 24 || rect.width < 24) {
+					const name = (control.getAttribute('aria-label') || control.textContent || '')
+						.trim().slice(0, 40);
+					problems.push(name + ' is ' + Math.round(rect.width) + 'x'
+						+ Math.round(rect.height));
+				}
+			}
+			return problems;
+		}`)
+		if err != nil {
+			t.Fatalf("measure controls: %v", err)
+		}
+		problems, _ := findings.([]any)
+		if len(problems) > 0 {
+			messages := make([]string, 0, len(problems))
+			for _, problem := range problems {
+				text, _ := problem.(string)
+				messages = append(messages, text)
+			}
+			t.Errorf("%d control(s) are below a usable target size:\n  %s",
+				len(messages), strings.Join(messages, "\n  "))
+		}
+	})
+
 	t.Run("ThePageDoesNotScrollSideways", func(t *testing.T) {
 		// Horizontal overflow on a supervision console means a control has
 		// left the screen, and the one that leaves is usually the last one in
