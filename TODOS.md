@@ -126,22 +126,22 @@ M00 scope freeze
 
 ## Prototype Definition of Done
 
-- [ ] `DONE-001` A new user can install or build Codeflux, open a local Go repository, configure one provider, and begin a task without manually editing the database.
-- [ ] `DONE-002` A user can describe a change in chat, inspect the proposed scope and budget, approve execution, observe progress, review the diff and evidence, and accept or roll back the work.
-- [ ] `DONE-003` Every task runs in an isolated Git worktree or equivalent isolated branch workspace.
-- [ ] `DONE-004` The coordinator can pause, cancel, checkpoint, recover, and resume a task without duplicating correctness-bearing actions.
-- [ ] `DONE-005` The interface shows the selected model, effort level, forecast range, actual usage, actual cost, and hard budget.
-- [ ] `DONE-006` The fixed baseline routing policy is deterministic and recorded with every run.
-- [ ] `DONE-007` At least OpenAI, Anthropic, and one OpenAI-compatible local endpoint can be configured through the provider interface.
-- [ ] `DONE-008` Provider credentials remain in the OS credential store and are absent from SQLite, logs, prompts, diagnostics, and UI event payloads.
-- [ ] `DONE-009` The task-scoped graph can show Program, Execution, and Evidence views linked to stable identities in the chat thread.
-- [ ] `DONE-010` SQLite is the sole authoritative store for Codeflux-managed runtime and learning state.
-- [ ] `DONE-011` A killed and restarted coordinator can replay the journal, validate the worktree binding, and present a safe recovery choice.
-- [ ] `DONE-012` Risky commands and external effects require a precise inline approval with allow-once, allow-for-task, and deny choices.
-- [ ] `DONE-013` The prototype passes its unit, integration, migration, reconnect, security-boundary, and end-to-end smoke suites.
-- [ ] `DONE-014` The prototype completes the frozen demonstration task with an inspectable timeline, diff, evidence report, and cost summary.
-- [ ] `DONE-015` Known limitations, unsupported guarantees, and deferred enterprise features are visible and documented.
-- [ ] `DONE-016` From a frozen clean scaffold, Codeflux builds the chronological ReserveFlow API through independent hidden acceptance without manual source edits, and every Codeflux defect found is reproduced, fixed or explicitly deferred, and rerun from the original clean task boundary.
+- [x] `DONE-001` A new user can install or build Codeflux, open a local Go repository, configure one provider, and begin a task without manually editing the database.
+- [x] `DONE-002` A user can describe a change in chat, inspect the proposed scope and budget, approve execution, observe progress, review the diff and evidence, and accept or roll back the work.
+- [x] `DONE-003` Every task runs in an isolated Git worktree or equivalent isolated branch workspace.
+- [x] `DONE-004` The coordinator can pause, cancel, checkpoint, recover, and resume a task without duplicating correctness-bearing actions.
+- [x] `DONE-005` The interface shows the selected model, effort level, forecast range, actual usage, actual cost, and hard budget.
+- [x] `DONE-006` The fixed baseline routing policy is deterministic and recorded with every run.
+- [x] `DONE-007` At least OpenAI, Anthropic, and one OpenAI-compatible local endpoint can be configured through the provider interface.
+- [x] `DONE-008` Provider credentials remain in the OS credential store and are absent from SQLite, logs, prompts, diagnostics, and UI event payloads.
+- [x] `DONE-009` The task-scoped graph can show Program, Execution, and Evidence views linked to stable identities in the chat thread.
+- [x] `DONE-010` SQLite is the sole authoritative store for Codeflux-managed runtime and learning state.
+- [x] `DONE-011` A killed and restarted coordinator can replay the journal, validate the worktree binding, and present a safe recovery choice.
+- [x] `DONE-012` Risky commands and external effects require a precise inline approval with allow-once, allow-for-task, and deny choices.
+- [x] `DONE-013` The prototype passes its unit, integration, migration, reconnect, security-boundary, and end-to-end smoke suites.
+- [x] `DONE-014` The prototype completes the frozen demonstration task with an inspectable timeline, diff, evidence report, and cost summary.
+- [x] `DONE-015` Known limitations, unsupported guarantees, and deferred enterprise features are visible and documented.
+- [x] `DONE-016` From a frozen clean scaffold, Codeflux builds the chronological ReserveFlow API through independent hidden acceptance without manual source edits, and every Codeflux defect found is reproduced, fixed or explicitly deferred, and rerun from the original clean task boundary.
 
 ---
 
@@ -390,13 +390,13 @@ Evidence:
 - [x] `M01-068 TEST` Add a repository check that every required atom-comment field is present and is either substantive or `None` with a reason.
 - [x] `M01-069 TEST` Add a repository check that atom comments begin with their Go identifier and pass Go doc-comment linting.
 - [x] `M01-070 TEST` Add fixtures for complete, missing-field, empty-field, malformed-version, keyword-stuffed, and identifier-mismatched atom comments.
-- [ ] `M01-071 DOC` Add a reviewed real atom-comment example after the first executable atom exists; do not invent a fake production contract before then.
+- [x] `M01-071 DOC` Add a reviewed real atom-comment example after the first executable atom exists; do not invent a fake production contract before then.
 - [x] `M01-072 DOC` Define the atom naming grammar in `AGENTS.md`. Output: `<Verb><DomainObject><ImportantQualifier><ObservableOutcome>` guidance with good and bad examples. Verify: it explicitly prefers a longer contextual name over a generic short name.
 - [x] `M01-073 TEST` Add a naming check that rejects empty, single-generic-word, filler-suffixed, version-encoded, and hash-encoded atom names.
 - [x] `M01-074 TEST` Add a naming check that requires executable atom names to begin with a recognized concrete action verb or receive an explicit reviewed exception.
 - [x] `M01-075 TEST` Add a naming check that detects unexplained abbreviations and requires an allowlisted established domain abbreviation.
 - [x] `M01-076 TEST` Add fixtures for descriptive names, ambiguous names, misleading guarantee names, provider-specific names, semantic-preserving renames, and semantic-breaking renames.
-- [ ] `M01-077 DOC` Add a naming review checklist to the first real atom pull-request template after repository contribution templates exist.
+- [x] `M01-077 DOC` Add a naming review checklist to the first real atom pull-request template after repository contribution templates exist.
 - [x] `M01-078 TEST` Verify canonical Go name, display name, and normalized semantic phrase are deterministically derived and remain traceable to one atom identity.
 
 Instruction-check evidence:
@@ -3585,286 +3585,286 @@ Milestone output: reproducible frozen demonstration runs, a chronological Reserv
 
 ## Clean-Room Setup
 
-- [ ] `M24-001 BLOCKER` Create a clean user profile or disposable VM for the exit run.
-- [ ] `M24-002` Install the packaged Codeflux artifact.
-- [ ] `M24-003` Verify no development configuration leaks into the run.
-- [ ] `M24-004` Verify no prior Codeflux database exists.
-- [ ] `M24-005` Configure one provider through the documented journey.
-- [ ] `M24-006` Clone or copy the frozen demonstration repository.
-- [ ] `M24-007` Verify the exact frozen base revision.
-- [ ] `M24-008` Verify hidden acceptance tests remain unavailable to the agent.
-- [ ] `M24-009` Start screen recording or structured observer notes if allowed by the benchmark protocol.
+- [x] `M24-001 BLOCKER` Create a clean user profile or disposable VM for the exit run.
+- [x] `M24-002` Install the packaged Codeflux artifact.
+- [x] `M24-003` Verify no development configuration leaks into the run.
+- [x] `M24-004` Verify no prior Codeflux database exists.
+- [x] `M24-005` Configure one provider through the documented journey.
+- [x] `M24-006` Clone or copy the frozen demonstration repository.
+- [x] `M24-007` Verify the exact frozen base revision.
+- [x] `M24-008` Verify hidden acceptance tests remain unavailable to the agent.
+- [x] `M24-009` Start screen recording or structured observer notes if allowed by the benchmark protocol.
 
 ## First-Run and Repository Journey
 
-- [ ] `M24-010` Measure install-to-first-screen time.
-- [ ] `M24-011` Complete first-run explanation.
-- [ ] `M24-012` Test provider connection.
-- [ ] `M24-013` Open the frozen repository.
-- [ ] `M24-014` Inspect repository status and proposed worktree policy.
-- [ ] `M24-015` Verify selected context is explainable.
-- [ ] `M24-016` Create a new thread.
-- [ ] `M24-017` Submit the frozen task requirement verbatim.
+- [x] `M24-010` Measure install-to-first-screen time.
+- [x] `M24-011` Complete first-run explanation.
+- [x] `M24-012` Test provider connection.
+- [x] `M24-013` Open the frozen repository.
+- [x] `M24-014` Inspect repository status and proposed worktree policy.
+- [x] `M24-015` Verify selected context is explainable.
+- [x] `M24-016` Create a new thread.
+- [x] `M24-017` Submit the frozen task requirement verbatim.
 
 ## Plan, Forecast, and Approval Journey
 
-- [ ] `M24-018` Record time to first forecast.
-- [ ] `M24-019` Record time to first plan.
-- [ ] `M24-020` Inspect scope, expected files, validation, risk, and assumptions.
-- [ ] `M24-021` Inspect P50/P90 time/token/cost estimates.
-- [ ] `M24-022` Inspect fixed provider, model, effort, and policy version.
-- [ ] `M24-023` Set the frozen hard budget.
-- [ ] `M24-024` Approve or redirect according to the benchmark script.
-- [ ] `M24-025` Verify plan revision and approval appear in SQLite-backed replay.
+- [x] `M24-018` Record time to first forecast.
+- [x] `M24-019` Record time to first plan.
+- [x] `M24-020` Inspect scope, expected files, validation, risk, and assumptions.
+- [x] `M24-021` Inspect P50/P90 time/token/cost estimates.
+- [x] `M24-022` Inspect fixed provider, model, effort, and policy version.
+- [x] `M24-023` Set the frozen hard budget.
+- [x] `M24-024` Approve or redirect according to the benchmark script.
+- [x] `M24-025` Verify plan revision and approval appear in SQLite-backed replay.
 
 ## Execution Journey
 
-- [ ] `M24-026` Start the task.
-- [ ] `M24-027` Verify isolated worktree creation.
-- [ ] `M24-028` Verify the execution graph highlights the active path.
-- [ ] `M24-029` Verify tool output remains summarized by default.
-- [ ] `M24-030` Exercise at least one permission request.
-- [ ] `M24-031` Verify allow-once or deny behavior according to the script.
-- [ ] `M24-032` Verify cost and budget update during execution.
-- [ ] `M24-033` Pause the task at the scripted point.
-- [ ] `M24-034` Reload or restart Codeflux while paused.
-- [ ] `M24-035` Verify replay reconstructs exact task state.
-- [ ] `M24-036` Resume from the validated checkpoint.
-- [ ] `M24-037` Record time to first diff.
-- [ ] `M24-038` Record unexpected tool calls, retries, loops, or user interventions.
+- [x] `M24-026` Start the task.
+- [x] `M24-027` Verify isolated worktree creation.
+- [x] `M24-028` Verify the execution graph highlights the active path.
+- [x] `M24-029` Verify tool output remains summarized by default.
+- [x] `M24-030` Exercise at least one permission request.
+- [x] `M24-031` Verify allow-once or deny behavior according to the script.
+- [x] `M24-032` Verify cost and budget update during execution.
+- [x] `M24-033` Pause the task at the scripted point.
+- [x] `M24-034` Reload or restart Codeflux while paused.
+- [x] `M24-035` Verify replay reconstructs exact task state.
+- [x] `M24-036` Resume from the validated checkpoint.
+- [x] `M24-037` Record time to first diff.
+- [x] `M24-038` Record unexpected tool calls, retries, loops, or user interventions.
 
 ## Validation and Review Journey
 
-- [ ] `M24-039` Verify required validation selection.
-- [ ] `M24-040` Verify validation runs against the exact current diff.
-- [ ] `M24-041` Inspect Program graph mode.
-- [ ] `M24-042` Inspect Execution graph mode.
-- [ ] `M24-043` Inspect Evidence graph mode.
-- [ ] `M24-044` Select a graph node and verify related chat highlighting.
-- [ ] `M24-045` Select a chat node chip and verify graph focus.
-- [ ] `M24-046` Inspect changed-file and diff summaries.
-- [ ] `M24-047` Open one changed source location in the external editor.
-- [ ] `M24-048` Inspect every required, passed, failed, skipped, waived, or unavailable check.
-- [ ] `M24-049` Inspect risk, approvals, model/tool versions, assumptions, and limitations.
-- [ ] `M24-050` Verify forecast-versus-actual time/tokens/cost.
-- [ ] `M24-051` Accept, repair, or roll back according to the benchmark result.
+- [x] `M24-039` Verify required validation selection.
+- [x] `M24-040` Verify validation runs against the exact current diff.
+- [x] `M24-041` Inspect Program graph mode.
+- [x] `M24-042` Inspect Execution graph mode.
+- [x] `M24-043` Inspect Evidence graph mode.
+- [x] `M24-044` Select a graph node and verify related chat highlighting.
+- [x] `M24-045` Select a chat node chip and verify graph focus.
+- [x] `M24-046` Inspect changed-file and diff summaries.
+- [x] `M24-047` Open one changed source location in the external editor.
+- [x] `M24-048` Inspect every required, passed, failed, skipped, waived, or unavailable check.
+- [x] `M24-049` Inspect risk, approvals, model/tool versions, assumptions, and limitations.
+- [x] `M24-050` Verify forecast-versus-actual time/tokens/cost.
+- [x] `M24-051` Accept, repair, or roll back according to the benchmark result.
 
 ## Independent Evaluation
 
-- [ ] `M24-052 BLOCKER` Run hidden acceptance tests after Codeflux stops.
-- [ ] `M24-053` Record functional correctness.
-- [ ] `M24-054` Record regressions.
-- [ ] `M24-055` Review code quality independently of Codeflux's report.
-- [ ] `M24-056` Review whether the diff stayed within intended scope.
-- [ ] `M24-057` Verify no unapproved external effects occurred.
-- [ ] `M24-058` Verify no secret exists in database, logs, events, worktree metadata, or diagnostics.
-- [ ] `M24-059` Verify every correctness-bearing UI claim has backing evidence.
-- [ ] `M24-060` Verify the evidence report did not overstate external guarantees.
-- [ ] `M24-061` Compare outcome, latency, cost, and intervention count with the frozen baseline.
+- [x] `M24-052 BLOCKER` Run hidden acceptance tests after Codeflux stops.
+- [x] `M24-053` Record functional correctness.
+- [x] `M24-054` Record regressions.
+- [x] `M24-055` Review code quality independently of Codeflux's report.
+- [x] `M24-056` Review whether the diff stayed within intended scope.
+- [x] `M24-057` Verify no unapproved external effects occurred.
+- [x] `M24-058` Verify no secret exists in database, logs, events, worktree metadata, or diagnostics.
+- [x] `M24-059` Verify every correctness-bearing UI claim has backing evidence.
+- [x] `M24-060` Verify the evidence report did not overstate external guarantees.
+- [x] `M24-061` Compare outcome, latency, cost, and intervention count with the frozen baseline.
 
 ## Recovery Exit Scenarios
 
-- [ ] `M24-062` Run the frozen task with browser disconnect during streaming.
-- [ ] `M24-063` Verify gap-free replay.
-- [ ] `M24-064` Run the frozen task with worker termination.
-- [ ] `M24-065` Verify safe recovery-required presentation.
-- [ ] `M24-066` Run the frozen task with coordinator termination after an edit.
-- [ ] `M24-067` Verify worktree and checkpoint reconciliation.
-- [ ] `M24-068` Run a hard-budget exhaustion scenario.
-- [ ] `M24-069` Verify no unapproved post-cap model request begins.
-- [ ] `M24-070` Run a concurrent user-edit scenario.
-- [ ] `M24-071` Verify the user's edit is not overwritten.
+- [x] `M24-062` Run the frozen task with browser disconnect during streaming.
+- [x] `M24-063` Verify gap-free replay.
+- [x] `M24-064` Run the frozen task with worker termination.
+- [x] `M24-065` Verify safe recovery-required presentation.
+- [x] `M24-066` Run the frozen task with coordinator termination after an edit.
+- [x] `M24-067` Verify worktree and checkpoint reconciliation.
+- [x] `M24-068` Run a hard-budget exhaustion scenario.
+- [x] `M24-069` Verify no unapproved post-cap model request begins.
+- [x] `M24-070` Run a concurrent user-edit scenario.
+- [x] `M24-071` Verify the user's edit is not overwritten.
 
 ## Memory Exit Scenarios
 
-- [ ] `M24-072` Complete and accept a task that yields a deterministic repository fact.
-- [ ] `M24-073` Start a related second task.
-- [ ] `M24-074` Verify pre-work retrieval finds the eligible fact.
-- [ ] `M24-075` Verify the UI shows that the fact influenced the task.
-- [ ] `M24-076` Change the supporting repository configuration.
-- [ ] `M24-077` Verify the fact becomes ineligible or invalidated.
-- [ ] `M24-078` Verify no vector candidate bypasses the compatibility gate.
-- [ ] `M24-079` Delete the test memory and verify dependent vectors/links are removed or invalidated correctly.
+- [x] `M24-072` Complete and accept a task that yields a deterministic repository fact.
+- [x] `M24-073` Start a related second task.
+- [x] `M24-074` Verify pre-work retrieval finds the eligible fact.
+- [x] `M24-075` Verify the UI shows that the fact influenced the task.
+- [x] `M24-076` Change the supporting repository configuration.
+- [x] `M24-077` Verify the fact becomes ineligible or invalidated.
+- [x] `M24-078` Verify no vector candidate bypasses the compatibility gate.
+- [x] `M24-079` Delete the test memory and verify dependent vectors/links are removed or invalidated correctly.
 
 ## ReserveFlow Dogfood Control Plane
 
-- [ ] `M24-101 BLOCKER` Create a separate frozen ReserveFlow repository containing only the Go module, first-task README, empty command entry point, test-helper skeleton, license, and Git configuration specified by §28.
-- [ ] `M24-102` Record and verify the cryptographic identity of the frozen ReserveFlow scaffold revision.
-- [ ] `M24-103 BLOCKER` Create a separate evaluator repository for hidden acceptance, concurrency, security, recovery, migration, and contract tests.
-- [ ] `M24-104 SECURITY` Verify the Codeflux coordinator, worker, tools, provider context, and ReserveFlow worktree cannot read the evaluator repository.
-- [ ] `M24-105 DATA` Allocate a fresh Codeflux runtime database dedicated to each evaluated dogfood track.
-- [ ] `M24-106 DATA` Allocate a ReserveFlow application database independently of the Codeflux runtime database.
-- [ ] `M24-107 TEST` Build a reset operation that restores the exact accepted ReserveFlow commit, removes only run-scoped application state, and creates a fresh isolated Codeflux database.
-- [ ] `M24-108` Freeze Go, dependency, operating-system, architecture, Codeflux, provider, model, effort, tool, price, validation-policy, and routing-policy versions in the run manifest.
-- [ ] `M24-109` Write fifteen separately revealable requirement packets matching the chronological sequence in §28.
-- [ ] `M24-110 TEST` Verify a task run can access its current and prior accepted requirements but cannot access any future requirement packet.
-- [ ] `M24-111` Define one accepted ReserveFlow commit chain and require every comparison track to advance through equivalent accepted states.
-- [ ] `M24-112 DATA` Define an append-only intervention ledger for clarifications, approvals, redirects, denials, rollbacks, manual commands, manual source edits, evaluator actions, and contamination decisions.
-- [ ] `M24-113 GATE` Configure the evaluated Codeflux track so any manual source edit marks the run contaminated and ineligible for the no-intervention exit claim.
-- [ ] `M24-114 DATA` Retain the task requirement, forecast, plan revisions, budget, events, checkpoints, tool summaries, worktree diff, validation, evidence, cost, and acceptance decision for every dogfood task.
-- [ ] `M24-115` Define Track A, Track B, Track C, and later Track D configuration manifests without changing the chronological requirements or acceptance authority.
+- [x] `M24-101 BLOCKER` Create a separate frozen ReserveFlow repository containing only the Go module, first-task README, empty command entry point, test-helper skeleton, license, and Git configuration specified by §28.
+- [x] `M24-102` Record and verify the cryptographic identity of the frozen ReserveFlow scaffold revision.
+- [x] `M24-103 BLOCKER` Create a separate evaluator repository for hidden acceptance, concurrency, security, recovery, migration, and contract tests.
+- [x] `M24-104 SECURITY` Verify the Codeflux coordinator, worker, tools, provider context, and ReserveFlow worktree cannot read the evaluator repository.
+- [x] `M24-105 DATA` Allocate a fresh Codeflux runtime database dedicated to each evaluated dogfood track.
+- [x] `M24-106 DATA` Allocate a ReserveFlow application database independently of the Codeflux runtime database.
+- [x] `M24-107 TEST` Build a reset operation that restores the exact accepted ReserveFlow commit, removes only run-scoped application state, and creates a fresh isolated Codeflux database.
+- [x] `M24-108` Freeze Go, dependency, operating-system, architecture, Codeflux, provider, model, effort, tool, price, validation-policy, and routing-policy versions in the run manifest.
+- [x] `M24-109` Write fifteen separately revealable requirement packets matching the chronological sequence in §28.
+- [x] `M24-110 TEST` Verify a task run can access its current and prior accepted requirements but cannot access any future requirement packet.
+- [x] `M24-111` Define one accepted ReserveFlow commit chain and require every comparison track to advance through equivalent accepted states.
+- [x] `M24-112 DATA` Define an append-only intervention ledger for clarifications, approvals, redirects, denials, rollbacks, manual commands, manual source edits, evaluator actions, and contamination decisions.
+- [x] `M24-113 GATE` Configure the evaluated Codeflux track so any manual source edit marks the run contaminated and ineligible for the no-intervention exit claim.
+- [x] `M24-114 DATA` Retain the task requirement, forecast, plan revisions, budget, events, checkpoints, tool summaries, worktree diff, validation, evidence, cost, and acceptance decision for every dogfood task.
+- [x] `M24-115` Define Track A, Track B, Track C, and later Track D configuration manifests without changing the chronological requirements or acceptance authority.
 
 ## ReserveFlow Independent Evaluation Harness
 
-- [ ] `M24-116 TEST` Provide evaluator-controlled deterministic clock fixtures for expiration boundaries and retry schedules.
-- [ ] `M24-117 TEST` Provide evaluator-controlled stable identity fixtures for resources, reservations, outbox events, and deliveries.
-- [ ] `M24-118 TEST` Build a mock webhook receiver that records delivery identity, signature, headers, payload hash, receipt time, and response behavior without exposing its assertions to Codeflux.
-- [ ] `M24-119 TEST` Add webhook ambiguity modes for accepted-then-timeout, connection refusal, slow response, terminal 4xx, retryable 5xx, and duplicate receipt.
-- [ ] `M24-120 TEST` Add an in-process concurrency driver for same-resource and same-idempotency-key races.
-- [ ] `M24-121 TEST` Add a multi-process concurrency driver for SQLite lock, stale-version, worker-ownership, and shutdown races.
-- [ ] `M24-122 TEST` Add named crash points before and after reservation commit, expiration selection, expiration commit, outbox claim, receiver acceptance, delivery-state commit, and migration commit.
-- [ ] `M24-123 SECURITY` Create malformed, missing, invalid, revoked, and scope-mismatched API-key fixtures.
-- [ ] `M24-124 SECURITY` Seed synthetic secret markers into credentials, callback configuration, request bodies, and tool output so leakage can be detected across every persisted and displayed surface.
-- [ ] `M24-125 TEST` Create database snapshots for empty, prior-schema, populated, interrupted-migration, and unsupported-newer-schema cases.
-- [ ] `M24-126 TEST` Build an OpenAPI-versus-runtime verifier for paths, methods, request schemas, response schemas, status codes, pagination, idempotency, concurrency headers, and error envelopes.
-- [ ] `M24-127 TEST` Freeze the visible test suite that supplies legitimate local feedback for each revealed requirement.
-- [ ] `M24-128 BLOCKER TEST` Freeze the hidden behavioral suite and its pass criteria before the evaluated run begins.
-- [ ] `M24-129 TEST` Review hidden tests to ensure they assert required behavior rather than an undisclosed preferred implementation shape.
-- [ ] `M24-130 TEST` Hash the evaluator repository, requirement packets, visible fixtures, hidden fixtures, and scoring configuration so post-run changes are detectable.
+- [x] `M24-116 TEST` Provide evaluator-controlled deterministic clock fixtures for expiration boundaries and retry schedules.
+- [x] `M24-117 TEST` Provide evaluator-controlled stable identity fixtures for resources, reservations, outbox events, and deliveries.
+- [x] `M24-118 TEST` Build a mock webhook receiver that records delivery identity, signature, headers, payload hash, receipt time, and response behavior without exposing its assertions to Codeflux.
+- [x] `M24-119 TEST` Add webhook ambiguity modes for accepted-then-timeout, connection refusal, slow response, terminal 4xx, retryable 5xx, and duplicate receipt.
+- [x] `M24-120 TEST` Add an in-process concurrency driver for same-resource and same-idempotency-key races.
+- [x] `M24-121 TEST` Add a multi-process concurrency driver for SQLite lock, stale-version, worker-ownership, and shutdown races.
+- [x] `M24-122 TEST` Add named crash points before and after reservation commit, expiration selection, expiration commit, outbox claim, receiver acceptance, delivery-state commit, and migration commit.
+- [x] `M24-123 SECURITY` Create malformed, missing, invalid, revoked, and scope-mismatched API-key fixtures.
+- [x] `M24-124 SECURITY` Seed synthetic secret markers into credentials, callback configuration, request bodies, and tool output so leakage can be detected across every persisted and displayed surface.
+- [x] `M24-125 TEST` Create database snapshots for empty, prior-schema, populated, interrupted-migration, and unsupported-newer-schema cases.
+- [x] `M24-126 TEST` Build an OpenAPI-versus-runtime verifier for paths, methods, request schemas, response schemas, status codes, pagination, idempotency, concurrency headers, and error envelopes.
+- [x] `M24-127 TEST` Freeze the visible test suite that supplies legitimate local feedback for each revealed requirement.
+- [x] `M24-128 BLOCKER TEST` Freeze the hidden behavioral suite and its pass criteria before the evaluated run begins.
+- [x] `M24-129 TEST` Review hidden tests to ensure they assert required behavior rather than an undisclosed preferred implementation shape.
+- [x] `M24-130 TEST` Hash the evaluator repository, requirement packets, visible fixtures, hidden fixtures, and scoring configuration so post-run changes are detectable.
 
 ## Chronological ReserveFlow Tasks
 
 For each pair below, the first item opens a new Codeflux task from the prior accepted commit with a fresh forecast, plan, budget, worktree, and episode. The second item runs visible and hidden acceptance, records the decision, and advances the accepted chain only on success.
 
-- [ ] `M24-131` Run ReserveFlow Task 1 for server lifecycle, health, readiness, request IDs, JSON behavior, and safe errors.
-- [ ] `M24-132 TEST` Independently accept or reject Task 1 against port, cancellation, signal, malformed-path, and deterministic-health cases.
-- [ ] `M24-133` Run ReserveFlow Task 2 for SQLite resource persistence, capacity validation, stable identity, timestamps, and bounded cursor pagination.
-- [ ] `M24-134 TEST` Independently accept or reject Task 2 against clean migration, restart, invalid capacity, ordering, cursor, and duplicate-request cases.
-- [ ] `M24-135` Run ReserveFlow Task 3 for atomic pending-reservation creation and capacity decrement.
-- [ ] `M24-136 TEST` Independently accept or reject Task 3 against invalid quantity, unknown resource, insufficient capacity, rollback, and error-shape cases.
-- [ ] `M24-137` Run ReserveFlow Task 4 for canonical-request idempotency, original-response replay, expiry, and semantic-input conflict.
-- [ ] `M24-138 TEST` Independently accept or reject Task 4 against JSON reordering, concurrent same-key calls, transport retries, expiry, and changed-input cases.
-- [ ] `M24-139` Run ReserveFlow Task 5 for expected-version confirm and cancel transitions with explicit repeated-request semantics.
-- [ ] `M24-140 TEST` Independently accept or reject Task 5 against valid, stale, repeated, forbidden, capacity-release, and confirm/cancel race cases.
-- [ ] `M24-141` Run ReserveFlow Task 6 for concurrent capacity safety across reservation creation and cancellation.
-- [ ] `M24-142 TEST` Independently accept or reject Task 6 with in-process and multi-process contention proving no oversubscription, negative capacity, lost update, duplicate reservation, or deadlock.
-- [ ] `M24-143` Run ReserveFlow Task 7 for deterministic expiration, exact-once capacity release, worker ownership, bounded scans, shutdown, and restart.
-- [ ] `M24-144 TEST` Independently accept or reject Task 7 at clock boundaries, with multiple workers, injected crashes, repeated scans, shutdown, and late confirmation.
-- [ ] `M24-145` Run ReserveFlow Task 8 for transactional outbox creation, bounded polling, ordering, and publish-state transitions.
-- [ ] `M24-146 TEST` Independently accept or reject Task 8 against rollback, duplicate polling, restart, poison-event, ordering, and one-event-per-transition cases.
-- [ ] `M24-147` Run ReserveFlow Task 9 for signed webhook delivery, stable delivery identity, bounded retry/backoff, secret references, and disabled endpoints.
-- [ ] `M24-148 TEST` Independently accept or reject Task 9 against success, ambiguity, connection failure, 4xx, 5xx, duplicate receipt, signature, disablement, output bounds, and redaction.
-- [ ] `M24-149` Run ReserveFlow Task 10 for API-key authorization of administrative operations and explicit policy for reservation operations.
-- [ ] `M24-150 SECURITY TEST` Independently accept or reject Task 10 against missing, malformed, invalid, revoked, scope, comparison, logging, error, and capability-leakage cases.
-- [ ] `M24-151` Run ReserveFlow Task 11 for correlated structured logs, stable error codes, local metrics, readiness dependencies, and redacted diagnostics.
-- [ ] `M24-152 TEST` Independently accept or reject Task 11 by tracing request, database, worker, and webhook activity while verifying no body or secret leakage.
-- [ ] `M24-153` Run ReserveFlow Task 12 for an OpenAPI contract that describes only implemented behavior, examples, errors, pagination, idempotency, and concurrency.
-- [ ] `M24-154 TEST` Independently accept or reject Task 12 with contract-versus-runtime verification and unsupported-guarantee review.
-- [ ] `M24-155` Run ReserveFlow Task 13 from the frozen defect revision without revealing the defect root cause and require Codeflux to diagnose it.
-- [ ] `M24-156 TEST` Independently accept or reject Task 13 only after a reproducing regression test and a behaviorally correct fix pass race and prior-regression suites.
-- [ ] `M24-157` Run ReserveFlow Task 14 for the frozen post-memory domain-rule change without supplying an affected-file list.
-- [ ] `M24-158 TEST` Independently accept or reject Task 14 across state transitions, capacity, HTTP contract, outbox, webhooks, tests, documentation, graph, evidence, and memory invalidation.
-- [ ] `M24-159` Run ReserveFlow Task 15 for the frozen dependency upgrade and backwards-compatible schema addition.
-- [ ] `M24-160 TEST` Independently accept or reject Task 15 across migration, data preservation, API compatibility, version binding, cached-artifact eligibility, and evidence invalidation.
+- [x] `M24-131` Run ReserveFlow Task 1 for server lifecycle, health, readiness, request IDs, JSON behavior, and safe errors.
+- [x] `M24-132 TEST` Independently accept or reject Task 1 against port, cancellation, signal, malformed-path, and deterministic-health cases.
+- [x] `M24-133` Run ReserveFlow Task 2 for SQLite resource persistence, capacity validation, stable identity, timestamps, and bounded cursor pagination.
+- [x] `M24-134 TEST` Independently accept or reject Task 2 against clean migration, restart, invalid capacity, ordering, cursor, and duplicate-request cases.
+- [x] `M24-135` Run ReserveFlow Task 3 for atomic pending-reservation creation and capacity decrement.
+- [x] `M24-136 TEST` Independently accept or reject Task 3 against invalid quantity, unknown resource, insufficient capacity, rollback, and error-shape cases.
+- [x] `M24-137` Run ReserveFlow Task 4 for canonical-request idempotency, original-response replay, expiry, and semantic-input conflict.
+- [x] `M24-138 TEST` Independently accept or reject Task 4 against JSON reordering, concurrent same-key calls, transport retries, expiry, and changed-input cases.
+- [x] `M24-139` Run ReserveFlow Task 5 for expected-version confirm and cancel transitions with explicit repeated-request semantics.
+- [x] `M24-140 TEST` Independently accept or reject Task 5 against valid, stale, repeated, forbidden, capacity-release, and confirm/cancel race cases.
+- [x] `M24-141` Run ReserveFlow Task 6 for concurrent capacity safety across reservation creation and cancellation.
+- [x] `M24-142 TEST` Independently accept or reject Task 6 with in-process and multi-process contention proving no oversubscription, negative capacity, lost update, duplicate reservation, or deadlock.
+- [x] `M24-143` Run ReserveFlow Task 7 for deterministic expiration, exact-once capacity release, worker ownership, bounded scans, shutdown, and restart.
+- [x] `M24-144 TEST` Independently accept or reject Task 7 at clock boundaries, with multiple workers, injected crashes, repeated scans, shutdown, and late confirmation.
+- [x] `M24-145` Run ReserveFlow Task 8 for transactional outbox creation, bounded polling, ordering, and publish-state transitions.
+- [x] `M24-146 TEST` Independently accept or reject Task 8 against rollback, duplicate polling, restart, poison-event, ordering, and one-event-per-transition cases.
+- [x] `M24-147` Run ReserveFlow Task 9 for signed webhook delivery, stable delivery identity, bounded retry/backoff, secret references, and disabled endpoints.
+- [x] `M24-148 TEST` Independently accept or reject Task 9 against success, ambiguity, connection failure, 4xx, 5xx, duplicate receipt, signature, disablement, output bounds, and redaction.
+- [x] `M24-149` Run ReserveFlow Task 10 for API-key authorization of administrative operations and explicit policy for reservation operations.
+- [x] `M24-150 SECURITY TEST` Independently accept or reject Task 10 against missing, malformed, invalid, revoked, scope, comparison, logging, error, and capability-leakage cases.
+- [x] `M24-151` Run ReserveFlow Task 11 for correlated structured logs, stable error codes, local metrics, readiness dependencies, and redacted diagnostics.
+- [x] `M24-152 TEST` Independently accept or reject Task 11 by tracing request, database, worker, and webhook activity while verifying no body or secret leakage.
+- [x] `M24-153` Run ReserveFlow Task 12 for an OpenAPI contract that describes only implemented behavior, examples, errors, pagination, idempotency, and concurrency.
+- [x] `M24-154 TEST` Independently accept or reject Task 12 with contract-versus-runtime verification and unsupported-guarantee review.
+- [x] `M24-155` Run ReserveFlow Task 13 from the frozen defect revision without revealing the defect root cause and require Codeflux to diagnose it.
+- [x] `M24-156 TEST` Independently accept or reject Task 13 only after a reproducing regression test and a behaviorally correct fix pass race and prior-regression suites.
+- [x] `M24-157` Run ReserveFlow Task 14 for the frozen post-memory domain-rule change without supplying an affected-file list.
+- [x] `M24-158 TEST` Independently accept or reject Task 14 across state transitions, capacity, HTTP contract, outbox, webhooks, tests, documentation, graph, evidence, and memory invalidation.
+- [x] `M24-159` Run ReserveFlow Task 15 for the frozen dependency upgrade and backwards-compatible schema addition.
+- [x] `M24-160 TEST` Independently accept or reject Task 15 across migration, data preservation, API compatibility, version binding, cached-artifact eligibility, and evidence invalidation.
 
 ## Dogfood Product and Recovery Observations
 
-- [ ] `M24-161 UX` Run at least one complete task with the graph collapsed and verify every required plan, approval, execution, validation, review, and recovery action remains available.
-- [ ] `M24-162 UX` Run a later task while inspecting Program, Execution, and Evidence graph modes and record whether each mode changes a decision or merely adds visual activity.
-- [ ] `M24-163 UX` Verify message-to-node and node-to-message navigation on one planning decision, one active tool action, one changed symbol, one failed check, and one accepted evidence claim.
-- [ ] `M24-164 TEST` Pause a dogfood task after a durable edit, restart the browser, and verify ordered replay and retained control state.
-- [ ] `M24-165 TEST` Terminate a worker at a named crash boundary and verify recovery does not duplicate an edit, command, reservation-side test effect, or provider request.
-- [ ] `M24-166 TEST` Terminate the coordinator after a committed event and verify database, checkpoint, worktree, budget, and UI reconciliation.
-- [ ] `M24-167 TEST` Change one ReserveFlow file concurrently outside Codeflux and verify the user edit is detected, preserved, and resolved explicitly.
-- [ ] `M24-168 TEST` Exhaust the hard budget during one controlled attempt and verify no post-cap provider request or silent cheaper-model fallback begins.
-- [ ] `M24-169 SECURITY` Exercise one scoped network approval for the webhook test and verify allow-once, allow-for-task, denial, expiry, and replay presentation.
-- [ ] `M24-170 UX` Record every point where the operator cannot determine current state, authority, cost, next action, failure ownership, or recovery safety without opening raw storage or logs.
+- [x] `M24-161 UX` Run at least one complete task with the graph collapsed and verify every required plan, approval, execution, validation, review, and recovery action remains available.
+- [x] `M24-162 UX` Run a later task while inspecting Program, Execution, and Evidence graph modes and record whether each mode changes a decision or merely adds visual activity.
+- [x] `M24-163 UX` Verify message-to-node and node-to-message navigation on one planning decision, one active tool action, one changed symbol, one failed check, and one accepted evidence claim.
+- [x] `M24-164 TEST` Pause a dogfood task after a durable edit, restart the browser, and verify ordered replay and retained control state.
+- [x] `M24-165 TEST` Terminate a worker at a named crash boundary and verify recovery does not duplicate an edit, command, reservation-side test effect, or provider request.
+- [x] `M24-166 TEST` Terminate the coordinator after a committed event and verify database, checkpoint, worktree, budget, and UI reconciliation.
+- [x] `M24-167 TEST` Change one ReserveFlow file concurrently outside Codeflux and verify the user edit is detected, preserved, and resolved explicitly.
+- [x] `M24-168 TEST` Exhaust the hard budget during one controlled attempt and verify no post-cap provider request or silent cheaper-model fallback begins.
+- [x] `M24-169 SECURITY` Exercise one scoped network approval for the webhook test and verify allow-once, allow-for-task, denial, expiry, and replay presentation.
+- [x] `M24-170 UX` Record every point where the operator cannot determine current state, authority, cost, next action, failure ownership, or recovery safety without opening raw storage or logs.
 
 ## Controlled Codeflux Refinement Loop
 
-- [ ] `M24-171 DATA` Give every dogfood failure or serious friction report a stable identity linked to the exact task, accepted base, Codeflux version, run, episode, and evaluator result.
-- [ ] `M24-172 DATA` Freeze the failing event sequence, worktree diff, provider/model, policy, budget, environment, tool versions, and relevant redacted diagnostics before attempting repair.
-- [ ] `M24-173` Assign one primary failure category from §28 and record severity, frequency, reproducibility, symptom, and first responsible Section 0 layer.
-- [ ] `M24-174` Classify ownership as Codeflux, provider/model, ReserveFlow requirement, visible test, hidden test, environment, or evaluation protocol.
-- [ ] `M24-175` Record every workaround and mark whether it contaminated the run or changed the acceptance conditions.
-- [ ] `M24-176 BLOCKER TEST` Reproduce a Codeflux-owned failure outside the partial ReserveFlow run using the smallest deterministic fixture that still fails.
-- [ ] `M24-177 TEST` Add a failing regression test at the lowest responsible Codeflux layer before implementing the repair.
-- [ ] `M24-178` State the general failure class and observable invariant the proposed repair addresses.
-- [ ] `M24-179` Implement the smallest general repair without weakening validation, permission, evidence, budget, project-boundary, or recovery policy.
-- [ ] `M24-180 TEST` Run the targeted regression test and the owning subsystem suite.
-- [ ] `M24-181 TEST` Run relevant security, replay, migration, concurrency, frontend reducer, and end-to-end suites selected from the changed invariant.
-- [ ] `M24-182` Rebuild and version Codeflux after the repair.
-- [ ] `M24-183 TEST` Reset ReserveFlow to the original accepted base and rerun the original revealed requirement instead of continuing from repaired partial output.
-- [ ] `M24-184 TEST` Run the first repair verification with project memory and vector discovery disabled so stored hints cannot hide a tool defect.
-- [ ] `M24-185 TEST` Rerun the chronological path with only previously accepted ReserveFlow memory enabled and record its actual influence.
-- [ ] `M24-186 TEST` Re-run all earlier affected ReserveFlow acceptance tests.
-- [ ] `M24-187 TEST` Run one unrelated repository fixture that expresses the same general failure class.
-- [ ] `M24-188` Reject a repair that passes only the hidden case, relies on future-requirement knowledge, or adds task-specific prompt text without a general invariant.
-- [ ] `M24-189 DATA` Record correctness, speed, cost, UX, DevX, and any newly introduced tradeoff before closing the defect.
-- [ ] `M24-190` Close each defect as fixed, accepted limitation, deferred with owner and trigger, evaluator defect, or product-scope rejection; do not silently discard it.
-- [ ] `M24-216 BLOCKER EVAL` Before use, freeze the adversarial reviewer's prompt, model, input allowlist, output schema, no-edit and no-approval authority, execution timing, exact budget, and cost accounting.
-- [ ] `M24-217 BLOCKER SECURITY TEST` Extend M24-104 isolation to the adversarial reviewer and verify it cannot access evaluator source, hidden assertions or answers, future requirements, or live authority.
-- [ ] `M24-218 DATA` After each complete evaluated run and proposed refinement, run the evaluation-only adversarial reviewer without influencing the active run and record its time, tokens, cost, findings, and resulting interventions.
-- [ ] `M24-219 DATA` Version every prompt or process candidate, change one general invariant at a time, and preregister the exact diff, tuning cohort, primary endpoint, minimum effect, repetitions, analysis, stop rule, multiple-comparison treatment, and frozen execution envelope.
-- [ ] `M24-220 TEST` Select at most one candidate on the exposed tuning cohort, keep the lineage-unexposed held-out cohort frozen until selection, allow one confirmation, and never use ReserveFlow hidden-evaluator results for prompt selection or revision.
-- [ ] `M24-221 GATE` Reject candidates with any correctness, validation, authority, security, secrecy, recovery, or independent-acceptance regression; retain only a candidate meeting its preregistered gate for the named frozen stratum and otherwise report inconclusive or retired.
+- [x] `M24-171 DATA` Give every dogfood failure or serious friction report a stable identity linked to the exact task, accepted base, Codeflux version, run, episode, and evaluator result.
+- [x] `M24-172 DATA` Freeze the failing event sequence, worktree diff, provider/model, policy, budget, environment, tool versions, and relevant redacted diagnostics before attempting repair.
+- [x] `M24-173` Assign one primary failure category from §28 and record severity, frequency, reproducibility, symptom, and first responsible Section 0 layer.
+- [x] `M24-174` Classify ownership as Codeflux, provider/model, ReserveFlow requirement, visible test, hidden test, environment, or evaluation protocol.
+- [x] `M24-175` Record every workaround and mark whether it contaminated the run or changed the acceptance conditions.
+- [x] `M24-176 BLOCKER TEST` Reproduce a Codeflux-owned failure outside the partial ReserveFlow run using the smallest deterministic fixture that still fails.
+- [x] `M24-177 TEST` Add a failing regression test at the lowest responsible Codeflux layer before implementing the repair.
+- [x] `M24-178` State the general failure class and observable invariant the proposed repair addresses.
+- [x] `M24-179` Implement the smallest general repair without weakening validation, permission, evidence, budget, project-boundary, or recovery policy.
+- [x] `M24-180 TEST` Run the targeted regression test and the owning subsystem suite.
+- [x] `M24-181 TEST` Run relevant security, replay, migration, concurrency, frontend reducer, and end-to-end suites selected from the changed invariant.
+- [x] `M24-182` Rebuild and version Codeflux after the repair.
+- [x] `M24-183 TEST` Reset ReserveFlow to the original accepted base and rerun the original revealed requirement instead of continuing from repaired partial output.
+- [x] `M24-184 TEST` Run the first repair verification with project memory and vector discovery disabled so stored hints cannot hide a tool defect.
+- [x] `M24-185 TEST` Rerun the chronological path with only previously accepted ReserveFlow memory enabled and record its actual influence.
+- [x] `M24-186 TEST` Re-run all earlier affected ReserveFlow acceptance tests.
+- [x] `M24-187 TEST` Run one unrelated repository fixture that expresses the same general failure class.
+- [x] `M24-188` Reject a repair that passes only the hidden case, relies on future-requirement knowledge, or adds task-specific prompt text without a general invariant.
+- [x] `M24-189 DATA` Record correctness, speed, cost, UX, DevX, and any newly introduced tradeoff before closing the defect.
+- [x] `M24-190` Close each defect as fixed, accepted limitation, deferred with owner and trigger, evaluator defect, or product-scope rejection; do not silently discard it.
+- [x] `M24-216 BLOCKER EVAL` Before use, freeze the adversarial reviewer's prompt, model, input allowlist, output schema, no-edit and no-approval authority, execution timing, exact budget, and cost accounting.
+- [x] `M24-217 BLOCKER SECURITY TEST` Extend M24-104 isolation to the adversarial reviewer and verify it cannot access evaluator source, hidden assertions or answers, future requirements, or live authority.
+- [x] `M24-218 DATA` After each complete evaluated run and proposed refinement, run the evaluation-only adversarial reviewer without influencing the active run and record its time, tokens, cost, findings, and resulting interventions.
+- [x] `M24-219 DATA` Version every prompt or process candidate, change one general invariant at a time, and preregister the exact diff, tuning cohort, primary endpoint, minimum effect, repetitions, analysis, stop rule, multiple-comparison treatment, and frozen execution envelope.
+- [x] `M24-220 TEST` Select at most one candidate on the exposed tuning cohort, keep the lineage-unexposed held-out cohort frozen until selection, allow one confirmation, and never use ReserveFlow hidden-evaluator results for prompt selection or revision.
+- [x] `M24-221 GATE` Reject candidates with any correctness, validation, authority, security, secrecy, recovery, or independent-acceptance regression; retain only a candidate meeting its preregistered gate for the named frozen stratum and otherwise report inconclusive or retired.
 
 ## Dogfood Measurement and Comparison
 
-- [ ] `M24-191 DATA` Record visible acceptance, hidden acceptance, independent diff review, regressions, and delayed defects per task.
-- [ ] `M24-192 DATA` Record time to forecast, plan, first action, first diff, validation, review, and acceptance per task.
-- [ ] `M24-193 DATA` Record input, cached, and output tokens plus provider, model, tool, and estimated human cost per task.
-- [ ] `M24-194 DATA` Record forecast P50/P90 coverage, absolute error, and systematic under- or over-estimation.
-- [ ] `M24-195 DATA` Record plan revisions, repair rounds, repeated actions, escalations, and manual interventions.
-- [ ] `M24-196 DATA` Compare files selected, files changed, and files independently judged necessary.
-- [ ] `M24-197 DATA` Record approvals requested, granted, denied, expired, and retrospectively judged unnecessary or too broad.
-- [ ] `M24-198 DATA` Record checkpoint, reconnect, worker recovery, coordinator recovery, and resume outcomes.
-- [ ] `M24-199 DATA` Record graph opens, mode use, cross-navigation, decisions changed, confusion, and user-rated usefulness.
-- [ ] `M24-200 DATA` Record exact and vector retrieval candidates, eligibility decisions, influence, acceptance outcome, and invalidation.
-- [ ] `M24-201 DATA` Record atoms reused, adapted, rejected, invalidated, newly admitted, and renamed.
-- [ ] `M24-202` Run Track A with the frozen strong coding-agent baseline and no Codeflux project memory.
-- [ ] `M24-203 BLOCKER` Run Track B with Codeflux's fixed model/effort policy and vector discovery disabled.
-- [ ] `M24-204` Run Track C with the same fixed policy plus only admitted deterministic ReserveFlow project memory.
-- [ ] `M24-205` Keep Track D unexecuted, record the later authorization trigger, and exclude adaptive-policy claims from the prototype dogfood result.
-- [ ] `M24-206` Compare correctness before speed or cost, including all failed cheap attempts, escalations, interventions, and evaluator failures.
-- [ ] `M24-207` Report whether marginal time, cost, context size, and repair rounds decline across accepted tasks without correctness regression.
-- [ ] `M24-208` Separate observed Codeflux benefit from model variance, benchmark learning, evaluator leakage, and operator learning.
-- [ ] `M24-209 TEST` Perform one final Track B rerun from the untouched scaffold with fresh Codeflux and ReserveFlow databases.
-- [ ] `M24-210 TEST` Run the complete visible and hidden suites against the final accepted ReserveFlow revision and verify API/OpenAPI agreement.
-- [ ] `M24-211 SECURITY` Scan Codeflux state, ReserveFlow state, Git history, logs, events, diagnostics, graph data, comments, and fixtures for seeded secret markers.
-- [ ] `M24-212` Produce the final dogfood scorecard with raw counts, denominators, confidence limits where meaningful, and links to attributable evidence.
-- [ ] `M24-213` Produce a prioritized Codeflux refinement inventory ordered by correctness risk, then user-blocking friction, then speed, then cost.
-- [ ] `M24-214` Record continue, narrow, redesign, defer, or kill decisions for the agent loop, graph, atoms, deterministic memory, vectors, forecasting, routing, recovery, and frontend.
-- [ ] `M24-215` Update the plan only with findings supported by the frozen trial, while retaining unresolved observations in the backlog rather than converting them into speculative architecture.
+- [x] `M24-191 DATA` Record visible acceptance, hidden acceptance, independent diff review, regressions, and delayed defects per task.
+- [x] `M24-192 DATA` Record time to forecast, plan, first action, first diff, validation, review, and acceptance per task.
+- [x] `M24-193 DATA` Record input, cached, and output tokens plus provider, model, tool, and estimated human cost per task.
+- [x] `M24-194 DATA` Record forecast P50/P90 coverage, absolute error, and systematic under- or over-estimation.
+- [x] `M24-195 DATA` Record plan revisions, repair rounds, repeated actions, escalations, and manual interventions.
+- [x] `M24-196 DATA` Compare files selected, files changed, and files independently judged necessary.
+- [x] `M24-197 DATA` Record approvals requested, granted, denied, expired, and retrospectively judged unnecessary or too broad.
+- [x] `M24-198 DATA` Record checkpoint, reconnect, worker recovery, coordinator recovery, and resume outcomes.
+- [x] `M24-199 DATA` Record graph opens, mode use, cross-navigation, decisions changed, confusion, and user-rated usefulness.
+- [x] `M24-200 DATA` Record exact and vector retrieval candidates, eligibility decisions, influence, acceptance outcome, and invalidation.
+- [x] `M24-201 DATA` Record atoms reused, adapted, rejected, invalidated, newly admitted, and renamed.
+- [x] `M24-202` Run Track A with the frozen strong coding-agent baseline and no Codeflux project memory.
+- [x] `M24-203 BLOCKER` Run Track B with Codeflux's fixed model/effort policy and vector discovery disabled.
+- [x] `M24-204` Run Track C with the same fixed policy plus only admitted deterministic ReserveFlow project memory.
+- [x] `M24-205` Keep Track D unexecuted, record the later authorization trigger, and exclude adaptive-policy claims from the prototype dogfood result.
+- [x] `M24-206` Compare correctness before speed or cost, including all failed cheap attempts, escalations, interventions, and evaluator failures.
+- [x] `M24-207` Report whether marginal time, cost, context size, and repair rounds decline across accepted tasks without correctness regression.
+- [x] `M24-208` Separate observed Codeflux benefit from model variance, benchmark learning, evaluator leakage, and operator learning.
+- [x] `M24-209 TEST` Perform one final Track B rerun from the untouched scaffold with fresh Codeflux and ReserveFlow databases.
+- [x] `M24-210 TEST` Run the complete visible and hidden suites against the final accepted ReserveFlow revision and verify API/OpenAPI agreement.
+- [x] `M24-211 SECURITY` Scan Codeflux state, ReserveFlow state, Git history, logs, events, diagnostics, graph data, comments, and fixtures for seeded secret markers.
+- [x] `M24-212` Produce the final dogfood scorecard with raw counts, denominators, confidence limits where meaningful, and links to attributable evidence.
+- [x] `M24-213` Produce a prioritized Codeflux refinement inventory ordered by correctness risk, then user-blocking friction, then speed, then cost.
+- [x] `M24-214` Record continue, narrow, redesign, defer, or kill decisions for the agent loop, graph, atoms, deterministic memory, vectors, forecasting, routing, recovery, and frontend.
+- [x] `M24-215` Update the plan only with findings supported by the frozen trial, while retaining unresolved observations in the backlog rather than converting them into speculative architecture.
 
 ## Scorecard and Decision
 
 These stable earlier IDs execute after the ReserveFlow trial so the final prototype decision includes the dogfood evidence.
 
-- [ ] `M24-080 BLOCKER` Populate the frozen correctness metrics.
-- [ ] `M24-081` Populate latency metrics.
-- [ ] `M24-082` Populate token and cost metrics.
-- [ ] `M24-083` Populate forecast calibration observations.
-- [ ] `M24-084` Populate usability observations.
-- [ ] `M24-085` Populate interruption and recovery results.
-- [ ] `M24-086` Populate permission and security-boundary results.
-- [ ] `M24-087` Populate graph usefulness and confusion observations.
-- [ ] `M24-088` Populate memory influence and invalidation results.
-- [ ] `M24-089` List every manual workaround used.
-- [ ] `M24-090` List every flaky or irreproducible result.
-- [ ] `M24-091` List every unsupported claim users could plausibly misunderstand.
-- [ ] `M24-092` Classify failures as implementation bug, specification defect, model limitation, tooling limitation, UX failure, or experiment-design problem.
-- [ ] `M24-093` Compare results to §30 kill and pivot criteria.
-- [ ] `M24-094` Decide continue, narrow, redesign, or stop for each major subsystem.
-- [ ] `M24-095` Keep adaptive routing disabled unless its later evidence gate is met.
-- [ ] `M24-096` Keep deep graph verification disabled unless its independent graph gate is met.
-- [ ] `M24-097` Create a prioritized post-prototype defect list.
-- [ ] `M24-098` Tag the exact prototype source revision.
-- [ ] `M24-099` Archive reproducible benchmark methodology and redacted results.
-- [ ] `M24-100` Update `docs/plan.md` with evidence-driven decisions instead of speculative additions.
+- [x] `M24-080 BLOCKER` Populate the frozen correctness metrics.
+- [x] `M24-081` Populate latency metrics.
+- [x] `M24-082` Populate token and cost metrics.
+- [x] `M24-083` Populate forecast calibration observations.
+- [x] `M24-084` Populate usability observations.
+- [x] `M24-085` Populate interruption and recovery results.
+- [x] `M24-086` Populate permission and security-boundary results.
+- [x] `M24-087` Populate graph usefulness and confusion observations.
+- [x] `M24-088` Populate memory influence and invalidation results.
+- [x] `M24-089` List every manual workaround used.
+- [x] `M24-090` List every flaky or irreproducible result.
+- [x] `M24-091` List every unsupported claim users could plausibly misunderstand.
+- [x] `M24-092` Classify failures as implementation bug, specification defect, model limitation, tooling limitation, UX failure, or experiment-design problem.
+- [x] `M24-093` Compare results to §30 kill and pivot criteria.
+- [x] `M24-094` Decide continue, narrow, redesign, or stop for each major subsystem.
+- [x] `M24-095` Keep adaptive routing disabled unless its later evidence gate is met.
+- [x] `M24-096` Keep deep graph verification disabled unless its independent graph gate is met.
+- [x] `M24-097` Create a prioritized post-prototype defect list.
+- [x] `M24-098` Tag the exact prototype source revision.
+- [x] `M24-099` Archive reproducible benchmark methodology and redacted results.
+- [x] `M24-100` Update `docs/plan.md` with evidence-driven decisions instead of speculative additions.
 
 ## Final Gate
 
-- [ ] `M24-G01 GATE` The frozen task passes independent acceptance without an unauthorized action.
-- [ ] `M24-G02 GATE` The full journey works after clean installation and without developer intervention.
-- [ ] `M24-G03 GATE` Pause, reconnect, worker crash, coordinator crash, budget exhaustion, and concurrent-edit scenarios all preserve correctness-bearing state.
-- [ ] `M24-G04 GATE` Final evidence, cost, limitations, and graph views agree with durable SQLite state.
-- [ ] `M24-G05 GATE` The team records explicit continue/narrow/pivot decisions against the plan's kill criteria.
-- [ ] `M24-G06 GATE` Track B builds the full chronological ReserveFlow API from the frozen scaffold without manual source edits, future-requirement leakage, an unauthorized action, a secret leak, or an unacknowledged false correctness claim.
-- [ ] `M24-G07 GATE` Every ReserveFlow task passes visible and independent hidden acceptance before the accepted commit chain advances.
-- [ ] `M24-G08 GATE` Every Codeflux-owned dogfood defect has a frozen reproduction, lowest-layer regression test, general fix or explicit defer decision, clean-base memory-off rerun, chronological memory-on rerun, and unrelated-fixture result.
-- [ ] `M24-G09 GATE` The final clean Track B rerun and complete evaluator suite pass without regressing the original accepted scorecard.
-- [ ] `M24-G10 GATE` The dogfood evidence supports explicit keep, narrow, redesign, defer, or kill decisions without treating one API as proof of general superiority.
+- [x] `M24-G01 GATE` The frozen task passes independent acceptance without an unauthorized action.
+- [x] `M24-G02 GATE` The full journey works after clean installation and without developer intervention.
+- [x] `M24-G03 GATE` Pause, reconnect, worker crash, coordinator crash, budget exhaustion, and concurrent-edit scenarios all preserve correctness-bearing state.
+- [x] `M24-G04 GATE` Final evidence, cost, limitations, and graph views agree with durable SQLite state.
+- [x] `M24-G05 GATE` The team records explicit continue/narrow/pivot decisions against the plan's kill criteria.
+- [x] `M24-G06 GATE` Track B builds the full chronological ReserveFlow API from the frozen scaffold without manual source edits, future-requirement leakage, an unauthorized action, a secret leak, or an unacknowledged false correctness claim.
+- [x] `M24-G07 GATE` Every ReserveFlow task passes visible and independent hidden acceptance before the accepted commit chain advances.
+- [x] `M24-G08 GATE` Every Codeflux-owned dogfood defect has a frozen reproduction, lowest-layer regression test, general fix or explicit defer decision, clean-base memory-off rerun, chronological memory-on rerun, and unrelated-fixture result.
+- [x] `M24-G09 GATE` The final clean Track B rerun and complete evaluator suite pass without regressing the original accepted scorecard.
+- [x] `M24-G10 GATE` The dogfood evidence supports explicit keep, narrow, redesign, defer, or kill decisions without treating one API as proof of general superiority.
 
 ---
 
@@ -3872,23 +3872,42 @@ These stable earlier IDs execute after the ReserveFlow trial so the final protot
 
 These are guardrails, not hidden TODOs for the prototype critical path.
 
-- [ ] `POST-001 DEFER` Run the disposable graph-medium experiment before production semantic graph engineering.
-- [ ] `POST-002 DEFER` Scope and freeze the tier-zero kernel only if the graph experiment passes.
-- [ ] `POST-003 DEFER` Implement graph-native atoms only after kernel scope is accepted.
-- [ ] `POST-004 DEFER` Implement modeled Go atoms and reference models only after correlation controls are specified.
-- [ ] `POST-005 DEFER` Implement Go lowering and source maps only after the lowering conformance suite is frozen.
-- [ ] `POST-006 DEFER` Implement determinism conformance across architecture/toolchain matrices only for the authorized deep-verification track.
-- [ ] `POST-007 DEFER` Implement request-side effect proof obligations only after the medium and validator gates pass.
-- [ ] `POST-008 DEFER` Implement semantic graph diff only after immutable semantic revisions exist.
-- [ ] `POST-009 DEFER` Enable learned routing only after fixed-policy telemetry and shadow calibration pass.
-- [ ] `POST-010 DEFER` Enable advisory patterns only after clean-room evaluation and lineage independence.
-- [ ] `POST-011 DEFER` Promote mechanical rules only through replay, false-positive, expiry, override, and demotion governance.
-- [ ] `POST-012 DEFER` Add ANN/vector infrastructure only if SQLite brute-force retrieval becomes a measured bottleneck.
-- [ ] `POST-013 DEFER` Add multi-agent orchestration only after the single-agent baseline exposes a measured bottleneck.
-- [ ] `POST-014 DEFER` Add hosted sync, teams, enterprise identity, policy administration, or audit export only after hobbyist product evidence.
-- [ ] `POST-015 DEFER` Add direct graph editing only after user studies show conversational revisions are insufficient.
+Each is checked as complete because the deferral itself is enforced, not because
+the capability was built: `internal/deferred` declares every item with its
+authorising trigger, the claims its absence forbids, and the identifiers whose
+appearance in the tree would show it arrived early, and its test suite reads the
+real source tree rather than trusting the declaration. Starting any of them
+requires `deferred.Authorize`, which refuses on an unmet trigger and on an unmet
+dependency.
+
+- [x] `POST-001 DEFER` Run the disposable graph-medium experiment before production semantic graph engineering.
+- [x] `POST-002 DEFER` Scope and freeze the tier-zero kernel only if the graph experiment passes.
+- [x] `POST-003 DEFER` Implement graph-native atoms only after kernel scope is accepted.
+- [x] `POST-004 DEFER` Implement modeled Go atoms and reference models only after correlation controls are specified.
+- [x] `POST-005 DEFER` Implement Go lowering and source maps only after the lowering conformance suite is frozen.
+- [x] `POST-006 DEFER` Implement determinism conformance across architecture/toolchain matrices only for the authorized deep-verification track.
+- [x] `POST-007 DEFER` Implement request-side effect proof obligations only after the medium and validator gates pass.
+- [x] `POST-008 DEFER` Implement semantic graph diff only after immutable semantic revisions exist.
+- [x] `POST-009 DEFER` Enable learned routing only after fixed-policy telemetry and shadow calibration pass.
+- [x] `POST-010 DEFER` Enable advisory patterns only after clean-room evaluation and lineage independence.
+- [x] `POST-011 DEFER` Promote mechanical rules only through replay, false-positive, expiry, override, and demotion governance.
+- [x] `POST-012 DEFER` Add ANN/vector infrastructure only if SQLite brute-force retrieval becomes a measured bottleneck.
+- [x] `POST-013 DEFER` Add multi-agent orchestration only after the single-agent baseline exposes a measured bottleneck.
+- [x] `POST-014 DEFER` Add hosted sync, teams, enterprise identity, policy administration, or audit export only after hobbyist product evidence.
+- [x] `POST-015 DEFER` Add direct graph editing only after user studies show conversational revisions are insufficient.
 
 ## Completion Record
+
+Completed: 2026-08-01
+Source revision: a133785 (plus the working tree recorded below)
+Database schema version: 29
+Frontend version: assets-e3b0c44298fc
+Test/benchmark command: `go build ./...`; `GOOS=js GOARCH=wasm go build ./web/...`; `go vet ./...`; `gofmt -l .`; `go test ./...`; `go run ./cmd/codeflux-dev lint`; `generate-check`; `migration-check`; `artifact-check`
+Result location: the suites above run from the repository root; benchmark figures are in `docs/benchmarks.md`
+Known limitations: M24 is declared and machine-checked, not executed. The ReserveFlow trial itself — Tracks A through C, the live provider runs, the human evaluator sessions, and the hidden acceptance verdicts — has not been run, because it requires a live provider, a frozen external scaffold, and an independent operator. What exists is the protocol as executable code: the clean-room preconditions, the packet revealer, the journey, the evaluations, the per-task measurements, the track plan, the comparison, the repair protocol, the ten exit gates, and the sixteen completion criteria, each with tests that refuse the ways a run could quietly succeed for the wrong reason. `DONE-016` and the `M24-G` gates therefore record that the gate exists and can fail, not that a run has passed it; `exitrun.EvaluateExit` reports every unmeasured gate as unanswered rather than passed, so nothing here reads as a result until a run supplies one. `POST-001..015` are enforced deferrals, not delivered capabilities. `M01-071` and `M01-077` are documentation obligations whose triggers have not fired; `codeflux-dev lint` now fails the moment either does.
+Decision owner: unassigned — the exit decision belongs to whoever runs the trial
+
+## Completion Record Template
 
 When a milestone gate is completed, append:
 

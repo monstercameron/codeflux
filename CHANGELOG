@@ -30,6 +30,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-004
+Date: 2026-08-01
+Type: Prototype exit protocol, dogfood control plane, and enforced deferrals
+Request-or-TODO: M24-001 through M24-221, M24-G01 through M24-G10,
+  DONE-001 through DONE-016, POST-001 through POST-015, M01-071, and
+  M01-077; closes every open item in TODOS.md
+Outcome: Added the exit protocol as executable structure: the clean-room
+  preconditions with hidden-test sealing, the forty-two-step evaluator
+  journey, ten independent evaluations, the scorecard with its kill criteria
+  and gated features, the dogfood control plane with its fifteen-packet
+  revealer and append-only ledger, the evaluator harness with its crash
+  points and secret markers, the fifteen paired tasks and verdicts, the ten
+  product observations, the failure report with its frozen evidence, the
+  fourteen-stage repair protocol, the frozen adversarial reviewer,
+  preregistration and candidate selection, eleven per-task measurements, the
+  four-track execution plan, the comparison report, ten exit gates bound to
+  sixteen completion criteria, the registry of fifteen enforced deferrals,
+  and the two atom documentation obligations wired into lint
+Affected-behavior: `codeflux-dev lint` now fails the moment the first real
+  atom declaration lands without a reviewed comment example in docs, and the
+  moment a pull-request template lands without an atom naming review section.
+  Both checks are silent until their trigger fires, because the plan forbids
+  inventing either contract earlier. exitrun.EvaluateExit reports an
+  unmeasured gate as unanswered rather than passed, so nothing reads as a
+  result until a run supplies one
+Compatibility-or-migration: No schema change and no runtime behavior change
+  outside the development command
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` pass at this
+  commit. The deferral registry's creep scan reads the real source tree, and
+  a companion test plants a marker in a temporary tree to show the scan
+  fires
+Dev-Log: DL-20260801-004
+
 Change-ID: CL-20260801-003
 Date: 2026-08-01
 Type: Command line, first run, doctor, application logging, and packaging
