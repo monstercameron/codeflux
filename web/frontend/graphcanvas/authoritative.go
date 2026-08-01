@@ -345,15 +345,24 @@ func authoritativeSVGRoot(
 		groupProps.Key = nodeID.String()
 		groupProps.Role = "button"
 		groupProps.TabIndex = tabIndex
+		// The <text> glyph authoritativeNodeContents draws for this node may
+		// be truncated to fit its shape; the group's aria-label, the
+		// full-label data hook below, and the sibling <title> tooltip always
+		// carry the full DisplayName, independent of that visual clipping
+		// (M21-165, M21-166). The stable node identity lives only in nodeID /
+		// data-node-id, never in the label text.
+		_, fullLabel, labelTruncated := TruncateLabel(node.DisplayName(), MaximumSVGNodeLabelRunes)
 		groupProps.Aria = map[string]string{
-			"label":   node.DisplayName() + ", " + graphClassLabel(node.Class()) + ", " + graphStatusLabel(node.Status()),
+			"label":   fullLabel + ", " + graphClassLabel(node.Class()) + ", " + graphStatusLabel(node.Status()),
 			"pressed": strconv.FormatBool(nodeID == selectedID),
 		}
 		groupProps.Data = map[string]string{
 			"component": "graph-node", "node-id": nodeID.String(), "class": string(node.Class()),
 			"status": string(node.Status()), "shape": graphShape(node.Class()),
 			"status-icon": graphStatusIcon(node.Status()), "status-label": graphStatusLabel(node.Status()),
-			"selected": strconv.FormatBool(nodeID == selectedID),
+			"selected":        strconv.FormatBool(nodeID == selectedID),
+			"full-label":      fullLabel,
+			"label-truncated": strconv.FormatBool(labelTruncated),
 		}
 		groupProps.Raw = map[string]any{
 			"transform": fmt.Sprintf("translate(%d %d)", placement.Bounds.X, placement.Bounds.Y),
@@ -445,9 +454,13 @@ func authoritativeNodeContents(node graph.Node, bounds graphlayout.Rect, mode pr
 	fill := graphClassColor(node.Class(), tokens)
 	dash := graphStatusDash(node.Status())
 	shape := authoritativeShape(node.Class(), bounds.Width, bounds.Height, fill, stroke, dash, 2)
-	display, _, _ := TruncateLabel(node.DisplayName(), 26)
+	// display is the visual glyph, truncated only when it would overflow the
+	// node shape; full is the untruncated DisplayName the <title> tooltip
+	// below always uses, so a sighted or assistive-tech user hovering a
+	// clipped label still reads the complete name (M21-166).
+	display, full, _ := TruncateLabel(node.DisplayName(), MaximumSVGNodeLabelRunes)
 	result := []ui.Node{
-		html.Tag("title", html.Props{}, html.Text(node.DisplayName()+", "+graphClassLabel(node.Class())+", "+graphStatusLabel(node.Status()))),
+		html.Tag("title", html.Props{}, html.Text(full+", "+graphClassLabel(node.Class())+", "+graphStatusLabel(node.Status()))),
 	}
 	if selected {
 		result = append(result, html.Tag("g", html.Props{Data: map[string]string{"component": "graph-selection-ring"}},

@@ -24,6 +24,53 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-001
+Date: 2026-08-01
+Status: Complete; Milestone 21 is finished and its eight gates are marked
+Change-ID: CL-20260801-001
+Request-or-TODO: The remaining M21 blocks listed in CL-20260801-001, taken up
+  from the next-safe-step recorded in DL-20260731-074
+Goal: Finish project memory so accepted work can reduce future cost, without
+  letting similarity, self-report, or an unadmitted item become authority
+Assumptions: DL-20260731-074 left the foundation built and its remediation
+  unreviewed; this entry covers the remainder plus the marking that entry
+  deliberately withheld. The retrieval gate must refuse before similarity is
+  consulted, because a gate applied after ranking is a gate that ranks
+Decisions: Keep the gate's refusal reasons a closed enumerated set so a
+  refusal is reportable rather than a bare false. Put atom documentation and
+  atom naming behind their own repositories rather than inside the memory
+  artifact tables, because their identity is the source symbol and not the
+  task. Hold vector discovery closed and prove it with an executable absence
+  test rather than a comment, so the branch gate cannot erode quietly. Move
+  the declared task shape into the intake request rather than inferring it
+  from requirement text: no requirement classifier exists, and a guess would
+  land inside the fingerprint that gates retrieval and routing
+Files-or-schemas: internal/retrieval and internal/retrievalgate; internal/
+  vectorsearch; internal/domain/episode.go; internal/atomdoc and
+  internal/atomname embedding and invalidation; eleven internal/storage
+  repositories and their migration tests; internal/coordinator task intake,
+  lifecycle adapter, preflight, and application wiring; internal/transport
+  task lifecycle service; migrations 000026 through 000029 with regenerated
+  catalog and build-info versions; api/proto and api/gen product API;
+  web/client graph and review resources; web/frontend graphcanvas,
+  graphinspector, and memoryinspector
+Validation: Full repository build, js/wasm build, vet, gofmt, the complete
+  test suite, lint, generate-check, migration-check, and artifact-check pass
+Failures-or-discarded-approaches: internal/transport is an adapter and may
+  not depend on internal/storage, so review staleness is classified through
+  an inward port rather than by inspecting the storage error. The evidence
+  report's SchemaVersion was split from the length bounds beside it because
+  a shared const group gave them one type and staticcheck SA9004 caught it
+Known-limitations: The retrieval influence report records influence as
+  declared by the planning step, so an item reported as uninfluential cannot
+  be distinguished from one whose influence was not noticed. The atom name
+  splitter still renders ArchiveBatch42 as "Archive Batch42" and AWSS3Bucket
+  as "A WS S3 Bucket"; both are recorded rather than papered over. Nothing
+  here has been exercised against a real provider
+Next-safe-step: Build the M22 test harness, benchmarks, and observability so
+  the claims this milestone makes about memory can be measured rather than
+  asserted
+
 Dev-Log: DL-20260731-074
 Date: 2026-07-31
 Status: Complete for the blocks listed; Milestone 21 is not finished

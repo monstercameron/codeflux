@@ -99,6 +99,10 @@ type DeleteMemoryArtifact struct {
 type MemoryArtifactDeletionOutcome struct {
 	Preview          domain.MemoryArtifactDeletionPreview
 	DeletedArtifacts []domain.MemoryArtifactID
+	// InvalidatedEmbeddings counts derived vectors invalidated alongside the
+	// deleted artifacts (M21-088). Rows are retained for lineage per
+	// M21-135, so this counts invalidations, never deletions.
+	InvalidatedEmbeddings int
 }
 
 // CreateMemoryArtifact persists a new artifact identity and its first
@@ -363,6 +367,16 @@ func (repositories *Repositories) DeleteMemoryArtifact(
 			if affected == 1 {
 				outcome.DeletedArtifacts = append(outcome.DeletedArtifacts, id)
 			}
+			// M21-088: a deleted artifact's derived vectors must not survive
+			// it. Deletion here is logical, so the embeddings are
+			// invalidated in the same transaction rather than dropped: the
+			// row stays for lineage (M21-135) but can never be an active
+			// retrieval candidate again.
+			invalidated, err := invalidateMemoryArtifactEmbeddingsForArtifact(ctx, transaction, id, micros)
+			if err != nil {
+				return err
+			}
+			outcome.InvalidatedEmbeddings += invalidated
 		}
 		outcome.Preview = preview
 		return nil
@@ -616,4 +630,36 @@ func scanMemoryArtifactRevision(row rowScanner, operation string) (MemoryArtifac
 	}
 	record.CreatedAt = repositoryTime(createdMicros)
 	return record, nil
+}
+
+// invalidateMemoryArtifactEmbeddingsForArtifact invalidates every still-valid
+// embedding derived from any revision of artifactID (M21-088). It returns how
+// many rows it invalidated.
+//
+// The rows are retained rather than removed: M21-135 keeps prior vectors for
+// historical lineage while excluding them from active retrieval, and
+// retention and eligibility are separate questions.
+func invalidateMemoryArtifactEmbeddingsForArtifact(
+	ctx context.Context,
+	transaction *Transaction,
+	artifactID domain.MemoryArtifactID,
+	micros int64,
+) (int, error) {
+	result, err := transaction.sql.ExecContext(
+		ctx,
+		`UPDATE memory_artifact_embeddings
+		 SET valid = 0, invalidated_at_unix_micros = ?
+		 WHERE valid = 1 AND revision_id IN (
+		     SELECT id FROM memory_artifact_revisions WHERE artifact_id = ?
+		 )`,
+		micros, artifactID,
+	)
+	if err != nil {
+		return 0, repositoryWriteError("invalidate memory artifact embeddings on deletion", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, classify("invalidate memory artifact embeddings on deletion", err)
+	}
+	return int(affected), nil
 }

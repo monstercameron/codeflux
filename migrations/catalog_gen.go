@@ -30,4 +30,8 @@ var Catalog = []Descriptor{
 	{Number: 23, Name: "000023_evidence_reports.sql", SHA256: "be11be226bfddaa4e8c73345976ec9a1572f935a020bed5b813c053fbfaad72b"},
 	{Number: 24, Name: "000024_acceptance_repair.sql", SHA256: "a756b596af8deccc6ae62e8298bdcae57e5da0f238152c0c6dc4b5447bbd0275"},
 	{Number: 25, Name: "000025_memory_artifact_schema.sql", SHA256: "d97c3df468607b424b60e219ba247ebc5bd6edd10aae6789e33d8217365b0ea9"},
+	{Number: 26, Name: "000026_atom_documentation_and_naming.sql", SHA256: "3ea210ab6708437560c411146412c0f3a53935e372ce8bedb265cfffc4d164b8"},
+	{Number: 27, Name: "000027_chronological_episodes.sql", SHA256: "081362acf1fe5da402922f5dfc16b33a768c455f0dd8a3bc053d7248d7358ccc"},
+	{Number: 28, Name: "000028_retrieval_channel_provenance.sql", SHA256: "fcdba34fefb56687f4af6614c41df16bff2ea349cb417c28e53794106416bde4"},
+	{Number: 29, Name: "000029_deterministic_retrieval_recall_reviews.sql", SHA256: "f885c5f69393b38a6fbd87f1f7da0e8341d01944213c040ac3cd42c353e8781a"},
 }

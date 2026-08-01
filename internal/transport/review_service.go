@@ -12,7 +12,6 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/gitwork"
 	"codeflux.dev/codeflux/internal/review"
-	"codeflux.dev/codeflux/internal/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -253,7 +252,7 @@ func (service *ReviewService) RollbackTask(ctx context.Context, envelope *codefl
 
 func mapReviewMutationError(err error) error {
 	switch {
-	case errors.Is(err, acceptance.ErrStaleReview), errors.Is(err, storage.ErrStaleRevision):
+	case errors.Is(err, acceptance.ErrStaleReview):
 		return status.Error(codes.Aborted, "review binding changed; open the renewed review")
 	case errors.Is(err, acceptance.ErrValidationRunning), errors.Is(err, acceptance.ErrAcknowledgementNeeded), errors.Is(err, acceptance.ErrRequiredCheckBlocked):
 		return status.Error(codes.FailedPrecondition, err.Error())

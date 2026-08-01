@@ -212,8 +212,8 @@ func fullFixture(t *testing.T) fixture {
 	lineage := domain.MemoryArtifactLineage{
 		ArtifactID: artifact, OriginKnown: true, OriginArtifactID: ancestorA,
 		DerivedFrom: []domain.MemoryArtifactID{ancestorA}, InfluencedBy: []domain.MemoryArtifactID{ancestorB},
-		SupportingEpisodes: []domain.EpisodeID{episode},
-		LineageRootsKnown:  true, LineageRootIDs: []domain.MemoryArtifactID{ancestorA},
+		SupportingEpisodes: []domain.EpisodeID{episode}, SupportingEpisodesKnown: true,
+		LineageRootsKnown: true, LineageRootIDs: []domain.MemoryArtifactID{ancestorA},
 	}
 	if err := lineage.Validate(); err != nil {
 		t.Fatal(err)
@@ -263,11 +263,12 @@ func fullFixture(t *testing.T) fixture {
 		ancestorA: {
 			ArtifactID: ancestorA, DerivedFrom: []domain.MemoryArtifactID{artifact},
 			OriginKnown: true, OriginArtifactID: artifact,
-			LineageRootsKnown: true, LineageRootIDs: []domain.MemoryArtifactID{artifact},
+			SupportingEpisodesKnown: true,
+			LineageRootsKnown:       true, LineageRootIDs: []domain.MemoryArtifactID{artifact},
 		},
 		ancestorB: {
 			ArtifactID: ancestorB, InfluencedBy: []domain.MemoryArtifactID{artifact},
-			OriginKnown: true, LineageRootsKnown: true,
+			OriginKnown: true, LineageRootsKnown: true, SupportingEpisodesKnown: true,
 		},
 	}
 	deletion := DeletionProps{

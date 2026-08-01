@@ -23,6 +23,7 @@ import (
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/frontendserver"
 	"codeflux.dev/codeflux/internal/gitwork"
+	"codeflux.dev/codeflux/internal/retrieval"
 	"codeflux.dev/codeflux/internal/review"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
@@ -71,6 +72,7 @@ type Application struct {
 	providers           ProviderDependencies
 	workspace           WorkspaceDependencies
 	preflight           *TaskPreflightService
+	taskLifecycle       *TaskLifecycleAdapter
 	events              *events.Hub
 	graphProjection     *GraphProjectionService
 	transport           *transport.Boundary
@@ -171,7 +173,15 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	taskPreflight, err := NewTaskPreflightService(repositories)
+	retrievalService, err := retrieval.NewService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	taskPreflight, err := NewTaskPreflightService(repositories, retrievalService)
+	if err != nil {
+		return nil, err
+	}
+	taskLifecycle, err := NewTaskLifecycleAdapter(taskPreflight, repositories)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +223,9 @@ func StartApplication(
 		lock: instanceLock, database: database, repos: repositories,
 		credentials: credentialStore, providers: providerDependencies,
 		workspace: workspaceDependencies, preflight: taskPreflight,
-		scheduler: scheduler,
-		listener:  listener, workers: options.Workers,
+		taskLifecycle: taskLifecycle,
+		scheduler:     scheduler,
+		listener:      listener, workers: options.Workers,
 		secret:    base64.RawURLEncoding.EncodeToString(secretBytes),
 		serveDone: make(chan error, 1),
 		heartbeat: options.HeartbeatTimeout, now: options.Now,
@@ -396,6 +407,9 @@ func StartApplication(
 	if err := taskService.ConfigureProjectionInvalidations(projectionInvalidations); err != nil {
 		return nil, err
 	}
+	// Install the requirement-to-running-task lifecycle so CreateTask and
+	// StartTask stop returning Unimplemented.
+	taskService.ConfigureTaskLifecycle(application.taskLifecycle)
 	threadApplication, err := NewThreadApplication(repositories, application.secret, application.events)
 	if err != nil {
 		return nil, err
@@ -640,6 +654,16 @@ func (application *Application) EventHub() *events.Hub {
 	return application.events
 }
 
+// Repositories exposes the durable store the application already owns.
+//
+// A harness or diagnostic that opened its own connection to the same file
+// would contend with this one for SQLite's single writer and could observe
+// state the application had not yet committed. Sharing the application's
+// repositories is the only way to read what the application actually sees.
+func (application *Application) Repositories() *storage.Repositories {
+	return application.repos
+}
+
 // GraphProjectionService exposes the durable task-event projection hook to
 // coordinator task producers. The service publishes only after SQLite commit.
 func (application *Application) GraphProjectionService() *GraphProjectionService {
@@ -652,6 +676,12 @@ func (application *Application) ProviderDependencies() ProviderDependencies {
 
 func (application *Application) WorkspaceDependencies() WorkspaceDependencies {
 	return application.workspace
+}
+
+// TaskLifecycleApplication exposes the requirement-to-running-task lifecycle
+// the CreateTask and StartTask RPCs delegate to.
+func (application *Application) TaskLifecycleApplication() *TaskLifecycleAdapter {
+	return application.taskLifecycle
 }
 
 // TaskPreflightService exposes the fixed-policy preparation, start, and

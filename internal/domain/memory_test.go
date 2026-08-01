@@ -886,7 +886,7 @@ func TestNewMemoryArtifactExportRecordRequiresMatchingLineage(t *testing.T) {
 	}
 	// A freshly observed artifact with no derived_from ancestry: known to
 	// have no origin/roots ancestor (it is one itself), not merely absent.
-	lineage := MemoryArtifactLineage{ArtifactID: artifact, OriginKnown: true, LineageRootsKnown: true}
+	lineage := MemoryArtifactLineage{ArtifactID: artifact, OriginKnown: true, LineageRootsKnown: true, SupportingEpisodesKnown: true}
 
 	record, err := NewMemoryArtifactExportRecord(revision, lineage)
 	if err != nil {
@@ -945,9 +945,10 @@ func TestMemoryArtifactLineageOriginAndRootsRequireKnownOrExplainedUnknown(t *te
 
 	// Unknown with a reason, and no contradicting value, is valid.
 	explained := MemoryArtifactLineage{
-		ArtifactID:                self,
-		OriginUnknownReason:       "origin predates lineage tracking",
-		LineageRootsUnknownReason: "roots predate lineage tracking",
+		ArtifactID:                      self,
+		OriginUnknownReason:             "origin predates lineage tracking",
+		LineageRootsUnknownReason:       "roots predate lineage tracking",
+		SupportingEpisodesUnknownReason: "supporting episodes predate episode tracking",
 	}
 	if err := explained.Validate(); err != nil {
 		t.Fatalf("explained-unknown lineage: %v", err)
@@ -966,20 +967,21 @@ func TestMemoryArtifactLineageOriginAndRootsRequireKnownOrExplainedUnknown(t *te
 	}
 
 	// Known must not also carry an unknown reason (contradiction).
-	knownWithReason := MemoryArtifactLineage{ArtifactID: self, OriginKnown: true, OriginUnknownReason: "should not be set"}
+	knownWithReason := MemoryArtifactLineage{ArtifactID: self, OriginKnown: true, OriginUnknownReason: "should not be set", SupportingEpisodesKnown: true}
 	if err := knownWithReason.Validate(); !errors.Is(err, ErrInvalidDomainValue) {
 		t.Fatalf("known origin with an unknown reason error = %v, want ErrInvalidDomainValue", err)
 	}
 
 	// Known with a real value (self-originated: zero origin, no roots
 	// besides itself) or a populated value are both valid.
-	if err := (MemoryArtifactLineage{ArtifactID: self, OriginKnown: true, LineageRootsKnown: true}).Validate(); err != nil {
+	if err := (MemoryArtifactLineage{ArtifactID: self, OriginKnown: true, LineageRootsKnown: true, SupportingEpisodesKnown: true}).Validate(); err != nil {
 		t.Fatalf("known, self-originated lineage: %v", err)
 	}
 	populated := MemoryArtifactLineage{
 		ArtifactID: self, DerivedFrom: []MemoryArtifactID{origin},
 		OriginKnown: true, OriginArtifactID: origin,
 		LineageRootsKnown: true, LineageRootIDs: []MemoryArtifactID{root},
+		SupportingEpisodesKnown: true,
 	}
 	if err := populated.Validate(); err != nil {
 		t.Fatalf("known, populated origin/roots: %v", err)
@@ -998,13 +1000,15 @@ func TestConfirmsMemoryArtifactIndependentlyRejectsSameEvidenceFamily(t *testing
 
 	index := map[MemoryArtifactID]MemoryArtifactLineage{
 		ancestor: {
-			ArtifactID:         ancestor,
-			SupportingEpisodes: []EpisodeID{exposedEpisode},
+			ArtifactID:              ancestor,
+			SupportingEpisodes:      []EpisodeID{exposedEpisode},
+			SupportingEpisodesKnown: true,
 		},
 		descendant: {
-			ArtifactID:         descendant,
-			DerivedFrom:        []MemoryArtifactID{ancestor},
-			SupportingEpisodes: []EpisodeID{exposedEpisode},
+			ArtifactID:              descendant,
+			DerivedFrom:             []MemoryArtifactID{ancestor},
+			SupportingEpisodes:      []EpisodeID{exposedEpisode},
+			SupportingEpisodesKnown: true,
 		},
 	}
 
@@ -1039,6 +1043,55 @@ func TestConfirmsMemoryArtifactIndependentlyRejectsSameEvidenceFamily(t *testing
 
 	if _, err := ConfirmsMemoryArtifactIndependently(mustMemoryArtifactID(t), index, []EpisodeID{freshEpisode}); !errors.Is(err, ErrInvalidDomainValue) {
 		t.Fatalf("unknown ancestor error = %v, want ErrInvalidDomainValue", err)
+	}
+}
+
+// TestConfirmsMemoryArtifactIndependentlyFailsClosedOnUnknownExposure closes
+// the landmine described in internal/storage/memory_lineage_repository.go's
+// prior "SupportingEpisodes and LineageRootIDs are out of this lane's scope"
+// state: before SupportingEpisodesKnown existed, an unpopulated
+// SupportingEpisodes slice was indistinguishable from "checked; genuinely
+// never exposed," so ConfirmsMemoryArtifactIndependently would always
+// confirm independence for every candidate, silently defeating §31
+// "Descendants of a pattern do not independently confirm their ancestor."
+// This test proves the fixed behavior: an ancestor whose own exposure is
+// merely unknown (SupportingEpisodesKnown false) must never let
+// independence be confirmed; the caller gets ErrMemoryArtifactExposureUnknown
+// instead of a false "yes, independent".
+func TestConfirmsMemoryArtifactIndependentlyFailsClosedOnUnknownExposure(t *testing.T) {
+	ancestor := mustMemoryArtifactID(t)
+	descendant := mustMemoryArtifactID(t)
+	freshEpisode := mustEpisodeID(t)
+
+	index := map[MemoryArtifactID]MemoryArtifactLineage{
+		ancestor: {
+			ArtifactID:                      ancestor,
+			SupportingEpisodesKnown:         false,
+			SupportingEpisodesUnknownReason: "never computed by this caller",
+		},
+		descendant: {
+			ArtifactID:              descendant,
+			DerivedFrom:             []MemoryArtifactID{ancestor},
+			SupportingEpisodesKnown: true,
+		},
+	}
+
+	if _, err := ConfirmsMemoryArtifactIndependently(ancestor, index, []EpisodeID{freshEpisode}); !errors.Is(err, ErrMemoryArtifactExposureUnknown) {
+		t.Fatalf("unknown ancestor exposure error = %v, want ErrMemoryArtifactExposureUnknown", err)
+	}
+
+	// Once exposure is genuinely known (even as "no episodes at all"),
+	// independence can be confirmed again.
+	known := index[ancestor]
+	known.SupportingEpisodesKnown = true
+	known.SupportingEpisodesUnknownReason = ""
+	index[ancestor] = known
+	confirmed, err := ConfirmsMemoryArtifactIndependently(ancestor, index, []EpisodeID{freshEpisode})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !confirmed {
+		t.Fatal("known-empty exposure should allow independent confirmation")
 	}
 }
 

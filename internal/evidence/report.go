@@ -16,17 +16,21 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 )
 
+// SchemaVersion is versioned independently of the bounds below, which are
+// compared against len() and are therefore int. Splitting the groups keeps
+// each constant's type explicit (staticcheck SA9004).
+const SchemaVersion uint32 = 1
+
 const (
-	SchemaVersion             uint32 = 1
-	MaximumChangedFiles              = 4096
-	MaximumValidations               = 1024
-	MaximumApprovals                 = 256
-	MaximumVersions                  = 128
-	MaximumClaims                    = 1024
-	MaximumLinksPerClaim             = 128
-	MaximumNarratives                = 256
-	MaximumTextBytes                 = 8192
-	MaximumApprovalScopeBytes        = 1024
+	MaximumChangedFiles       = 4096
+	MaximumValidations        = 1024
+	MaximumApprovals          = 256
+	MaximumVersions           = 128
+	MaximumClaims             = 1024
+	MaximumLinksPerClaim      = 128
+	MaximumNarratives         = 256
+	MaximumTextBytes          = 8192
+	MaximumApprovalScopeBytes = 1024
 )
 
 var ErrInvalidReport = errors.New("invalid final evidence report")

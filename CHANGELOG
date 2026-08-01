@@ -30,6 +30,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-001
+Date: 2026-08-01
+Type: Project-memory retrieval, chronological episodes, and atom identity
+Request-or-TODO: M21-029 through M21-050, M21-064 through M21-089, M21-103
+  through M21-107, M21-126 through M21-145, M21-153 through M21-156, M21-164
+  through M21-168, and M21-G01 through M21-G08; completes Milestone 21
+Outcome: Added chronological episode capture, deterministic fact extraction,
+  the pre-work retrieval gate with its eligibility, provenance, and reason
+  vocabulary, the atom documentation and atom name repositories with their
+  discovery paths, deterministic recall review, retrieval influence
+  reporting, the closed vector-discovery branch gate, and the task intake and
+  lifecycle adapters that let a requirement reach a started task
+Affected-behavior: Planning now consults admitted project memory before work
+  begins, and records which items were eligible, which influenced the plan,
+  and why the rest were refused; retrieval refuses on provenance and
+  eligibility before similarity is consulted, and vector discovery stays
+  closed at its branch gate with an executable absence test
+Compatibility-or-migration: Adds migrations 000026 through 000029 for atom
+  documentation and naming, chronological episodes, retrieval channel
+  provenance, and deterministic recall reviews; schema version moves from 25
+  to 29 and the generated catalog and build-info versions are regenerated.
+  The migrations are additive; existing rows are untouched
+Verification: `go build ./...`, `GOOS=js GOARCH=wasm go build ./web/...`,
+  `go vet ./...`, `gofmt -l`, `go test ./...`, `codeflux-dev lint`,
+  `generate-check`, `migration-check`, and `artifact-check` all pass at this
+  commit
+Dev-Log: DL-20260801-001
+
 Change-ID: CL-20260731-073
 Date: 2026-07-31
 Type: Deterministic project-memory foundation

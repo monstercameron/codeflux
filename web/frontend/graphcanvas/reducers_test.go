@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"codeflux.dev/codeflux/internal/atomname"
 	"codeflux.dev/codeflux/web/frontend/state"
 )
 
@@ -105,6 +106,57 @@ func TestEveryNodePurposeHasADistinctShape(t *testing.T) {
 		if shapeLabel(got) == "" || semanticLabel(purpose) == "" {
 			t.Fatalf("%s shape lacks an accessible purpose description", purpose)
 		}
+	}
+}
+
+// TestTruncateLabelMatchesAtomNameTruncationContract proves graphcanvas's
+// visual-label truncation (M21-166) is not an independent reimplementation
+// that could silently drift from internal/atomname.TruncateGraphNodeLabel's
+// tested contract (M21-175): for the same text and budget, both functions
+// must agree rune-for-rune on the truncated display text and the Truncated
+// flag, and TruncateLabel's "full" return must always equal the untruncated
+// input regardless of the budget.
+func TestTruncateLabelMatchesAtomNameTruncationContract(t *testing.T) {
+	canonical, err := atomname.NewCanonicalName("ReserveAccountFundsUntilAuthorizationExpires")
+	if err != nil {
+		t.Fatalf("NewCanonicalName failed: %v", err)
+	}
+	display := atomname.DeriveDisplayName(canonical)
+	text := display.String()
+	runeCount := len([]rune(text))
+
+	for _, budget := range []int{-5, 0, 1, 2, 11, 12, runeCount - 1, runeCount, runeCount + 5} {
+		want := atomname.TruncateGraphNodeLabel(display, budget)
+		gotDisplay, gotFull, gotClipped := TruncateLabel(text, budget)
+		if gotDisplay != want.Text || gotClipped != want.Truncated {
+			t.Errorf("budget %d: TruncateLabel(%q) = (%q, clipped=%t), want (%q, clipped=%t) from atomname.TruncateGraphNodeLabel",
+				budget, text, gotDisplay, gotClipped, want.Text, want.Truncated)
+		}
+		if gotFull != text {
+			t.Errorf("budget %d: full label = %q, want the untruncated %q", budget, gotFull, text)
+		}
+	}
+}
+
+// TestTruncateLabelBoundaryCases exercises the M21-166 boundary behaviors: a
+// name longer than the label budget is clipped, a name exactly at the budget
+// is not, and a non-positive budget (no rendering room at all) leaves the
+// full name untouched rather than applying a silent default truncation.
+func TestTruncateLabelBoundaryCases(t *testing.T) {
+	const longName = "ValidateProviderEvidenceAcrossRevisions"
+	runeCount := len([]rune(longName))
+
+	if display, full, clipped := TruncateLabel(longName, runeCount); clipped || display != full || display != longName {
+		t.Fatalf("name exactly at budget must not be truncated, got display=%q full=%q clipped=%t", display, full, clipped)
+	}
+	if display, full, clipped := TruncateLabel(longName, runeCount-1); !clipped || display == full || full != longName {
+		t.Fatalf("name longer than budget must be truncated while preserving the full name, got display=%q full=%q clipped=%t", display, full, clipped)
+	}
+	if display, full, clipped := TruncateLabel(longName, 0); clipped || display != longName || full != longName {
+		t.Fatalf("non-positive budget must skip truncation entirely, got display=%q full=%q clipped=%t", display, full, clipped)
+	}
+	if display, full, clipped := TruncateLabel(longName, -3); clipped || display != longName || full != longName {
+		t.Fatalf("negative budget must skip truncation entirely, got display=%q full=%q clipped=%t", display, full, clipped)
 	}
 }
 

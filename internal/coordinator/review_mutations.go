@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"codeflux.dev/codeflux/internal/acceptance"
 	"codeflux.dev/codeflux/internal/domain"
@@ -144,7 +145,26 @@ func reviewDigest(parts ...string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+// finalizeReviewDecision translates storage-layer staleness into the
+// acceptance port's own vocabulary before returning.
+//
+// internal/transport is an adapter and may not depend on internal/storage
+// (a sibling adapter); it must classify failures through inward ports. This
+// is where that translation belongs: the application knows a stale task
+// revision means the review binding changed, and says so in terms the port
+// already defines.
 func (service *ReviewMutationService) finalizeReviewDecision(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, reason, key string) (storage.Task, error) {
+	task, err := service.finalizeReviewDecisionWithStorageErrors(ctx, taskID, decision, reason, key)
+	if err != nil {
+		if errors.Is(err, storage.ErrStaleRevision) {
+			return storage.Task{}, fmt.Errorf("%w: %w", acceptance.ErrStaleReview, err)
+		}
+		return storage.Task{}, err
+	}
+	return task, nil
+}
+
+func (service *ReviewMutationService) finalizeReviewDecisionWithStorageErrors(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, reason, key string) (storage.Task, error) {
 	task, err := service.repositories.GetTask(ctx, taskID)
 	if err != nil {
 		return storage.Task{}, err

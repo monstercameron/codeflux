@@ -249,3 +249,16 @@ func mountedGraphInspector(
 	}
 	return html.Div(html.Props{Data: map[string]string{"component": "mounted-graph-inspector"}}, children...)
 }
+
+func mountedGraphCurrentNode(resource graphResource) domain.NodeID {
+	nodes := resource.Revision.Nodes()
+	for _, node := range nodes {
+		if node.Status() == taskgraph.NodeStatusActive {
+			return node.ID()
+		}
+	}
+	if len(nodes) > 0 {
+		return nodes[0].ID()
+	}
+	return domain.NodeID{}
+}

@@ -151,6 +151,23 @@ message CreateTaskRequest {
   StableIdentity thread_id = 2;
   StableIdentity source_message_id = 3;
   string requirement = 4;
+
+  // The declared shape of the task. These are supplied by the caller rather
+  // than inferred from the requirement text: no requirement classifier
+  // exists, and a guess here would land inside the task fingerprint that
+  // gates project-memory retrieval and routing. See
+  // coordinator.TaskIntakeRequest.
+  string task_class = 5;
+  string repository_revision = 6;
+  string baseline_model_revision = 7;
+  string tool_configuration_version = 8;
+  string validation_profile_version = 9;
+
+  // Structured scope hints. Optional, but they are what project-memory
+  // retrieval matches on; the requirement prose is never matched against.
+  repeated string affected_paths = 10;
+  repeated string affected_packages = 11;
+  repeated string affected_symbols = 12;
 }
 
 message CreateTaskResponse {
@@ -169,6 +186,13 @@ message StartTaskRequest {
   MutationControl control = 1;
   StableIdentity task_id = 2;
   uint64 approved_plan_revision = 3;
+
+  // The exact execution preflight the user approved. StartPreparedTaskRun
+  // validates against this binding, so naming it here is what makes "start
+  // exactly what was reviewed" enforceable rather than advisory. It is
+  // distinct from approved_plan_revision: one identifies the reviewed plan,
+  // the other the immutable policy/forecast/budget binding.
+  uint64 preflight_revision = 4;
 }
 
 message StartTaskResponse {

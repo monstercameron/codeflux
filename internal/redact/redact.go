@@ -333,6 +333,73 @@ var patterns = []secretPattern{
 		expression: regexp.MustCompile(`\bgh[pousr]_[A-Za-z0-9]{20,}\b`),
 		replace:    func(string) string { return Marker },
 	},
+	// GitHub fine-grained personal access tokens, which do not match the
+	// classic gh*_ shape above.
+	{
+		expression: regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),
+		replace:    func(string) string { return Marker },
+	},
+	// AWS access key IDs. The prefix set is AWS's own documented list of
+	// unique identifier prefixes for long- and short-lived keys.
+	{
+		expression: regexp.MustCompile(`\b(?:AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ABIA)[0-9A-Z]{16}\b`),
+		replace:    func(string) string { return Marker },
+	},
+	// AWS secret access keys are 40 characters of unlabelled base64, which
+	// is far too generic to match on shape alone without redacting ordinary
+	// hashes and identifiers. Match the labelled form instead, which is how
+	// they appear in configuration, environment dumps, and pasted output.
+	{
+		expression: regexp.MustCompile(`(?i)\baws_?secret_?access_?key\s*[:=]\s*(?:"[^"\r\n]+"|'[^'\r\n]+'|[^\s,;]+)`),
+		replace:    labelledSecretReplacement,
+	},
+	// Google API keys.
+	{
+		expression: regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`),
+		replace:    func(string) string { return Marker },
+	},
+	// Slack bot, user, app, refresh, and legacy tokens.
+	{
+		expression: regexp.MustCompile(`\bxox[baprse]-[0-9A-Za-z\-]{10,}\b`),
+		replace:    func(string) string { return Marker },
+	},
+	// JSON Web Tokens. Three base64url segments with the standard
+	// `{"alg"` / `{"typ"` header prefix, so ordinary dotted identifiers are
+	// not swept up.
+	{
+		expression: regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b`),
+		replace:    func(string) string { return Marker },
+	},
+	// Credentials embedded in a URI authority, e.g. a database connection
+	// string. Only the password segment is replaced so the scheme, user, and
+	// host stay legible for diagnostics.
+	{
+		expression: regexp.MustCompile(`\b([a-zA-Z][a-zA-Z0-9+.\-]*://[^\s:@/]+):[^\s@/]+@`),
+		replace: func(match string) string {
+			separator := strings.LastIndex(match, ":")
+			if separator < 0 {
+				return Marker
+			}
+			return match[:separator] + ":" + Marker + "@"
+		},
+	},
+	// Labelled passwords in configuration, environment output, and pasted
+	// command lines. Deliberately broad: over-redacting a non-secret value
+	// costs legibility, under-redacting one leaks a credential.
+	{
+		expression: regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token)\s*[:=]\s*(?:"[^"\r\n]+"|'[^'\r\n]+'|[^\s,;]+)`),
+		replace:    labelledSecretReplacement,
+	},
+}
+
+// labelledSecretReplacement keeps a `label: ` prefix and replaces only the
+// value, so redacted output still says which setting was present.
+func labelledSecretReplacement(match string) string {
+	index := strings.IndexAny(match, ":=")
+	if index < 0 {
+		return Marker
+	}
+	return strings.TrimSpace(match[:index]) + ": " + Marker
 }
 
 func sensitiveFieldName(name string) bool {

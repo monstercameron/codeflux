@@ -3048,223 +3048,223 @@ Milestone output: project-scoped factual episodes, deterministic repository fact
 
 ## Memory Boundary
 
-- [ ] `M21-001 BLOCKER` Define project-memory authority separately from raw task history.
-- [ ] `M21-002` Define factual repository fact type.
-- [ ] `M21-003` Define reviewed command type.
-- [ ] `M21-004` Define file-to-test mapping type.
-- [ ] `M21-005` Define repository convention type.
-- [ ] `M21-006` Define accepted regression case type.
-- [ ] `M21-007` Define execution recipe type.
-- [ ] `M21-008` Define executable atom reference type without requiring deep semantic atoms.
-- [ ] `M21-009` Define observation/hypothesis type with `evidence_strength: none`.
-- [ ] `M21-010` Define maturity states: candidate, validated, preferred-for-experiment, quarantined, invalidated, retired.
-- [ ] `M21-011` Prohibit model self-report from creating validated status.
-- [ ] `M21-012` Define project ownership and cross-project isolation.
-- [ ] `M21-013` Define user inspection, correction, export, and deletion semantics.
+- [x] `M21-001 BLOCKER` Define project-memory authority separately from raw task history.
+- [x] `M21-002` Define factual repository fact type.
+- [x] `M21-003` Define reviewed command type.
+- [x] `M21-004` Define file-to-test mapping type.
+- [x] `M21-005` Define repository convention type.
+- [x] `M21-006` Define accepted regression case type.
+- [x] `M21-007` Define execution recipe type.
+- [x] `M21-008` Define executable atom reference type without requiring deep semantic atoms.
+- [x] `M21-009` Define observation/hypothesis type with `evidence_strength: none`.
+- [x] `M21-010` Define maturity states: candidate, validated, preferred-for-experiment, quarantined, invalidated, retired.
+- [x] `M21-011` Prohibit model self-report from creating validated status.
+- [x] `M21-012` Define project ownership and cross-project isolation.
+- [x] `M21-013` Define user inspection, correction, export, and deletion semantics.
 
 ## SQLite Memory Schema
 
-- [ ] `M21-014 DATA` Create memory artifact identity table.
-- [ ] `M21-015 DATA` Create immutable artifact revision table.
-- [ ] `M21-016 DATA` Create artifact type and maturity fields.
-- [ ] `M21-017 DATA` Create project and repository-revision bindings.
-- [ ] `M21-018 DATA` Create supporting-evidence links.
-- [ ] `M21-019 DATA` Create `derived_from` lineage.
-- [ ] `M21-020 DATA` Create `influenced_by` lineage.
-- [ ] `M21-021 DATA` Create invalidation and quarantine records.
-- [ ] `M21-022 DATA` Create applicability-predicate records.
-- [ ] `M21-023 DATA` Create task-fingerprint schema-version table.
-- [ ] `M21-024 DATA` Create vector-model/version metadata tables.
-- [ ] `M21-025 DATA` Create vector rows linked to artifact revision.
-- [ ] `M21-026 DATA` Create retrieval-candidate and retrieval-decision logs.
-- [ ] `M21-027 DATA` Add project-boundary foreign keys and indexes.
-- [ ] `M21-028 TEST` Test cascading logical deletion without cross-project impact.
+- [x] `M21-014 DATA` Create memory artifact identity table.
+- [x] `M21-015 DATA` Create immutable artifact revision table.
+- [x] `M21-016 DATA` Create artifact type and maturity fields.
+- [x] `M21-017 DATA` Create project and repository-revision bindings.
+- [x] `M21-018 DATA` Create supporting-evidence links.
+- [x] `M21-019 DATA` Create `derived_from` lineage.
+- [x] `M21-020 DATA` Create `influenced_by` lineage.
+- [x] `M21-021 DATA` Create invalidation and quarantine records.
+- [x] `M21-022 DATA` Create applicability-predicate records.
+- [x] `M21-023 DATA` Create task-fingerprint schema-version table.
+- [x] `M21-024 DATA` Create vector-model/version metadata tables.
+- [x] `M21-025 DATA` Create vector rows linked to artifact revision.
+- [x] `M21-026 DATA` Create retrieval-candidate and retrieval-decision logs.
+- [x] `M21-027 DATA` Add project-boundary foreign keys and indexes.
+- [x] `M21-028 TEST` Test cascading logical deletion without cross-project impact.
 
 ## Chronological Episode Capture
 
-- [ ] `M21-029 BLOCKER` Define episode start and end boundaries.
-- [ ] `M21-030` Record requirement and accepted plan revisions.
-- [ ] `M21-031` Record repository/context revisions.
-- [ ] `M21-032` Record ordered actions and results by event reference.
-- [ ] `M21-033` Record user interventions and approvals.
-- [ ] `M21-034` Record validation and final decision.
-- [ ] `M21-035` Record forecast and actual metrics.
-- [ ] `M21-036` Record failures before repairs.
-- [ ] `M21-037` Record whether the outcome was accepted, rejected, abandoned, or unresolved.
-- [ ] `M21-038` Freeze the episode after terminal user decision.
-- [ ] `M21-039` Allow later invalidation overlays without mutating historical facts.
+- [x] `M21-029 BLOCKER` Define episode start and end boundaries.
+- [x] `M21-030` Record requirement and accepted plan revisions.
+- [x] `M21-031` Record repository/context revisions.
+- [x] `M21-032` Record ordered actions and results by event reference.
+- [x] `M21-033` Record user interventions and approvals.
+- [x] `M21-034` Record validation and final decision.
+- [x] `M21-035` Record forecast and actual metrics.
+- [x] `M21-036` Record failures before repairs.
+- [x] `M21-037` Record whether the outcome was accepted, rejected, abandoned, or unresolved.
+- [x] `M21-038` Freeze the episode after terminal user decision.
+- [x] `M21-039` Allow later invalidation overlays without mutating historical facts.
 
 ## Deterministic Fact Extraction
 
-- [ ] `M21-040` Extract successful build commands only from attributable executions.
-- [ ] `M21-041` Extract successful test commands only from attributable executions.
-- [ ] `M21-042` Bind commands to repository revision and relevant path scope.
-- [ ] `M21-043` Extract file-to-test mappings from observed successful validations.
-- [ ] `M21-044` Extract stable project instructions only after user approval.
-- [ ] `M21-045` Extract formatting/lint conventions from configuration and accepted work.
-- [ ] `M21-046` Deduplicate facts by normalized identity.
-- [ ] `M21-047` Track first observed, last confirmed, and supporting episode count.
-- [ ] `M21-048` Invalidate facts when supporting files or versions change.
-- [ ] `M21-049` Require revalidation before an invalidated fact regains influence.
-- [ ] `M21-050 TEST` Test a changed test runner invalidates its stored command.
+- [x] `M21-040` Extract successful build commands only from attributable executions.
+- [x] `M21-041` Extract successful test commands only from attributable executions.
+- [x] `M21-042` Bind commands to repository revision and relevant path scope.
+- [x] `M21-043` Extract file-to-test mappings from observed successful validations.
+- [x] `M21-044` Extract stable project instructions only after user approval.
+- [x] `M21-045` Extract formatting/lint conventions from configuration and accepted work.
+- [x] `M21-046` Deduplicate facts by normalized identity.
+- [x] `M21-047` Track first observed, last confirmed, and supporting episode count.
+- [x] `M21-048` Invalidate facts when supporting files or versions change.
+- [x] `M21-049` Require revalidation before an invalidated fact regains influence.
+- [x] `M21-050 TEST` Test a changed test runner invalidates its stored command.
 
 ## Task Fingerprint
 
-- [ ] `M21-051 BLOCKER` Define fingerprint schema version 1.
-- [ ] `M21-052` Include project and repository identity.
-- [ ] `M21-053` Include base revision or compatibility range.
-- [ ] `M21-054` Include normalized task class.
-- [ ] `M21-055` Include affected package/symbol/path hints.
-- [ ] `M21-056` Include language/toolchain/dependency bindings.
-- [ ] `M21-057` Include risk and validation requirements.
-- [ ] `M21-058` Include requested effects/authority class.
-- [ ] `M21-059` Separate exact-match fields from descriptive retrieval text.
-- [ ] `M21-060` Serialize exact fields canonically.
-- [ ] `M21-061` Hash the canonical exact fingerprint.
-- [ ] `M21-062 TEST` Verify identical inputs produce identical fingerprints.
-- [ ] `M21-063 TEST` Verify material dependency or revision changes alter relevant bindings.
+- [x] `M21-051 BLOCKER` Define fingerprint schema version 1.
+- [x] `M21-052` Include project and repository identity.
+- [x] `M21-053` Include base revision or compatibility range.
+- [x] `M21-054` Include normalized task class.
+- [x] `M21-055` Include affected package/symbol/path hints.
+- [x] `M21-056` Include language/toolchain/dependency bindings.
+- [x] `M21-057` Include risk and validation requirements.
+- [x] `M21-058` Include requested effects/authority class.
+- [x] `M21-059` Separate exact-match fields from descriptive retrieval text.
+- [x] `M21-060` Serialize exact fields canonically.
+- [x] `M21-061` Hash the canonical exact fingerprint.
+- [x] `M21-062 TEST` Verify identical inputs produce identical fingerprints.
+- [x] `M21-063 TEST` Verify material dependency or revision changes alter relevant bindings.
 
 ## Pre-Work Retrieval Gate
 
-- [ ] `M21-064 BLOCKER` Run exact identity/fingerprint lookup before planning from scratch.
-- [ ] `M21-065` Retrieve reviewed project facts relevant to selected context.
-- [ ] `M21-066` Retrieve compatible commands and file-to-test mappings.
-- [ ] `M21-067` Retrieve exact reusable atoms or recipes only when applicability predicates pass.
-- [ ] `M21-068` Reject candidate with project-boundary mismatch.
-- [ ] `M21-069` Reject candidate with toolchain/dependency mismatch.
-- [ ] `M21-070` Reject candidate with invalidated evidence.
-- [ ] `M21-071` Reject candidate whose assurance is below the current task requirement.
-- [ ] `M21-072` Record every accepted and rejected retrieval candidate with reason.
-- [ ] `M21-073` Present influential memory items to the user.
-- [ ] `M21-074` Let the agent use, adapt, or reject an eligible item.
-- [ ] `M21-075` Record actual influence rather than mere retrieval.
-- [ ] `M21-076` Fall back to ordinary planning when no eligible item exists.
-- [ ] `M21-077` Never treat vector similarity as eligibility.
+- [x] `M21-064 BLOCKER` Run exact identity/fingerprint lookup before planning from scratch.
+- [x] `M21-065` Retrieve reviewed project facts relevant to selected context.
+- [x] `M21-066` Retrieve compatible commands and file-to-test mappings.
+- [x] `M21-067` Retrieve exact reusable atoms or recipes only when applicability predicates pass.
+- [x] `M21-068` Reject candidate with project-boundary mismatch.
+- [x] `M21-069` Reject candidate with toolchain/dependency mismatch.
+- [x] `M21-070` Reject candidate with invalidated evidence.
+- [x] `M21-071` Reject candidate whose assurance is below the current task requirement.
+- [x] `M21-072` Record every accepted and rejected retrieval candidate with reason.
+- [x] `M21-073` Present influential memory items to the user.
+- [x] `M21-074` Let the agent use, adapt, or reject an eligible item.
+- [x] `M21-075` Record actual influence rather than mere retrieval.
+- [x] `M21-076` Fall back to ordinary planning when no eligible item exists.
+- [x] `M21-077` Never treat vector similarity as eligibility.
 
 ## Optional Vector Candidate Discovery
 
-- [ ] `M21-078` Measure deterministic retrieval misses before enabling embeddings.
-- [ ] `M21-079` Select an embedding provider/model only if the measured problem justifies it.
-- [ ] `M21-080` Record model, dimensions, normalization, and input-schema version.
-- [ ] `M21-081` Generate embeddings from scrubbed descriptive fields.
-- [ ] `M21-082` Store vectors in SQLite linked to exact artifact revision.
-- [ ] `M21-083` Implement brute-force cosine search for prototype-scale data.
-- [ ] `M21-084` Apply project scope before similarity ranking.
-- [ ] `M21-085` Apply compatibility and assurance gates after candidate discovery.
-- [ ] `M21-086` Record candidate rank and final rejection/acceptance.
-- [ ] `M21-087` Re-embed when embedding model or input schema changes.
-- [ ] `M21-088` Delete vectors when the owning artifact is deleted.
-- [ ] `M21-089 DEFER` Do not add a separate vector database.
+- [x] `M21-078` Measure deterministic retrieval misses before enabling embeddings.
+- [x] `M21-079` Select an embedding provider/model only if the measured problem justifies it.
+- [x] `M21-080` Record model, dimensions, normalization, and input-schema version.
+- [x] `M21-081` Generate embeddings from scrubbed descriptive fields.
+- [x] `M21-082` Store vectors in SQLite linked to exact artifact revision.
+- [x] `M21-083` Implement brute-force cosine search for prototype-scale data.
+- [x] `M21-084` Apply project scope before similarity ranking.
+- [x] `M21-085` Apply compatibility and assurance gates after candidate discovery.
+- [x] `M21-086` Record candidate rank and final rejection/acceptance.
+- [x] `M21-087` Re-embed when embedding model or input schema changes.
+- [x] `M21-088` Delete vectors when the owning artifact is deleted.
+- [x] `M21-089 DEFER` Do not add a separate vector database.
 
 ## Inspection and Correction UI
 
-- [ ] `M21-090 UX` Add project-memory list.
-- [ ] `M21-091 UX` Filter by type, maturity, validity, and last confirmation.
-- [ ] `M21-092 UX` Show supporting episodes and lineage.
-- [ ] `M21-093 UX` Show bindings and applicability predicate.
-- [ ] `M21-094 UX` Show retrieval/influence history.
-- [ ] `M21-095 UX` Allow user correction by creating a new revision.
-- [ ] `M21-096 UX` Allow quarantine.
-- [ ] `M21-097 UX` Allow invalidation with reason.
-- [ ] `M21-098 UX` Allow deletion with affected-descendant preview.
-- [ ] `M21-099 UX` Export selected structured records without secrets.
+- [x] `M21-090 UX` Add project-memory list.
+- [x] `M21-091 UX` Filter by type, maturity, validity, and last confirmation.
+- [x] `M21-092 UX` Show supporting episodes and lineage.
+- [x] `M21-093 UX` Show bindings and applicability predicate.
+- [x] `M21-094 UX` Show retrieval/influence history.
+- [x] `M21-095 UX` Allow user correction by creating a new revision.
+- [x] `M21-096 UX` Allow quarantine.
+- [x] `M21-097 UX` Allow invalidation with reason.
+- [x] `M21-098 UX` Allow deletion with affected-descendant preview.
+- [x] `M21-099 UX` Export selected structured records without secrets.
 
 ## Atom Documentation Extraction and Embedding
 
 Plan: §7 Atom Documentation as Retrieval Material; §23 Atom Storage and Vector Storage; §31 Versioned Task Fingerprints and Retrieval and Pre-Work Gate.
 
-- [ ] `M21-100 BLOCKER` Define atom-documentation schema version 1 using the exact field names in `AGENTS.md`.
-- [ ] `M21-101` Define which atom categories are source-authored, SQLite-authored, or generated projections.
-- [ ] `M21-102` Define immutable atom-documentation revision identity separately from atom and atom-version identity.
-- [ ] `M21-103 DATA` Add `atom_documentation_revisions` with atom ID, atom version, schema version, repository revision, source comment hash, contract hash, normalized input hash, dependency bindings, validation status, and timestamps.
-- [ ] `M21-104 DATA` Add normalized atom-documentation field storage without discarding the original scrubbed comment text.
-- [ ] `M21-105 DATA` Link each atom embedding to the exact documentation revision that produced it.
-- [ ] `M21-106 DATA` Add uniqueness constraints preventing two different normalized documents from claiming one documentation revision.
-- [ ] `M21-107 DATA` Add indexes for atom identity, comment hash, contract hash, validity, and pending re-embedding.
-- [ ] `M21-108` Parse source-authored atom comments with the Go parser and AST rather than regular expressions alone.
-- [ ] `M21-109` Locate the doc group attached to the declared atom identifier.
-- [ ] `M21-110` Parse and validate the schema-version header.
-- [ ] `M21-111` Parse required top-level fields without losing list structure.
-- [ ] `M21-112` Normalize indentation and insignificant whitespace.
-- [ ] `M21-113` Preserve meaningful units, punctuation, domain terms, and negative examples.
-- [ ] `M21-114` Reject missing, duplicate, unknown, or out-of-order fields according to the schema policy.
-- [ ] `M21-115` Reject empty fields and unexplained `None` values.
-- [ ] `M21-116` Validate that the opening sentence begins with the Go identifier.
-- [ ] `M21-117` Flag likely keyword stuffing or repeated boilerplate for review rather than silently embedding it.
-- [ ] `M21-118 SECURITY` Run documentation through the same secret and sensitive-data scrubber used before persistence.
-- [ ] `M21-119 SECURITY` Reject comments containing known credentials, private keys, or prohibited sensitive fixtures.
-- [ ] `M21-120` Compute the exact source-comment hash before normalization.
-- [ ] `M21-121` Compute the normalized documentation-input hash after parsing and scrubbing.
-- [ ] `M21-122` Bind the parsed document to the current atom contract hash and dependency bindings.
-- [ ] `M21-123` Persist admission success or rejection reason.
-- [ ] `M21-124` Generate Go comments for SQLite-authored atoms from the same structured documentation revision.
-- [ ] `M21-125 TEST` Round-trip a structured SQLite atom document through generated Go comment and AST extraction.
-- [ ] `M21-126 TEST` Verify round-trip preservation of semantic fields and stable normalized hash.
-- [ ] `M21-127` Define embedding-input schema version 1 separately from documentation schema version 1.
-- [ ] `M21-128` Include Purpose, Use when, Do not use when, Semantics, input/output meaning, Effects, Failure semantics, and Retrieval concepts in the default embedding input.
-- [ ] `M21-129` Include retry, reconciliation, security, dependency, and limit fields only through concise semantic normalization.
-- [ ] `M21-130` Exclude source paths, line numbers, timestamps, evidence run IDs, hashes, and repeated field labels from embedding input.
-- [ ] `M21-131` Preserve negative selection examples so semantically close but invalid atoms can be distinguished.
-- [ ] `M21-132` Record embedding model, dimensions, normalization, input-schema version, and input hash.
-- [ ] `M21-133` Queue re-embedding when normalized input or embedding configuration changes.
-- [ ] `M21-134` Invalidate retrieval influence immediately when comment, contract, binding, or evidence validity changes.
-- [ ] `M21-135` Keep prior vectors for historical lineage while excluding them from active retrieval.
-- [ ] `M21-136` Require project, compatibility, applicability, evidence, and assurance gates after vector candidate discovery.
-- [ ] `M21-137` Record whether an atom was retrieved from exact identity, structured fields, vector similarity, or several channels.
-- [ ] `M21-138` Record whether the agent used, adapted, or rejected the atom and why.
-- [ ] `M21-139 TEST` Test semantic comment change creates a new documentation revision and pending vector.
-- [ ] `M21-140 TEST` Test formatting-only comment change changes the source hash but can preserve the normalized input hash.
-- [ ] `M21-141 TEST` Test contract change invalidates an otherwise unchanged comment vector.
-- [ ] `M21-142 TEST` Test dependency-binding change invalidates active retrieval.
-- [ ] `M21-143 TEST` Test embedding-model change regenerates vectors without rewriting historical documentation.
-- [ ] `M21-144 TEST` Test a high-similarity atom with failed applicability is rejected.
-- [ ] `M21-145 TEST` Test a richly documented atom cannot self-promote its assurance level.
+- [x] `M21-100 BLOCKER` Define atom-documentation schema version 1 using the exact field names in `AGENTS.md`.
+- [x] `M21-101` Define which atom categories are source-authored, SQLite-authored, or generated projections.
+- [x] `M21-102` Define immutable atom-documentation revision identity separately from atom and atom-version identity.
+- [x] `M21-103 DATA` Add `atom_documentation_revisions` with atom ID, atom version, schema version, repository revision, source comment hash, contract hash, normalized input hash, dependency bindings, validation status, and timestamps.
+- [x] `M21-104 DATA` Add normalized atom-documentation field storage without discarding the original scrubbed comment text.
+- [x] `M21-105 DATA` Link each atom embedding to the exact documentation revision that produced it.
+- [x] `M21-106 DATA` Add uniqueness constraints preventing two different normalized documents from claiming one documentation revision.
+- [x] `M21-107 DATA` Add indexes for atom identity, comment hash, contract hash, validity, and pending re-embedding.
+- [x] `M21-108` Parse source-authored atom comments with the Go parser and AST rather than regular expressions alone.
+- [x] `M21-109` Locate the doc group attached to the declared atom identifier.
+- [x] `M21-110` Parse and validate the schema-version header.
+- [x] `M21-111` Parse required top-level fields without losing list structure.
+- [x] `M21-112` Normalize indentation and insignificant whitespace.
+- [x] `M21-113` Preserve meaningful units, punctuation, domain terms, and negative examples.
+- [x] `M21-114` Reject missing, duplicate, unknown, or out-of-order fields according to the schema policy.
+- [x] `M21-115` Reject empty fields and unexplained `None` values.
+- [x] `M21-116` Validate that the opening sentence begins with the Go identifier.
+- [x] `M21-117` Flag likely keyword stuffing or repeated boilerplate for review rather than silently embedding it.
+- [x] `M21-118 SECURITY` Run documentation through the same secret and sensitive-data scrubber used before persistence.
+- [x] `M21-119 SECURITY` Reject comments containing known credentials, private keys, or prohibited sensitive fixtures.
+- [x] `M21-120` Compute the exact source-comment hash before normalization.
+- [x] `M21-121` Compute the normalized documentation-input hash after parsing and scrubbing.
+- [x] `M21-122` Bind the parsed document to the current atom contract hash and dependency bindings.
+- [x] `M21-123` Persist admission success or rejection reason.
+- [x] `M21-124` Generate Go comments for SQLite-authored atoms from the same structured documentation revision.
+- [x] `M21-125 TEST` Round-trip a structured SQLite atom document through generated Go comment and AST extraction.
+- [x] `M21-126 TEST` Verify round-trip preservation of semantic fields and stable normalized hash.
+- [x] `M21-127` Define embedding-input schema version 1 separately from documentation schema version 1.
+- [x] `M21-128` Include Purpose, Use when, Do not use when, Semantics, input/output meaning, Effects, Failure semantics, and Retrieval concepts in the default embedding input.
+- [x] `M21-129` Include retry, reconciliation, security, dependency, and limit fields only through concise semantic normalization.
+- [x] `M21-130` Exclude source paths, line numbers, timestamps, evidence run IDs, hashes, and repeated field labels from embedding input.
+- [x] `M21-131` Preserve negative selection examples so semantically close but invalid atoms can be distinguished.
+- [x] `M21-132` Record embedding model, dimensions, normalization, input-schema version, and input hash.
+- [x] `M21-133` Queue re-embedding when normalized input or embedding configuration changes.
+- [x] `M21-134` Invalidate retrieval influence immediately when comment, contract, binding, or evidence validity changes.
+- [x] `M21-135` Keep prior vectors for historical lineage while excluding them from active retrieval.
+- [x] `M21-136` Require project, compatibility, applicability, evidence, and assurance gates after vector candidate discovery.
+- [x] `M21-137` Record whether an atom was retrieved from exact identity, structured fields, vector similarity, or several channels.
+- [x] `M21-138` Record whether the agent used, adapted, or rejected the atom and why.
+- [x] `M21-139 TEST` Test semantic comment change creates a new documentation revision and pending vector.
+- [x] `M21-140 TEST` Test formatting-only comment change changes the source hash but can preserve the normalized input hash.
+- [x] `M21-141 TEST` Test contract change invalidates an otherwise unchanged comment vector.
+- [x] `M21-142 TEST` Test dependency-binding change invalidates active retrieval.
+- [x] `M21-143 TEST` Test embedding-model change regenerates vectors without rewriting historical documentation.
+- [x] `M21-144 TEST` Test a high-similarity atom with failed applicability is rejected.
+- [x] `M21-145 TEST` Test a richly documented atom cannot self-promote its assurance level.
 
 ## Atom Name Storage, Aliases, and Embedding
 
 Plan: §7 Atom Naming and Retrieval Identity; §23 Atom Storage; §31 Retrieval and Pre-Work Gate.
 
-- [ ] `M21-146 BLOCKER` Define atom naming-schema version 1 independently from documentation and embedding-input schemas.
-- [ ] `M21-147` Define canonical Go identifier validation and maximum practical display behavior without imposing a short semantic length limit.
-- [ ] `M21-148` Derive a human-readable display name from the canonical semantic phrase.
-- [ ] `M21-149` Derive the normalized word-split phrase deterministically from the Go identifier.
-- [ ] `M21-150` Preserve meaningful initialisms during word splitting.
-- [ ] `M21-151` Define the allowlist and project extension mechanism for established domain abbreviations.
-- [ ] `M21-152` Require a short naming rationale explaining the nearest confusing alternative and the qualifier that distinguishes this atom.
-- [ ] `M21-153 DATA` Add `atom_names` with atom ID, atom version, canonical name, display name, normalized phrase, schema version, rationale, validity, and revision metadata.
-- [ ] `M21-154 DATA` Add `atom_name_aliases` with alias text, normalized form, source, active interval, and target atom identity.
-- [ ] `M21-155 DATA` Add a uniqueness constraint for active normalized canonical names within project and semantic scope.
-- [ ] `M21-156 DATA` Preserve prior canonical names as immutable aliases after a semantic-preserving rename.
-- [ ] `M21-157` Classify a proposed rename as formatting-only, semantic-preserving, or semantic-breaking.
-- [ ] `M21-158` Require explicit review for semantic-preserving rename classification.
-- [ ] `M21-159` Require a new atom version or identity for semantic-breaking rename classification.
-- [ ] `M21-160` Create a new documentation revision after an accepted canonical rename.
-- [ ] `M21-161` Include canonical name and normalized semantic phrase exactly once in embedding input.
-- [ ] `M21-162` Include reviewed aliases as low-weight discovery text without duplicating the canonical phrase.
-- [ ] `M21-163` Exclude obsolete or invalidated aliases from active candidate generation while retaining lineage.
-- [ ] `M21-164` Invalidate and regenerate derived vectors after canonical name, normalized phrase, or active alias changes.
-- [ ] `M21-165` Render the display name as the primary graph-node label and preserve the stable atom ID separately.
-- [ ] `M21-166` Truncate only the visual graph label when space requires it; expose the full name in tooltip, inspector, search result, and accessibility label.
-- [ ] `M21-167` Search canonical name, normalized phrase, and active aliases before vector similarity.
-- [ ] `M21-168` Record which name or alias caused an atom to enter the candidate set.
-- [ ] `M21-169 TEST` Test deterministic conversion among canonical, display, and normalized names.
-- [ ] `M21-170 TEST` Test collision detection within one semantic scope.
-- [ ] `M21-171 TEST` Test that equivalent names in separate project scopes remain isolated.
-- [ ] `M21-172 TEST` Test semantic-preserving rename retains atom ID and creates alias/documentation revision lineage.
-- [ ] `M21-173 TEST` Test semantic-breaking rename cannot retain the old compatible identity silently.
-- [ ] `M21-174 TEST` Test an old alias finds the renamed atom but does not bypass applicability.
-- [ ] `M21-175 TEST` Test graph truncation never changes stored canonical or accessible names.
+- [x] `M21-146 BLOCKER` Define atom naming-schema version 1 independently from documentation and embedding-input schemas.
+- [x] `M21-147` Define canonical Go identifier validation and maximum practical display behavior without imposing a short semantic length limit.
+- [x] `M21-148` Derive a human-readable display name from the canonical semantic phrase.
+- [x] `M21-149` Derive the normalized word-split phrase deterministically from the Go identifier.
+- [x] `M21-150` Preserve meaningful initialisms during word splitting.
+- [x] `M21-151` Define the allowlist and project extension mechanism for established domain abbreviations.
+- [x] `M21-152` Require a short naming rationale explaining the nearest confusing alternative and the qualifier that distinguishes this atom.
+- [x] `M21-153 DATA` Add `atom_names` with atom ID, atom version, canonical name, display name, normalized phrase, schema version, rationale, validity, and revision metadata.
+- [x] `M21-154 DATA` Add `atom_name_aliases` with alias text, normalized form, source, active interval, and target atom identity.
+- [x] `M21-155 DATA` Add a uniqueness constraint for active normalized canonical names within project and semantic scope.
+- [x] `M21-156 DATA` Preserve prior canonical names as immutable aliases after a semantic-preserving rename.
+- [x] `M21-157` Classify a proposed rename as formatting-only, semantic-preserving, or semantic-breaking.
+- [x] `M21-158` Require explicit review for semantic-preserving rename classification.
+- [x] `M21-159` Require a new atom version or identity for semantic-breaking rename classification.
+- [x] `M21-160` Create a new documentation revision after an accepted canonical rename.
+- [x] `M21-161` Include canonical name and normalized semantic phrase exactly once in embedding input.
+- [x] `M21-162` Include reviewed aliases as low-weight discovery text without duplicating the canonical phrase.
+- [x] `M21-163` Exclude obsolete or invalidated aliases from active candidate generation while retaining lineage.
+- [x] `M21-164` Invalidate and regenerate derived vectors after canonical name, normalized phrase, or active alias changes.
+- [x] `M21-165` Render the display name as the primary graph-node label and preserve the stable atom ID separately.
+- [x] `M21-166` Truncate only the visual graph label when space requires it; expose the full name in tooltip, inspector, search result, and accessibility label.
+- [x] `M21-167` Search canonical name, normalized phrase, and active aliases before vector similarity.
+- [x] `M21-168` Record which name or alias caused an atom to enter the candidate set.
+- [x] `M21-169 TEST` Test deterministic conversion among canonical, display, and normalized names.
+- [x] `M21-170 TEST` Test collision detection within one semantic scope.
+- [x] `M21-171 TEST` Test that equivalent names in separate project scopes remain isolated.
+- [x] `M21-172 TEST` Test semantic-preserving rename retains atom ID and creates alias/documentation revision lineage.
+- [x] `M21-173 TEST` Test semantic-breaking rename cannot retain the old compatible identity silently.
+- [x] `M21-174 TEST` Test an old alias finds the renamed atom but does not bypass applicability.
+- [x] `M21-175 TEST` Test graph truncation never changes stored canonical or accessible names.
 
 ## Gate
 
-- [ ] `M21-G01 GATE` No memory item influences a task without project, compatibility, validity, and assurance checks.
-- [ ] `M21-G02 GATE` Similarity produces candidates only; exact predicates determine eligibility.
-- [ ] `M21-G03 GATE` The user can identify every memory item that influenced a completed task.
-- [ ] `M21-G04 GATE` Changed support invalidates dependent facts and vectors transitively.
-- [ ] `M21-G05 GATE` The prototype still works when vector discovery is disabled.
-- [ ] `M21-G06 GATE` Every active atom vector is traceable to one validated documentation revision, contract hash, repository revision, embedding model, and input-schema version.
-- [ ] `M21-G07 GATE` Rich atom comments improve candidate discovery without bypassing exact applicability, evidence, or assurance checks.
-- [ ] `M21-G08 GATE` Every reusable atom has a standalone-descriptive canonical name, deterministic display and normalized forms, collision control, and rename lineage bound to its embeddings.
+- [x] `M21-G01 GATE` No memory item influences a task without project, compatibility, validity, and assurance checks.
+- [x] `M21-G02 GATE` Similarity produces candidates only; exact predicates determine eligibility.
+- [x] `M21-G03 GATE` The user can identify every memory item that influenced a completed task.
+- [x] `M21-G04 GATE` Changed support invalidates dependent facts and vectors transitively.
+- [x] `M21-G05 GATE` The prototype still works when vector discovery is disabled.
+- [x] `M21-G06 GATE` Every active atom vector is traceable to one validated documentation revision, contract hash, repository revision, embedding model, and input-schema version.
+- [x] `M21-G07 GATE` Rich atom comments improve candidate discovery without bypassing exact applicability, evidence, or assurance checks.
+- [x] `M21-G08 GATE` Every reusable atom has a standalone-descriptive canonical name, deterministic display and normalized forms, collision control, and rename lineage bound to its embeddings.
 
 ---
 

@@ -7,7 +7,19 @@ import (
 	"unicode/utf8"
 )
 
-const DefaultVisualLabelRunes = 24
+// MaximumCanvasNodeLabelRunes bounds the node label glyph rendered onto the
+// Canvas 2D pixel surface (draw_wasm.go). Truncating this visual label never
+// removes the full DisplayName from the page: the DOM companion button laid
+// over the same node bounds always carries the full text as its Title
+// (native hover tooltip), aria-label, and full-label data hook (M21-166).
+const MaximumCanvasNodeLabelRunes = 34
+
+// MaximumSVGNodeLabelRunes bounds the node label glyph rendered as SVG <text>
+// in the authoritative renderer (authoritative.go). Truncating this visual
+// label never removes the full DisplayName: the sibling SVG <title> tooltip,
+// the node group's aria-label, and its full-label data hook always carry the
+// full, untruncated text (M21-166).
+const MaximumSVGNodeLabelRunes = 26
 
 type Interaction struct {
 	Viewport   Viewport
@@ -151,21 +163,44 @@ func StyleFor(placement NodePlacement, selectedID, activeID string) SemanticStyl
 	return style
 }
 
-// TruncateLabel clips only the display form and preserves the full value for
-// the accessible overlay.
+// truncationEllipsis marks a visually truncated graph-node label. It mirrors
+// the unexported constant of the same name and value in
+// internal/atomname/truncate.go so the two truncation surfaces stay visually
+// identical.
+const truncationEllipsis = "…"
+
+// TruncateLabel derives the visual graph-node label for label, clipping only
+// the returned display form and always preserving the full, untrimmed value
+// as full for the tooltip, accessibility label, and full-label data hook
+// (M21-165, M21-166). It never mutates or replaces the caller's copy of the
+// node's real DisplayName — a stored node title or DisplayName read after
+// calling this function is unaffected (M21-175's guarantee, reproduced here
+// for the frontend rendering surfaces).
+//
+// The algorithm deliberately mirrors
+// internal/atomname.TruncateGraphNodeLabel's tested contract rune-for-rune
+// (see TestTruncateLabelMatchesAtomNameTruncationContract in
+// reducers_test.go): a non-positive budget means "no truncation," a budget at
+// or under the ellipsis width returns that many literal runes with no
+// ellipsis, and a wider budget trims trailing spaces before appending the
+// ellipsis. graphcanvas cannot call atomname.TruncateGraphNodeLabel directly:
+// that function takes an atomname.DisplayName, and atomname exports no way to
+// construct one from an arbitrary string — only DeriveDisplayName(CanonicalName)
+// — because production node titles here are not yet backed by an
+// atomname.AtomNameRecord (that wiring belongs to internal/graph's projector,
+// out of scope for this frontend-only change).
 func TruncateLabel(label string, maximumRunes int) (display, full string, clipped bool) {
 	full = strings.TrimSpace(label)
-	if maximumRunes <= 0 {
-		maximumRunes = DefaultVisualLabelRunes
-	}
-	if utf8.RuneCountInString(full) <= maximumRunes {
+	runes := []rune(full)
+	if maximumRunes <= 0 || len(runes) <= maximumRunes {
 		return full, full, false
 	}
-	if maximumRunes == 1 {
-		return "…", full, true
+	ellipsisLength := utf8.RuneCountInString(truncationEllipsis)
+	if maximumRunes <= ellipsisLength {
+		return string(runes[:maximumRunes]), full, true
 	}
-	runes := []rune(full)
-	return strings.TrimSpace(string(runes[:maximumRunes-1])) + "…", full, true
+	kept := strings.TrimRight(string(runes[:maximumRunes-ellipsisLength]), " ")
+	return kept + truncationEllipsis, full, true
 }
 
 func layoutHasNode(layout Layout, id string) bool {

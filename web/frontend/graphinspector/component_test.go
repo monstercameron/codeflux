@@ -107,6 +107,61 @@ func TestContextInspectorExposesDisabledReasonsAndNonColorStatus(t *testing.T) {
 	}
 }
 
+// TestContextInspectorAlwaysShowsTheFullDisplayNameAndStableIdentity is
+// M21-165/M21-166: the inspector never applies visual truncation to the
+// node's DisplayName (unlike the bounded graph-canvas label), so a long
+// display name must reach the header, its title/aria-label, and its
+// full-label data hook intact; and re-rendering with the same NodeID but a
+// changed DisplayName (a semantic-preserving rename) must keep the stable
+// identity resolvable while only the label text changes.
+func TestContextInspectorAlwaysShowsTheFullDisplayNameAndStableIdentity(t *testing.T) {
+	props := inspectorFixture(t)
+	longName := "ReconcileAmbiguousGatewayChargeOutcomeAcrossEveryDocumentedRetryPath"
+	renamed, err := taskgraph.NewNode(
+		props.Node.ID(), props.Node.Class(), props.Node.Status(), longName, props.Node.Contract(), props.Node.Sources(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	props.Node = renamed
+	markup := renderInspector(t, props)
+
+	for _, want := range []string{
+		`data-node-id="` + renamed.ID().String() + `"`,
+		`aria-label="Node inspector: ` + longName + `"`,
+		`title="` + longName + `"`,
+		`data-full-label="` + longName + `"`,
+		longName,
+	} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("inspector with a long display name is missing %q\n%s", want, markup)
+		}
+	}
+	if strings.Contains(markup, "…") {
+		t.Fatalf("the node inspector must never truncate the display name\n%s", markup)
+	}
+
+	// Same stable identity, a different (shorter) display name: the identity
+	// stays resolvable and the rendered label follows the rename exactly.
+	rerenamed, err := taskgraph.NewNode(
+		props.Node.ID(), props.Node.Class(), props.Node.Status(), "Reconcile gateway charge", props.Node.Contract(), props.Node.Sources(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	props.Node = rerenamed
+	secondMarkup := renderInspector(t, props)
+	if !strings.Contains(secondMarkup, `data-node-id="`+renamed.ID().String()+`"`) {
+		t.Fatalf("node identity must survive a display-name change\n%s", secondMarkup)
+	}
+	if !strings.Contains(secondMarkup, `data-full-label="Reconcile gateway charge"`) {
+		t.Fatalf("renamed node's new display name was not applied\n%s", secondMarkup)
+	}
+	if strings.Contains(secondMarkup, longName) {
+		t.Fatalf("stale display name from before the rename leaked into the re-rendered inspector\n%s", secondMarkup)
+	}
+}
+
 func TestInspectorRejectsUnsafeSourcesUnboundedListsAndContradictoryKnownState(t *testing.T) {
 	props := inspectorFixture(t)
 

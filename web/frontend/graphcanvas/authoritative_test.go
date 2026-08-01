@@ -97,6 +97,57 @@ func TestAuthoritativeRendererEmitsCompleteAccessibleVisualContract(t *testing.T
 	}
 }
 
+// TestAuthoritativeNodeLabelTruncationPreservesFullNameAndIdentity is
+// M21-165/M21-166 for the production SVG graph: a DisplayName longer than
+// the SVG label budget must render a clipped <text> glyph while the sibling
+// <title> tooltip, the node group's aria-label, and its full-label data hook
+// all still carry the complete DisplayName; the node's stable domain.NodeID
+// stays the addressable identity throughout and is never the rendered label.
+func TestAuthoritativeNodeLabelTruncationPreservesFullNameAndIdentity(t *testing.T) {
+	fixture := newAuthoritativeGraphFixture(t)
+	longName := "ReconcileAmbiguousGatewayChargeOutcomeAcrossEveryRetry"
+	if len([]rune(longName)) <= MaximumSVGNodeLabelRunes {
+		t.Fatalf("fixture display name must exceed the SVG label budget of %d runes", MaximumSVGNodeLabelRunes)
+	}
+	nodes := fixture.revision.Nodes()
+	renamed, err := graph.NewNode(nodes[0].ID(), nodes[0].Class(), nodes[0].Status(), longName, nodes[0].Contract(), nodes[0].Sources())
+	if err != nil {
+		t.Fatal(err)
+	}
+	replaced := append([]graph.Node(nil), nodes...)
+	replaced[0] = renamed
+	revision, err := graph.NewRevision(fixture.revision.Metadata(), replaced, fixture.revision.Edges())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	markup, err := ui.RenderToString(ui.CreateElement(Renderer, Props{Authoritative: &AuthoritativeProps{
+		Revision: revision, Layout: fixture.layout, TaskState: domain.TaskStateRunning, ResponsiveMode: "wide",
+	}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(markup, `data-node-id="`+nodes[0].ID().String()+`"`) {
+		t.Fatalf("renamed node's stable identity is missing from the markup\n%s", markup)
+	}
+	if !strings.Contains(markup, `data-full-label="`+longName+`"`) {
+		t.Errorf("full-label data hook is missing the untruncated display name\n%s", markup)
+	}
+	if !strings.Contains(markup, `data-label-truncated="true"`) {
+		t.Errorf("long display name should be reported as truncated\n%s", markup)
+	}
+	if !strings.Contains(markup, "<title>"+longName+", ") {
+		t.Errorf("SVG title tooltip is missing the full untruncated name\n%s", markup)
+	}
+	if !strings.Contains(markup, `aria-label="`+longName+", ") {
+		t.Errorf("node group aria-label is missing the full untruncated name\n%s", markup)
+	}
+	if strings.Contains(markup, `>`+longName+`<`) {
+		t.Errorf("the visible <text> glyph must be truncated, not the full name\n%s", markup)
+	}
+}
+
 func TestAuthoritativeRendererRejectsIncompatibleLayoutSafely(t *testing.T) {
 	fixture := newAuthoritativeGraphFixture(t)
 	fixture.layout.AlgorithmVersion = "future-layout"

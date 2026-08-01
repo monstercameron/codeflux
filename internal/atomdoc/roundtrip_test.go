@@ -113,6 +113,43 @@ func TestGeneratedCommentRoundTripAdmitsThroughFullPipeline(t *testing.T) {
 	}
 }
 
+// TestComposeDocumentationEmbeddingInputRoundTripsWithStableHash is M21-126:
+// generating a comment from a structured Document, round-tripping it through
+// AST extraction and validation (the same path
+// TestGeneratedCommentRoundTripsThroughASTExtractionWithSemanticIdentity
+// exercises for the full 19-field document), and composing embedding input
+// from each side must preserve every embedding-input segment field-for-field
+// and produce a stable normalized-documentation hash, proving the
+// embedding-input path itself — not just the underlying Document — survives
+// the round trip with a stable normalized hash.
+func TestComposeDocumentationEmbeddingInputRoundTripsWithStableHash(t *testing.T) {
+	original := fullSyntheticDocumentForTest()
+	reparsed := roundTripDocument(t, original)
+
+	originalInput, err := ComposeDocumentationEmbeddingInput(original)
+	if err != nil {
+		t.Fatalf("compose original embedding input: %v", err)
+	}
+	reparsedInput, err := ComposeDocumentationEmbeddingInput(reparsed)
+	if err != nil {
+		t.Fatalf("compose reparsed embedding input: %v", err)
+	}
+
+	if !reflect.DeepEqual(originalInput, reparsedInput) {
+		t.Fatalf("embedding input did not round-trip:\n got:  %#v\n want: %#v", reparsedInput, originalInput)
+	}
+
+	// Stable normalized-documentation hash across the round trip: the
+	// embedding input is derived deterministically from the same Document
+	// content that ComputeNormalizedDocumentationInputHash already proves
+	// stable (this file's decisive M21-125 assertion), so the two must agree.
+	originalHash := ComputeNormalizedDocumentationInputHash(SchemaVersion, original)
+	reparsedHash := ComputeNormalizedDocumentationInputHash(SchemaVersion, reparsed)
+	if originalHash != reparsedHash {
+		t.Fatalf("normalized-input hash did not round-trip: got %s want %s", reparsedHash, originalHash)
+	}
+}
+
 // --- Adversarial round-trip fixtures ---
 //
 // TestGeneratedCommentRoundTripsThroughASTExtractionWithSemanticIdentity uses
@@ -190,7 +227,7 @@ func TestAdversarialRoundTripColonsInValues(t *testing.T) {
 // control bytes, so the DEFECT 1 rejection must not false-positive on them.
 func TestAdversarialRoundTripUnicodeCombiningMarksAndRTL(t *testing.T) {
 	doc := fullSyntheticDocumentForTest()
-	doc.RetrievalConcepts = Field{Text: "Café résumé identifiers, Arabic اختبار and Hebrew בדיקה with an RTL mark ‏ embedded, three ascii words present here."}
+	doc.RetrievalConcepts = Field{Text: "Café résumé identifiers, Arabic اختبار and Hebrew בדיקה with an RTL mark \u200f embedded, three ascii words present here."}
 	reparsed := roundTripDocument(t, doc)
 	if reparsed.RetrievalConcepts.Text != doc.RetrievalConcepts.Text {
 		t.Fatalf("unicode value did not round-trip byte-identically:\n got:  %q\n want: %q", reparsed.RetrievalConcepts.Text, doc.RetrievalConcepts.Text)

@@ -342,11 +342,18 @@ func domCompanion(
 				}
 			}),
 		)
+		// The label glyph the Canvas 2D surface draws for this node may be
+		// truncated to fit its bounds; this stable-identity companion button
+		// always carries the full DisplayName as its native hover tooltip,
+		// aria-label, and full-label data hook, independent of that visual
+		// clipping (M21-165, M21-166).
+		_, fullLabel, labelTruncated := TruncateLabel(placement.Node.Title, MaximumCanvasNodeLabelRunes)
 		buttonProps.OnClick = selectNode
 		buttonProps.Type = "button"
 		buttonProps.Value = placement.Node.ID
+		buttonProps.Title = fullLabel
 		buttonProps.Aria = map[string]string{
-			"label":   placement.Node.Title + " - " + statusLabel(placement.Node.Status),
+			"label":   fullLabel + " - " + statusLabel(placement.Node.Status),
 			"pressed": strconv.FormatBool(selected.Get() == placement.Node.ID),
 			"description": semanticLabel(placement.Semantic) + " node, " +
 				shapeLabel(shapeForSemantic(placement.Semantic)) + " shape",
@@ -355,7 +362,9 @@ func domCompanion(
 			"component": "graph-node", "node-id": placement.Node.ID,
 			"selected": strconv.FormatBool(selected.Get() == placement.Node.ID),
 			"semantic": string(placement.Semantic), "status": placement.Node.Status,
-			"shape": string(shapeForSemantic(placement.Semantic)),
+			"shape":           string(shapeForSemantic(placement.Semantic)),
+			"full-label":      fullLabel,
+			"label-truncated": strconv.FormatBool(labelTruncated),
 		}
 		buttonProps.Class = companionButtonClass(props.Mode.Tokens(), screen, width, height)
 		buttons = append(buttons, html.Button(buttonProps))

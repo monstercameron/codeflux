@@ -214,6 +214,7 @@ type TaskService struct {
 	reconciler    RecoveryReconciliationApplication
 	safeResume    RecoverySafeResumeApplication
 	invalidations TaskProjectionInvalidationApplication
+	lifecycle     TaskLifecycleApplication
 }
 
 func (service *TaskService) ConfigureProjectionInvalidations(

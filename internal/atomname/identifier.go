@@ -293,12 +293,34 @@ func groupIdentifierRuns(raw string) []identifierRun {
 	return runs
 }
 
-// maxAbbreviationRunLength is the longest key in defaultAbbreviations
-// (currently "HTTPS", 5 letters), computed once so the longest-match scans
-// below never probe past a length no abbreviation could satisfy.
+// splitterTokens is the vocabulary the word splitter uses to break a run of
+// adjacent capitals into real words. It deliberately unions the established
+// abbreviations with the known provider names: "AWS" is a genuine word unit
+// inside AWSS3Bucket even though it is a provider name rather than a domain
+// abbreviation, and without it the run "AWSS" matches nothing and decomposes
+// into meaningless single letters.
+//
+// This affects SPLITTING only. Grammar validation
+// (NamingLexicon.isApprovedAbbreviation / isKnownProviderName) still reads
+// the two sets separately, so a provider name in a name still requires the
+// provider-specific naming exception it always did.
+var splitterTokens = func() map[string]struct{} {
+	tokens := map[string]struct{}{}
+	for token := range defaultAbbreviations {
+		tokens[token] = struct{}{}
+	}
+	for token := range defaultProviderNames {
+		tokens[strings.ToUpper(token)] = struct{}{}
+	}
+	return tokens
+}()
+
+// maxAbbreviationRunLength is the longest token the splitter can match,
+// computed once so the longest-match scans below never probe past a length
+// no token could satisfy.
 var maxAbbreviationRunLength = func() int {
 	max := 0
-	for token := range defaultAbbreviations {
+	for token := range splitterTokens {
 		if len(token) > max {
 			max = len(token)
 		}
@@ -306,10 +328,10 @@ var maxAbbreviationRunLength = func() int {
 	return max
 }()
 
-// isEstablishedAbbreviation reports whether word is exactly one entry in
-// the built-in established-abbreviation allowlist.
+// isEstablishedAbbreviation reports whether word is a token the splitter
+// treats as one indivisible word unit.
 func isEstablishedAbbreviation(word string) bool {
-	_, ok := defaultAbbreviations[word]
+	_, ok := splitterTokens[word]
 	return ok
 }
 

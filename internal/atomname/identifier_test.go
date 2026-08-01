@@ -142,12 +142,16 @@ func TestSplitIdentifierWordsHandlesAdjacentInitialismsAndAcronymTransitions(t *
 		// and "s" (still an improvement over the old "I"+"Ds" corruption).
 		"MergeDuplicateIDs": {"Merge", "Duplicate", "IDs"},
 		"IDs":               {"IDs"},
-		// A run of adjacent approved abbreviations with a trailing digit
-		// that has no abbreviation match anywhere in its prefix must not
-		// silently disappear into a merged blob; it decomposes into the
-		// best-effort known pieces plus single-character fallback tokens,
-		// with the digit attached to the immediately preceding piece.
-		"AWSS3Bucket": {"A", "WS", "S3", "Bucket"},
+		// M21-150. This previously expected {"A", "WS", "S3", "Bucket"} and
+		// was recorded as a known limitation: "AWS" is a provider name
+		// rather than a domain abbreviation, so the splitter's token
+		// vocabulary could not see it and the run "AWSS" decomposed into
+		// single-letter fallbacks. splitterTokens now unions the
+		// abbreviation and provider vocabularies for SPLITTING only, so the
+		// run delimits correctly. Grammar validation still reads the two
+		// sets separately, so a provider name in a name continues to
+		// require its naming exception.
+		"AWSS3Bucket": {"AWS", "S3", "Bucket"},
 		// A solitary uppercase letter at the very end of an identifier
 		// (not an abbreviation, no lowercase to attach to) stays its own
 		// single-letter token.

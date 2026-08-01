@@ -63,6 +63,67 @@ func TestRendererEmitsCanvasInteractionAndAccessibilityContract(t *testing.T) {
 	}
 }
 
+// TestRendererPreservesFullDisplayNameWhenTheVisualLabelIsTruncated is
+// M21-165/M21-166: a node title longer than the canvas label budget must
+// still expose its complete text through the native hover tooltip, the
+// accessible label, and a full-label data hook, while the stable node
+// identity (data-node-id / button value) stays independent of that label
+// content entirely.
+func TestRendererPreservesFullDisplayNameWhenTheVisualLabelIsTruncated(t *testing.T) {
+	longTitle := "ValidateProviderEvidenceAcrossEveryTaskGraphRevision"
+	if len([]rune(longTitle)) <= MaximumCanvasNodeLabelRunes {
+		t.Fatalf("fixture title must exceed the canvas label budget of %d runes", MaximumCanvasNodeLabelRunes)
+	}
+	nodes := []state.GraphNodeView{
+		{ID: "atom-1", Title: longTitle, Status: "active"},
+		{ID: "atom-2", Title: "Short label", Status: "passed"},
+	}
+	markup, err := ui.RenderToString(ui.CreateElement(Renderer, Props{
+		Nodes: nodes, CurrentID: "atom-1", ResponsiveMode: "wide",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		`data-node-id="atom-1"`,
+		`value="atom-1"`,
+		`title="` + longTitle + `"`,
+		`data-full-label="` + longTitle + `"`,
+		`data-label-truncated="true"`,
+		`aria-label="` + longTitle + ` - Active"`,
+	} {
+		if !strings.Contains(markup, fragment) {
+			t.Errorf("truncated-label node is missing %q\n%s", fragment, markup)
+		}
+	}
+	if !strings.Contains(markup, `data-node-id="atom-2"`) || !strings.Contains(markup, `data-label-truncated="false"`) {
+		t.Errorf("short-label node should report an untruncated label\n%s", markup)
+	}
+
+	// Re-render with the same stable node ID but a different display name:
+	// the identity must remain resolvable and unchanged while the label text
+	// follows the rename.
+	renamed := []state.GraphNodeView{
+		{ID: "atom-1", Title: "Renamed after documentation revision", Status: "active"},
+		nodes[1],
+	}
+	renamedMarkup, err := ui.RenderToString(ui.CreateElement(Renderer, Props{
+		Nodes: renamed, CurrentID: "atom-1", ResponsiveMode: "wide",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(renamedMarkup, `data-node-id="atom-1"`) || !strings.Contains(renamedMarkup, `value="atom-1"`) {
+		t.Fatalf("node identity must survive a display-name change\n%s", renamedMarkup)
+	}
+	if !strings.Contains(renamedMarkup, `data-full-label="Renamed after documentation revision"`) {
+		t.Fatalf("renamed node's full label was not applied\n%s", renamedMarkup)
+	}
+	if strings.Contains(renamedMarkup, `data-full-label="`+longTitle+`"`) {
+		t.Fatalf("stale label from before the rename leaked into the re-rendered markup\n%s", renamedMarkup)
+	}
+}
+
 func TestRendererKeepsInvalidGraphVisibleAsAlert(t *testing.T) {
 	markup, err := ui.RenderToString(ui.CreateElement(Renderer, Props{
 		Nodes: []state.GraphNodeView{{ID: "node", Title: "One"}, {ID: "node", Title: "Duplicate"}},

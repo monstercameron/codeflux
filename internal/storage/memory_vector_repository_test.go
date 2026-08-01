@@ -115,3 +115,65 @@ func TestCreateMemoryArtifactEmbeddingRejectsEmptyVector(t *testing.T) {
 		t.Fatal("expected an empty vector to be rejected")
 	}
 }
+
+// TestM21_088_DeletingAnArtifactInvalidatesItsDerivedVectors proves a
+// deleted artifact's vectors cannot remain active retrieval candidates.
+// The rows are retained rather than dropped, per M21-135's separation of
+// retention from eligibility.
+func TestM21_088_DeletingAnArtifactInvalidatesItsDerivedVectors(t *testing.T) {
+	ctx := t.Context()
+	repositories := openTestRepositories(t)
+	projectID := testProjectID(t, 8800)
+	repositoryID := testRepositoryID(t, 8801)
+	mustCreateProjectRepository(t, repositories, projectID, repositoryID)
+
+	artifact := createMemoryArtifactFixture(t, repositories, projectID, repositoryID, 8802)
+	revision, err := repositories.GetLatestMemoryArtifactRevision(ctx, artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model, err := repositories.CreateMemoryEmbeddingModel(ctx, CreateMemoryEmbeddingModel{
+		ID: "model-fixture-8800", Provider: "fixture-provider", ModelName: "fixture-model",
+		ModelVersion: "v1", Dimensions: 8, NumericEncoding: "float32", Normalization: "l2",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	space, err := repositories.CreateMemoryEmbeddingSpace(ctx, CreateMemoryEmbeddingSpace{
+		ID: "space-fixture-8800", EmbeddingModelID: model.ID, InputSchemaVersion: 1,
+		ProjectID: projectID, SecurityScope: "project-local",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repositories.CreateMemoryArtifactEmbedding(ctx, CreateMemoryArtifactEmbedding{
+		ID: "embedding-fixture-8800", RevisionID: revision.RevisionID, EmbeddingSpaceID: space.ID,
+		SourceContentSHA256: revision.ContentSHA256, Vector: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outcome, err := repositories.DeleteMemoryArtifact(ctx, DeleteMemoryArtifact{
+		Target: artifact, ReasonRedacted: "M21-088 fixture deletion",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.InvalidatedEmbeddings != 1 {
+		t.Fatalf("InvalidatedEmbeddings = %d, want 1", outcome.InvalidatedEmbeddings)
+	}
+
+	embeddings, err := repositories.ListMemoryArtifactEmbeddings(ctx, revision.RevisionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(embeddings) != 1 {
+		t.Fatalf("embeddings = %d, want the row retained for lineage", len(embeddings))
+	}
+	if embeddings[0].Valid {
+		t.Fatal("a deleted artifact's vector must not remain valid")
+	}
+	if embeddings[0].InvalidatedAtMicros == nil {
+		t.Fatal("invalidation must be timestamped")
+	}
+}

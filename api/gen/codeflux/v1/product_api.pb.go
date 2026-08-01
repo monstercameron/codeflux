@@ -1587,8 +1587,23 @@ type CreateTaskRequest struct {
 	ThreadId        *StableIdentity        `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	SourceMessageId *StableIdentity        `protobuf:"bytes,3,opt,name=source_message_id,json=sourceMessageId,proto3" json:"source_message_id,omitempty"`
 	Requirement     string                 `protobuf:"bytes,4,opt,name=requirement,proto3" json:"requirement,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The declared shape of the task. These are supplied by the caller rather
+	// than inferred from the requirement text: no requirement classifier
+	// exists, and a guess here would land inside the task fingerprint that
+	// gates project-memory retrieval and routing. See
+	// coordinator.TaskIntakeRequest.
+	TaskClass                string `protobuf:"bytes,5,opt,name=task_class,json=taskClass,proto3" json:"task_class,omitempty"`
+	RepositoryRevision       string `protobuf:"bytes,6,opt,name=repository_revision,json=repositoryRevision,proto3" json:"repository_revision,omitempty"`
+	BaselineModelRevision    string `protobuf:"bytes,7,opt,name=baseline_model_revision,json=baselineModelRevision,proto3" json:"baseline_model_revision,omitempty"`
+	ToolConfigurationVersion string `protobuf:"bytes,8,opt,name=tool_configuration_version,json=toolConfigurationVersion,proto3" json:"tool_configuration_version,omitempty"`
+	ValidationProfileVersion string `protobuf:"bytes,9,opt,name=validation_profile_version,json=validationProfileVersion,proto3" json:"validation_profile_version,omitempty"`
+	// Structured scope hints. Optional, but they are what project-memory
+	// retrieval matches on; the requirement prose is never matched against.
+	AffectedPaths    []string `protobuf:"bytes,10,rep,name=affected_paths,json=affectedPaths,proto3" json:"affected_paths,omitempty"`
+	AffectedPackages []string `protobuf:"bytes,11,rep,name=affected_packages,json=affectedPackages,proto3" json:"affected_packages,omitempty"`
+	AffectedSymbols  []string `protobuf:"bytes,12,rep,name=affected_symbols,json=affectedSymbols,proto3" json:"affected_symbols,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CreateTaskRequest) Reset() {
@@ -1647,6 +1662,62 @@ func (x *CreateTaskRequest) GetRequirement() string {
 		return x.Requirement
 	}
 	return ""
+}
+
+func (x *CreateTaskRequest) GetTaskClass() string {
+	if x != nil {
+		return x.TaskClass
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetRepositoryRevision() string {
+	if x != nil {
+		return x.RepositoryRevision
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetBaselineModelRevision() string {
+	if x != nil {
+		return x.BaselineModelRevision
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetToolConfigurationVersion() string {
+	if x != nil {
+		return x.ToolConfigurationVersion
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetValidationProfileVersion() string {
+	if x != nil {
+		return x.ValidationProfileVersion
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetAffectedPaths() []string {
+	if x != nil {
+		return x.AffectedPaths
+	}
+	return nil
+}
+
+func (x *CreateTaskRequest) GetAffectedPackages() []string {
+	if x != nil {
+		return x.AffectedPackages
+	}
+	return nil
+}
+
+func (x *CreateTaskRequest) GetAffectedSymbols() []string {
+	if x != nil {
+		return x.AffectedSymbols
+	}
+	return nil
 }
 
 type CreateTaskResponse struct {
@@ -1786,8 +1857,14 @@ type StartTaskRequest struct {
 	Control              *MutationControl       `protobuf:"bytes,1,opt,name=control,proto3" json:"control,omitempty"`
 	TaskId               *StableIdentity        `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
 	ApprovedPlanRevision uint64                 `protobuf:"varint,3,opt,name=approved_plan_revision,json=approvedPlanRevision,proto3" json:"approved_plan_revision,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// The exact execution preflight the user approved. StartPreparedTaskRun
+	// validates against this binding, so naming it here is what makes "start
+	// exactly what was reviewed" enforceable rather than advisory. It is
+	// distinct from approved_plan_revision: one identifies the reviewed plan,
+	// the other the immutable policy/forecast/budget binding.
+	PreflightRevision uint64 `protobuf:"varint,4,opt,name=preflight_revision,json=preflightRevision,proto3" json:"preflight_revision,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StartTaskRequest) Reset() {
@@ -1837,6 +1914,13 @@ func (x *StartTaskRequest) GetTaskId() *StableIdentity {
 func (x *StartTaskRequest) GetApprovedPlanRevision() uint64 {
 	if x != nil {
 		return x.ApprovedPlanRevision
+	}
+	return 0
+}
+
+func (x *StartTaskRequest) GetPreflightRevision() uint64 {
+	if x != nil {
+		return x.PreflightRevision
 	}
 	return 0
 }
@@ -7289,22 +7373,33 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\tthread_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12\x1a\n" +
 	"\barchived\x18\x03 \x01(\bR\barchived\"H\n" +
 	"\x15ArchiveThreadResponse\x12/\n" +
-	"\x06thread\x18\x01 \x01(\v2\x17.codeflux.v1.ThreadViewR\x06thread\"\xf0\x01\n" +
+	"\x06thread\x18\x01 \x01(\v2\x17.codeflux.v1.ThreadViewR\x06thread\"\xf3\x04\n" +
 	"\x11CreateTaskRequest\x126\n" +
 	"\acontrol\x18\x01 \x01(\v2\x1c.codeflux.v1.MutationControlR\acontrol\x128\n" +
 	"\tthread_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\bthreadId\x12G\n" +
 	"\x11source_message_id\x18\x03 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x0fsourceMessageId\x12 \n" +
-	"\vrequirement\x18\x04 \x01(\tR\vrequirement\"?\n" +
+	"\vrequirement\x18\x04 \x01(\tR\vrequirement\x12\x1d\n" +
+	"\n" +
+	"task_class\x18\x05 \x01(\tR\ttaskClass\x12/\n" +
+	"\x13repository_revision\x18\x06 \x01(\tR\x12repositoryRevision\x126\n" +
+	"\x17baseline_model_revision\x18\a \x01(\tR\x15baselineModelRevision\x12<\n" +
+	"\x1atool_configuration_version\x18\b \x01(\tR\x18toolConfigurationVersion\x12<\n" +
+	"\x1avalidation_profile_version\x18\t \x01(\tR\x18validationProfileVersion\x12%\n" +
+	"\x0eaffected_paths\x18\n" +
+	" \x03(\tR\raffectedPaths\x12+\n" +
+	"\x11affected_packages\x18\v \x03(\tR\x10affectedPackages\x12)\n" +
+	"\x10affected_symbols\x18\f \x03(\tR\x0faffectedSymbols\"?\n" +
 	"\x12CreateTaskResponse\x12)\n" +
 	"\x04task\x18\x01 \x01(\v2\x15.codeflux.v1.TaskViewR\x04task\"F\n" +
 	"\x0eGetTaskRequest\x124\n" +
 	"\atask_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\"<\n" +
 	"\x0fGetTaskResponse\x12)\n" +
-	"\x04task\x18\x01 \x01(\v2\x15.codeflux.v1.TaskViewR\x04task\"\xb6\x01\n" +
+	"\x04task\x18\x01 \x01(\v2\x15.codeflux.v1.TaskViewR\x04task\"\xe5\x01\n" +
 	"\x10StartTaskRequest\x126\n" +
 	"\acontrol\x18\x01 \x01(\v2\x1c.codeflux.v1.MutationControlR\acontrol\x124\n" +
 	"\atask_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\x06taskId\x124\n" +
-	"\x16approved_plan_revision\x18\x03 \x01(\x04R\x14approvedPlanRevision\">\n" +
+	"\x16approved_plan_revision\x18\x03 \x01(\x04R\x14approvedPlanRevision\x12-\n" +
+	"\x12preflight_revision\x18\x04 \x01(\x04R\x11preflightRevision\">\n" +
 	"\x11StartTaskResponse\x12)\n" +
 	"\x04task\x18\x01 \x01(\v2\x15.codeflux.v1.TaskViewR\x04task\"\x98\x01\n" +
 	"\x10PauseTaskRequest\x126\n" +

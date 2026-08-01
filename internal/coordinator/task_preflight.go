@@ -5,13 +5,23 @@ import (
 	"errors"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/fingerprint"
 	"codeflux.dev/codeflux/internal/forecast"
 	"codeflux.dev/codeflux/internal/policy"
 	"codeflux.dev/codeflux/internal/providers"
+	"codeflux.dev/codeflux/internal/retrieval"
+	"codeflux.dev/codeflux/internal/retrievalgate"
 	"codeflux.dev/codeflux/internal/storage"
 )
 
 type taskPreflightStore interface {
+	// GetThread, CreateTask, and CreateBudget back IntakeTask
+	// (task_intake.go): resolving a thread's project and repository, then
+	// recording the task and its hard budget before any preflight runs.
+	GetThread(context.Context, domain.ThreadID) (storage.Thread, error)
+	CreateTask(context.Context, storage.CreateTask) (storage.Task, error)
+	GetTask(context.Context, domain.TaskID) (storage.Task, error)
+
 	RecordExecutionPolicy(
 		context.Context,
 		storage.RecordExecutionPolicy,
@@ -54,12 +64,22 @@ type taskPreflightStore interface {
 // TaskForecastInput contains the fixed-policy features and stable identities
 // needed before plan approval.
 type TaskForecastInput struct {
-	TaskID                   domain.TaskID
-	BudgetID                 domain.BudgetID
-	BaselineModelRevision    string
-	Override                 *policy.ManualOverride
-	RepositoryRevision       string
-	TaskFingerprint          string
+	TaskID                domain.TaskID
+	BudgetID              domain.BudgetID
+	BaselineModelRevision string
+	Override              *policy.ManualOverride
+	RepositoryRevision    string
+	// Fingerprint is the real, structured task fingerprint (docs/plan.md §5
+	// "Task Fingerprint and Retrieval"; internal/fingerprint.
+	// ExactFingerprintInput's project, repository, base revision, task
+	// class, affected hints, toolchain bindings, risk, required assurance,
+	// and requested authority) that ForecastTask both hashes for
+	// forecast.Generate's own TaskFingerprint binding AND -- the reason this
+	// replaces what used to be a bare hash string -- passes to
+	// retrieval.Service.RunPreWorkGate BEFORE planning from scratch, so
+	// project memory has a real chance to influence the task
+	// (docs/plan.md §31 "Retrieval and Pre-Work Gate").
+	Fingerprint              fingerprint.ExactFingerprintInput
 	TaskClass                forecast.TaskClass
 	RepositorySize           forecast.RepositorySize
 	LikelyFiles              []string
@@ -77,6 +97,16 @@ type ForecastedTask struct {
 	Policy   storage.ExecutionPolicyRevision
 	Forecast storage.EffortForecastRevision
 	Budget   storage.BudgetSnapshot
+	// Retrieval is the pre-work retrieval gate's own typed result for this
+	// task's fingerprint (M21-073): the bounded set of eligible memory
+	// items, or Retrieval.FellBack == true when nothing was eligible -- a
+	// normal outcome, already durably recorded, never an error. A caller
+	// that finds Retrieval.Eligible non-empty and goes on to use, adapt, or
+	// reject one of those items must call
+	// TaskPreflightService.RecordMemoryInfluence afterward: ForecastTask
+	// itself never does, because retrieval and influence are different
+	// facts.
+	Retrieval retrieval.PreWorkGateResult
 }
 
 // PrepareTaskPreflight adds a ready-task revision and presentation identity to
@@ -96,16 +126,27 @@ type PreparedTaskPreflight struct {
 // TaskPreflightService is the coordinator-owned production path for fixed
 // policy selection, forecasting, exact budgets, start, and outcome telemetry.
 type TaskPreflightService struct {
-	store taskPreflightStore
+	store     taskPreflightStore
+	retrieval *retrieval.Service
 }
 
+// NewTaskPreflightService builds a TaskPreflightService. retrievalService is
+// the pre-work retrieval gate (internal/retrieval.Service) ForecastTask
+// consults before planning from scratch; both store and retrievalService
+// are required, so a caller can never silently construct a preflight service
+// that plans without ever giving project memory a chance to influence the
+// task.
 func NewTaskPreflightService(
 	store taskPreflightStore,
+	retrievalService *retrieval.Service,
 ) (*TaskPreflightService, error) {
 	if store == nil {
 		return nil, errors.New("task preflight repository is required")
 	}
-	return &TaskPreflightService{store: store}, nil
+	if retrievalService == nil {
+		return nil, errors.New("task preflight retrieval service is required")
+	}
+	return &TaskPreflightService{store: store, retrieval: retrievalService}, nil
 }
 
 // ForecastTask records the exact selected policy, advisory forecast, and
@@ -114,9 +155,38 @@ func (service *TaskPreflightService) ForecastTask(
 	ctx context.Context,
 	input TaskForecastInput,
 ) (ForecastedTask, error) {
-	if service == nil || service.store == nil {
+	if service == nil || service.store == nil || service.retrieval == nil {
 		return ForecastedTask{}, errors.New("task preflight service is unavailable")
 	}
+	exact, err := fingerprint.BuildExactFingerprint(input.Fingerprint)
+	if err != nil {
+		return ForecastedTask{}, err
+	}
+	fingerprintHash, err := exact.Hash()
+	if err != nil {
+		return ForecastedTask{}, err
+	}
+
+	// Pre-work retrieval gate (docs/plan.md §31 "Before generating a
+	// solution, the agent: 1. constructs the task fingerprint... 2. loads
+	// version-compatible workspace facts and execution recipes... 9.
+	// records every retrieval, routing, reuse, rejection, escalation, and
+	// outcome"): consult project memory BEFORE selecting a policy or
+	// generating an effort forecast, i.e. before planning from scratch.
+	// RunPreWorkGate itself durably records a fallback when nothing is
+	// eligible (M21-076) -- that is a normal outcome, never an error, and
+	// ordinary planning below always proceeds regardless of FellBack.
+	retrievalResult, err := service.retrieval.RunPreWorkGate(ctx, retrieval.PreWorkGateInput{
+		QueryID:   "forecast-retrieval:" + input.ForecastIdempotencyKey,
+		ProjectID: exact.Project,
+		TaskID:    input.TaskID,
+		Boundary:  domain.MemoryQueryProjectBoundary{Project: exact.Project},
+		Task:      exact,
+	})
+	if err != nil {
+		return ForecastedTask{}, err
+	}
+
 	selected, err := policy.Select(policy.SelectionInput{
 		BaselineModelRevision: input.BaselineModelRevision,
 		Override:              input.Override,
@@ -136,7 +206,7 @@ func (service *TaskPreflightService) ForecastTask(
 	}
 	value, err := forecast.Generate(forecast.Input{
 		RepositoryRevision:       input.RepositoryRevision,
-		TaskFingerprint:          input.TaskFingerprint,
+		TaskFingerprint:          fingerprintHash,
 		TaskClass:                input.TaskClass,
 		RepositorySize:           input.RepositorySize,
 		LikelyFiles:              input.LikelyFiles,
@@ -179,7 +249,27 @@ func (service *TaskPreflightService) ForecastTask(
 	}
 	return ForecastedTask{
 		Policy: policyRevision, Forecast: forecastRevision, Budget: snapshot,
+		Retrieval: retrievalResult,
 	}, nil
+}
+
+// RecordMemoryInfluence persists what the agent actually did with one
+// eligible memory item ForecastTask's retrieval gate surfaced -- used it as
+// -is, adapted it, or rejected it (M21-074, M21-075). Calling this is the
+// separate, later fact that turns "eligible" into "influenced (or was
+// deliberately not used for) the outcome": ForecastTask itself never calls
+// this, so a caller that never calls it for an eligible item has retrieved
+// memory without that retrieval ever counting as influential.
+func (service *TaskPreflightService) RecordMemoryInfluence(
+	ctx context.Context,
+	item retrieval.InfluentialMemoryItem,
+	action retrievalgate.AgentInfluenceAction,
+	justification string,
+) error {
+	if service == nil || service.retrieval == nil {
+		return errors.New("task preflight retrieval service is unavailable")
+	}
+	return service.retrieval.RecordInfluence(ctx, item, action, justification)
 }
 
 // AdjustBudgetBeforeApproval applies an attributable durable user choice.

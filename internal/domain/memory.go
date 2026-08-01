@@ -43,6 +43,21 @@ var ErrAuthorityProofRequired = errors.New("memory artifact maturity requires an
 // authorize revision B: see MaturityTransitionRequest.Revision.
 var ErrAuthorityProofMismatch = errors.New("memory artifact maturity authority proof does not match the revision it is applied to")
 
+// ErrMemoryArtifactExposureUnknown classifies an attempt to call
+// ConfirmsMemoryArtifactIndependently with a lineage index in which some
+// artifact belonging to the ancestor's evidence family has
+// SupportingEpisodesKnown false. Per §31 "Descendants of a pattern do not
+// independently confirm their ancestor," unknown exposure must never be
+// treated as no exposure: silently reading an unpopulated/unknown
+// SupportingEpisodes as empty would let every candidate episode read as
+// "never exposed" and independent confirmation would always incorrectly
+// succeed. Callers hitting this error must first determine that artifact's
+// real supporting-episode exposure (e.g. via the storage layer's
+// GetMemoryArtifactLineage or loadMemoryArtifactLineageIndex, both of which
+// now query memory_artifact_supporting_episode for real) before independent
+// confirmation can be trusted.
+var ErrMemoryArtifactExposureUnknown = errors.New("memory artifact supporting-episode exposure is not known")
+
 // ErrMemoryArtifactCorrectionRequiresNewIdentity classifies an attempt to
 // correct (ReviseMemoryArtifactWithUserCorrection) a memory-artifact
 // revision whose maturity can no longer reach an authority-bearing state
@@ -1169,7 +1184,25 @@ type MemoryArtifactLineage struct {
 	OriginKnown         bool             `json:"origin_known"`
 	OriginUnknownReason string           `json:"origin_unknown_reason"`
 
-	SupportingEpisodes []EpisodeID `json:"supporting_episode_ids"`
+	// SupportingEpisodes, when SupportingEpisodesKnown is true, names every
+	// episode that exposed this artifact revision (an empty slice
+	// legitimately means "known: no episode has exposed it yet"). When
+	// SupportingEpisodesKnown is false, SupportingEpisodes must be empty and
+	// SupportingEpisodesUnknownReason must explain why exposure has not been
+	// determined. This Known/UnknownReason pair closes a real landmine: a
+	// bare, unexplained empty SupportingEpisodes could not be told apart
+	// from "checked; genuinely never exposed" versus "not computed by this
+	// caller" -- and ConfirmsMemoryArtifactIndependently would silently
+	// treat the second case as the first, always confirming independence
+	// for artifacts whose exposure was simply never looked up, defeating
+	// §31 "Descendants of a pattern do not independently confirm their
+	// ancestor." ConfirmsMemoryArtifactIndependently now refuses to confirm
+	// independence when any artifact in the evidence family carries
+	// SupportingEpisodesKnown false, rather than silently treating unknown
+	// exposure as no exposure.
+	SupportingEpisodes              []EpisodeID `json:"supporting_episode_ids"`
+	SupportingEpisodesKnown         bool        `json:"supporting_episodes_known"`
+	SupportingEpisodesUnknownReason string      `json:"supporting_episodes_unknown_reason"`
 
 	// LineageRootIDs, when LineageRootsKnown is true, names every artifact
 	// at the root of this artifact's derived_from/influenced_by ancestry
@@ -1212,6 +1245,15 @@ func (value MemoryArtifactLineage) Validate() error {
 		if id.IsZero() {
 			return valueError("memory.lineage.supporting_episode_ids", "must not contain empty identities")
 		}
+	}
+	if value.SupportingEpisodesKnown {
+		if strings.TrimSpace(value.SupportingEpisodesUnknownReason) != "" {
+			return valueError("memory.lineage.supporting_episodes_unknown_reason", "known supporting episodes must not carry an unknown reason")
+		}
+	} else if strings.TrimSpace(value.SupportingEpisodesUnknownReason) == "" {
+		return valueError("memory.lineage.supporting_episodes_unknown_reason", "must explain why supporting episodes are unknown")
+	} else if len(value.SupportingEpisodes) != 0 {
+		return valueError("memory.lineage.supporting_episode_ids", "unknown supporting episodes must not carry episode identities")
 	}
 	if value.OriginKnown {
 		if strings.TrimSpace(value.OriginUnknownReason) != "" {
@@ -1276,10 +1318,22 @@ func ConfirmsMemoryArtifactIndependently(
 	family := lineage.EvidenceFamily(index)
 	exposed := map[EpisodeID]struct{}{}
 	for id := range family {
-		if related, ok := index[id]; ok {
-			for _, episode := range related.SupportingEpisodes {
-				exposed[episode] = struct{}{}
-			}
+		related, ok := index[id]
+		if !ok {
+			// No lineage entry for id at all: the caller's index does not
+			// cover this artifact (e.g. a deliberately narrow, deletion-scoped
+			// index). That is a distinct, pre-existing, out-of-scope
+			// condition from "we looked this artifact up and its exposure is
+			// unknown" below; a caller needing a trustworthy answer must
+			// supply the whole project's lineage index, per
+			// loadMemoryArtifactLineageIndex's own documentation.
+			continue
+		}
+		if !related.SupportingEpisodesKnown {
+			return false, fmt.Errorf("%w: artifact %s in %s's evidence family", ErrMemoryArtifactExposureUnknown, id, ancestor)
+		}
+		for _, episode := range related.SupportingEpisodes {
+			exposed[episode] = struct{}{}
 		}
 	}
 	for _, episode := range candidateEpisodes {
@@ -1495,4 +1549,116 @@ func sameMemoryArtifactIDSet(a, b []MemoryArtifactID) bool {
 		}
 	}
 	return true
+}
+
+// -----------------------------------------------------------------------
+// Deterministic fact identity and normalization (M21-046)
+// -----------------------------------------------------------------------
+
+// ErrMemoryFactIdentityUnsupportedKind classifies an attempt to normalize a
+// memory-artifact content kind that NormalizedMemoryFactIdentity does not
+// declare a stable identity rule for.
+var ErrMemoryFactIdentityUnsupportedKind = errors.New("memory artifact kind has no declared normalized-fact identity rule")
+
+// NormalizedMemoryFactIdentity computes the deterministic key that decides
+// whether two independently extracted memory-artifact contents describe the
+// SAME underlying fact slot (M21-046), as opposed to two different facts
+// that merely happen to share a kind and repository.
+//
+// The rule is deliberately narrow: identity is built only from the fields
+// that name WHAT the fact is about, never from the fields that carry its
+// currently claimed truth. The latter -- a reviewed command's argv, a file
+// mapping's test paths, a repository fact's statement, a convention's
+// statement -- is the payload that is EXPECTED to drift over time (a build
+// command changes, a test runner changes, a convention is revised). Per
+// docs/plan.md §31 "Facts bind to repository revisions ... and are
+// invalidated when their supporting evidence changes," a changed payload
+// for the same identity slot is precisely the M21-048 invalidation trigger,
+// not a reason to mint a second, parallel fact for the same slot.
+// RevisionBinding is excluded from every kind's identity for the same
+// reason: the exact/valid-from/valid-until revision is expected to move
+// forward as the same fact is reconfirmed at newer revisions and must never
+// fork identity on every commit.
+//
+// Declared identity keys, one per kind (repository is always included;
+// "normalized" text is defined by normalizeMemoryFactText below):
+//
+//	repository-fact:           Category
+//	reviewed-command:          Purpose
+//	file-to-test-mapping:      normalized SourcePath
+//	repository-convention:     normalized Scope
+//	accepted-regression-case:  Classification, normalized ReproducibleInput
+//	execution-recipe:          normalized ApplicabilityStatement
+//	executable-atom-reference: Atom
+//	observation-hypothesis:    normalized Statement
+//
+// Every field is concatenated with internal/validation's own
+// length-prefixed anti-collision scheme (writeFingerprint's "%d:value"
+// shape), so no field's content can be crafted to make two genuinely
+// different identity tuples collide by shifting a separator boundary.
+//
+// The returned string is not itself persisted as a schema column in this
+// change (no migration was authorized this pass); it is deterministic and
+// stable enough to become an indexed column later without changing the
+// values already computed for existing content. The M21-046 storage caller
+// (internal/storage's findLatestMemoryArtifactRevisionByNormalizedIdentity)
+// currently recomputes and compares it during a bounded scan instead.
+func NormalizedMemoryFactIdentity(content MemoryArtifactContent) (string, error) {
+	if err := content.Validate(); err != nil {
+		return "", err
+	}
+	switch content.Kind {
+	case MemoryArtifactKindRepositoryFact:
+		fact := content.RepositoryFact
+		return joinMemoryFactIdentityFields(string(content.Kind), fact.Repository.String(), string(fact.Category)), nil
+	case MemoryArtifactKindReviewedCommand:
+		command := content.ReviewedCommand
+		return joinMemoryFactIdentityFields(string(content.Kind), command.Repository.String(), string(command.Purpose)), nil
+	case MemoryArtifactKindFileToTestMapping:
+		mapping := content.FileToTestMapping
+		return joinMemoryFactIdentityFields(string(content.Kind), mapping.Repository.String(), normalizeMemoryFactText(mapping.SourcePath)), nil
+	case MemoryArtifactKindRepositoryConvention:
+		convention := content.RepositoryConvention
+		return joinMemoryFactIdentityFields(string(content.Kind), convention.Repository.String(), normalizeMemoryFactText(convention.Scope)), nil
+	case MemoryArtifactKindAcceptedRegressionCase:
+		regression := content.AcceptedRegressionCase
+		return joinMemoryFactIdentityFields(
+			string(content.Kind), regression.Repository.String(), string(regression.Classification),
+			normalizeMemoryFactText(regression.ReproducibleInput),
+		), nil
+	case MemoryArtifactKindExecutionRecipe:
+		recipe := content.ExecutionRecipe
+		return joinMemoryFactIdentityFields(string(content.Kind), recipe.Repository.String(), normalizeMemoryFactText(recipe.ApplicabilityStatement)), nil
+	case MemoryArtifactKindExecutableAtomReference:
+		atom := content.AtomReference
+		return joinMemoryFactIdentityFields(string(content.Kind), atom.Repository.String(), atom.Atom.String()), nil
+	case MemoryArtifactKindObservationHypothesis:
+		observation := content.ObservationHypothesis
+		return joinMemoryFactIdentityFields(string(content.Kind), observation.Repository.String(), normalizeMemoryFactText(observation.Statement)), nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrMemoryFactIdentityUnsupportedKind, content.Kind)
+	}
+}
+
+// normalizeMemoryFactText collapses leading/trailing and repeated interior
+// whitespace to single spaces (strings.Fields plus a single-space join), so
+// cosmetic whitespace differences between two extractions of the same fact
+// never fork identity, while comparison stays case-sensitive and otherwise
+// byte-exact (repository paths, commands, and prose statements are
+// case-sensitive on the platforms Codeflux targets).
+func normalizeMemoryFactText(value string) string {
+	return strings.Join(strings.Fields(value), " ")
+}
+
+// joinMemoryFactIdentityFields concatenates fields using the same
+// length-prefixed anti-collision shape internal/validation/profile.go's
+// writeFingerprint already establishes for command-identity fingerprints
+// ("%d:" plus the field, repeated), so this file introduces no second,
+// divergent collision-avoidance convention.
+func joinMemoryFactIdentityFields(fields ...string) string {
+	var builder strings.Builder
+	for _, field := range fields {
+		fmt.Fprintf(&builder, "%d:%s", len(field), field)
+	}
+	return builder.String()
 }

@@ -159,7 +159,7 @@ func drawNode(context js.Value, placement NodePlacement, frame drawFrame) {
 	context.Set("fillStyle", string(frame.Tokens.Colors.TextPrimary))
 	context.Set("font", "600 12px "+frame.Tokens.Fonts.UI)
 	context.Set("textBaseline", "middle")
-	display, _, clipped := TruncateLabel(placement.Node.Title, 34)
+	display, _, clipped := TruncateLabel(placement.Node.Title, MaximumCanvasNodeLabelRunes)
 	lines := labelLines(display, 21)
 	lineY := placement.Bounds.Y + placement.Bounds.Height/2
 	if len(lines) == 2 {

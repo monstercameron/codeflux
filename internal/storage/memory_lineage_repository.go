@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"codeflux.dev/codeflux/internal/domain"
 )
@@ -29,6 +30,16 @@ import (
 const (
 	memoryArtifactLineageOriginUnknownReason = "origin is not computed by this storage lane; only direct derived_from/influenced_by edges are persisted (M21-019/M21-020)"
 	memoryArtifactLineageRootsUnknownReason  = "lineage roots are not computed by this storage lane; only direct derived_from/influenced_by edges are persisted (M21-019/M21-020)"
+	// memoryArtifactLineageSupportingEpisodesUnknownReason marks a lineage
+	// stub entry as not yet checked against memory_artifact_supporting_episode.
+	// Every caller in this file that returns entries to a consumer replaces
+	// this placeholder with a real, Known=true query result before
+	// returning (see listMemoryArtifactSupportingEpisodes and the
+	// finalize-pass helpers below); it exists only so an intermediate stub
+	// value, before that pass runs, still satisfies
+	// domain.MemoryArtifactLineage.Validate()'s Known/UnknownReason
+	// contract rather than silently claiming "known: no episodes".
+	memoryArtifactLineageSupportingEpisodesUnknownReason = "supporting episodes not yet queried for this lineage entry"
 )
 
 // memoryLineageQueryer is satisfied by both *sql.DB and *sql.Tx.
@@ -44,12 +55,46 @@ type memoryLineageQueryer interface {
 // between "known: no origin" and "not determined yet").
 func newMemoryArtifactLineageStub(id domain.MemoryArtifactID) domain.MemoryArtifactLineage {
 	return domain.MemoryArtifactLineage{
-		ArtifactID:                id,
-		OriginKnown:               false,
-		OriginUnknownReason:       memoryArtifactLineageOriginUnknownReason,
-		LineageRootsKnown:         false,
-		LineageRootsUnknownReason: memoryArtifactLineageRootsUnknownReason,
+		ArtifactID:                      id,
+		OriginKnown:                     false,
+		OriginUnknownReason:             memoryArtifactLineageOriginUnknownReason,
+		LineageRootsKnown:               false,
+		LineageRootsUnknownReason:       memoryArtifactLineageRootsUnknownReason,
+		SupportingEpisodesKnown:         false,
+		SupportingEpisodesUnknownReason: memoryArtifactLineageSupportingEpisodesUnknownReason,
 	}
+}
+
+// RecordMemoryArtifactSupportingEpisode declares that episodeID exposed or
+// supported artifactID (M21-039 landmine closure): the real backing store
+// for domain.MemoryArtifactLineage.SupportingEpisodes, so
+// domain.ConfirmsMemoryArtifactIndependently can tell "genuinely never
+// exposed" apart from "not yet determined" instead of reading every
+// unpopulated artifact as trivially independent. See
+// migrations/000027_chronological_episodes.sql's
+// memory_artifact_supporting_episode table and its project-boundary
+// trigger.
+func (repositories *Repositories) RecordMemoryArtifactSupportingEpisode(
+	ctx context.Context,
+	artifactID domain.MemoryArtifactID,
+	episodeID domain.EpisodeID,
+) error {
+	switch {
+	case artifactID.IsZero():
+		return errors.New("memory artifact ID must not be empty")
+	case episodeID.IsZero():
+		return errors.New("episode ID must not be empty")
+	}
+	_, micros := repositories.timestamp()
+	return repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		_, err := transaction.sql.ExecContext(
+			ctx,
+			`INSERT OR IGNORE INTO memory_artifact_supporting_episode (artifact_id, episode_id, recorded_at_unix_micros)
+			 VALUES (?, ?, ?)`,
+			artifactID, episodeID, micros,
+		)
+		return repositoryWriteError("record memory artifact supporting episode", err)
+	})
 }
 
 // RecordMemoryArtifactDerivedFrom declares one semantic-dependency lineage
@@ -100,10 +145,13 @@ func (repositories *Repositories) recordMemoryArtifactLineageEdge(
 }
 
 // GetMemoryArtifactLineage reads one artifact's direct derived_from and
-// influenced_by ancestors, matching domain.MemoryArtifactLineage's shape.
-// SupportingEpisodes and LineageRootIDs are out of this lane's scope: the
-// former needs the M21-029..039 episodes table, the latter is derivable at
-// query time from the DerivedFrom/InfluencedBy closure.
+// influenced_by ancestors plus its real supporting-episode exposure,
+// matching domain.MemoryArtifactLineage's shape. LineageRootIDs remains out
+// of this lane's scope: it is derivable at query time from the
+// DerivedFrom/InfluencedBy closure, not from a single artifact's own row.
+// SupportingEpisodes, in contrast, is a bounded, single-artifact-scoped
+// query against memory_artifact_supporting_episode (M21-039 landmine
+// closure), so it is always computed for real here, never left unknown.
 func (repositories *Repositories) GetMemoryArtifactLineage(
 	ctx context.Context,
 	artifactID domain.MemoryArtifactID,
@@ -119,10 +167,58 @@ func (repositories *Repositories) GetMemoryArtifactLineage(
 	if err != nil {
 		return domain.MemoryArtifactLineage{}, err
 	}
+	supportingEpisodes, err := listMemoryArtifactSupportingEpisodes(ctx, repositories.database.sql, artifactID)
+	if err != nil {
+		return domain.MemoryArtifactLineage{}, err
+	}
 	lineage := newMemoryArtifactLineageStub(artifactID)
 	lineage.DerivedFrom = derivedFrom
 	lineage.InfluencedBy = influencedBy
+	setMemoryArtifactLineageSupportingEpisodesKnown(&lineage, supportingEpisodes)
 	return lineage, nil
+}
+
+// setMemoryArtifactLineageSupportingEpisodesKnown replaces lineage's
+// placeholder "not yet queried" SupportingEpisodes state with a real,
+// Known=true query result, clearing the unknown-reason placeholder so the
+// value satisfies domain.MemoryArtifactLineage.Validate()'s
+// Known/UnknownReason contract (Known=true must never also carry an
+// unknown reason).
+func setMemoryArtifactLineageSupportingEpisodesKnown(lineage *domain.MemoryArtifactLineage, episodes []domain.EpisodeID) {
+	lineage.SupportingEpisodes = episodes
+	lineage.SupportingEpisodesKnown = true
+	lineage.SupportingEpisodesUnknownReason = ""
+}
+
+// listMemoryArtifactSupportingEpisodes reads every episode recorded as
+// supporting/exposing artifactID via RecordMemoryArtifactSupportingEpisode,
+// in deterministic identity order.
+func listMemoryArtifactSupportingEpisodes(
+	ctx context.Context,
+	queries memoryLineageQueryer,
+	artifactID domain.MemoryArtifactID,
+) ([]domain.EpisodeID, error) {
+	rows, err := queries.QueryContext(
+		ctx,
+		`SELECT episode_id FROM memory_artifact_supporting_episode WHERE artifact_id = ? ORDER BY episode_id`,
+		artifactID,
+	)
+	if err != nil {
+		return nil, classify("list memory artifact supporting episodes", err)
+	}
+	defer rows.Close()
+	var episodes []domain.EpisodeID
+	for rows.Next() {
+		var episode domain.EpisodeID
+		if err := rows.Scan(&episode); err != nil {
+			return nil, classify("scan memory artifact supporting episode", err)
+		}
+		episodes = append(episodes, episode)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("list memory artifact supporting episodes", err)
+	}
+	return episodes, nil
 }
 
 func listMemoryArtifactLineageAncestors(
@@ -173,7 +269,90 @@ func loadMemoryArtifactLineageIndex(
 	if err := populateMemoryArtifactLineageIndex(ctx, queries, projectID, "memory_artifact_influenced_by", index, false); err != nil {
 		return nil, err
 	}
+	// M21-039 landmine closure: every entry this loader returns is
+	// project-scoped and already fully materialized above, so its real
+	// supporting-episode exposure can be (and must be) computed here too,
+	// rather than left as the "not yet queried" stub state -- otherwise
+	// domain.ConfirmsMemoryArtifactIndependently, the caller this index
+	// exists for, would read every entry as trivially unexposed.
+	if err := finalizeMemoryArtifactLineageIndexSupportingEpisodes(ctx, queries, index); err != nil {
+		return nil, err
+	}
 	return index, nil
+}
+
+// finalizeMemoryArtifactLineageIndexSupportingEpisodes replaces every
+// entry in index's "not yet queried" SupportingEpisodes placeholder with a
+// real, Known=true result queried in one bulk round trip, bounded by
+// len(index) (already bounded by this file's own callers: project-scoped
+// for loadMemoryArtifactLineageIndex, cap-bounded for
+// loadMemoryArtifactLineageIndexForDeletionBounded).
+func finalizeMemoryArtifactLineageIndexSupportingEpisodes(
+	ctx context.Context,
+	queries memoryLineageQueryer,
+	index map[domain.MemoryArtifactID]domain.MemoryArtifactLineage,
+) error {
+	if len(index) == 0 {
+		return nil
+	}
+	ids := make([]domain.MemoryArtifactID, 0, len(index))
+	for id := range index {
+		ids = append(ids, id)
+	}
+	episodesByArtifact, err := loadMemoryArtifactSupportingEpisodesForIDs(ctx, queries, ids)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		entry := index[id]
+		setMemoryArtifactLineageSupportingEpisodesKnown(&entry, episodesByArtifact[id])
+		index[id] = entry
+	}
+	return nil
+}
+
+// loadMemoryArtifactSupportingEpisodesForIDs bulk-reads every recorded
+// memory_artifact_supporting_episode row for exactly the given ids, in one
+// query, keyed by artifact ID with episodes in deterministic identity
+// order.
+func loadMemoryArtifactSupportingEpisodesForIDs(
+	ctx context.Context,
+	queries memoryLineageQueryer,
+	ids []domain.MemoryArtifactID,
+) (map[domain.MemoryArtifactID][]domain.EpisodeID, error) {
+	result := map[domain.MemoryArtifactID][]domain.EpisodeID{}
+	if len(ids) == 0 {
+		return result, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := queries.QueryContext(
+		ctx,
+		`SELECT artifact_id, episode_id FROM memory_artifact_supporting_episode
+		 WHERE artifact_id IN (`+strings.Join(placeholders, ",")+`)
+		 ORDER BY artifact_id, episode_id`,
+		args...,
+	)
+	if err != nil {
+		return nil, classify("load memory artifact supporting episodes for ids", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var artifactID domain.MemoryArtifactID
+		var episodeID domain.EpisodeID
+		if err := rows.Scan(&artifactID, &episodeID); err != nil {
+			return nil, classify("scan memory artifact supporting episode for ids", err)
+		}
+		result[artifactID] = append(result[artifactID], episodeID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("load memory artifact supporting episodes for ids", err)
+	}
+	return result, nil
 }
 
 // maximumMemoryArtifactLineageDeletionTraversal bounds how many artifacts
@@ -346,6 +525,9 @@ func loadMemoryArtifactLineageIndexForDeletionBounded(
 			"%w: target %s's reachable lineage subgraph reaches at least %d artifacts (bound %d)",
 			ErrMemoryArtifactLineageTooLarge, target, len(index), cap,
 		)
+	}
+	if err := finalizeMemoryArtifactLineageIndexSupportingEpisodes(ctx, queries, index); err != nil {
+		return nil, err
 	}
 	return index, nil
 }
