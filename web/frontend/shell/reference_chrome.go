@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/graphcanvas"
 	"codeflux.dev/codeflux/web/frontend/primitives"
@@ -108,19 +109,29 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 		if props.Workspace.Dirty {
 			worktree = "uncommitted changes"
 		} else {
-			worktree = "worktree status"
+			worktree = "Unknown"
 		}
 	}
-	provider := fallback(props.View.Provider, "provider")
-	model := fallback(props.View.Model, "model")
-	effort := fallback(props.View.Effort, "effort")
-	forecast := fallback(props.View.ForecastCost, "forecast")
-	tokensUsed := fallback(props.View.ActualTokens, "usage")
-	actual := fallback(props.View.ActualCost, fallback(props.CostLabel, "actual"))
-	pricing := fallback(props.View.PricingSnapshot, "pricing snapshot")
-	budget := fallback(props.View.HardBudget, "budget")
-	remaining := fallback(props.View.RemainingBudget, "remaining")
-	warning := fallback(props.View.BudgetWarning, "threshold")
+	// Each of these used to fall back to the name of the field it holds, so an
+	// unset model rendered the word "model" and an unmeasured spend rendered
+	// the word "actual". Read at a glance those are indistinguishable from
+	// values, and the whole row looked populated while nothing had been
+	// measured. Unknown is now said out loud.
+	const unknown = "Unknown"
+	provider := fallback(props.View.Provider, unknown)
+	model := fallback(props.View.Model, unknown)
+	effort := fallback(props.View.Effort, unknown)
+	forecast := fallback(props.View.ForecastCost, unknown)
+	tokensUsed := fallback(props.View.ActualTokens, unknown)
+	actual := fallback(props.View.ActualCost, fallback(props.CostLabel, unknown))
+	pricing := fallback(props.View.PricingSnapshot, unknown)
+	budget := fallback(props.View.HardBudget, "Not set")
+	remaining := fallback(props.View.RemainingBudget, unknown)
+	warning := fallback(props.View.BudgetWarning, "None")
+	// A task is what gives the model and cost controls a subject. Without one
+	// they are five copies of the word Unknown taking the width the repository
+	// and branch need, so they are not drawn at all.
+	taskSelected := strings.TrimSpace(props.View.TaskState) != ""
 	connection := string(props.View.Connection)
 	if connection == "" {
 		connection = string(props.Session.Connection)
@@ -171,7 +182,7 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 			contextControl("repository", repository, "/", props.Mode, props.OnNavigatePath),
 			contextControl("branch", branch, "/settings", props.Mode, props.OnNavigatePath),
 			contextControl("worktree", worktree, "/settings", props.Mode, props.OnNavigatePath),
-			html.Div(html.Props{Class: wideOnlyClass()},
+			html.Div(html.Props{Class: wideOnlyClass(), Hidden: !taskSelected},
 				contextControl("model", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
 			),
 			costReadoutPlaceholder(),
@@ -182,7 +193,7 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				u.Flex, u.ItemsCenter, u.JustifyEnd, css.Gap(css.Px(tokens.Spacing.SM)),
 			).String(),
 		},
-			html.Div(html.Props{Class: wideOnlyClass()},
+			html.Div(html.Props{Class: wideOnlyClass(), Hidden: !taskSelected},
 				// The header carries the two figures that decide whether to
 				// intervene: what this has cost, and what is left of the cap.
 				// The forecast, token count, pricing snapshot and warning
@@ -599,6 +610,7 @@ func SearchDialog(props SearchDialogProps) ui.Node {
 type ProductSidebarProps struct {
 	Snapshot         state.Snapshot
 	Route            routes.Route
+	SelectedScope    NavigationScope
 	Mode             primitives.Mode
 	ThreadRail       ui.Node
 	CompactOpen      bool
@@ -638,24 +650,18 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 	if layout.Viewport == state.ViewportWide {
 		navigationLabel = "Threads"
 	}
-	navItems := []struct {
-		icon  primitives.IconName
-		label string
-		path  string
-	}{
-		{primitives.IconHome, "Home", "/"},
-		{primitives.IconTasks, "Tasks", "/tasks"},
-		{primitives.IconGraph, "Graphs", "/graphs"},
-		{primitives.IconMemory, "Memory", "/memory"},
-		{primitives.IconRepositories, "Repositories", "/"},
-		{primitives.IconSettings, "Settings", "/settings"},
-	}
+	// Every destination comes from the route table rather than from a literal.
+	// Three of these used to be paths the client does not route -- /tasks and
+	// /memory were never routes, and /graphs was one the server refused -- so
+	// half the rail sent a person to a page that did not exist.
+	navItems := navigationDestinations(props.Route, props.SelectedScope)
 	items := make([]ui.Node, 0, len(navItems))
 	for _, item := range navItems {
-		selected := routeSelected(props.Route, item.label)
+		selected := routeSelected(props.Route, item.label, item.path)
 		path := item.path
+		reachable := item.reason == ""
 		buttonProps := html.PropsOf(html.OnClick(func() {
-			if props.OnNavigatePath != nil {
+			if props.OnNavigatePath != nil && reachable {
 				props.OnNavigatePath(path)
 			}
 			if compact && props.OnCollapse != nil {
@@ -663,7 +669,13 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 			}
 		}))
 		buttonProps.Type = "button"
-		buttonProps.Disabled = props.OnNavigatePath == nil
+		buttonProps.Disabled = props.OnNavigatePath == nil || !reachable
+		if item.reason != "" {
+			// A destination that cannot exist yet says so rather than
+			// navigating to nothing.
+			buttonProps.Title = item.reason
+			buttonProps.Aria = map[string]string{"description": item.reason}
+		}
 		buttonProps.Aria = map[string]string{"current": selectedAria(selected)}
 		buttonProps.Data = map[string]string{"component": "client-route-control", "path": path}
 		buttonProps.Class = sidebarLinkClass(tokens, selected)
@@ -796,9 +808,15 @@ func productSidebarClass(layout state.LayoutPreferences, tokens design.Tokens) s
 	return css.New(rules...).String()
 }
 
-func routeSelected(route routes.Route, label string) bool {
+// routeSelected reports whether a destination is the page being looked at.
+//
+// A rail with two current pages tells a person nothing about where they are,
+// so exactly one destination answers true for any route. The destination path
+// is taken rather than derived, so this cannot drift from where a control
+// actually goes.
+func routeSelected(route routes.Route, label, destination string) bool {
 	switch label {
-	case "Home", "Repositories":
+	case "Repositories":
 		return route.Name == routes.RepositoryChooser
 	case "Tasks":
 		return route.Name == routes.ThreadWorkspace
@@ -893,27 +911,39 @@ func AssuranceRail(props AssuranceRailProps) ui.Node {
 		html.Div(html.Props{
 			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
 		},
-			html.Strong(html.Props{Text: "Task details"}),
+			// This heading set no colour and so inherited one, which against
+			// the rail's own surface rendered it very nearly invisible: the
+			// panel it names read as an unlabelled stack of cards. It is a
+			// Strong rather than a heading tag, which is why the heading
+			// contrast check did not catch it.
+			html.Strong(html.Props{
+				Class: design.HeadingClass(tokens, design.HeadingPanel),
+				Text:  "Task details",
+			}),
 			headerIconButton(primitives.IconClose, "Collapse task details sidebar", props.Mode, props.OnCollapse),
 		),
-		inspectorCard("Identity and plan", []detailRow{
-			{"Milestone", "M16"},
-			{"Plan reference", "§27A · §27C"},
-			{"Repository", fallback(props.Snapshot.Workspace.RepositoryName, "Not selected")},
-			{"Branch", fallback(props.Snapshot.Workspace.Branch, "Unknown")},
+		// Every row below is read from the coordinator's answer. This rail used
+		// to open with "Milestone M16" and "Plan reference §27A · §27C", follow
+		// with four correctness gates whose verdicts were string literals, and
+		// close with four artifacts reported as present without anything having
+		// looked. It was the development plan for this file, printed into the
+		// product, and it read as measurement.
+		inspectorCard("Repository", []detailRow{
+			{"Name", fallback(props.Snapshot.TopBar.Repository, "Not selected")},
+			{"Branch", fallback(props.Snapshot.TopBar.Branch, "Unknown")},
+			{"Working tree", fallback(props.Snapshot.TopBar.WorktreeStatus, "Unknown")},
 		}, tokens),
-		gatesCard(tokens),
-		inspectorCard("Measured metrics", []detailRow{
-			{"Frontend", "GWC v5"},
+		inspectorCard("Task", []detailRow{
+			{"State", humanize(fallback(props.Snapshot.TopBar.TaskState, "No task"))},
+			{"Model", fallback(props.Snapshot.TopBar.Model, "Unknown")},
+			{"Effort", fallback(props.Snapshot.TopBar.Effort, "Unknown")},
+		}, tokens),
+		inspectorCard("Measured", []detailRow{
 			{"Connection", humanize(string(props.Snapshot.Session.Connection))},
-			{"Actual cost", fallback(props.Snapshot.CostLabel, "Unknown")},
-			{"External requests", "None"},
-		}, tokens),
-		inspectorCard("Related artifacts", []detailRow{
-			{"Browser suite", "Running"},
-			{"Task graph", "Live context"},
-			{"Plan", "Referenced"},
-			{"Local database", "Available"},
+			{"Spent", fallback(props.Snapshot.TopBar.ActualCost, "Unknown")},
+			{"Tokens", fallback(props.Snapshot.TopBar.ActualTokens, "Unknown")},
+			{"Forecast", fallback(props.Snapshot.TopBar.ForecastCost, "Unknown")},
+			{"Budget", fallback(props.Snapshot.TopBar.HardBudget, "Not set")},
 		}, tokens),
 	)
 }
@@ -984,22 +1014,21 @@ func inspectorCard(title string, rows []detailRow, tokens design.Tokens) ui.Node
 	)
 }
 
-func gatesCard(tokens design.Tokens) ui.Node {
-	rows := []detailRow{
-		{"Route bootstrap", "Passed"},
-		{"Origin boundary", "Passed"},
-		{"Visual fidelity", "Running ◌"},
-		{"Browser matrix", "Pending ○"},
-	}
-	return inspectorCard("Correctness gates", rows, tokens)
-}
-
 func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 	tokens := props.Mode.Tokens()
 	pauseLabel, pauseAccessible := taskPausePresentation(props.Snapshot.TopBar.TaskState, false)
-	taskStateLabel := humanize(fallback(props.Snapshot.TopBar.TaskState, "unknown"))
-	taskTitle := fallback(props.Snapshot.TopBar.TaskTitle, "Selected task")
-	taskSummary := fallback(props.Snapshot.TopBar.TaskSummary, "No authoritative task summary is available.")
+	// A thread with no task is the ordinary state of a new conversation, not a
+	// failure to load one. It used to be headed "Selected task / Unknown / No
+	// authoritative task summary is available" — three sentences of system
+	// vocabulary reporting an absence as a fault.
+	noTask := strings.TrimSpace(props.Snapshot.TopBar.TaskState) == ""
+	taskStateLabel := humanize(fallback(props.Snapshot.TopBar.TaskState, "No task"))
+	taskTitle := fallback(props.Snapshot.TopBar.TaskTitle, "No task yet")
+	taskSummary := fallback(props.Snapshot.TopBar.TaskSummary,
+		"Describe a change and Codeflux will plan it, run it, and show its work.")
+	if noTask {
+		taskSummary = "Describe a change and Codeflux will plan it, run it, and show its work."
+	}
 	taskStateColor := tokens.Colors.Active
 	switch {
 	case strings.Contains(strings.ToLower(taskStateLabel), "paused"):
@@ -1223,25 +1252,40 @@ func taskPausePresentation(taskState string, compact bool) (string, string) {
 }
 
 func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor design.Color, tokens design.Tokens) ui.Node {
+	// With no task there is nothing to measure. This strip used to print six
+	// labels against six copies of the word Unknown — the widest, boldest,
+	// most colourful row on the page saying nothing at all, and drawing the eye
+	// away from the one thing that was true. One sentence replaces it.
+	if strings.TrimSpace(topBar.TaskState) == "" {
+		return html.Div(html.Props{
+			Data: map[string]string{"component": "task-metrics", "state": "no-task"},
+			Class: css.New(
+				css.PaddingY(css.Px(tokens.Spacing.MD)),
+				css.PaddingX(css.Px(tokens.Spacing.MD)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+			).String(),
+		}, html.P(html.Props{
+			Class: css.New(css.Margin(css.Zero)).String(),
+			Text:  "No task is running. Describe a change below to start one.",
+		}))
+	}
 	metrics := []detailRow{
-		{"Correctness profile", "Unknown"},
 		{"Task state", taskState},
-		{"Progress", "Unknown"},
-		{"Elapsed", "Unknown"},
 		{"Cost", fallback(topBar.ActualCost, "Unknown")},
-		{"Gates", "Unknown"},
+		{"Tokens", fallback(topBar.ActualTokens, "Unknown")},
+		{"Forecast", fallback(topBar.ForecastCost, "Unknown")},
+		{"Budget", fallback(topBar.HardBudget, "Not set")},
+		{"Remaining", fallback(topBar.RemainingBudget, "Unknown")},
 	}
 	nodes := make([]ui.Node, 0, len(metrics))
 	for index, metric := range metrics {
+		// Only the task state is coloured. Colour on a metric means something
+		// needs attention, and spreading it across three of six rows spent the
+		// signal on values that were not asking for any.
 		valueColor := tokens.Colors.TextPrimary
-		if index == 1 {
+		if index == 0 {
 			valueColor = taskStateColor
-		}
-		if index == 2 {
-			valueColor = tokens.Colors.Active
-		}
-		if index == 5 {
-			valueColor = tokens.Colors.Success
 		}
 		nodes = append(nodes, html.Div(html.Props{
 			Class: css.New(
@@ -1785,4 +1829,110 @@ func contextIcon(kind string) primitives.IconName {
 // on counting parentheses.
 func costReadoutPlaceholder() ui.Node {
 	return html.Span(html.Props{Hidden: true})
+}
+
+// navigationDestination is one rail entry and whether it can be reached.
+type navigationDestination struct {
+	icon  primitives.IconName
+	label string
+	path  string
+	// reason is empty when the destination exists, and otherwise says why it
+	// does not yet.
+	reason string
+}
+
+// navigationDestinations builds the rail from the route table.
+//
+// Two destinations need a repository to exist at all: a thread workspace and a
+// memory view are both scoped to one. Until a repository is selected there is
+// no path to send anybody to, so the entry says why instead of navigating to a
+// page the server will refuse.
+// NavigationScope is what the coordinator says is open.
+//
+// The navigation rail needs it because the route a person is standing on does
+// not always name a repository — the chooser never does — and a rail that reads
+// only the route disables every scoped destination on the page every session
+// begins at.
+type NavigationScope struct {
+	RepositoryID domain.RepositoryID
+	ThreadID     domain.ThreadID
+}
+
+func navigationDestinations(
+	route routes.Route,
+	selected NavigationScope,
+) []navigationDestination {
+	const needsRepository = "Choose a repository first; this view is scoped to one."
+	// Scope comes from the route when the route has one, and otherwise from
+	// what the coordinator says is open. Reading the route alone meant that
+	// standing on the repository chooser — the page every session starts on —
+	// disabled Tasks and Memory with "Choose a repository first" while a
+	// repository was already open, and the only enabled way to it was the page
+	// the person was already looking at.
+	repository, thread := route.RepositoryID, route.ThreadID
+	if repository.IsZero() {
+		repository, thread = selected.RepositoryID, selected.ThreadID
+	}
+
+	// There is no Home. It pointed at the repository chooser, which is exactly
+	// where Repositories points, so two rail items lit up together on the page
+	// every session begins at — and a rail with two current pages tells a
+	// person nothing about where they are. Pointing it at the open conversation
+	// instead only moved the collision onto Tasks. Each remaining destination
+	// is somewhere the others are not.
+	destinations := []navigationDestination{}
+
+	tasks := navigationDestination{
+		icon: primitives.IconTasks, label: "Tasks", reason: needsRepository,
+	}
+	memory := navigationDestination{
+		icon: primitives.IconMemory, label: "Memory", reason: needsRepository,
+	}
+	if !repository.IsZero() {
+		if !thread.IsZero() {
+			tasks = navigationDestination{
+				icon: primitives.IconTasks, label: "Tasks",
+				path: pathOrEmpty(routes.Route{
+					Name: routes.ThreadWorkspace, RepositoryID: repository, ThreadID: thread,
+				}),
+			}
+		} else {
+			tasks.reason = "Open a thread first; the task workspace is scoped to one."
+		}
+		memory = navigationDestination{
+			icon: primitives.IconMemory, label: "Memory",
+			path: pathOrEmpty(routes.Route{Name: routes.Memory, RepositoryID: repository}),
+		}
+	}
+
+	destinations = append(destinations,
+		tasks,
+		navigationDestination{
+			icon: primitives.IconGraph, label: "Graphs",
+			path: pathOrEmpty(routes.Route{Name: routes.Graphs}),
+		},
+		memory,
+		navigationDestination{
+			icon: primitives.IconRepositories, label: "Repositories",
+			path: pathOrEmpty(routes.Route{Name: routes.RepositoryChooser}),
+		},
+		navigationDestination{
+			icon: primitives.IconSettings, label: "Settings",
+			path: pathOrEmpty(routes.Route{Name: routes.Settings}),
+		},
+	)
+	return destinations
+}
+
+// pathOrEmpty renders a route, or nothing when it cannot be rendered.
+//
+// An unrenderable route yields an empty path, which the rail treats as
+// unreachable. That is better than a literal: a route the table cannot express
+// is one the server will refuse.
+func pathOrEmpty(route routes.Route) string {
+	path, err := routes.Path(route)
+	if err != nil {
+		return ""
+	}
+	return path
 }

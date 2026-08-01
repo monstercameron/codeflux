@@ -9,7 +9,6 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
-	"codeflux.dev/codeflux/internal/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,10 +19,58 @@ import (
 // It is an interface so the service can be exercised without a database, and
 // so it cannot reach past what a workspace picker legitimately reads.
 type WorkspaceApplication interface {
-	ListRepositories(context.Context, int) ([]storage.Repository, error)
-	GetRepository(context.Context, domain.RepositoryID) (storage.Repository, error)
-	GetWorkspaceScope(context.Context, domain.WorkspaceID) (storage.WorkspaceScope, error)
+	ListRepositories(context.Context, int) ([]RepositoryRecord, error)
+	GetRepository(context.Context, domain.RepositoryID) (RepositoryRecord, error)
+	GetWorkspaceScope(context.Context, domain.WorkspaceID) (WorkspaceRecord, error)
+	// ReadRepositoryState reports what Git says right now. The database records
+	// what was true when a repository was opened, and a working tree changes
+	// between one glance at the interface and the next, so a top bar drawn from
+	// stored fields is a top bar that will eventually lie.
+	ReadRepositoryState(context.Context, RepositoryRecord) (RepositoryGitState, error)
 }
+
+// RepositoryRecord is what this service needs to know about a repository.
+//
+// It is declared here rather than borrowed from the storage package because
+// this is an adapter: it may depend on ports pointing inward, never on a
+// sibling adapter's types. Naming its own inputs also keeps the service
+// testable without a database.
+type RepositoryRecord struct {
+	ID            domain.RepositoryID
+	CanonicalPath string
+	GitIdentity   string
+	Revision      uint64
+}
+
+// WorkspaceRecord is what this service needs to know about a workspace.
+type WorkspaceRecord struct {
+	WorkspaceID  domain.WorkspaceID
+	RepositoryID domain.RepositoryID
+}
+
+// RepositoryGitState is the working tree as Git currently reports it.
+//
+// A field Git declined to answer is left zero rather than guessed, so a caller
+// renders it as unknown instead of as something false.
+type RepositoryGitState struct {
+	Branch           string
+	HeadRevision     string
+	Detached         bool
+	Dirty            bool
+	ChangedPathCount uint32
+}
+
+// MaximumRepositoryPage bounds one page of repositories.
+//
+// It is declared here as well as in the store because the two bounds answer
+// different questions: the store's protects the database, and this one decides
+// whether a page told the caller everything. They are checked against each
+// other by TestTheRepositoryPageBoundMatchesTheStore.
+const MaximumRepositoryPage = 200
+
+// ErrWorkspaceTargetNotFound reports a repository or workspace that is not
+// there, so this service does not have to recognize another package's error.
+var ErrWorkspaceTargetNotFound = errors.New("workspace target not found")
 
 // WorkspaceService serves the repository and workspace surfaces.
 //
@@ -63,7 +110,7 @@ func (service *WorkspaceService) ListRepositories(
 		// There is no continuation token because the page is bounded and
 		// ordered by a stable key; a caller that needs more than the bound is
 		// a caller whose picker needs a search rather than a longer list.
-		Page: &codefluxv1.PageInfo{HasMore: len(summaries) >= storage.MaximumRepositoryPage},
+		Page: &codefluxv1.PageInfo{HasMore: len(summaries) >= MaximumRepositoryPage},
 	}, nil
 }
 
@@ -78,13 +125,27 @@ func (service *WorkspaceService) InspectRepository(
 	}
 	repository, err := service.application.GetRepository(ctx, id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, ErrWorkspaceTargetNotFound) {
 			return nil, status.Error(codes.NotFound, "no such repository")
 		}
 		return nil, status.Error(codes.Internal, "the repository could not be read")
 	}
+	summary := repositorySummary(repository)
+	// A working-tree read can fail for ordinary reasons — the directory moved,
+	// Git is mid-operation — and none of them are a reason to refuse the whole
+	// inspection. The stored identity still answers the question of which
+	// repository this is; only the live fields go unanswered.
+	if live, liveErr := service.application.ReadRepositoryState(ctx, repository); liveErr == nil {
+		summary.Git = &codefluxv1.GitStateView{
+			HeadRevision:     live.HeadRevision,
+			Branch:           live.Branch,
+			Detached:         live.Detached,
+			Dirty:            live.Dirty,
+			ChangedPathCount: live.ChangedPathCount,
+		}
+	}
 	return &codefluxv1.InspectRepositoryResponse{
-		Repository: repositorySummary(repository),
+		Repository: summary,
 		Warnings:   repositoryWarnings(repository),
 	}, nil
 }
@@ -100,7 +161,7 @@ func (service *WorkspaceService) GetWorkspaceState(
 	}
 	workspace, err := service.application.GetWorkspaceScope(ctx, id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, ErrWorkspaceTargetNotFound) {
 			return nil, status.Error(codes.NotFound, "no such workspace")
 		}
 		return nil, status.Error(codes.Internal, "the workspace could not be read")
@@ -127,7 +188,7 @@ func (service *WorkspaceService) OpenWorkspace(
 }
 
 // repositorySummary renders one repository for a picker.
-func repositorySummary(repository storage.Repository) *codefluxv1.RepositorySummary {
+func repositorySummary(repository RepositoryRecord) *codefluxv1.RepositorySummary {
 	return &codefluxv1.RepositorySummary{
 		RepositoryId: &codefluxv1.StableIdentity{
 			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
@@ -149,7 +210,7 @@ func repositorySummary(repository storage.Repository) *codefluxv1.RepositorySumm
 }
 
 // repositoryWarnings states anything a person should know before choosing.
-func repositoryWarnings(repository storage.Repository) []*codefluxv1.RedactedText {
+func repositoryWarnings(repository RepositoryRecord) []*codefluxv1.RedactedText {
 	var warnings []*codefluxv1.RedactedText
 	if strings.TrimSpace(repository.GitIdentity) == "" {
 		warnings = append(warnings, &codefluxv1.RedactedText{
@@ -171,7 +232,7 @@ func repositoryWarnings(repository storage.Repository) []*codefluxv1.RedactedTex
 // The root is reported as the workspace-relative path the API's SafePath
 // declares, not as an absolute one. An absolute path in a view is a path a
 // client could act on, and nothing outside the coordinator is allowed to.
-func workspaceView(workspace storage.WorkspaceScope, observed time.Time) *codefluxv1.WorkspaceView {
+func workspaceView(workspace WorkspaceRecord, observed time.Time) *codefluxv1.WorkspaceView {
 	view := &codefluxv1.WorkspaceView{
 		WorkspaceId: &codefluxv1.StableIdentity{
 			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,

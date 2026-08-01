@@ -161,12 +161,22 @@ func TestTheProductionConsoleServesAndMounts(t *testing.T) {
 	t.Run("NavigationIsDrawnRatherThanTyped", func(t *testing.T) {
 		// The icon set was Unicode glyphs, several of which fall back to a
 		// box on Windows. Drawn marks are the same shape everywhere.
-		count, err := page.Locator(`[data-component="product-sidebar"] svg`).Count()
+		icons, err := page.Locator(`[data-component="product-sidebar"] svg`).Count()
 		if err != nil {
 			t.Fatalf("count navigation icons: %v", err)
 		}
-		if count < 6 {
-			t.Errorf("the navigation rail drew %d icons, want one per route", count)
+		// The invariant is one drawn mark per destination, not a fixed number.
+		// A count fixed at six outlived the rail it was written against.
+		controls, err := page.Locator(
+			`[data-component="product-sidebar"] [data-component="client-route-control"]`).Count()
+		if err != nil {
+			t.Fatalf("count navigation controls: %v", err)
+		}
+		if controls == 0 {
+			t.Fatal("the navigation rail drew no destinations")
+		}
+		if icons < controls {
+			t.Errorf("the rail drew %d icons for %d destinations", icons, controls)
 		}
 		// A glyph that failed to render leaves the replacement character. It
 		// must appear nowhere on the page.
@@ -322,11 +332,107 @@ func TestTheProductionConsoleServesAndMounts(t *testing.T) {
 			t.Errorf("the page scrolls %.0fpx sideways", width)
 		}
 	})
+
+	t.Run("StartingOpensARepository", func(t *testing.T) {
+		// A database with no repository row reports first-run, and the browser
+		// then has no workspace to attach a session to: the whole interface
+		// stayed in local preview with sample content and a composer that
+		// refused to send. Nothing inside the interface could create that first
+		// row, so a fresh install had no way out of preview at all.
+		if !strings.Contains(console.Output(), "opened repository:") {
+			t.Fatalf("the console opened no repository:\n%s", console.Output())
+		}
+		payload, err := page.Evaluate(
+			`async () => { const r = await fetch("/bootstrap"); return await r.text() }`)
+		if err != nil {
+			t.Fatalf("read the bootstrap payload: %v", err)
+		}
+		document, _ := payload.(string)
+		for _, required := range []string{
+			`"first_run_complete":true`,
+			`"selected_session_id"`,
+			`"selected_thread_id"`,
+			`"selected_repository_id"`,
+			`"selected_workspace_id"`,
+		} {
+			if !strings.Contains(document, required) {
+				// Without the session the client starts no stream at all and
+				// reports itself disconnected forever, with no error anywhere
+				// to say why: it simply has nothing to connect to.
+				t.Errorf("the bootstrap payload is missing %s:\n%s", required, document)
+			}
+		}
+	})
+
+	t.Run("TheInterfaceReachesTheCoordinator", func(t *testing.T) {
+		// Reaching the coordinator is the difference between a supervision
+		// console and a picture of one.
+		threadPath, err := page.Evaluate(`async () => {
+			const response = await fetch("/bootstrap")
+			const payload = await response.json()
+			if (!payload.selected_repository_id || !payload.selected_thread_id) { return "" }
+			return "/workspace/" + payload.selected_repository_id.value +
+				"/thread/" + payload.selected_thread_id.value
+		}`)
+		route, _ := threadPath.(string)
+		if err != nil || route == "" {
+			t.Fatalf("the coordinator named no thread to open: %v", err)
+		}
+		if _, err := page.Goto(console.URL+strings.TrimPrefix(route, "/"),
+			playwright.PageGotoOptions{
+				WaitUntil: playwright.WaitUntilStateNetworkidle,
+				Timeout:   playwright.Float(120000),
+			}); err != nil {
+			t.Fatalf("open the thread workspace: %v", err)
+		}
+		// Connecting is a round trip over the bridge, and headless Chromium
+		// renders at a fraction of normal frame rate, which stretches every
+		// step of that handshake. The live state is waited for rather than read
+		// once, and the generous timeout is that frame rate, not a guess.
+		if err := page.Locator(`[data-connection="live"]`).First().WaitFor(
+			playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateAttached,
+				Timeout: playwright.Float(45000),
+			},
+		); err != nil {
+			connection, _ := page.Locator(`[data-connection]`).First().
+				GetAttribute("data-connection")
+			t.Errorf("the interface reports %q against a running coordinator", connection)
+		}
+	})
+
+	t.Run("NothingOnScreenIsInvented", func(t *testing.T) {
+		// The interface used to boot from a fixture: five invented threads,
+		// five invented messages, a ten-node graph, a task called "Implement
+		// the Codeflux frontend shell", a cost of $0.42, and a rail reporting
+		// correctness gates as passed without anything having run. It looked
+		// like it was working on something while connected to nothing.
+		body, err := page.Locator("body").InnerText()
+		if err != nil {
+			t.Fatalf("read the page: %v", err)
+		}
+		for _, invented := range []string{
+			"Implement the Codeflux frontend shell",
+			"$0.42", "$0.36", "$4.00",
+			"Milestone", "§27A", "M16",
+			"Harden recovery boundaries", "Compare provider evidence",
+			"Write generated frontend files",
+			"Browser suite", "Correctness gates",
+		} {
+			if strings.Contains(body, invented) {
+				t.Errorf("the interface presents invented data: %q", invented)
+			}
+		}
+	})
 }
 
 // productionConsole is a running executable and the URL it printed.
 type productionConsole struct {
 	URL string
+	// Output is what the process said about itself. The repository it opened is
+	// announced there and nowhere else, and a console that opened none serves an
+	// interface that can never leave first-run.
+	Output func() string
 }
 
 // startProductionConsole builds the assets, starts the executable, and returns
@@ -385,7 +491,7 @@ func startProductionConsole(t *testing.T) productionConsole {
 	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
 		if strings.Contains(output.String(), "codeflux is running at") {
-			return productionConsole{URL: url}
+			return productionConsole{URL: url, Output: output.String}
 		}
 		if command.ProcessState != nil && command.ProcessState.Exited() {
 			t.Fatalf("the console exited before serving:\n%s", output.String())

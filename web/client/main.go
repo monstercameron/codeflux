@@ -75,7 +75,6 @@ func productApplication() ui.Node {
 	latestThreadEvent := ui.UseState(events.SessionEvent{})
 	taskObservedAt := ui.UseRef(time.Now())
 	reconnectStartedAt := ui.UseRef(time.Time{})
-	previewTaskState := ui.UseState("in progress")
 	preferencesReady := ui.UseState(false)
 	resource := bootstrap.Get()
 	restoreContext := routes.RestorationContext{}
@@ -106,12 +105,7 @@ func productApplication() ui.Node {
 		tokens, _ = design.TokensFor(design.Options{})
 	}
 
-	store := sampleStore()
-	previewTopBar := store.Snapshot().TopBar
-	previewTopBar.TaskState = previewTaskState.Get()
-	previewTopBar.CanPause = previewTaskState.Get() != "stopped"
-	previewTopBar.CanStop = previewTaskState.Get() != "stopped"
-	store = store.ReduceRemote(frontendstate.TopBarChanged{TopBar: previewTopBar})
+	store := coordinatorStore()
 	session := frontendstate.SessionView{
 		Bootstrap:  frontendstate.BootstrapBooting,
 		Connection: frontendstate.ConnectionConnecting,
@@ -173,7 +167,7 @@ func productApplication() ui.Node {
 		frontendstate.LayoutChanged{Preferences: layout},
 	)
 	if layoutErr != nil {
-		store = sampleStore()
+		store = coordinatorStore()
 		store = store.ReduceRemote(frontendstate.SessionChanged{Session: session})
 	}
 	if selectedGraphID.Get() != "" {
@@ -202,14 +196,42 @@ func productApplication() ui.Node {
 		appRoute = routes.Route{Name: routes.FirstRun}
 	}
 	threadRailSource := useMountedThreadRailFirstPage(resource.Value, store.Snapshot(), appRoute)
+	repositoryChoices := useMountedRepositoryChoices(resource.Value)
+	// The repository, branch, and worktree status come from the coordinator's
+	// own reading of the working tree. Anything it did not answer is left for
+	// the top bar to render as unknown.
+	store = store.ReduceRemote(frontendstate.TopBarChanged{
+		TopBar: applyWorkspaceSummary(store.Snapshot().TopBar, repositoryChoices.Summary),
+	})
 	selectedRefreshRevision := uint64(0)
 	if row, ok := mountedThreadRailRow(threadRailSource.State.Value, selectedThread.Get().ID()); ok {
 		selectedRefreshRevision = row.Thread().Revision()
 	}
-	selectedRefreshDependency := selectedThread.Get().ID().String() + "|" + strconv.FormatUint(selectedRefreshRevision, 10)
+	// The route is part of the dependency because it is what a person typed or
+	// followed, and the rail's identity is part of it because the route can
+	// only be honoured once the rail has loaded the thread it names.
+	selectedRefreshDependency := selectedThread.Get().ID().String() + "|" +
+		strconv.FormatUint(selectedRefreshRevision, 10) + "|" +
+		appRoute.ThreadID.String() + "|" +
+		threadRailSource.State.Value.RepositoryID().String()
 	ui.UseEffectOf(func() func() {
 		selected := selectedThread.Get()
-		if selected.ID().IsZero() || threadRailSource.State.Value.RepositoryID().IsZero() {
+		if threadRailSource.State.Value.RepositoryID().IsZero() {
+			return nil
+		}
+		if selected.ID().IsZero() {
+			// Nothing had ever adopted the thread the URL names. The rail
+			// restored it internally, so the interface drew the right
+			// conversation, but no session was opened against it and the whole
+			// app reported itself disconnected against sample content.
+			if appRoute.ThreadID.IsZero() {
+				return nil
+			}
+			if row, ok := mountedThreadRailRow(
+				threadRailSource.State.Value, appRoute.ThreadID,
+			); ok {
+				selectedThread.Set(row.Thread())
+			}
 			return nil
 		}
 		if row, ok := mountedThreadRailRow(threadRailSource.State.Value, selected.ID()); ok && row.Thread() != selected {
@@ -218,14 +240,13 @@ func productApplication() ui.Node {
 		return nil
 	}, selectedRefreshDependency)
 	var authoritativeTaskControls *taskcontrols.Props
-	onPauseRequested := func() {
-		if previewTaskState.Get() == "paused" {
-			previewTaskState.Set("in progress")
-			return
-		}
-		previewTaskState.Set("paused")
-	}
-	onStopRequested := func() { previewTaskState.Set("stopped") }
+	// Pause and stop stay unbound until a real task supplies them. They used to
+	// flip a browser-local string, so the interface reported a run as paused
+	// while nothing had been asked to pause — the worst possible lie for a
+	// control whose entire purpose is stopping work. A nil handler renders the
+	// control disabled, which is the truth.
+	var onPauseRequested func()
+	var onStopRequested func()
 	var reloadTaskControls func()
 	var reloadGraph func()
 	previewTimeline := livePreviewTimeline()
@@ -395,6 +416,24 @@ func productApplication() ui.Node {
 		},
 	)
 	reloadGraph = graphSource.Reload
+	// The conversation and graph panes follow their own authoritative sources
+	// rather than the store's opening guess. Left at the opening guess they
+	// drew loading skeletons that nothing would ever resolve, which reads as a
+	// coordinator that is thinking when it is in fact idle.
+	store = store.ReduceRemote(frontendstate.MessagesAppended{
+		State: panePresence(
+			timelineSource.SessionReady, len(timelineSource.Props.Cards),
+		),
+		Messages: nil,
+	})
+	// A thread with no task has no graph to load, so the pane is answered and
+	// empty rather than perpetually loading. Reporting it as loading drew
+	// skeleton bars that nothing would ever replace.
+	graphAnswered := graphSource.Authoritative != nil || !timelineSource.TaskReady
+	store = store.ReduceRemote(frontendstate.GraphReplaced{
+		State: panePresence(graphAnswered, graphNodePresence(graphSource)),
+		Nodes: nil,
+	})
 	var onReconnectRequested func()
 	if !selectedThread.Get().SessionID().IsZero() {
 		onReconnectRequested = func() {
@@ -469,6 +508,8 @@ func productApplication() ui.Node {
 		}),
 		AuthoritativeGraph: graphSource.Authoritative,
 		GraphInspector:     graphSource.Inspector,
+		RepositoryChoices:  repositoryChoices.Choices,
+		SelectedScope:      selectedNavigationScope(resource.Value),
 		Route:              appRoute,
 		Tokens:             tokens,
 		Translator: frontendi18n.EnglishRegistry().Resolve(
@@ -672,103 +713,91 @@ func routeFor(path, query string) routes.Route {
 	return route
 }
 
-func sampleStore() frontendstate.Store {
-	threads := []frontendstate.ThreadView{
-		{ID: "thread-1", Title: "Implement frontend shell", Status: "active", Unread: 2},
-		{ID: "thread-2", Title: "Harden recovery boundaries", Status: "complete"},
-		{ID: "thread-3", Title: "Compare provider evidence", Status: "waiting"},
-		{ID: "thread-4", Title: "Review workspace patch", Status: "blocked"},
-		{ID: "thread-5", Title: "Generate API contracts", Status: "waiting"},
-	}
-	messages := []frontendstate.MessageView{
-		{
-			ID: "message-1", Role: "requirement",
-			Body:     "Build the Codeflux product shell entirely in typed Go with no handwritten JavaScript, HTML, or CSS.",
-			Sequence: 1,
-		},
-		{
-			ID: "message-2", Role: "forecast",
-			Body:     "The shell can be completed locally. Primary risks are deep-route bootstrap, responsive composition, keyboard focus, and truthful task-state presentation.",
-			Sequence: 2,
-		},
-		{
-			ID: "message-3", Role: "plan",
-			Body:     "Implement design tokens and route shells, connect the embedded GWC runtime, then verify wide, standard, compact, and minimum viewports.",
-			Sequence: 3,
-		},
-		{
-			ID: "message-4", Role: "execution",
-			Body:     "Rendering the canonical conversation/graph split and rebuilding the loopback server from the current source.",
-			Pending:  true,
-			Sequence: 4,
-		},
-		{
-			ID: "message-5", Role: "validation",
-			Body:     "Go component tests and the WASM build pass. Browser accessibility and visual comparison are running.",
-			Sequence: 5,
-		},
-	}
-	graph := []frontendstate.GraphNodeView{
-		{ID: "requirements", Title: "Shell requirements", Status: "complete"},
-		{ID: "design", Title: "Design tokens", Status: "complete"},
-		{ID: "routes", Title: "Route model", Status: "complete"},
-		{ID: "bootstrap", Title: "Session bootstrap", Status: "complete"},
-		{ID: "implementation", Title: "GWC workspace", Status: "active", Selected: true},
-		{ID: "responsive", Title: "Responsive layout", Status: "active"},
-		{ID: "browser", Title: "Browser tests", Status: "running"},
-		{ID: "plan", Title: "Refinement plan", Status: "complete"},
-		{ID: "review", Title: "Adversarial review", Status: "waiting"},
-		{ID: "evidence", Title: "Release evidence", Status: "waiting"},
-	}
-	store := frontendstate.NewStore(
-		frontendstate.NewSnapshot(threads, messages, graph),
-	)
-	store = store.ReduceRemote(frontendstate.WorkspaceChanged{
-		Workspace: frontendstate.WorkspaceView{
-			RepositoryID:   "codeflux",
-			RepositoryName: "codeflux",
-			Branch:         "main",
-			Dirty:          true,
-		},
-	})
-	store = store.ReduceRemote(frontendstate.TopBarChanged{
-		TopBar: frontendstate.TopBarView{
-			Repository:     "codeflux",
-			Branch:         "main",
-			WorktreeStatus: "uncommitted changes",
-			TaskTitle:      "Implement the Codeflux frontend shell",
-			TaskSummary:    "Build the local-first GWC workspace with explicit correctness and browser evidence.",
-			TaskState:      "in progress",
-			Model:          "gpt-5",
-			Effort:         "high",
-			ForecastCost:   "$0.36",
-			ActualCost:     "$0.42",
-			HardBudget:     "$4.00",
-		},
-	})
+// coordinatorStore is the application's starting state.
+//
+// It is deliberately empty. This used to be a fixture — five invented threads,
+// five invented messages, a ten-node graph, a task called "Implement the
+// Codeflux frontend shell" and a cost of $0.42 — drawn on every boot before any
+// real data arrived, and left in place wherever a real source had nothing to
+// say. The result was an interface that looked like it was working on
+// something while connected to nothing, which is the one thing a supervision
+// tool must never do. Every pane now fills from the coordinator or shows its
+// own empty state.
+func coordinatorStore() frontendstate.Store {
+	store := frontendstate.NewStore(frontendstate.NewSnapshot(nil, nil, nil))
+	// Each surface is marked loading rather than ready: they are answered by
+	// their own mounted resources, and reporting them ready while empty would
+	// draw "nothing here" over data that is still on its way.
 	store = store.ReduceRemote(frontendstate.SettingsChanged{
-		Settings: frontendstate.SettingsView{State: frontendstate.DataReady},
+		Settings: frontendstate.SettingsView{State: frontendstate.DataLoading},
 	})
 	store = store.ReduceRemote(frontendstate.MemoryChanged{
-		Memory: frontendstate.MemoryView{State: frontendstate.DataReady},
+		Memory: frontendstate.MemoryView{State: frontendstate.DataLoading},
 	})
 	store = store.ReduceRemote(frontendstate.DiagnosticsChanged{
-		Diagnostics: frontendstate.DiagnosticsView{State: frontendstate.DataReady},
+		Diagnostics: frontendstate.DiagnosticsView{State: frontendstate.DataLoading},
 	})
 	store = store.ReduceRemote(frontendstate.FirstRunChanged{
-		FirstRun: frontendstate.FirstRunView{State: frontendstate.DataReady},
+		FirstRun: frontendstate.FirstRunView{State: frontendstate.DataLoading},
 	})
 	store = store.ReduceRemote(frontendstate.ThreadsReplaced{
-		State: frontendstate.DataReady, Threads: threads,
+		State: frontendstate.DataLoading, Threads: nil,
 	})
 	store = store.ReduceRemote(frontendstate.MessagesAppended{
-		State: frontendstate.DataReady, Messages: nil,
+		State: frontendstate.DataLoading, Messages: nil,
 	})
 	store = store.ReduceRemote(frontendstate.GraphReplaced{
-		State: frontendstate.DataReady, Nodes: graph,
-	})
-	store = store.ReduceRemote(frontendstate.CostChanged{
-		Label: "$" + strconv.FormatFloat(0.42, 'f', 2, 64),
+		State: frontendstate.DataLoading, Nodes: nil,
 	})
 	return store
+}
+
+// panePresence reports what a pane should draw for itself.
+//
+// A pane with no answer yet is loading; a pane with an answer holding nothing
+// is empty. Collapsing the two is what made an idle coordinator look busy: the
+// skeleton never resolved because there was nothing coming.
+func panePresence(answered bool, count int) frontendstate.DataState {
+	switch {
+	case !answered:
+		return frontendstate.DataLoading
+	case count == 0:
+		return frontendstate.DataReadyEmpty
+	default:
+		return frontendstate.DataReady
+	}
+}
+
+// graphNodePresence counts the nodes an authoritative graph actually holds.
+func graphNodePresence(source mountedGraphSource) int {
+	if source.Authoritative == nil {
+		return 0
+	}
+	return len(source.Authoritative.Layout.Nodes)
+}
+
+// selectedNavigationScope is what the coordinator says is open.
+//
+// The navigation rail needs it because the route a person is standing on does
+// not always name a repository — the chooser never does — so a rail reading
+// only the route disabled Tasks and Memory with "Choose a repository first" on
+// the page every session begins at, while a repository was already open.
+func selectedNavigationScope(envelope bootstrapEnvelope) shell.NavigationScope {
+	scope := shell.NavigationScope{}
+	if identity := envelope.SelectedRepositoryID; identity != nil {
+		if repositoryID, err := domain.ParseRepositoryID(identity.GetValue()); err == nil {
+			scope.RepositoryID = repositoryID
+		}
+	}
+	if identity := envelope.SelectedThreadID; identity != nil {
+		if threadID, err := domain.ParseThreadID(identity.GetValue()); err == nil {
+			scope.ThreadID = threadID
+		}
+	}
+	// A thread without its repository cannot be navigated to, and offering it
+	// would produce a link to a path that does not parse.
+	if scope.RepositoryID.IsZero() {
+		scope.ThreadID = domain.ThreadID{}
+	}
+	return scope
 }

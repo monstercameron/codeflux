@@ -4,6 +4,7 @@ package frontendserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -21,6 +22,7 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/web/frontend/routes"
 	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 	"google.golang.org/grpc"
 )
@@ -33,14 +35,16 @@ const (
 // Bootstrap is the secret-free compatibility envelope consumed before the
 // browser opens a bridge session.
 type Bootstrap struct {
-	ApplicationVersion  string                     `json:"application_version"`
-	APIVersion          string                     `json:"api_version"`
-	SchemaVersion       int                        `json:"schema_version"`
-	FrontendVersion     string                     `json:"frontend_version"`
-	BridgePath          string                     `json:"bridge_path"`
-	SelectedSessionID   *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
-	SelectedWorkspaceID *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
-	RouteAccess         RouteAccess                `json:"route_access"`
+	ApplicationVersion   string                     `json:"application_version"`
+	APIVersion           string                     `json:"api_version"`
+	SchemaVersion        int                        `json:"schema_version"`
+	FrontendVersion      string                     `json:"frontend_version"`
+	BridgePath           string                     `json:"bridge_path"`
+	SelectedSessionID    *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
+	SelectedThreadID     *codefluxv1.StableIdentity `json:"selected_thread_id,omitempty"`
+	SelectedRepositoryID *codefluxv1.StableIdentity `json:"selected_repository_id,omitempty"`
+	SelectedWorkspaceID  *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
+	RouteAccess          RouteAccess                `json:"route_access"`
 }
 
 // RouteAccess is the minimal server-confirmed allowlist used to validate a
@@ -77,7 +81,16 @@ type Options struct {
 	AssetsDirectory string
 	GRPCServer      *grpc.Server
 	SessionToken    string
-	Bootstrap       Bootstrap
+	// Bootstrap is the payload used when no provider is supplied.
+	Bootstrap Bootstrap
+	// BootstrapProvider recomputes the payload per request.
+	//
+	// The payload was serialized once at construction, so it described the
+	// database as it was the moment the coordinator started. Everything in it
+	// changes with use -- a repository opened, a thread created, first-run
+	// completed -- and a browser reloading after any of those read a stale
+	// answer and stayed in local preview.
+	BootstrapProvider func(context.Context) (Bootstrap, error)
 }
 
 // NewHandler builds the production local frontend boundary.
@@ -106,6 +119,22 @@ func NewHandler(options Options) (http.Handler, error) {
 			return nil, errors.New("frontend selected session identity is invalid")
 		}
 	}
+	if selected := options.Bootstrap.SelectedThreadID; selected != nil {
+		if selected.GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD {
+			return nil, errors.New("frontend selected thread identity is invalid")
+		}
+		if _, parseErr := domain.ParseThreadID(selected.GetValue()); parseErr != nil {
+			return nil, errors.New("frontend selected thread identity is invalid")
+		}
+	}
+	if selected := options.Bootstrap.SelectedRepositoryID; selected != nil {
+		if selected.GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY {
+			return nil, errors.New("frontend selected repository identity is invalid")
+		}
+		if _, parseErr := domain.ParseRepositoryID(selected.GetValue()); parseErr != nil {
+			return nil, errors.New("frontend selected repository identity is invalid")
+		}
+	}
 	if selected := options.Bootstrap.SelectedWorkspaceID; selected != nil {
 		if selected.GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE {
 			return nil, errors.New("frontend selected workspace identity is invalid")
@@ -126,9 +155,28 @@ func NewHandler(options Options) (http.Handler, error) {
 		return nil, err
 	}
 	options.Bootstrap.BridgePath = bridgePath
-	bootstrap, err := json.Marshal(options.Bootstrap)
+	staticBootstrap, err := json.Marshal(options.Bootstrap)
 	if err != nil {
 		return nil, fmt.Errorf("marshal frontend bootstrap: %w", err)
+	}
+	// A provider failure falls back to the payload captured at construction
+	// rather than to an error page: a stale answer still lets the interface
+	// mount and report its own connection state, where a failed bootstrap
+	// leaves a blank document.
+	currentBootstrap := func(ctx context.Context) []byte {
+		if options.BootstrapProvider == nil {
+			return staticBootstrap
+		}
+		live, err := options.BootstrapProvider(ctx)
+		if err != nil {
+			return staticBootstrap
+		}
+		live.BridgePath = bridgePath
+		encoded, err := json.Marshal(live)
+		if err != nil {
+			return staticBootstrap
+		}
+		return encoded
 	}
 
 	mux := http.NewServeMux()
@@ -148,7 +196,7 @@ func NewHandler(options Options) (http.Handler, error) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.Header().Set("Cache-Control", "no-store")
 		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write(bootstrap)
+		_, _ = writer.Write(currentBootstrap(request.Context()))
 	})
 	mux.HandleFunc("GET /wasm_exec.js", serveAsset(assets.wasmShim, "text/javascript; charset=utf-8"))
 	mux.HandleFunc("GET /bin/main.wasm", serveAsset(assets.wasmBinary, "application/wasm"))
@@ -272,23 +320,14 @@ func serveBytes(writer http.ResponseWriter, content []byte, contentType string) 
 	_, _ = writer.Write(content)
 }
 
+// isApplicationRoute reports whether a path should receive the document.
+//
+// The decision comes from the client's own route table rather than from a
+// second list kept here. The two lists had drifted: this one allowed /tasks
+// and /memory, which the client does not route, and refused /graphs, which it
+// does — so the navigation rail sent a person to a server 404.
 func isApplicationRoute(path string) bool {
-	if path == "/" {
-		return true
-	}
-	for _, prefix := range []string{
-		"/tasks",
-		"/workspace",
-		"/memory",
-		"/settings",
-		"/diagnostics",
-		"/first-run",
-	} {
-		if path == prefix || strings.HasPrefix(path, prefix+"/") {
-			return true
-		}
-	}
-	return false
+	return routes.IsApplicationPath(path)
 }
 
 func setSessionCookie(writer http.ResponseWriter, token string) {

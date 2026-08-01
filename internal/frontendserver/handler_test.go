@@ -1,6 +1,7 @@
 package frontendserver
 
 import (
+	"codeflux.dev/codeflux/internal/domain"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,7 +31,18 @@ func TestHandlerServesGeneratedShellAndSecretFreeBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/", "/tasks", "/workspace/repo", "/memory", "/settings"} {
+	// These are the paths the client actually routes. /tasks, /memory, and a
+	// bare /workspace were in this list and are not routes: the server used to
+	// serve a document for them, which produced a page that mounted and then
+	// rendered not-found.
+	repository, err := domain.NewRepositoryID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"/", "/graphs", "/settings", "/diagnostics", "/first-run",
+		"/workspace/" + repository.String() + "/memory",
+	} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		request.Host = "127.0.0.1:8080"
 		response := httptest.NewRecorder()

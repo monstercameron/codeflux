@@ -8,54 +8,64 @@ import (
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
-	"codeflux.dev/codeflux/internal/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 // stubWorkspaceApplication answers the narrow surface the service reads.
 type stubWorkspaceApplication struct {
-	repositories []storage.Repository
-	scope        storage.WorkspaceScope
+	repositories []RepositoryRecord
+	scope        WorkspaceRecord
 	err          error
 	requested    int
+	// gitState is what the working tree says, and gitErr is Git declining to
+	// answer. They are separate from err because an inspection must still
+	// return the repository when only the live read fails.
+	gitState RepositoryGitState
+	gitErr   error
+}
+
+func (stub *stubWorkspaceApplication) ReadRepositoryState(
+	_ context.Context, _ RepositoryRecord,
+) (RepositoryGitState, error) {
+	return stub.gitState, stub.gitErr
 }
 
 func (stub *stubWorkspaceApplication) ListRepositories(
 	_ context.Context, limit int,
-) ([]storage.Repository, error) {
+) ([]RepositoryRecord, error) {
 	stub.requested = limit
 	return stub.repositories, stub.err
 }
 
 func (stub *stubWorkspaceApplication) GetRepository(
 	_ context.Context, _ domain.RepositoryID,
-) (storage.Repository, error) {
+) (RepositoryRecord, error) {
 	if stub.err != nil {
-		return storage.Repository{}, stub.err
+		return RepositoryRecord{}, stub.err
 	}
 	if len(stub.repositories) == 0 {
-		return storage.Repository{}, storage.ErrNotFound
+		return RepositoryRecord{}, ErrWorkspaceTargetNotFound
 	}
 	return stub.repositories[0], nil
 }
 
 func (stub *stubWorkspaceApplication) GetWorkspaceScope(
 	_ context.Context, _ domain.WorkspaceID,
-) (storage.WorkspaceScope, error) {
+) (WorkspaceRecord, error) {
 	if stub.err != nil {
-		return storage.WorkspaceScope{}, stub.err
+		return WorkspaceRecord{}, stub.err
 	}
 	return stub.scope, nil
 }
 
-func fixtureRepository(t *testing.T, path, identity string) storage.Repository {
+func fixtureRepository(t *testing.T, path, identity string) RepositoryRecord {
 	t.Helper()
 	id, err := domain.NewRepositoryID()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return storage.Repository{ID: id, CanonicalPath: path, GitIdentity: identity, Revision: 3}
+	return RepositoryRecord{ID: id, CanonicalPath: path, GitIdentity: identity, Revision: 3}
 }
 
 func TestTheWorkspaceServiceRequiresAnApplication(t *testing.T) {
@@ -68,7 +78,7 @@ func TestARepositoryIsNamedByItsDirectoryNotItsWholePath(t *testing.T) {
 	// A picker showing four absolute paths that differ only in their last
 	// segment is a picker nobody can read.
 	service, err := NewWorkspaceService(&stubWorkspaceApplication{
-		repositories: []storage.Repository{
+		repositories: []RepositoryRecord{
 			fixtureRepository(t, "/home/person/work/orders-service", strings.Repeat("a", 40)),
 		},
 	})
@@ -98,7 +108,7 @@ func TestNoSummaryCarriesAPathAClientCouldActOn(t *testing.T) {
 	// An absolute path in a view is a path a client could act on, and nothing
 	// outside the coordinator is allowed to.
 	service, _ := NewWorkspaceService(&stubWorkspaceApplication{
-		repositories: []storage.Repository{
+		repositories: []RepositoryRecord{
 			fixtureRepository(t, "/home/person/secret-project", strings.Repeat("b", 40)),
 		},
 	})
@@ -135,7 +145,7 @@ func TestInspectionWarnsAboutWhatWouldBiteLater(t *testing.T) {
 	// revision. Finding that out after starting a task is finding it out too
 	// late.
 	service, _ := NewWorkspaceService(&stubWorkspaceApplication{
-		repositories: []storage.Repository{fixtureRepository(t, "relative/path", "  ")},
+		repositories: []RepositoryRecord{fixtureRepository(t, "relative/path", "  ")},
 	})
 	id, err := domain.NewRepositoryID()
 	if err != nil {
@@ -228,5 +238,73 @@ func TestAnInvalidIdentityIsRejectedBeforeAnyRead(t *testing.T) {
 	}
 }
 
-// compile-time proof the concrete repositories satisfy the narrow surface.
-var _ WorkspaceApplication = (*storage.Repositories)(nil)
+// The compile-time proof that lived here named *storage.Repositories, which is
+// the dependency this adapter is not allowed to have. The composition that does
+// satisfy this port is asserted where it is built, in the coordinator.
+
+func TestInspectionReportsTheWorkingTreeGitReportsNow(t *testing.T) {
+	// The stored row records what was true when a repository was opened. A top
+	// bar drawn from it says "main / uncommitted changes" about a tree that has
+	// since been committed and moved to another branch.
+	stub := &stubWorkspaceApplication{
+		repositories: []RepositoryRecord{
+			fixtureRepository(t, "/home/person/work/orders", strings.Repeat("a", 40)),
+		},
+		gitState: RepositoryGitState{
+			Branch: "release/4.2", HeadRevision: strings.Repeat("c", 40),
+			Dirty: true, ChangedPathCount: 7,
+		},
+	}
+	service, _ := NewWorkspaceService(stub)
+	id, _ := domain.NewRepositoryID()
+	response, err := service.InspectRepository(context.Background(),
+		&codefluxv1.InspectRepositoryRequest{
+			RepositoryId: &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+				Value: id.String(),
+			},
+		})
+	if err != nil {
+		t.Fatalf("inspection failed: %v", err)
+	}
+	git := response.GetRepository().GetGit()
+	if git.GetBranch() != "release/4.2" {
+		t.Errorf("branch = %q, want the branch Git reports", git.GetBranch())
+	}
+	if !git.GetDirty() || git.GetChangedPathCount() != 7 {
+		t.Errorf("working tree reported dirty=%v count=%d, want true and 7",
+			git.GetDirty(), git.GetChangedPathCount())
+	}
+	if git.GetHeadRevision() == strings.Repeat("a", 40) {
+		t.Error("the head revision came from the stored row rather than from Git")
+	}
+}
+
+func TestAnUnreadableWorkingTreeStillReturnsTheRepository(t *testing.T) {
+	// A working-tree read fails for ordinary reasons — the directory moved, Git
+	// is mid-rebase — and none of them are a reason to refuse the whole
+	// inspection. Only the live fields go unanswered.
+	service, _ := NewWorkspaceService(&stubWorkspaceApplication{
+		repositories: []RepositoryRecord{
+			fixtureRepository(t, "/home/person/work/orders", strings.Repeat("a", 40)),
+		},
+		gitErr: errors.New("git is unavailable"),
+	})
+	id, _ := domain.NewRepositoryID()
+	response, err := service.InspectRepository(context.Background(),
+		&codefluxv1.InspectRepositoryRequest{
+			RepositoryId: &codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+				Value: id.String(),
+			},
+		})
+	if err != nil {
+		t.Fatalf("an unreadable working tree refused the whole inspection: %v", err)
+	}
+	if response.GetRepository().GetDisplayName().GetValue() != "orders" {
+		t.Error("the repository identity was lost with the live read")
+	}
+	if branch := response.GetRepository().GetGit().GetBranch(); branch != "" {
+		t.Errorf("branch = %q; an unanswered field must stay unanswered", branch)
+	}
+}

@@ -18,7 +18,7 @@ import (
 // inspection owners when a selected coordinator session is available.
 func livePreviewTimeline() shell.TimelineControlProps {
 	reviewOpen := ui.UseState(false)
-	hasOlder := ui.UseState(true)
+	hasOlder := ui.UseState(false)
 	taskID, taskErr := domain.ParseTaskID("tsk_" + previewComposerUUID)
 	approvalID, approvalErr := domain.ParseApprovalID("apr_" + previewComposerUUID)
 	approvalState := ui.UseState(approvalPreviewState{
@@ -70,14 +70,14 @@ func livePreviewTimeline() shell.TimelineControlProps {
 		})
 	}
 	currentApproval := approvalState.Get()
+	// No cards are fabricated. This used to return a pending approval card —
+	// "Write generated frontend files", with working Approve and Deny controls
+	// — drawn whenever no authoritative timeline had loaded. A person could
+	// authorize an action that did not exist. An unconnected timeline now shows
+	// its own empty state, and the approval machinery below stays wired for the
+	// authoritative cards that replace this fallback.
+	_ = currentApproval
 	return shell.TimelineControlProps{
-		Cards: []timelinecard.Card{{
-			Kind:       timelinecard.KindApproval,
-			Sequence:   7,
-			StableKey:  currentApproval.Approval.ID,
-			OccurredAt: time.Date(2026, 7, 31, 12, 7, 0, 0, time.UTC),
-			Approval:   &currentApproval.Approval,
-		}},
 		Actions: timelineview.Actions{
 			OnApproval: resolveApproval,
 			ApprovalCommand: func(rawID string) timelineview.ApprovalCommandState {

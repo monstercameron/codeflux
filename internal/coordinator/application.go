@@ -518,7 +518,11 @@ func StartApplication(
 	// every call to it returned Unimplemented: the repository picker, the
 	// workspace state, and the inspection surface were all unreachable against
 	// a coordinator that had the data for each.
-	workspaceService, err := transport.NewWorkspaceService(repositories)
+	workspaceApplication, err := newWorkspaceApplication(repositories, checkpointing.worktrees)
+	if err != nil {
+		return nil, err
+	}
+	workspaceService, err := transport.NewWorkspaceService(workspaceApplication)
 	if err != nil {
 		return nil, err
 	}
@@ -651,6 +655,15 @@ func StartApplication(
 						AccessibleThreads:      accessibleThreads,
 						ArchivedThreads:        archivedThreads,
 					},
+				},
+				// The payload is recomputed per request. Captured once, it
+				// described the database as it was when the coordinator
+				// started, so a browser reloading after a repository was
+				// opened read a first-run answer and stayed in local preview.
+				BootstrapProvider: func(requestContext context.Context) (
+					frontendserver.Bootstrap, error,
+				) {
+					return currentFrontendBootstrap(requestContext, repositories, info)
 				},
 			},
 		)
@@ -988,4 +1001,80 @@ func listenLoopback(address string) (net.Listener, error) {
 		return nil, fmt.Errorf("listen on coordinator loopback: %w", err)
 	}
 	return listener, nil
+}
+
+// currentFrontendBootstrap reads the compatibility envelope a browser needs
+// right now.
+//
+// Everything in it changes with use: a repository opened, a thread created,
+// first-run completed. Serving a payload captured at startup meant a browser
+// that reloaded after any of those read a stale answer, found no workspace to
+// attach a session to, and stayed in local preview with sample content and a
+// composer that refused to send.
+func currentFrontendBootstrap(
+	ctx context.Context,
+	repositories *storage.Repositories,
+	info buildinfo.Info,
+) (frontendserver.Bootstrap, error) {
+	access, err := repositories.ReadFrontendRouteAccess(ctx)
+	if err != nil {
+		return frontendserver.Bootstrap{}, err
+	}
+	bootstrap := frontendserver.Bootstrap{
+		ApplicationVersion: info.Version,
+		APIVersion:         "codeflux.v1",
+		SchemaVersion:      int(info.SchemaVersion),
+		FrontendVersion:    info.FrontendVersion,
+		RouteAccess: frontendserver.RouteAccess{
+			FirstRunComplete: access.FirstRunComplete,
+		},
+	}
+	for _, repositoryID := range access.AccessibleRepositories {
+		bootstrap.RouteAccess.AccessibleRepositories = append(
+			bootstrap.RouteAccess.AccessibleRepositories,
+			&codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+				Value: repositoryID.String(),
+			})
+	}
+	for _, threadID := range access.AccessibleThreads {
+		bootstrap.RouteAccess.AccessibleThreads = append(
+			bootstrap.RouteAccess.AccessibleThreads,
+			&codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
+				Value: threadID.String(),
+			})
+	}
+	for _, threadID := range access.ArchivedThreads {
+		bootstrap.RouteAccess.ArchivedThreads = append(
+			bootstrap.RouteAccess.ArchivedThreads,
+			&codefluxv1.StableIdentity{
+				Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
+				Value: threadID.String(),
+			})
+	}
+	if !access.SelectedWorkspaceID.IsZero() {
+		bootstrap.SelectedWorkspaceID = &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE,
+			Value: access.SelectedWorkspaceID.String(),
+		}
+	}
+	// The session is what the browser opens a stream against. Publishing the
+	// workspace without it produced an interface that had every identity it
+	// needed to draw itself and no way to receive a single update.
+	if !access.SelectedSessionID.IsZero() {
+		bootstrap.SelectedSessionID = &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION,
+			Value: access.SelectedSessionID.String(),
+		}
+		bootstrap.SelectedThreadID = &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD,
+			Value: access.SelectedThreadID.String(),
+		}
+		bootstrap.SelectedRepositoryID = &codefluxv1.StableIdentity{
+			Kind:  codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY,
+			Value: access.SelectedRepositoryID.String(),
+		}
+	}
+	return bootstrap, nil
 }

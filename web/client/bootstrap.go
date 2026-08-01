@@ -18,14 +18,16 @@ import (
 const defaultBootstrapTimeout = 12 * time.Second
 
 type bootstrapEnvelope struct {
-	ApplicationVersion  string                     `json:"application_version"`
-	APIVersion          string                     `json:"api_version"`
-	SchemaVersion       int                        `json:"schema_version"`
-	FrontendVersion     string                     `json:"frontend_version"`
-	BridgePath          string                     `json:"bridge_path"`
-	SelectedSessionID   *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
-	SelectedWorkspaceID *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
-	RouteAccess         routeAccessEnvelope        `json:"route_access"`
+	ApplicationVersion   string                     `json:"application_version"`
+	APIVersion           string                     `json:"api_version"`
+	SchemaVersion        int                        `json:"schema_version"`
+	FrontendVersion      string                     `json:"frontend_version"`
+	BridgePath           string                     `json:"bridge_path"`
+	SelectedSessionID    *codefluxv1.StableIdentity `json:"selected_session_id,omitempty"`
+	SelectedThreadID     *codefluxv1.StableIdentity `json:"selected_thread_id,omitempty"`
+	SelectedRepositoryID *codefluxv1.StableIdentity `json:"selected_repository_id,omitempty"`
+	SelectedWorkspaceID  *codefluxv1.StableIdentity `json:"selected_workspace_id,omitempty"`
+	RouteAccess          routeAccessEnvelope        `json:"route_access"`
 }
 
 // routeAccessEnvelope contains identifiers only. Repository paths, thread

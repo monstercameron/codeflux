@@ -32,6 +32,8 @@ type RootProps struct {
 	Telemetry            telemetryview.Props
 	ThreadRail           ui.Node
 	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
+	RepositoryChoices    *RepositoryChoiceSet
+	SelectedScope        NavigationScope
 	GraphInspector       ui.Node
 	Route                routes.Route
 	Tokens               design.Tokens
@@ -88,8 +90,10 @@ func AppRoot(props RootProps) ui.Node {
 				Composer: props.Composer, Timeline: props.Timeline,
 				TaskControls: props.TaskControls, ThreadRail: props.ThreadRail,
 				AuthoritativeGraph: props.AuthoritativeGraph, GraphInspector: props.GraphInspector,
-				Telemetry:  props.Telemetry,
-				Translator: props.Translator, Probe: props.Probe,
+				RepositoryChoices: props.RepositoryChoices,
+				SelectedScope:     props.SelectedScope,
+				Telemetry:         props.Telemetry,
+				Translator:        props.Translator, Probe: props.Probe,
 				OnLayoutChange: props.OnLayoutChange, OnGraphSelect: props.OnGraphSelect,
 				OnThreadNavigate:     props.OnThreadNavigate,
 				OnNavigatePath:       props.OnNavigatePath,
@@ -114,6 +118,8 @@ type AppShellProps struct {
 	Telemetry            telemetryview.Props
 	ThreadRail           ui.Node
 	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
+	RepositoryChoices    *RepositoryChoiceSet
+	SelectedScope        NavigationScope
 	GraphInspector       ui.Node
 	Route                routes.Route
 	Tokens               design.Tokens
@@ -255,6 +261,7 @@ func AppShell(props AppShellProps) ui.Node {
 					ui.CreateElement(ProductSidebar, ProductSidebarProps{
 						Snapshot:         props.Snapshot,
 						Route:            props.Route,
+						SelectedScope:    props.SelectedScope,
 						Mode:             primitiveMode(props.Tokens),
 						ThreadRail:       props.ThreadRail,
 						CompactOpen:      compactRailOpen.Get(),
@@ -274,6 +281,8 @@ func AppShell(props AppShellProps) ui.Node {
 							Timeline:           props.Timeline,
 							TaskControls:       props.TaskControls,
 							AuthoritativeGraph: props.AuthoritativeGraph,
+							RepositoryChoices:  props.RepositoryChoices,
+							SelectedScope:      props.SelectedScope,
 							GraphInspector:     props.GraphInspector,
 							Telemetry:          props.Telemetry,
 							Route:              props.Route,
@@ -592,6 +601,8 @@ type RouteShellProps struct {
 	Timeline           TimelineControlProps
 	TaskControls       *taskcontrols.Props
 	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	RepositoryChoices  *RepositoryChoiceSet
+	SelectedScope      NavigationScope
 	GraphInspector     ui.Node
 	Telemetry          telemetryview.Props
 	Route              routes.Route
@@ -614,9 +625,12 @@ func RouteShell(props RouteShellProps) ui.Node {
 	mode := primitiveMode(props.Tokens)
 	switch props.Route.Name {
 	case routes.RepositoryChooser:
-		return ui.CreateElement(RepositoryChooserShell, RepositoryChooserProps{
-			State: props.Snapshot.ThreadsState, Mode: mode,
-		})
+		chooser := RepositoryChooserProps{State: props.Snapshot.ThreadsState, Mode: mode}
+		if props.RepositoryChoices != nil {
+			chooser.State, chooser.Choices =
+				props.RepositoryChoices.State, props.RepositoryChoices.Choices
+		}
+		return ui.CreateElement(RepositoryChooserShell, chooser)
 	case routes.ThreadWorkspace:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
@@ -679,6 +693,8 @@ type TaskWorkspaceProps struct {
 	Timeline           TimelineControlProps
 	TaskControls       *taskcontrols.Props
 	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	RepositoryChoices  *RepositoryChoiceSet
+	SelectedScope      NavigationScope
 	GraphInspector     ui.Node
 	Tokens             design.Tokens
 	Probe              RenderProbe
@@ -1493,15 +1509,40 @@ func primitiveMode(tokens design.Tokens) primitives.Mode {
 	}
 }
 
+// RepositoryChoice is one repository a person can enter.
+//
+// The chooser used to draw a hardcoded count of zero, so somebody with a
+// repository already open was told they had none, beside a browse control that
+// could not create one either. A choice carries the path it leads to, because
+// a row that cannot be entered is not a choice.
+type RepositoryChoice struct {
+	Name     string
+	Detail   string
+	Revision string
+	Path     string
+}
+
+// RepositoryChoiceSet is the coordinator's answer about what can be opened.
+//
+// It carries its own load state rather than borrowing the thread list's,
+// because the two ask different questions of the coordinator and can disagree:
+// threads can be loading while repositories are already known, and reusing one
+// state for both is how a populated list came to be drawn as empty.
+type RepositoryChoiceSet struct {
+	State   state.DataState
+	Choices []RepositoryChoice
+}
+
 type RepositoryChooserProps struct {
-	State state.DataState
-	Mode  primitives.Mode
+	State   state.DataState
+	Choices []RepositoryChoice
+	Mode    primitives.Mode
 }
 
 func RepositoryChooserShell(props RepositoryChooserProps) ui.Node {
 	return routeMain("repository-chooser-shell", "Choose a repository", props.Mode,
 		routeRegion(props.Mode, "recent-workspaces", "Recent valid workspaces",
-			asyncStateContent(props.State, "recent workspaces", 0, props.Mode)),
+			repositoryChoiceList(props)),
 		routeRegion(props.Mode, "browse-open", "Browse or open",
 			html.P(html.Props{Text: "Open an authorized local repository."}),
 			primitives.Button(primitives.ButtonProps{
@@ -1515,6 +1556,72 @@ func RepositoryChooserShell(props RepositoryChooserProps) ui.Node {
 			html.P(html.Props{Text: "Unavailable repositories stay closed and can be retried."}),
 		),
 	)
+}
+
+// repositoryChoiceList draws the repositories a person can enter.
+//
+// A choice with no path is not drawn as a link, because a link that goes
+// nowhere is worse than a line of text: it invites a click and answers with
+// silence.
+func repositoryChoiceList(props RepositoryChooserProps) ui.Node {
+	if props.State != state.DataReady || len(props.Choices) == 0 {
+		count := len(props.Choices)
+		reported := props.State
+		// A ready answer holding nothing is empty, not ready. Reporting it as
+		// ready is what produced the line "0 recent workspaces" where an
+		// invitation to open one belonged.
+		if reported == state.DataReady && count == 0 {
+			reported = state.DataReadyEmpty
+		}
+		return asyncStateContent(reported, "recent workspaces", count, props.Mode)
+	}
+	tokens := props.Mode.Tokens()
+	rowClass := css.New(
+		u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD)),
+		css.PaddingY(css.Px(tokens.Spacing.SM)),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.TextDecoration.None,
+		css.BorderBottom(
+			css.Px(tokens.Geometry.BorderWidth),
+			css.Hex(string(tokens.Colors.BorderSubtle)),
+		),
+	).String()
+	nameClass := css.New(
+		css.Font(css.FontStack(tokens.Fonts.Reading)),
+		css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	).String()
+	// The detail is metadata about the row, not the row. Given the readout
+	// treatment it came out in mono at heading weight and outweighed the
+	// repository name it was describing, so the eye landed on "Open thread"
+	// rather than on which repository that was.
+	detailClass := css.New(
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+	).String()
+
+	rows := make([]ui.Node, 0, len(props.Choices))
+	for _, choice := range props.Choices {
+		detail := choice.Detail
+		if choice.Revision != "" {
+			detail = detail + " · " + choice.Revision
+		}
+		label := []ui.Node{
+			html.Span(html.Props{Class: nameClass, Text: choice.Name}),
+			html.Span(html.Props{Class: detailClass, Text: detail}),
+		}
+		if choice.Path == "" {
+			rows = append(rows, html.Div(html.Props{Class: rowClass}, label...))
+			continue
+		}
+		rows = append(rows, html.A(html.Props{
+			Href: choice.Path, Class: rowClass,
+			DataAttr: html.DataAttribute{Name: "repository-choice", Value: choice.Name},
+		}, label...))
+	}
+	return html.Div(html.Props{
+		Class: css.New(u.Flex, u.FlexCol, css.MinWidth(css.Zero)).String(),
+	}, rows...)
 }
 
 type SimpleRouteProps struct {

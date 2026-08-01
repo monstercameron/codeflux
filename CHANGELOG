@@ -30,6 +30,68 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-012
+Date: 2026-08-01
+Type: Local repository bootstrap, live session publication, and removal of
+  invented interface data
+Request-or-TODO: User: "ffs get the dev server ui working" and "stop using
+  seeded data and use real experiment/code data that we are working on from the
+  engine"
+Outcome: codeflux start opens a repository, the coordinator publishes the
+  session a browser must attach to, and every value the interface presents is
+  read from the coordinator or reported as unknown
+Affected-behavior: A fresh database held no repository row, so the coordinator
+  reported first-run and the browser had no workspace to attach a session to.
+  Nothing inside the interface could create that first row, because
+  OpenWorkspace refuses by design and the chooser's only control re-rendered
+  first-run, so the product could never leave local preview. start now opens
+  the repository the person ran it in, defaulting to the working directory and
+  overridable with --repository, and refuses a directory that is not a Git
+  repository or has no commit rather than recording a workspace whose every
+  task would fail at its first command. The bootstrap payload is recomputed per
+  request instead of captured at construction, because start opens the
+  repository after the coordinator is built and the captured payload said
+  first-run forever; it now also carries selected_session_id,
+  selected_thread_id, and selected_repository_id. Without the session the
+  client started no stream at all and reported itself disconnected with no
+  error anywhere to say why; without the repository it could only guess which
+  repository a thread belonged to. The client also adopts the thread the URL
+  names, which nothing did, so a correct deep link drew the right conversation
+  against no session. Separately, the application booted from a fixture on
+  every render: five invented threads, five invented messages, a ten-node
+  graph, a task titled "Implement the Codeflux frontend shell", a spend of
+  $0.42 against a $4.00 budget, a right rail opening with "Milestone M16" and a
+  plan reference that reported four correctness gates as passed without
+  anything having run, and a timeline fallback drawing a pending approval card
+  with working Approve and Deny controls for an action that did not exist.
+  Pause and Stop flipped a browser-local string, so the interface reported a
+  run as paused while nothing had been asked to pause, and the top bar's chips
+  fell back to the names of the fields they hold, so an unset model rendered
+  the word "model". All of it is gone. The top bar reads the repository,
+  branch, and working-tree state Git reports now, counted ("4 uncommitted
+  changes") rather than stated; the rail reads the repository, task, and
+  measured cost; the chooser lists the repositories the coordinator returns,
+  each as a row that can be entered; an unbound control renders disabled; a
+  pane with no answer says so instead of drawing a skeleton nothing would
+  resolve; and the navigation rail scopes itself to what is open rather than to
+  the URL, which had disabled Tasks and Memory on the page every session begins
+  at
+Compatibility-or-migration: No schema change. storage gains
+  EnsureLocalBootstrap, idempotent on canonical path and self-repairing after
+  an interrupted open; FrontendRouteAccess gains the selected session, thread,
+  and repository, read in the same single statement as everything else; gitwork
+  gains ReadRepositoryState; WorkspaceService.InspectRepository reports the
+  live working tree and still returns the repository when only that read fails;
+  transport declares its own RepositoryRecord, WorkspaceRecord, and
+  RepositoryGitState rather than importing the storage adapter, which the
+  boundary check forbids
+Verification: go build ./..., GOOS=js GOARCH=wasm go build ./web/client,
+  go test ./..., and codeflux-dev lint pass. The opt-in production console
+  suite drives the real executable and now also asserts that start opened a
+  repository, that the payload names all four identities, that the interface
+  reaches live, and that no invented string appears anywhere on the page
+Dev-Log: DL-20260801-012
+
 Change-ID: CL-20260801-011
 Date: 2026-08-01
 Type: Workspace service registration

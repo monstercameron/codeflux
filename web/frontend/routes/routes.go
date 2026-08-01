@@ -338,3 +338,15 @@ func Restore(raw string, context RestorationContext) Restoration {
 	}
 	return Restoration{Route: route, Reason: RestoreAccepted}
 }
+
+// IsApplicationPath reports whether a path is one this application owns.
+//
+// It exists so the server that decides which paths receive the document and
+// the client that decides what to render read the same table. They were two
+// hand-maintained lists that disagreed: the server allowed /tasks and /memory,
+// which are not routes, and refused /graphs, which is — so the navigation rail
+// sent a person to a server 404.
+func IsApplicationPath(path string) bool {
+	route, err := Parse(path)
+	return err == nil && route.Name != NotFound
+}

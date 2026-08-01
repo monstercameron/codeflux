@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/web/frontend/routes"
 	"google.golang.org/grpc"
 )
 
@@ -165,3 +167,85 @@ func TestAFailingAssetSourceIsReportedNotIgnored(t *testing.T) {
 type failingAssets struct{ err error }
 
 func (assets failingAssets) Get(string) ([]byte, error) { return nil, assets.err }
+
+// TestTheServerServesExactlyWhatTheClientRoutes binds the two decisions.
+//
+// They were two hand-maintained lists and they disagreed: this server allowed
+// /tasks and /memory, which the client does not route, and refused /graphs,
+// which it does. Clicking Graphs in the navigation rail produced a server 404.
+func TestTheServerServesExactlyWhatTheClientRoutes(t *testing.T) {
+	handler, err := NewHandler(assetHandlerOptions(completeAssetSource(), ""))
+	if err != nil {
+		t.Fatalf("build handler: %v", err)
+	}
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	repository, err := domain.NewRepositoryID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread, err := domain.NewThreadID()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	served := []string{
+		"/",
+		"/settings",
+		"/graphs",
+		"/diagnostics",
+		"/first-run",
+		"/workspace/" + repository.String() + "/memory",
+		"/workspace/" + repository.String() + "/thread/" + thread.String(),
+	}
+	for _, path := range served {
+		t.Run("serves "+path, func(t *testing.T) {
+			response, err := server.Client().Get(server.URL + path)
+			if err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+			defer response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				t.Fatalf("GET %s = %d; the client routes this path but the server refused it",
+					path, response.StatusCode)
+			}
+		})
+	}
+
+	// A path the client cannot route must not receive the document either:
+	// serving it produces a page that mounts and then renders not-found,
+	// which is a worse answer than the honest one.
+	for _, path := range []string{"/tasks", "/memory", "/workspace", "/nope"} {
+		t.Run("refuses "+path, func(t *testing.T) {
+			response, err := server.Client().Get(server.URL + path)
+			if err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+			defer response.Body.Close()
+			if response.StatusCode == http.StatusOK {
+				t.Fatalf("GET %s = 200; the client cannot route this path", path)
+			}
+		})
+	}
+
+	// Every path the route table can produce must be served. This is the
+	// binding that keeps the two from drifting again.
+	for _, route := range []routes.Route{
+		{Name: routes.RepositoryChooser},
+		{Name: routes.Settings},
+		{Name: routes.Graphs},
+		{Name: routes.Diagnostics},
+		{Name: routes.FirstRun},
+		{Name: routes.Memory, RepositoryID: repository},
+		{Name: routes.ThreadWorkspace, RepositoryID: repository, ThreadID: thread},
+	} {
+		path, err := routes.Path(route)
+		if err != nil {
+			t.Fatalf("route %s has no path: %v", route.Name, err)
+		}
+		if !isApplicationRoute(path) {
+			t.Errorf("the route table produces %q, which this server refuses", path)
+		}
+	}
+}

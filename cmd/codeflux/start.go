@@ -23,6 +23,7 @@ type startArguments struct {
 	database       string
 	address        string
 	assets         string
+	repository     string
 	openBrowser    bool
 	nonInteractive bool
 }
@@ -41,7 +42,7 @@ func parseStartArguments(args []string) (startArguments, error) {
 
 	for index := 0; index < len(remaining); index++ {
 		switch remaining[index] {
-		case "--database", "--address", "--assets":
+		case "--database", "--address", "--assets", "--repository":
 			name := remaining[index]
 			if index+1 >= len(remaining) {
 				return startArguments{}, fmt.Errorf("%s requires a value", name)
@@ -56,6 +57,8 @@ func parseStartArguments(args []string) (startArguments, error) {
 				arguments.database = value
 			case "--assets":
 				arguments.assets = value
+			case "--repository":
+				arguments.repository = value
 			default:
 				arguments.address = value
 			}
@@ -171,6 +174,23 @@ func runStart(
 			fmt.Fprintf(stderr, "codeflux start: shutdown: %v\n", shutdownErr)
 		}
 	}()
+
+	// Without a repository the coordinator reports first-run, the browser has
+	// no workspace to attach a session to, and the whole interface stays in
+	// local preview: sample content, a composer that refuses to send, and a
+	// graph that says it is not available. Nothing inside the interface could
+	// create that first repository, so start does it here, from a directory
+	// the person running the command named on their own machine.
+	if scope, bootstrapErr := ensureLocalRepository(
+		ctx, application.Repositories(), arguments.repository,
+	); bootstrapErr != nil {
+		fmt.Fprintf(stderr, "codeflux start: %v\n", bootstrapErr)
+		return exitUnavailable
+	} else if scope.Created {
+		fmt.Fprintf(stdout, "opened repository: %s\n", scope.Path)
+	} else {
+		fmt.Fprintf(stdout, "reopened repository: %s\n", scope.Path)
+	}
 
 	url := browserURL(application.Address())
 	// M23-003: the URL is printed, the session secret is not. A secret echoed

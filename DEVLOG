@@ -24,6 +24,77 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-012
+Date: 2026-08-01
+Status: The interface reaches the coordinator, reports live, and presents
+  nothing it was not told
+Change-ID: CL-20260801-012
+Request-or-TODO: User: "ffs get the dev server ui working" and "stop using
+  seeded data and use real experiment/code data that we are working on from the
+  engine"
+Goal: Find and remove whatever kept a running product in preview mode, then
+  remove every fabricated value it was drawing in the meantime
+Assumptions: Authority to take a repository comes from the person who ran the
+  command on their own machine naming their own directory, which is why the
+  bootstrap lives behind the CLI and not behind an RPC a browser can call. An
+  unanswered field said out loud is better than a plausible default, because a
+  reader cannot tell a default from a measurement
+Decisions: Default the repository to the working directory, because the
+  overwhelmingly common case is running the command inside the repository you
+  mean; resolve it through git rev-parse rather than the typed path, because
+  somebody three directories down means the repository; refuse a directory with
+  no commit, because a change must bind to a base revision; create the thread
+  through CreateThreadCommit rather than an INSERT, because that call mints the
+  session in the same transaction, appends the thread-created event every
+  projection reads, and keys the whole thing so a repeated start is a no-op.
+  Read branch and dirtiness from Git rather than from stored columns, because a
+  working tree changes between one glance at the interface and the next; count
+  the changed paths, because one dirty file and four hundred are different
+  decisions and "uncommitted changes" is the same sentence for both; render an
+  unbound Pause and Stop as disabled rather than letting them flip a local
+  string; collapse the metric strip to one sentence when there is no task,
+  because six labels against six copies of Unknown was the widest, boldest row
+  on the page saying nothing; drop the Home rail item, because it and
+  Repositories were the same destination and lit up together on the page every
+  session begins at
+Files-or-schemas: internal/storage/local_bootstrap_repository.go,
+  internal/storage/frontend_route_access.go, cmd/codeflux/local_repository.go,
+  cmd/codeflux/start.go, internal/coordinator/application.go,
+  internal/coordinator/workspace_application.go,
+  internal/gitwork/repository_state.go,
+  internal/transport/workspace_service.go, internal/frontendserver/handler.go,
+  web/frontend/routes/routes.go, web/client/bootstrap.go, web/client/main.go,
+  web/client/repository_choices.go, web/client/workspace_summary.go,
+  web/client/timeline_preview.go, web/frontend/shell/shell.go,
+  web/frontend/shell/reference_chrome.go
+Validation: New storage tests cover the first open, the idempotent reopen, the
+  four refusals, and an open interrupted between its two writes; new unit tests
+  cover the chooser projection, the worktree wording, the detached head, the
+  no-task metric strip, the scoped navigation, and the single current rail
+  item; the production console suite asserts all of it against the real
+  executable
+Failures-or-discarded-approaches: First wrote CreateSession before CreateThread
+  and it failed with database entity not found: sessions reference threads, not
+  the other way round, and CreateThreadCommit already makes both. Also queried
+  a threads.session_id column that does not exist. Publishing only the session
+  and thread was not enough: without the repository the client had to guess
+  which repository a thread belonged to, which is wrong the moment a second
+  repository exists. Marking every pane loading in the opening store replaced
+  the fixture with skeletons nothing would ever resolve, which reads as a
+  coordinator that is thinking when it is idle; panes now follow their own
+  sources. Pointing Home at the open conversation only moved its collision from
+  Repositories onto Tasks, so it was removed rather than redirected. The
+  transport service was importing the storage adapter, which the boundary check
+  forbids; it now declares its own record types and the coordinator translates
+Known-limitations: One repository is opened per start; opening a second from
+  inside the interface still requires the durable approval OpenWorkspace waits
+  on. The right rail reports the task and its cost but not the correctness
+  evidence the removed gates card claimed, which needs a coordinator-published
+  verdict vocabulary
+Next-safe-step: Bind the composer's send to a real task so the workspace has
+  something to supervise, and publish real gate verdicts so the rail can report
+  evidence instead of omitting it
+
 Dev-Log: DL-20260801-011
 Date: 2026-08-01
 Status: Three of the four RPCs serve; OpenWorkspace refuses by design

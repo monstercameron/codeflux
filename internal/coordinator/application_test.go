@@ -145,7 +145,9 @@ func TestApplicationHostsGeneratedFrontendOnCoordinatorOrigin(t *testing.T) {
 	})
 
 	client := &http.Client{}
-	response, err := client.Get("http://" + application.Address() + "/tasks")
+	// /graphs rather than /tasks: /tasks is not a route the client can parse,
+	// so the server correctly refuses it now.
+	response, err := client.Get("http://" + application.Address() + "/graphs")
 	if err != nil {
 		t.Fatal(err)
 	}
