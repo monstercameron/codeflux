@@ -30,6 +30,22 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260801-005
+Date: 2026-08-01
+Type: Backlog record
+Request-or-TODO: AUDIT-001 through AUDIT-032
+Outcome: Recorded thirty-two completion-audit follow-ups comparing every
+  checked TODO against the current plan, production wiring, tests, and
+  retained evidence
+Affected-behavior: No behavior change. The items name checked claims that must
+  be reconciled before the completion ledger can be treated as authoritative,
+  including the two this repository's own investigation had already confirmed:
+  the start command never mounted the browser assets, and starting a task
+  never spawned a worker
+Compatibility-or-migration: None
+Verification: The file is the record; no code changed
+Dev-Log: DL-20260801-005
+
 Change-ID: CL-20260801-004
 Date: 2026-08-01
 Type: Prototype exit protocol, dogfood control plane, and enforced deferrals

@@ -24,6 +24,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-005
+Date: 2026-08-01
+Status: Recorded; the items themselves are open
+Change-ID: CL-20260801-005
+Request-or-TODO: AUDIT-001 through AUDIT-032
+Goal: Keep the completion ledger honest by naming, in the same file that
+  records completion, every checked claim that does not survive inspection
+Assumptions: The block was appended to TODOS.md outside this session's own
+  work and is committed here as the governance record it is, not as authored
+  content
+Decisions: Commit it on its own rather than folding it into the work that
+  references it. The items are the reason for that work; a reader resolving
+  AUDIT-020 from a commit message needs the item to already exist in history
+Files-or-schemas: TODOS.md
+Validation: No code changed; the repository suites are unaffected
+Failures-or-discarded-approaches: None
+Known-limitations: Thirty-two items are open. Several need decisions or
+  access this environment does not have -- target-class benchmark hardware, a
+  live provider, an independent evaluator -- and are recorded rather than
+  resolved
+Next-safe-step: Take the two blockers the audit and this repository's own
+  investigation agree on: AUDIT-021, the executable that starts without an
+  interface, and AUDIT-020, the task start that records a run and executes
+  nothing
+
 Dev-Log: DL-20260801-004
 Date: 2026-08-01
 Status: Complete as declared structure; the dogfood trial itself has NOT been

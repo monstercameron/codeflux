@@ -3921,3 +3921,46 @@ Result location:
 Known limitations:
 Decision owner:
 ```
+
+---
+
+# Completion Audit Follow-ups (2026-08-01)
+
+These unchecked review items were appended after comparing every checked TODO
+with the current plan, production wiring, tests, and retained completion
+evidence. They do not silently reopen or rewrite the original history; each
+item names the checked claim that must be reconciled before the completion
+ledger can be treated as authoritative.
+
+- [ ] `AUDIT-001 REVIEW DOC` Reconcile `M00-019`: replace the plan's nonexistent `AwaitingAcceptance` success state with the implemented `awaiting-review` state, then add a trace test that every lifecycle state named by the plan parses through `domain.AllTaskStates`.
+- [ ] `AUDIT-002 REVIEW PLAN` Reconcile `M00-G01` and `M00-G02`: add a machine-readable feature/deferred manifest with journey, measurement, milestone, and dependency fields, and make plan tracing reject unmapped features or deferred critical-path dependencies.
+- [ ] `AUDIT-003 REVIEW BLOCKER` Reconcile `M01-026`: make one `codeflux-dev build` invocation generate or verify protobuf output, build the server and worker, and build the GWC/WASM frontend under one artifact root; prove it from a clean clone.
+- [ ] `AUDIT-004 REVIEW SECURITY` Reconcile `M03-003` on the primary Windows platform: apply and test user-only DACLs for the application-data directory, SQLite database, backup, migration-lock, WAL, and SHM files instead of skipping the permission assertion.
+- [ ] `AUDIT-005 REVIEW DATA` Reconcile `M03-067`: seed real graph and vector descendants, run the supported deletion or purge path, and assert the intended restriction/cascade behavior and zero orphan rows.
+- [ ] `AUDIT-006 REVIEW SECURITY` Reconcile `M04-G01`: configure and exercise a deterministic provider through effective config and OS credential lookup, then scan SQLite, WAL, SHM, events, and outputs for the canary secret.
+- [ ] `AUDIT-007 REVIEW SECURITY` Reconcile `M04-G02`: run a full coordinator-to-worker/provider mock task and scan prompts, events, logs, UI payloads, diagnostics, SQLite, WAL, and SHM rather than manually redacting already-isolated boundary values.
+- [ ] `AUDIT-008 REVIEW TEST` Reconcile `M07-057`: register production services in the in-process transport and exercise every RPC success and typed-domain-error path instead of returning empty dynamic responses from an unknown-service handler.
+- [ ] `AUDIT-009 REVIEW BLOCKER TEST` Reconcile `M07-082` through `M07-090`, `M07-G01`, and `M07-G04`: run the chronological journeys against the real application, generated services, temporary SQLite/Git, worker/provider/effect ports, and named crash boundaries instead of string-append and in-test map fakes.
+- [ ] `AUDIT-010 REVIEW BLOCKER` Reconcile `M08-043`, `M08-045`, and `M08-G03`: register and wire `WorkspaceService` through repository mapping, context selection, `ContextManifestRepository`, committed events, and the mounted expandable context card.
+- [ ] `AUDIT-011 REVIEW SECURITY` Reconcile `M08-049`: replace caller-supplied approved instruction paths with a durable approval identity bound to project, repository revision, scope, and consumption, with forged/stale/replay tests.
+- [ ] `AUDIT-012 REVIEW BLOCKER` Reconcile `M09-026`: wire `StorageEditEventRecorder` into the production `gitwork` service, route mediated edits through `ApplyEditBatch`, and integration-test atomic edits plus the committed redacted event.
+- [ ] `AUDIT-013 REVIEW BLOCKER` Reconcile `M10-027`: implement the worker ToolService/agent-loop adapter as the sole command executor, remove coordinator-owned direct execution, and prove worker PID and lease attribution end to end.
+- [ ] `AUDIT-014 REVIEW` Reconcile `M10-035`: publish incrementally redacted, bounded command progress while the process is running, with backpressure and cancellation tests, rather than publishing only after process exit.
+- [ ] `AUDIT-015 REVIEW SECURITY` Reconcile `M10-026`, `M10-042`, `M10-G01`, and `M10-G02`: implement and register the production ToolService, bind exact durable grant consumption to worker execution, and test attribution, substitution, replay, expiry, and denial end to end.
+- [ ] `AUDIT-016 REVIEW BLOCKER` Reconcile `M11-004`: construct and register production workspace and provider/settings services during application startup and verify their real capabilities over generated RPC clients.
+- [ ] `AUDIT-017 REVIEW SECURITY` Reconcile `M11-033`: expose a validated, explicitly authorized user container command through config, application options, task launch, and supervisor wiring, then test container and native paths.
+- [ ] `AUDIT-018 REVIEW BLOCKER` Reconcile `M11-036` and `M11-037`: add a completion/unblock dispatch pump so queued work starts when capacity becomes free, project queue position and reason to clients, and test fairness across pause, approval, capacity release, and restart.
+- [ ] `AUDIT-019 REVIEW BLOCKER` Reconcile `M12-051`, `M12-052`, and `M12-G04`: wire provider recovery into exhausted execution, expose retry/resume/explicit-switch commands, persist exact from/to authority, and prove no adapter fallback silently changes provider or model.
+- [ ] `AUDIT-020 REVIEW BLOCKER TEST` Reconcile `M14-021`: complete the real StartTask path through worktree creation, durable scheduling, worker launch, provider/tool loop, and awaiting-review; make `TestRequirementReachesAStartedRunThroughTheRealApplication` pass without a recorded-but-idle run.
+- [ ] `AUDIT-021 REVIEW BLOCKER TEST` Reconcile `M16-G01`: build the production executable, start it without an external asset directory, navigate its printed URL, and prove the embedded GWC shell, WASM client, and bridge load with zero external requests.
+- [ ] `AUDIT-022 REVIEW BLOCKER` Reconcile `M17-081` through `M17-084`: carry policy, exact hard budget, model override, and reasoning-effort override through the generated request contract and persist them in authoritative task/preflight state.
+- [ ] `AUDIT-023 REVIEW BLOCKER TEST` Reconcile `M17-085`: mount a server-backed repository file/symbol picker and add generated-client-to-real-ThreadService coverage for distinct artifact and atom identities.
+- [ ] `AUDIT-024 REVIEW BLOCKER E2E` Reconcile `M17-G04`: replace `authoritative-disabled` plan/review actions with generated RPC bindings for approve, revise, start, accept, repair, reject, rollback, and abandon, preserving one idempotency key through settlement and replay.
+- [ ] `AUDIT-025 REVIEW GATE` Reconcile the M13-M18 gate evidence: define one revision-bound command that runs unit, integration, security, migration, and production-mounted Chromium checks with no milestone-relevant skips, and retain an unambiguous result manifest.
+- [ ] `AUDIT-026 REVIEW GATE` Reconcile `M21-078` through `M21-088`, `M21-G04`, and `M21-G06`: run the deterministic-retrieval miss measurement and exercise active vectors non-vacuously, or explicitly defer the unopened vector branch instead of marking an instrument and vacuous gate as completed evidence.
+- [ ] `AUDIT-027 REVIEW BLOCKER TEST` Reconcile `M22-036` through `M22-050` and `M22-G03`: connect fault injection to the real worker, coordinator, browser, provider, command, worktree, and SQLite boundaries; the current generic `RunWithFault` ledger never enters those production paths.
+- [ ] `AUDIT-028 REVIEW BENCH` Reconcile `M22-089`: rerun and record the benchmark suite on the specified ordinary target-class hobbyist laptop; the retained reference run is explicitly classified `above-target`.
+- [ ] `AUDIT-029 REVIEW BLOCKER` Reconcile `M22-113` through `M22-118` and `M22-G06`: implement callable `codeflux-dev seed`, `replay`, and `inspect-db` workflows and prove local vertical replay; the current registry still marks them as unavailable skeletons.
+- [ ] `AUDIT-030 REVIEW BLOCKER RELEASE` Reconcile `M23-052` through `M23-060` and `M23-G01`: build real reproducible platform binaries, embed non-placeholder frontend assets, generate checksums, sign and verify actual files, and install one artifact into a clean profile; current release tests validate synthetic artifacts, `web/assets/static` contains only a README, and the release package invokes no builder or signer.
+- [ ] `AUDIT-031 REVIEW BLOCKER EXPERIMENT` Reconcile execution-bearing `M24` items and `M24-G01` through `M24-G10`: run the frozen ReserveFlow Tracks A-C with the live provider and independent evaluator, populate attributable results, and only then record pass/fail decisions; the completion record explicitly says the trial was not run and the gates are unanswered.
+- [ ] `AUDIT-032 REVIEW RELEASE` Reconcile `M24-098` and the completion record: tag the exact evaluated prototype revision and record its actual source/frontend artifact identities; the record names stale revision `a133785`, reports the empty-asset hash, and no tag points at current `HEAD`.
