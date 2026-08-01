@@ -654,3 +654,73 @@ func NewBudgetID() (BudgetID, error) {
 	value, err := newTypedID[budgetIDKind]()
 	return BudgetID{value}, err
 }
+
+type episodeIDKind struct{}
+
+func (episodeIDKind) prefix() string { return "epi" }
+func (episodeIDKind) label() string  { return "episode" }
+
+// EpisodeID identifies one immutable chronological task-history record. An
+// episode is raw fact: it exists independently of whether any project-memory
+// artifact ever earns authority from it. See MemoryArtifactID and
+// MaturityState for the distinct, revocable authority concept built on top
+// of episodes.
+type EpisodeID struct{ typedID[episodeIDKind] }
+
+// ParseEpisodeID parses a canonical episode identity.
+func ParseEpisodeID(raw string) (EpisodeID, error) {
+	value, err := parseTypedID[episodeIDKind](raw)
+	return EpisodeID{value}, err
+}
+
+// NewEpisodeID generates a locally unique, time-sortable episode identity.
+func NewEpisodeID() (EpisodeID, error) {
+	value, err := newTypedID[episodeIDKind]()
+	return EpisodeID{value}, err
+}
+
+type memoryArtifactIDKind struct{}
+
+func (memoryArtifactIDKind) prefix() string { return "mem" }
+func (memoryArtifactIDKind) label() string  { return "memory artifact" }
+
+// MemoryArtifactID identifies one project-memory artifact across every
+// immutable revision and maturity change it ever undergoes. The identity is
+// stable; authority is not. See MaturityState.
+type MemoryArtifactID struct{ typedID[memoryArtifactIDKind] }
+
+// ParseMemoryArtifactID parses a canonical memory-artifact identity.
+func ParseMemoryArtifactID(raw string) (MemoryArtifactID, error) {
+	value, err := parseTypedID[memoryArtifactIDKind](raw)
+	return MemoryArtifactID{value}, err
+}
+
+// NewMemoryArtifactID generates a locally unique, time-sortable memory-artifact identity.
+func NewMemoryArtifactID() (MemoryArtifactID, error) {
+	value, err := newTypedID[memoryArtifactIDKind]()
+	return MemoryArtifactID{value}, err
+}
+
+type memoryArtifactRevisionIDKind struct{}
+
+func (memoryArtifactRevisionIDKind) prefix() string { return "mrv" }
+func (memoryArtifactRevisionIDKind) label() string  { return "memory artifact revision" }
+
+// MemoryArtifactRevisionID identifies one immutable revision of a memory
+// artifact. A user correction always creates a new revision identity; it
+// never mutates an existing one.
+type MemoryArtifactRevisionID struct {
+	typedID[memoryArtifactRevisionIDKind]
+}
+
+// ParseMemoryArtifactRevisionID parses a canonical memory-artifact-revision identity.
+func ParseMemoryArtifactRevisionID(raw string) (MemoryArtifactRevisionID, error) {
+	value, err := parseTypedID[memoryArtifactRevisionIDKind](raw)
+	return MemoryArtifactRevisionID{value}, err
+}
+
+// NewMemoryArtifactRevisionID generates a locally unique, time-sortable memory-artifact-revision identity.
+func NewMemoryArtifactRevisionID() (MemoryArtifactRevisionID, error) {
+	value, err := newTypedID[memoryArtifactRevisionIDKind]()
+	return MemoryArtifactRevisionID{value}, err
+}

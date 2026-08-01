@@ -29,4 +29,5 @@ var Catalog = []Descriptor{
 	{Number: 22, Name: "000022_validation_run_records.sql", SHA256: "35888df87d1fb2da7bde5de262534253d41dc163df9bd1720571141858cd59fb"},
 	{Number: 23, Name: "000023_evidence_reports.sql", SHA256: "be11be226bfddaa4e8c73345976ec9a1572f935a020bed5b813c053fbfaad72b"},
 	{Number: 24, Name: "000024_acceptance_repair.sql", SHA256: "a756b596af8deccc6ae62e8298bdcae57e5da0f238152c0c6dc4b5447bbd0275"},
+	{Number: 25, Name: "000025_memory_artifact_schema.sql", SHA256: "d97c3df468607b424b60e219ba247ebc5bd6edd10aae6789e33d8217365b0ea9"},
 }

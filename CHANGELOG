@@ -30,6 +30,44 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260731-073
+Date: 2026-07-31
+Type: Deterministic project-memory foundation
+Request-or-TODO: M21-001 through M21-028, M21-051 through M21-063, M21-090
+  through M21-099, M21-100 through M21-102, M21-108 through M21-125,
+  M21-146 through M21-152, M21-157 through M21-163, and M21-169 through
+  M21-175
+Outcome: Added the governed project-memory domain vocabulary, its immutable
+  SQLite schema and repositories, the versioned task fingerprint, atom
+  documentation extraction and admission, atom naming identity and rename
+  classification, and the project-memory inspection and correction surface.
+  Each block was then adversarially reviewed, and every reproduced defect
+  found was fixed with a test that failed beforehand.
+Affected-behavior: Memory artifacts carry maturity states whose authority
+  grants require corroborated evidence bound to the exact revision, so a proof
+  earned for one artifact cannot promote another. Quarantine is terminal:
+  correction of a terminal artifact is refused rather than silently returning
+  it to candidate under its original identity. Deletion previews are computed
+  transitively over derived_from, verified against the current lineage index,
+  and acknowledged by explicit dependent identity rather than a bare flag.
+  Agent self-report is stored but can never satisfy an authority grant.
+  Fingerprints hash only exact identity fields, normalized for path separator
+  and Unicode form. Atom documentation rejects control bytes that previously
+  allowed two different documents to collide on one normalized hash.
+Compatibility-or-migration: Adds migration 000025 and its generated catalog
+  and version entries. Extends internal/domain with memory types and three ID
+  kinds. golang.org/x/text is now a direct dependency. No handwritten
+  JavaScript, TypeScript, HTML, or CSS source is added. No prior migration
+  checksum changed.
+Verification: go build, go vet, gofmt, migration-check, and the js/wasm web
+  build are clean across the repository. Domain, storage, fingerprint,
+  atomdoc, atomname, memoryinspector, and i18n suites pass, including the full
+  storage suite against real temporary SQLite databases. Cross-project,
+  immutability, quarantine-terminality, and cascade boundaries were exercised
+  by raw SQL against a migrated database, and the counterexample boundary was
+  confirmed to fail open before its trigger and Go check were added.
+Dev-Log: DL-20260731-074
+
 Change-ID: CL-20260731-072
 Date: 2026-07-31
 Type: Frontend design tokens and presentation primitives

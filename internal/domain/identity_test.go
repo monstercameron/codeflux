@@ -47,6 +47,9 @@ func TestEveryIdentityTypeParsesItsCanonicalPrefix(t *testing.T) {
 		{name: "model request", prefix: "mrq", parse: wrapIDParser(ParseModelRequestID)},
 		{name: "provider", prefix: "prv", parse: wrapIDParser(ParseProviderID)},
 		{name: "budget", prefix: "bdg", parse: wrapIDParser(ParseBudgetID)},
+		{name: "episode", prefix: "epi", parse: wrapIDParser(ParseEpisodeID)},
+		{name: "memory artifact", prefix: "mem", parse: wrapIDParser(ParseMemoryArtifactID)},
+		{name: "memory artifact revision", prefix: "mrv", parse: wrapIDParser(ParseMemoryArtifactRevisionID)},
 	}
 
 	for _, test := range cases {
@@ -178,6 +181,15 @@ func TestEveryIdentityTypeJSONAndSQLRoundTrips(t *testing.T) {
 	})
 	t.Run("budget", func(t *testing.T) {
 		assertIdentityCodecs(t, "bdg", ParseBudgetID)
+	})
+	t.Run("episode", func(t *testing.T) {
+		assertIdentityCodecs(t, "epi", ParseEpisodeID)
+	})
+	t.Run("memory artifact", func(t *testing.T) {
+		assertIdentityCodecs(t, "mem", ParseMemoryArtifactID)
+	})
+	t.Run("memory artifact revision", func(t *testing.T) {
+		assertIdentityCodecs(t, "mrv", ParseMemoryArtifactRevisionID)
 	})
 }
 

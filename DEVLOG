@@ -24,6 +24,71 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260731-074
+Date: 2026-07-31
+Status: Complete for the blocks listed; Milestone 21 is not finished
+Change-ID: CL-20260731-073
+Request-or-TODO: M21-001..028, 051..063, 090..099, 100..102, 108..125,
+  146..152, 157..163, 169..175; user required parallel streams and required
+  that nothing be called done before adversarial review
+Goal: Build the project-memory foundation so accepted work can later reduce
+  future cost, without letting similarity or model self-report become
+  authority
+Assumptions: The memory boundary vocabulary must land before any consumer, so
+  it was built serially first; migrations have exactly one writer; TODOS.md,
+  DEVLOG, and CHANGELOG were kept out of every agent's scope while six lanes
+  ran concurrently, and are reconciled here in one pass
+Decisions: Work the token/type layer rather than consumers where possible so
+  unowned surfaces inherit changes with no merge surface. Hold vector
+  discovery at the plan's branch gate: the tables exist, no embedding,
+  similarity, or ranking runtime was written. Resolve the self-report
+  authorization contradiction as EXCLUDE, from plan.md line 882 prohibiting
+  the dependency agent-self-report to accepted-outcome, line 7339 assigning
+  evidence_strength none, and section 31 requiring explanations be stored at
+  all, which makes a poisoning reading self-defeating.
+Files-or-schemas: internal/domain/memory.go and identity.go; nine
+  internal/storage memory repositories; migrations/000025 and generated
+  catalog/version outputs; internal/fingerprint; internal/atomdoc;
+  internal/atomname; web/frontend/memoryinspector; web/frontend/i18n; go.mod
+Validation: Full repository build, vet, gofmt, migration-check, js/wasm build,
+  and every affected package suite pass. Six adversarial reviewers, each
+  evaluation-only with no edit or approval authority, attacked the six blocks
+  with executable reproductions; all six returned ITERATE. Every reproduced
+  defect was then fixed by a separate agent that wrote the failing test first
+  and recorded output before and after.
+Failures-or-discarded-approaches: The adversarial pass found, and this change
+  fixes: correction returning quarantined and invalidated artifacts to
+  candidate under their original identity, bypassing the transition table; an
+  authority proof bound to nothing and replayable across artifacts; a deletion
+  preview that was forgeable, accepted when stale, and one hop deep while the
+  cascade deleted transitively; a normalized-hash collision from unescaped
+  control bytes; a field-header regex that rejected legitimate documents; a
+  word splitter that produced garbage display names and false-positive grammar
+  rejections; list values silently corrupted by a "; " join and split; and a
+  project boundary and naming scope that failed open on zero values. Three
+  reviewers independently reached the same deletion-preview hole from
+  different directions. Two storage tests and four naming tests asserted the
+  defective behavior as correct and were corrected rather than deleted; the
+  self-report domain test was inverted deliberately, per the plan reading
+  above. A poisoning implementation of M21-011 was discarded.
+Known-limitations: Milestone 21 is roughly half built. Chronological episode
+  capture, deterministic fact extraction, the pre-work retrieval gate, the
+  atom documentation and atom name tables, and the milestone gates are not
+  implemented, so nothing yet consults memory before planning. Vector
+  discovery stays closed at its branch gate. SupportingEpisodes and
+  LineageRootIDs are not persisted and are reported as explicitly unknown; if
+  that index were fed to ConfirmsMemoryArtifactIndependently before the
+  episodes table exists, every candidate would read as never exposed and
+  independent confirmation would always succeed. The inspection surface is
+  complete and tested but not mounted in the production shell. Atom naming
+  still splits ArchiveBatch42 as "Archive Batch42" and AWSS3Bucket as "A WS S3
+  Bucket". No TODOS.md item is marked complete, because the fixes themselves
+  have not yet been adversarially reviewed.
+Next-safe-step: Adversarially review the remediation itself, checking whether
+  any fix opened a new hole or weakened a test, then mark only evidence-backed
+  TODOS.md items. Independently, the packaged end-to-end run has never been
+  attempted with a real provider, which remains the largest unmeasured risk.
+
 Dev-Log: DL-20260731-073
 Date: 2026-07-31
 Status: Complete

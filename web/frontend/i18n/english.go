@@ -140,6 +140,139 @@ const (
 	MsgTermApproval                   MessageID = "term.approval"
 	MsgTermCheckpoint                 MessageID = "term.checkpoint"
 	MsgTermRecovery                   MessageID = "term.recovery"
+	MsgKindCode                       MessageID = "kind.code"
+	MsgKindTest                       MessageID = "kind.test"
+	MsgKindPlan                       MessageID = "kind.plan"
+	MsgKindEvidence                   MessageID = "kind.evidence"
+	MsgKindMemory                     MessageID = "kind.memory"
+	MsgKindForecast                   MessageID = "kind.forecast"
+	MsgKindExecution                  MessageID = "kind.execution"
+	MsgKindValidation                 MessageID = "kind.validation"
+
+	// Project-memory inspection and correction UI (M21-090..099).
+	MsgMemoryInspectorUnavailable              MessageID = "memory-inspector.error.title"
+	MsgMemoryKindRepositoryFact                MessageID = "memory-inspector.kind.repository-fact"
+	MsgMemoryKindReviewedCommand               MessageID = "memory-inspector.kind.reviewed-command"
+	MsgMemoryKindFileToTestMapping             MessageID = "memory-inspector.kind.file-to-test-mapping"
+	MsgMemoryKindRepositoryConvention          MessageID = "memory-inspector.kind.repository-convention"
+	MsgMemoryKindAcceptedRegressionCase        MessageID = "memory-inspector.kind.accepted-regression-case"
+	MsgMemoryKindExecutionRecipe               MessageID = "memory-inspector.kind.execution-recipe"
+	MsgMemoryKindExecutableAtomReference       MessageID = "memory-inspector.kind.executable-atom-reference"
+	MsgMemoryKindObservationHypothesis         MessageID = "memory-inspector.kind.observation-hypothesis"
+	MsgMemoryMaturityCandidate                 MessageID = "memory-inspector.maturity.candidate"
+	MsgMemoryMaturityValidated                 MessageID = "memory-inspector.maturity.validated"
+	MsgMemoryMaturityPreferredForExperiment    MessageID = "memory-inspector.maturity.preferred-for-experiment"
+	MsgMemoryMaturityQuarantined               MessageID = "memory-inspector.maturity.quarantined"
+	MsgMemoryMaturityInvalidated               MessageID = "memory-inspector.maturity.invalidated"
+	MsgMemoryMaturityRetired                   MessageID = "memory-inspector.maturity.retired"
+	MsgMemoryFilterKindLabel                   MessageID = "memory-inspector.filter.kind.label"
+	MsgMemoryFilterMaturityLabel               MessageID = "memory-inspector.filter.maturity.label"
+	MsgMemoryFilterValidityLabel               MessageID = "memory-inspector.filter.validity.label"
+	MsgMemoryFilterLastConfirmationLabel       MessageID = "memory-inspector.filter.last-confirmation.label"
+	MsgMemoryFilterClear                       MessageID = "memory-inspector.filter.clear"
+	MsgMemoryFilterValidityAny                 MessageID = "memory-inspector.filter.validity.any"
+	MsgMemoryFilterValidityCurrentlyValid      MessageID = "memory-inspector.filter.validity.currently-valid"
+	MsgMemoryFilterValidityNotYetValidated     MessageID = "memory-inspector.filter.validity.not-yet-validated"
+	MsgMemoryFilterValidityNoLongerValid       MessageID = "memory-inspector.filter.validity.no-longer-valid"
+	MsgMemoryFilterConfirmationAny             MessageID = "memory-inspector.filter.last-confirmation.any"
+	MsgMemoryFilterConfirmationWithin7Days     MessageID = "memory-inspector.filter.last-confirmation.within-7-days"
+	MsgMemoryFilterConfirmationWithin30Days    MessageID = "memory-inspector.filter.last-confirmation.within-30-days"
+	MsgMemoryFilterConfirmationOlderThan30Days MessageID = "memory-inspector.filter.last-confirmation.older-than-30-days"
+	MsgMemoryFilterConfirmationNeverConfirmed  MessageID = "memory-inspector.filter.last-confirmation.never-confirmed"
+	MsgMemoryListTitleLabel                    MessageID = "memory-inspector.list.title"
+	MsgMemoryListAriaLabel                     MessageID = "memory-inspector.list.aria-label"
+	MsgMemoryListLoading                       MessageID = "memory-inspector.list.loading"
+	MsgMemoryListEmptyTitle                    MessageID = "memory-inspector.list.empty.title"
+	MsgMemoryListEmptyBody                     MessageID = "memory-inspector.list.empty.body"
+	MsgMemoryListErrorTitle                    MessageID = "memory-inspector.list.error.title"
+	MsgMemoryListErrorBody                     MessageID = "memory-inspector.list.error.body"
+	MsgMemoryListDisconnectedTitle             MessageID = "memory-inspector.list.disconnected.title"
+	MsgMemoryListDisconnectedBody              MessageID = "memory-inspector.list.disconnected.body"
+	MsgMemoryListRetry                         MessageID = "memory-inspector.list.retry"
+	MsgMemoryListRowLastConfirmed              MessageID = "memory-inspector.list.row.last-confirmed"
+	MsgMemoryListRowNeverConfirmed             MessageID = "memory-inspector.list.row.never-confirmed"
+	MsgMemorySelectedNoneTitle                 MessageID = "memory-inspector.selected.none.title"
+	MsgMemorySelectedNoneBody                  MessageID = "memory-inspector.selected.none.body"
+	MsgMemorySelectedLoading                   MessageID = "memory-inspector.selected.loading"
+	MsgMemorySelectedErrorTitle                MessageID = "memory-inspector.selected.error.title"
+	MsgMemorySelectedErrorBody                 MessageID = "memory-inspector.selected.error.body"
+	MsgMemorySelectedDeniedTitle               MessageID = "memory-inspector.selected.denied.title"
+	MsgMemorySelectedDeniedBody                MessageID = "memory-inspector.selected.denied.body"
+	MsgMemorySelectedIncompatibleTitle         MessageID = "memory-inspector.selected.incompatible.title"
+	MsgMemorySelectedIncompatibleBody          MessageID = "memory-inspector.selected.incompatible.body"
+	MsgMemorySelectedDisconnectedTitle         MessageID = "memory-inspector.selected.disconnected.title"
+	MsgMemorySelectedDisconnectedBody          MessageID = "memory-inspector.selected.disconnected.body"
+	MsgMemorySelectedRetry                     MessageID = "memory-inspector.selected.retry"
+	MsgMemoryDetailIdentityTitle               MessageID = "memory-inspector.detail.identity.title"
+	MsgMemoryDetailIdentityArtifactID          MessageID = "memory-inspector.detail.identity.artifact-id"
+	MsgMemoryDetailIdentityRevisionID          MessageID = "memory-inspector.detail.identity.revision-id"
+	MsgMemoryDetailIdentityScope               MessageID = "memory-inspector.detail.identity.scope"
+	MsgMemoryDetailIdentitySupersedes          MessageID = "memory-inspector.detail.identity.supersedes"
+	MsgMemoryDetailIdentityFromCorrection      MessageID = "memory-inspector.detail.identity.from-correction"
+	MsgMemoryDetailLineageTitle                MessageID = "memory-inspector.detail.lineage.title"
+	MsgMemoryDetailLineageDerivedFrom          MessageID = "memory-inspector.detail.lineage.derived-from"
+	MsgMemoryDetailLineageInfluencedBy         MessageID = "memory-inspector.detail.lineage.influenced-by"
+	MsgMemoryDetailLineageOrigin               MessageID = "memory-inspector.detail.lineage.origin"
+	MsgMemoryDetailLineageRoots                MessageID = "memory-inspector.detail.lineage.roots"
+	MsgMemoryDetailLineageEmpty                MessageID = "memory-inspector.detail.lineage.empty"
+	MsgMemoryDetailLineageUnknownAncestor      MessageID = "memory-inspector.detail.lineage.unknown-ancestor"
+	MsgMemoryDetailLineageOriginUnknown        MessageID = "memory-inspector.detail.lineage.origin.unknown"
+	MsgMemoryDetailLineageOriginIsSelf         MessageID = "memory-inspector.detail.lineage.origin.is-self"
+	MsgMemoryDetailLineageRootsUnknown         MessageID = "memory-inspector.detail.lineage.roots.unknown"
+	MsgMemoryDetailLineageRootsIsSelf          MessageID = "memory-inspector.detail.lineage.roots.is-self"
+	MsgMemoryDetailEpisodesTitle               MessageID = "memory-inspector.detail.episodes.title"
+	MsgMemoryDetailEpisodesEmpty               MessageID = "memory-inspector.detail.episodes.empty"
+	MsgMemoryDetailEpisodeUnknown              MessageID = "memory-inspector.detail.episodes.unknown"
+	MsgMemoryDetailBindingsTitle               MessageID = "memory-inspector.detail.bindings.title"
+	MsgMemoryDetailBindingsUnknown             MessageID = "memory-inspector.detail.bindings.unknown"
+	MsgMemoryDetailBindingsExactRevision       MessageID = "memory-inspector.detail.bindings.exact-revision"
+	MsgMemoryDetailBindingsValidFrom           MessageID = "memory-inspector.detail.bindings.valid-from"
+	MsgMemoryDetailBindingsValidUntil          MessageID = "memory-inspector.detail.bindings.valid-until"
+	MsgMemoryDetailBindingsUnmodeled           MessageID = "memory-inspector.detail.bindings.unmodeled"
+	MsgMemoryDetailApplicabilityTitle          MessageID = "memory-inspector.detail.applicability.title"
+	MsgMemoryDetailApplicabilityUnmodeled      MessageID = "memory-inspector.detail.applicability.unmodeled"
+	MsgMemoryDetailHistoryTitle                MessageID = "memory-inspector.detail.history.title"
+	MsgMemoryDetailHistoryRetrieved            MessageID = "memory-inspector.detail.history.retrieved"
+	MsgMemoryDetailHistoryInfluenced           MessageID = "memory-inspector.detail.history.influenced"
+	MsgMemoryDetailHistoryRejected             MessageID = "memory-inspector.detail.history.rejected"
+	MsgMemoryDetailHistoryEmpty                MessageID = "memory-inspector.detail.history.empty"
+	MsgMemoryCorrectionTitle                   MessageID = "memory-inspector.correction.title"
+	MsgMemoryCorrectionExplain                 MessageID = "memory-inspector.correction.explain"
+	MsgMemoryCorrectionFieldStatement          MessageID = "memory-inspector.correction.field.statement"
+	MsgMemoryCorrectionFieldCommand            MessageID = "memory-inspector.correction.field.command"
+	MsgMemoryCorrectionFieldTestPaths          MessageID = "memory-inspector.correction.field.test-paths"
+	MsgMemoryCorrectionFieldExpectedOutcome    MessageID = "memory-inspector.correction.field.expected-outcome"
+	MsgMemoryCorrectionFieldPlanSummary        MessageID = "memory-inspector.correction.field.plan-summary"
+	MsgMemoryCorrectionFieldCanonicalName      MessageID = "memory-inspector.correction.field.canonical-name"
+	MsgMemoryCorrectionFieldCommandLines       MessageID = "memory-inspector.correction.field.command-lines"
+	MsgMemoryCorrectionFieldTestPathsLines     MessageID = "memory-inspector.correction.field.test-paths-lines"
+	MsgMemoryCorrectionListFieldExplain        MessageID = "memory-inspector.correction.list-field.explain"
+	MsgMemoryCorrectionSubmit                  MessageID = "memory-inspector.correction.submit"
+	MsgMemoryCorrectionInvalid                 MessageID = "memory-inspector.correction.invalid"
+	MsgMemoryQuarantineTitle                   MessageID = "memory-inspector.quarantine.title"
+	MsgMemoryQuarantineExplain                 MessageID = "memory-inspector.quarantine.explain"
+	MsgMemoryQuarantineConfirm                 MessageID = "memory-inspector.quarantine.confirm"
+	MsgMemoryQuarantineSubmit                  MessageID = "memory-inspector.quarantine.submit"
+	MsgMemoryQuarantineUnavailable             MessageID = "memory-inspector.quarantine.unavailable"
+	MsgMemoryInvalidationTitle                 MessageID = "memory-inspector.invalidation.title"
+	MsgMemoryInvalidationExplain               MessageID = "memory-inspector.invalidation.explain"
+	MsgMemoryInvalidationReasonLabel           MessageID = "memory-inspector.invalidation.reason-label"
+	MsgMemoryInvalidationSubmit                MessageID = "memory-inspector.invalidation.submit"
+	MsgMemoryInvalidationUnavailable           MessageID = "memory-inspector.invalidation.unavailable"
+	MsgMemoryDeletionTitle                     MessageID = "memory-inspector.deletion.title"
+	MsgMemoryDeletionExplain                   MessageID = "memory-inspector.deletion.explain"
+	MsgMemoryDeletionPreviewLoading            MessageID = "memory-inspector.deletion.preview-loading"
+	MsgMemoryDeletionDirectDependents          MessageID = "memory-inspector.deletion.direct-dependents"
+	MsgMemoryDeletionContextuallyInfluenced    MessageID = "memory-inspector.deletion.contextually-influenced"
+	MsgMemoryDeletionNone                      MessageID = "memory-inspector.deletion.none"
+	MsgMemoryDeletionAcknowledge               MessageID = "memory-inspector.deletion.acknowledge"
+	MsgMemoryDeletionAcknowledgedList          MessageID = "memory-inspector.deletion.acknowledged-list"
+	MsgMemoryDeletionSubmit                    MessageID = "memory-inspector.deletion.submit"
+	MsgMemoryExportTitle                       MessageID = "memory-inspector.export.title"
+	MsgMemoryExportExplain                     MessageID = "memory-inspector.export.explain"
+	MsgMemoryExportEmpty                       MessageID = "memory-inspector.export.empty"
+	MsgMemoryExportSubmit                      MessageID = "memory-inspector.export.submit"
+	MsgMemoryExportSelect                      MessageID = "memory-inspector.export.select"
 )
 
 var englishEntries = []Entry{
@@ -280,6 +413,138 @@ var englishEntries = []Entry{
 	{ID: MsgTermApproval, Text: "Approval"},
 	{ID: MsgTermCheckpoint, Text: "Checkpoint"},
 	{ID: MsgTermRecovery, Text: "Recovery"},
+	{ID: MsgKindCode, Text: "Code"},
+	{ID: MsgKindTest, Text: "Test"},
+	{ID: MsgKindPlan, Text: "Plan"},
+	{ID: MsgKindEvidence, Text: "Evidence"},
+	{ID: MsgKindMemory, Text: "Memory"},
+	{ID: MsgKindForecast, Text: "Forecast"},
+	{ID: MsgKindExecution, Text: "Execution"},
+	{ID: MsgKindValidation, Text: "Validation"},
+
+	{ID: MsgMemoryInspectorUnavailable, Text: "Project memory inspector unavailable"},
+	{ID: MsgMemoryKindRepositoryFact, Text: "Repository fact"},
+	{ID: MsgMemoryKindReviewedCommand, Text: "Reviewed command"},
+	{ID: MsgMemoryKindFileToTestMapping, Text: "File-to-test mapping"},
+	{ID: MsgMemoryKindRepositoryConvention, Text: "Repository convention"},
+	{ID: MsgMemoryKindAcceptedRegressionCase, Text: "Accepted regression case"},
+	{ID: MsgMemoryKindExecutionRecipe, Text: "Execution recipe"},
+	{ID: MsgMemoryKindExecutableAtomReference, Text: "Executable atom reference"},
+	{ID: MsgMemoryKindObservationHypothesis, Text: "Observation or hypothesis"},
+	{ID: MsgMemoryMaturityCandidate, Text: "Candidate"},
+	{ID: MsgMemoryMaturityValidated, Text: "Validated"},
+	{ID: MsgMemoryMaturityPreferredForExperiment, Text: "Preferred for experiment"},
+	{ID: MsgMemoryMaturityQuarantined, Text: "Quarantined"},
+	{ID: MsgMemoryMaturityInvalidated, Text: "Invalidated"},
+	{ID: MsgMemoryMaturityRetired, Text: "Retired"},
+	{ID: MsgMemoryFilterKindLabel, Text: "Filter by type"},
+	{ID: MsgMemoryFilterMaturityLabel, Text: "Filter by maturity"},
+	{ID: MsgMemoryFilterValidityLabel, Text: "Filter by validity"},
+	{ID: MsgMemoryFilterLastConfirmationLabel, Text: "Filter by last confirmation"},
+	{ID: MsgMemoryFilterClear, Text: "Clear filters"},
+	{ID: MsgMemoryFilterValidityAny, Text: "Any validity"},
+	{ID: MsgMemoryFilterValidityCurrentlyValid, Text: "Currently valid"},
+	{ID: MsgMemoryFilterValidityNotYetValidated, Text: "Not yet validated"},
+	{ID: MsgMemoryFilterValidityNoLongerValid, Text: "No longer valid"},
+	{ID: MsgMemoryFilterConfirmationAny, Text: "Any time"},
+	{ID: MsgMemoryFilterConfirmationWithin7Days, Text: "Confirmed within 7 days"},
+	{ID: MsgMemoryFilterConfirmationWithin30Days, Text: "Confirmed within 30 days"},
+	{ID: MsgMemoryFilterConfirmationOlderThan30Days, Text: "Confirmed more than 30 days ago"},
+	{ID: MsgMemoryFilterConfirmationNeverConfirmed, Text: "Never confirmed"},
+	{ID: MsgMemoryListTitleLabel, Text: "Project memory"},
+	{ID: MsgMemoryListAriaLabel, Text: "Project memory artifacts"},
+	{ID: MsgMemoryListLoading, Text: "Loading memory artifacts"},
+	{ID: MsgMemoryListEmptyTitle, Text: "No memory artifacts match"},
+	{ID: MsgMemoryListEmptyBody, Text: "Adjust filters or wait for new artifacts to be captured."},
+	{ID: MsgMemoryListErrorTitle, Text: "Could not load memory artifacts"},
+	{ID: MsgMemoryListErrorBody, Text: "Retry is available."},
+	{ID: MsgMemoryListDisconnectedTitle, Text: "Memory list is offline"},
+	{ID: MsgMemoryListDisconnectedBody, Text: "Reconnect to see live memory artifacts."},
+	{ID: MsgMemoryListRetry, Text: "Retry"},
+	{ID: MsgMemoryListRowLastConfirmed, Text: "Last confirmed {state}"},
+	{ID: MsgMemoryListRowNeverConfirmed, Text: "Never confirmed"},
+	{ID: MsgMemorySelectedNoneTitle, Text: "No artifact selected"},
+	{ID: MsgMemorySelectedNoneBody, Text: "Select an artifact from the list to inspect it."},
+	{ID: MsgMemorySelectedLoading, Text: "Loading artifact detail"},
+	{ID: MsgMemorySelectedErrorTitle, Text: "Could not load artifact detail"},
+	{ID: MsgMemorySelectedErrorBody, Text: "Retry is available."},
+	{ID: MsgMemorySelectedDeniedTitle, Text: "Access denied"},
+	{ID: MsgMemorySelectedDeniedBody, Text: "You are not authorized to inspect this artifact."},
+	{ID: MsgMemorySelectedIncompatibleTitle, Text: "Update required"},
+	{ID: MsgMemorySelectedIncompatibleBody, Text: "This artifact requires a compatible CodeFlux version."},
+	{ID: MsgMemorySelectedDisconnectedTitle, Text: "Detail is offline"},
+	{ID: MsgMemorySelectedDisconnectedBody, Text: "Reconnect to load artifact detail."},
+	{ID: MsgMemorySelectedRetry, Text: "Retry"},
+	{ID: MsgMemoryDetailIdentityTitle, Text: "Identity and maturity"},
+	{ID: MsgMemoryDetailIdentityArtifactID, Text: "Stable artifact identity"},
+	{ID: MsgMemoryDetailIdentityRevisionID, Text: "Current revision"},
+	{ID: MsgMemoryDetailIdentityScope, Text: "Project scope"},
+	{ID: MsgMemoryDetailIdentitySupersedes, Text: "Supersedes revision"},
+	{ID: MsgMemoryDetailIdentityFromCorrection, Text: "Created from a user correction"},
+	{ID: MsgMemoryDetailLineageTitle, Text: "Lineage"},
+	{ID: MsgMemoryDetailLineageDerivedFrom, Text: "Derived from (semantic dependency)"},
+	{ID: MsgMemoryDetailLineageInfluencedBy, Text: "Influenced by (contextual exposure)"},
+	{ID: MsgMemoryDetailLineageOrigin, Text: "Origin artifact"},
+	{ID: MsgMemoryDetailLineageRoots, Text: "Lineage roots"},
+	{ID: MsgMemoryDetailLineageEmpty, Text: "None recorded"},
+	{ID: MsgMemoryDetailLineageUnknownAncestor, Text: "Unknown — ancestor artifact record is unavailable"},
+	{ID: MsgMemoryDetailLineageOriginUnknown, Text: "Unknown — {message}"},
+	{ID: MsgMemoryDetailLineageOriginIsSelf, Text: "This artifact is its own origin: it has no derived-from ancestor."},
+	{ID: MsgMemoryDetailLineageRootsUnknown, Text: "Unknown — {message}"},
+	{ID: MsgMemoryDetailLineageRootsIsSelf, Text: "This artifact is itself the only lineage root."},
+	{ID: MsgMemoryDetailEpisodesTitle, Text: "Supporting episodes"},
+	{ID: MsgMemoryDetailEpisodesEmpty, Text: "No supporting episodes are recorded."},
+	{ID: MsgMemoryDetailEpisodeUnknown, Text: "Unknown — {message}"},
+	{ID: MsgMemoryDetailBindingsTitle, Text: "Bindings"},
+	{ID: MsgMemoryDetailBindingsUnknown, Text: "Unknown — {message}"},
+	{ID: MsgMemoryDetailBindingsExactRevision, Text: "Exact revision"},
+	{ID: MsgMemoryDetailBindingsValidFrom, Text: "Valid from revision"},
+	{ID: MsgMemoryDetailBindingsValidUntil, Text: "Valid until revision"},
+	{ID: MsgMemoryDetailBindingsUnmodeled, Text: "Unknown — no revision binding is modeled for this artifact kind."},
+	{ID: MsgMemoryDetailApplicabilityTitle, Text: "Applicability predicate"},
+	{ID: MsgMemoryDetailApplicabilityUnmodeled, Text: "Unknown — applicability predicate is not modeled for this artifact kind."},
+	{ID: MsgMemoryDetailHistoryTitle, Text: "Retrieval and influence history"},
+	{ID: MsgMemoryDetailHistoryRetrieved, Text: "Retrieved (not necessarily used)"},
+	{ID: MsgMemoryDetailHistoryInfluenced, Text: "Influenced accepted outcome"},
+	{ID: MsgMemoryDetailHistoryRejected, Text: "Retrieved and rejected"},
+	{ID: MsgMemoryDetailHistoryEmpty, Text: "No retrieval history is recorded."},
+	{ID: MsgMemoryCorrectionTitle, Text: "Correct this artifact"},
+	{ID: MsgMemoryCorrectionExplain, Text: "A correction always creates a new candidate revision. The current revision is preserved and never mutated."},
+	{ID: MsgMemoryCorrectionFieldStatement, Text: "Statement"},
+	{ID: MsgMemoryCorrectionFieldCommand, Text: "Command (space-separated arguments, joined by \"; \")"},
+	{ID: MsgMemoryCorrectionFieldTestPaths, Text: "Test paths (joined by \"; \")"},
+	{ID: MsgMemoryCorrectionFieldExpectedOutcome, Text: "Expected outcome"},
+	{ID: MsgMemoryCorrectionFieldPlanSummary, Text: "Plan summary"},
+	{ID: MsgMemoryCorrectionFieldCanonicalName, Text: "Canonical name"},
+	{ID: MsgMemoryCorrectionFieldCommandLines, Text: "Command (one argument per line)"},
+	{ID: MsgMemoryCorrectionFieldTestPathsLines, Text: "Test paths (one per line)"},
+	{ID: MsgMemoryCorrectionListFieldExplain, Text: "Enter one value per line. A blank line is ignored; leading and trailing space on each line is trimmed."},
+	{ID: MsgMemoryCorrectionSubmit, Text: "Create corrected revision"},
+	{ID: MsgMemoryCorrectionInvalid, Text: "This correction is not valid: {message}"},
+	{ID: MsgMemoryQuarantineTitle, Text: "Quarantine"},
+	{ID: MsgMemoryQuarantineExplain, Text: "Quarantine stops new retrieval immediately and is terminal for this revision. It cannot be un-quarantined or restored with inherited authority."},
+	{ID: MsgMemoryQuarantineConfirm, Text: "I understand this action is terminal for this revision"},
+	{ID: MsgMemoryQuarantineSubmit, Text: "Quarantine this revision"},
+	{ID: MsgMemoryQuarantineUnavailable, Text: "Quarantine is unavailable: {message}"},
+	{ID: MsgMemoryInvalidationTitle, Text: "Invalidate"},
+	{ID: MsgMemoryInvalidationExplain, Text: "Invalidation records that this revision's claim is no longer trusted."},
+	{ID: MsgMemoryInvalidationReasonLabel, Text: "Reason for invalidation"},
+	{ID: MsgMemoryInvalidationSubmit, Text: "Invalidate this revision"},
+	{ID: MsgMemoryInvalidationUnavailable, Text: "Invalidation is unavailable: {message}"},
+	{ID: MsgMemoryDeletionTitle, Text: "Delete"},
+	{ID: MsgMemoryDeletionExplain, Text: "Deletion cannot proceed until the affected-descendant preview has loaded."},
+	{ID: MsgMemoryDeletionPreviewLoading, Text: "Loading affected-descendant preview"},
+	{ID: MsgMemoryDeletionDirectDependents, Text: "Direct semantic dependents"},
+	{ID: MsgMemoryDeletionContextuallyInfluenced, Text: "Contextually influenced descendants"},
+	{ID: MsgMemoryDeletionNone, Text: "None"},
+	{ID: MsgMemoryDeletionAcknowledge, Text: "I acknowledge these dependents will be affected"},
+	{ID: MsgMemoryDeletionAcknowledgedList, Text: "Acknowledged dependents"},
+	{ID: MsgMemoryDeletionSubmit, Text: "Delete this artifact"},
+	{ID: MsgMemoryExportTitle, Text: "Export selected records"},
+	{ID: MsgMemoryExportExplain, Text: "Export is secret-free by construction. Redaction happens upstream before a record reaches this list; this view performs no additional scrubbing."},
+	{ID: MsgMemoryExportEmpty, Text: "No exportable records are available."},
+	{ID: MsgMemoryExportSubmit, Text: "Export selected"},
+	{ID: MsgMemoryExportSelect, Text: "Select {label} for export"},
 }
 
 var (
