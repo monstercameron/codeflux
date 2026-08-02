@@ -24,6 +24,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-017
+Date: 2026-08-02
+Status: Design references tracked
+Change-ID: CL-20260802-008
+Request-or-TODO: User: "Track it -- it's design source"
+Goal: Settle design/, the one directory that was neither tracked nor ignored
+Assumptions: Reference renderings are design source, not disposable output, so
+  the .artifacts/ rule does not apply to them
+Decisions: Track rather than ignore. The directory had been sitting in git
+  status as an undecided reminder; leaving it there indefinitely is how a
+  decision gets made by accident
+Files-or-schemas: design/references/ui/*.png (6 files, 11.2 MB). No schema
+Validation: git check-attr binary confirms .gitattributes covers them
+Failures-or-discarded-approaches: Using one as the README hero was considered
+  and rejected -- they are mockups with a stock avatar and fabricated records,
+  and presenting one as the product would contradict the documentation's own
+  standard for what may be claimed
+Known-limitations: These images will age against the real interface. Nothing
+  checks that they still describe the current design
+Next-safe-step: Replace or supplement them with captures of the running
+  interface once the shell is stable
+
 Dev-Log: DL-20260802-016
 Date: 2026-08-02
 Status: Repository metadata published; licence changed to MIT

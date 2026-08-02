@@ -30,6 +30,24 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-008
+Date: 2026-08-02
+Type: The interface design references are tracked as source rather than left
+  loose in the working tree
+Request-or-TODO: User, asked whether design/ was source or scratch: "Track it --
+  it's design source"
+Outcome: The six reference renderings under design/references/ui/ are committed.
+  They are inputs to the interface work rather than build output, so versioning
+  them lets a later change be compared against the target it was chasing. They
+  are explicitly NOT screenshots: they carry invented data and describe a design
+  target, which is why they were kept out of the README
+Affected-behavior: None. Images only; no source, schema, or runtime path
+Compatibility-or-migration: None. Adds 11.2 MB of PNG to the repository, which
+  .gitattributes already marks binary so no line-ending normalisation applies
+Verification: git check-attr confirms the binary attribute applies. No gate is
+  affected by an image
+Dev-Log: DL-20260802-017
+
 Change-ID: CL-20260802-007
 Date: 2026-08-02
 Type: The repository gains the public-facing metadata a published project needs,
