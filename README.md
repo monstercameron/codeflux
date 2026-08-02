@@ -2,8 +2,7 @@
 
 # CodeFlux
 
-**A coding agent that derives authority from what an action *is* —
-never from what the model says it needs.**
+**An experimental coding agent that builds programs out of verified atoms.**
 
 [![Main gate](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml?query=branch%3Amain)
 [![Dev pass](https://github.com/monstercameron/codeflux/actions/workflows/dev-pass.yml/badge.svg?branch=dev)](https://github.com/monstercameron/codeflux/actions/workflows/dev-pass.yml?query=branch%3Adev)
@@ -13,39 +12,50 @@ never from what the model says it needs.**
 [![Platforms](https://img.shields.io/badge/platforms-windows%20%7C%20macos%20%7C%20linux-lightgrey.svg)](#supported-platforms)
 [![Status: prototype](https://img.shields.io/badge/status-prototype-orange.svg)](#project-status)
 
-**[Quickstart](#quickstart) · [How it works](#how-it-works) · [What it will not do](#what-it-will-not-do) · [User guide](docs/using.md) · [Contributing](.github/CONTRIBUTING.md)**
+**[The idea](#the-idea) · [Quickstart](#quickstart) · [How a run produces code](#how-a-run-produces-code) · [What it will not do](#what-it-will-not-do) · [User guide](docs/using.md) · [Contributing](.github/CONTRIBUTING.md)**
 
 </div>
 
 ---
 
-## The argument
+## The idea
 
-Most coding agents ask permission with a sentence the model wrote. You approve
-the sentence. Then something else runs.
+Most coding agents write a program in one pass and then try to check it.
+CodeFlux builds one from the bottom up, out of **atoms**.
 
-CodeFlux asks with the **exact action identity**: the tool, its ordered
-arguments, and its declared effects. Approving `curl https://example.com` does
-not approve `curl https://elsewhere`, and it does not approve the same URL
-reached through a different tool. A denial is recorded against the *capability*,
-not against the one tool you happened to be shown — so a refused action is not
-quietly retried through a side door.
+An atom is a reusable unit with a stable identity, a typed signature, a
+contract, documentation, declared effects, and the evidence that it works. It is
+larger than a helper function and smaller than a workflow. An atom reads nothing
+outside its arguments, so what it does is determined by what you pass it.
 
-This matters because repository content is untrusted input. A poisoned `README`
-can absolutely persuade a model to *propose* something hostile. It cannot
-persuade CodeFlux that the proposal is authorized, because authority is never
-derived from anything a model or a file asserts. That is the whole design, and
-everything below follows from it.
+Atoms compose into **molecules**, molecules into control flow, control flow into
+a program. Each layer states what it must guarantee, and each guarantee names
+the pieces that discharge it.
 
-The second commitment is narrower and just as load-bearing: **CodeFlux reports
-what it knows, what is ambiguous, and what it recommends as three separate
-things.** A forecast is a range, never a promise. An unreported price stays
-`unknown` and is never rendered as zero. A passing validation means the checks
-that ran passed — not that the change is correct. The execution graph explains
-what happened; it does not prove that what happened was right.
+**Correctness is the dimension being optimized.** Everything else is downstream
+of it. Cost is the interesting consequence: a verified atom is project capital,
+so the next task that needs it recalls it instead of rebuilding it. When an atom
+is reused, the eleven stages that established it collapse into one obligation —
+it must still pass the *new* run's tests, derived from the *new* contract. Reuse
+without that re-verification would just inherit the old blind spot.
 
-An agent that overstates its own evidence is worse than no agent, because you
-stop reading the diff.
+That is also where the cost theory lives. If a program can be assembled from
+atoms that are already verified, assembly is a smaller job than authorship, and
+a cheaper model may be able to do it. Whether that holds is not settled.
+
+**This is a bet, and it is written down as one.** Two of them, really:
+functional decomposition into pure atoms, and the claim that verified reuse
+compounds. The plan gives atom reuse an explicit kill criterion — if it produces
+no measurable improvement in defects, review time, or total cost, it goes. The
+prototype exists to find out.
+
+Two habits hold the rest together. Authority comes from what an action *is* —
+the tool, its ordered arguments, its declared effects — not from what the model
+says it needs, so a poisoned file can persuade a model to propose something but
+cannot make it authorized. And what is known, what is ambiguous, and what is
+recommended stay three separate things: a forecast is a range, an unreported
+price stays `unknown` rather than becoming zero, and a passing check means those
+checks passed and nothing more.
 
 ---
 
@@ -102,7 +112,20 @@ Delete that directory and CodeFlux is gone. Your repository is not part of it.
 
 ---
 
-## What it actually does differently
+## What it does differently
+
+### Atoms are kept, and re-verified before they are reused
+
+A verified atom carries its purpose, inputs, outputs, algorithm, and the
+metadata a later run needs to find it. Documentation is written *after* the
+tests, the fuzzing, and the mutation score, so it describes what the atom is
+known to do rather than what its author meant.
+
+A later task looking for the same contract recalls that atom instead of writing
+a new one — but only if it still passes the tests the new run derived from the
+new contract. An atom that fails re-verification is rebuilt. Molecules are
+registered the same way, because a registry holding only leaf functions makes
+every run rebuild the joins.
 
 ### It never edits your checkout
 
@@ -304,21 +327,20 @@ flowchart TD
     class GATE1,GATE2,GATE3,GATE4 gate
 ```
 
-Three things in that picture are load-bearing.
+Three details in that picture matter more than the rest.
 
-**Tests come before the thing they test, and cases come before the tests.**
-Stage 7 derives a ladder of inputs from the *signature* — straightforward,
-degenerate, edge, complex, wrong, pathological — before any test is written. A
-test written by reading an implementation checks what the code does; a case
-derived from the contract checks what the signature promised, and those two
-differ exactly where the bug is.
+**Cases come before tests, and tests come before code.** Stage 7 derives a
+ladder of inputs from the *signature* — straightforward, degenerate, edge,
+complex, wrong, pathological — before any test is written. A test written by
+reading an implementation checks what the code does; a case derived from the
+contract checks what the signature promised. They differ where the bug is.
 
-**Ordering within a phase is an argument, not a convention.** Anti-pattern
-detection sits *after* verification because a swallowed error is neither a
-compile error nor a test failure — no test written against current behavior
-would ever catch one. Optimization may only run *after* mutation scoring,
-because rewriting code guarded by tests nobody has shown can detect a defect is
-how a behavior change reaches delivery with a green suite behind it.
+**The order within a phase is deliberate.** Anti-pattern detection runs *after*
+verification, because a swallowed error is neither a compile error nor a test
+failure and no test written against current behavior would catch one.
+Optimization runs *after* mutation scoring, because rewriting code guarded by
+tests that have never been shown to detect a defect is how a behavior change
+ships with a green suite behind it.
 Documentation comes *last*, after fuzzing and mutation, so it describes what the
 atom is known to do rather than what its author meant.
 

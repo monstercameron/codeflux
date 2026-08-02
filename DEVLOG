@@ -25,11 +25,46 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-036
+Date: 2026-08-02
+Status: README rethemed around atoms
+Change-ID: CL-20260802-026
+Commit: pending
+Request-or-TODO: User: the README sounds pretentious; the project is an
+  experimental agent building large programs from well-defined reusable atoms,
+  correctness first, betting on FP and atomicity
+Goal: Make the README describe the bet the project is actually making, plainly
+Assumptions: The user's framing is authoritative for what the project is for,
+  and the plan is authoritative for the details. Both were used: his thesis for
+  the shape, the plan for every specific claim
+Decisions: Structural authority moved from the opening to a closing paragraph of
+  the same section. It is real and worth stating, but it is a property of how
+  the agent is allowed to act, not the reason the project exists -- leading with
+  it described the safety rails rather than the building. The cost claim is
+  written as a hypothesis, because the user said "perhaps" and the plan attaches
+  a kill criterion to exactly this question; asserting a cost win the prototype
+  exists to test would be the same overstatement the documentation warns against
+  everywhere else. Stage numbers were taken from internal/pipeline rather than
+  from the plan's newer flow, where the reuse decision sits at a different stage
+  number, because the diagrams in this README document the committed package
+Files-or-schemas: README.md. GitHub repository description updated server-side
+Validation: The atom definition, the molecule-registry rationale, the
+  re-verification obligation, and the kill criterion were each read out of
+  docs/plan.md before being written
+Failures-or-discarded-approaches: The first README was written from what was
+  interesting in the source rather than from what the project is betting on, and
+  nothing in the repository would have caught that -- only the author could
+Known-limitations: The plan describes a longer flow than internal/pipeline
+  declares, and the two number their stages differently. The README follows the
+  package; if the package is updated to the plan's flow, the diagrams and the
+  reuse prose both need revisiting
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-035
 Date: 2026-08-02
 Status: TODOS backfilled; CHANGELOG audited and found complete
 Change-ID: CL-20260802-025
-Commit: pending
+Commit: 5337f43
 Request-or-TODO: User: "review the latest commits against the todo list and
   changelog and backfill todos and changes that werent documented"
 Goal: Make the completion ledger match what was actually done today

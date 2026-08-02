@@ -42,8 +42,45 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-025
+Change-ID: CL-20260802-026
 Commit: pending
+Date: 2026-08-02
+Type: The README leads with the atom thesis instead of the authority model, in
+  a plainer voice
+Request-or-TODO: User: "the readme souns so pretentious, this is an experimental
+  coding agent where we build large programs from the ground up using well
+  defined atoms. the theory is atoms are building blocks, so if they are well
+  defined and reusable we enhance correctness and cost as we can use cheaper
+  models perhaps after the atom was already created, correctness is the biggest
+  dimension we are working on and we are betting big on FP and atomicity, refine
+  the readme based on teh plan and my opinion of the project"
+Outcome: The opening argued structural authority, which is a safety property
+  rather than the project's bet, and argued it in an aphoristic register the
+  user found pretentious. It now opens on atoms: a reusable unit with identity,
+  typed signature, contract, documentation, declared effects, and evidence,
+  larger than a helper and smaller than a workflow, reading nothing outside its
+  arguments. Atoms compose into molecules, molecules into control flow, control
+  flow into a program. Correctness is named as the dimension being optimized and
+  cost as its consequence -- a verified atom is capital, and reusing it collapses
+  eleven stages into one obligation, that it still passes the new run's cases
+  derived from the new contract. The cheaper-model claim is stated as the
+  hypothesis it is rather than as a result, and the kill criterion the plan
+  attaches to reuse is stated in the opening rather than buried in the
+  limitations. Authority and the known/ambiguous/recommended split are kept, in
+  one paragraph, as the habits they are. A section on how atoms are kept and
+  re-verified was added; the pipeline prose was sanded of its grander phrasing;
+  the GitHub description was rewritten to match
+Affected-behavior: None. Documentation only
+Compatibility-or-migration: None
+Verification: Every claim was read out of docs/plan.md or internal/pipeline
+  before being written: the atom definition, molecule registration, the
+  re-verification obligation, and the reuse kill criterion. No stage numbers
+  from the plan's newer flow were used, since internal/pipeline is what the
+  diagrams document
+Dev-Log: DL-20260802-036
+
+Change-ID: CL-20260802-025
+Commit: 5337f43
 Date: 2026-08-02
 Type: The day's repository work is backfilled into TODOS.md, including the
   server-side configuration no commit can carry
