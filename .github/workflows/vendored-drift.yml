@@ -1,0 +1,69 @@
+name: Vendored drift
+
+# The two skills under .claude/skills/ are point-in-time copies. Nothing else
+# compares them against upstream, so without this they rot silently: the file
+# keeps working, keeps being read, and slowly stops matching the thing it claims
+# to be a copy of.
+#
+# This reports drift. It does not update anything — pulling third-party prompt
+# content automatically is exactly what AGENTS.md forbids, and an unattended
+# update to instructions an agent obeys is a supply-chain change nobody reviewed.
+
+on:
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Compare vendored skills with upstream
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Compare karpathy-guidelines against its pinned commit
+        id: karpathy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pinned in AGENTS.md and CLAUDE.md. Bump both, and this, together.
+          PIN: 2c606141936f1eeef17fa3043a72095b4765b9c2
+          UPSTREAM: multica-ai/andrej-karpathy-skills
+          PATH_IN_REPO: skills/karpathy-guidelines/SKILL.md
+        run: |
+          set -uo pipefail
+          if ! gh api "repos/$UPSTREAM/contents/$PATH_IN_REPO?ref=$PIN" \
+               --jq .content 2>/dev/null | base64 -d > /tmp/upstream.md; then
+            echo "::warning::could not fetch upstream; treating as unknown, not as match"
+            exit 0
+          fi
+          # The vendored copy carries an appended provenance section, so compare
+          # only the part above it. A diff in the body is real drift.
+          sed '/^## Provenance and precedence/,$d' \
+            .claude/skills/karpathy-guidelines/SKILL.md > /tmp/vendored.md
+          if diff -q /tmp/upstream.md /tmp/vendored.md >/dev/null; then
+            echo "karpathy-guidelines: matches pin $PIN"
+          else
+            echo "::warning::karpathy-guidelines differs from its pinned upstream"
+            diff -u /tmp/upstream.md /tmp/vendored.md | head -60 || true
+          fi
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "### Vendored skill drift"
+            echo ""
+            echo "Upstream moving is not a defect. This job exists so the copy"
+            echo "is re-read deliberately rather than trusted indefinitely."
+            echo ""
+            echo "frontend-design is vendored verbatim from the Anthropic plugin"
+            echo "marketplace, which publishes no per-skill version, so it cannot"
+            echo "be compared automatically and is re-checked by hand."
+          } >> "$GITHUB_STEP_SUMMARY"

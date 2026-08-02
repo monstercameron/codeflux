@@ -25,11 +25,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-033
+Date: 2026-08-02
+Status: Vendored drift check added
+Change-ID: CL-20260802-023
+Commit: pending
+Request-or-TODO: User: "use the gaps to refine the repo handling"
+Goal: Make vendored copies re-read deliberately instead of trusted indefinitely
+Assumptions: Drift is not itself a defect. Upstream moving is expected; being
+  unaware of it is the problem
+Decisions: Report, never update. Weekly, not per-push, since a vendored file
+  changes only when someone changes it. The comparison strips the provenance
+  section appended to the Karpathy copy, so only the body is compared and a
+  difference there is real. A fetch failure warns rather than passes, because a
+  check that reads "green" when it could not reach upstream is worse than no
+  check. frontend-design cannot be compared this way at all: the Anthropic
+  marketplace publishes no per-skill version, so the workflow says so in its
+  summary rather than pretending to cover it
+Files-or-schemas: .github/workflows/vendored-drift.yml. No schema change
+Validation: YAML parses
+Failures-or-discarded-approaches: Running it per-push was rejected as noise
+Known-limitations: frontend-design is unmonitored and must be re-checked by
+  hand. The Karpathy pin now lives in three files and nothing enforces that they
+  agree, so a partial bump would leave the check comparing against a commit the
+  documentation no longer names
+Next-safe-step: If the pin is ever bumped, change all three files together
+
 Dev-Log: DL-20260802-032
 Date: 2026-08-02
 Status: Worktree isolation required for concurrent lanes
 Change-ID: CL-20260802-022
-Commit: pending
+Commit: a476144
 Request-or-TODO: User: "use the gaps to refine the repo handling"
 Goal: Stop lanes blocking each other's commits
 Assumptions: Worktrees are the cheaper of the two fixes. The alternative was

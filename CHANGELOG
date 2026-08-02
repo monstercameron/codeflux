@@ -42,8 +42,28 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-022
+Change-ID: CL-20260802-023
 Commit: pending
+Date: 2026-08-02
+Type: A scheduled job reports drift between the vendored skills and upstream
+Request-or-TODO: User: "use the gaps to refine the repo handling"
+Outcome: The two skills under .claude/skills/ were point-in-time copies with
+  nothing watching them, so they would rot silently -- still read, still obeyed,
+  slowly no longer matching what they claim to be a copy of. A weekly job now
+  fetches karpathy-guidelines at its pinned commit and diffs it against the
+  vendored body, ignoring the appended provenance section. It reports and
+  updates nothing: pulling third-party prompt content automatically is what
+  AGENTS.md forbids, and an unattended change to instructions an agent obeys is
+  a supply-chain change nobody reviewed. A failed fetch is reported as unknown
+  rather than passed as a match, so an upstream deletion cannot read as agreement
+Affected-behavior: None
+Compatibility-or-migration: The pinned commit appears in three places now --
+  AGENTS.md, CLAUDE.md, and this workflow -- and all three move together
+Verification: The workflow file parses
+Dev-Log: DL-20260802-033
+
+Change-ID: CL-20260802-022
+Commit: a476144
 Date: 2026-08-02
 Type: Concurrent agent lanes are required to take separate Git worktrees
 Request-or-TODO: User: "use the gaps to refine the repo handling", addressing
