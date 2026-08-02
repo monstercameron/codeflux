@@ -30,6 +30,35 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-013
+Date: 2026-08-02
+Type: CI splits into a non-gating dev pass and the gated main pass
+Request-or-TODO: User: "lets start create the workflows and the non gated dev
+  pass and the gated main pass"
+Outcome: ci.yml is now the main gate and runs only on main and on pull requests
+  into main. Its six jobs plus CodeQL's "Analyze Go" are the seven required
+  checks, and their names are unchanged, because the ruleset matches required
+  checks by exact job name and a renamed job becomes a required check that never
+  reports and blocks every merge while looking correct. A header on the file now
+  says so. dev-pass.yml is new: lint, generate-check, unit tests, and build on
+  one Ubuntu runner, on dev and on pull requests into dev. It gates nothing --
+  the dev ruleset requires no checks -- and its job name is deliberately
+  distinct so it can never be mistaken for a required one. Each of its steps
+  runs even after an earlier one failed, so a single push reports everything
+  broken rather than only the first thing, and it writes a step summary saying
+  in as many words that it is not a verdict. Both workflows gained
+  workflow_dispatch for manual reruns
+Affected-behavior: The full four-platform matrix no longer runs on every push to
+  every branch, so feedback on dev is one runner instead of six. Platform-
+  specific breakage is now caught at the pull request into main rather than
+  earlier, which is the intended trade
+Compatibility-or-migration: The README's CI badge is pinned to ?branch=main. The
+  default branch is dev, where the gate no longer runs, so an unpinned badge
+  would have rendered "no status" indefinitely
+Verification: All four workflow files parse. Job names were enumerated and
+  compared against the ruleset's seven required contexts; they match exactly
+Dev-Log: DL-20260802-022
+
 Change-ID: CL-20260802-012
 Date: 2026-08-02
 Type: The repository gains a tracked Claude Code configuration, three subagents,

@@ -5,7 +5,8 @@
 **A coding agent that derives authority from what an action *is* —
 never from what the model says it needs.**
 
-[![CI](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml/badge.svg)](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml)
+[![Main gate](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/monstercameron/codeflux/actions/workflows/ci.yml?query=branch%3Amain)
+[![Dev pass](https://github.com/monstercameron/codeflux/actions/workflows/dev-pass.yml/badge.svg?branch=dev)](https://github.com/monstercameron/codeflux/actions/workflows/dev-pass.yml?query=branch%3Adev)
 [![CodeQL](https://github.com/monstercameron/codeflux/actions/workflows/codeql.yml/badge.svg)](https://github.com/monstercameron/codeflux/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go 1.26+](https://img.shields.io/badge/go-1.26%2B-00ADD8.svg?logo=go&logoColor=white)](go.mod)

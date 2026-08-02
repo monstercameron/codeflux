@@ -1,0 +1,117 @@
+name: Dev pass
+
+# The non-gated pass. It runs on dev and on pull requests into dev, and it
+# gates nothing: the dev ruleset requires no status checks, so a red run here
+# blocks no merge.
+#
+# That is the point. dev is where a half-finished integration is allowed to
+# exist and be looked at, and a red dev pass is information rather than an
+# emergency. What it must not be is silent, so every step reports and none of
+# them is allowed to swallow a failure.
+#
+# It is one runner, not the four the main gate uses, because its job is fast
+# feedback. Anything platform-specific is caught by the gate on the way to main.
+# The job names here are deliberately distinct from the gate's, so they can
+# never be mistaken for a required check.
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel superseded runs. On an integration branch the newest push is the only
+  # one whose answer anybody wants.
+  group: dev-pass-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANTHROPIC_API_KEY: ""
+  CODEFLUX_LIVE_PROVIDER: ""
+  GOTOOLCHAIN: local
+  OPENAI_API_KEY: ""
+
+jobs:
+  quick:
+    name: Dev pass (Ubuntu 24.04 AMD64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.5
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install pinned Staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+
+      # Every step below runs even when an earlier one failed. A dev pass that
+      # stopped at the first failure would report one problem per push, which on
+      # a branch carrying several lanes' unfinished work is the slowest possible
+      # way to learn what is broken.
+      - name: Check formatting, vet, lint, migrations, and secrets
+        id: lint
+        if: ${{ !cancelled() }}
+        run: go run ./cmd/codeflux-dev lint
+
+      - name: Check deterministic generation
+        id: generate
+        if: ${{ !cancelled() }}
+        run: go run ./cmd/codeflux-dev generate-check
+
+      - name: Run unit tests
+        id: tests
+        if: ${{ !cancelled() }}
+        run: go run ./cmd/codeflux-dev test-fast
+
+      - name: Build
+        id: build
+        if: ${{ !cancelled() }}
+        run: go run ./cmd/codeflux-dev build
+
+      - name: Check artifact boundary
+        if: ${{ !cancelled() }}
+        run: go run ./cmd/codeflux-dev artifact-check
+
+      - name: Summarise what passed and what did not
+        if: always()
+        run: |
+          {
+            echo "### Dev pass"
+            echo ""
+            echo "Nothing here gates a merge. This is the state of \`dev\`, not a verdict on it."
+            echo ""
+            echo "| Step | Result |"
+            echo "| --- | --- |"
+            echo "| Lint | ${{ steps.lint.outcome }} |"
+            echo "| Generate check | ${{ steps.generate.outcome }} |"
+            echo "| Unit tests | ${{ steps.tests.outcome }} |"
+            echo "| Build | ${{ steps.build.outcome }} |"
+            echo ""
+            echo "The full seven-check matrix runs on the pull request into \`main\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create allow-listed failure metadata
+        if: failure()
+        run: go run ./cmd/codeflux-dev ci-failure-artifact
+
+      - name: Upload redacted failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dev-pass-failure
+          path: .artifacts/test-failures/context.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,8 +1,22 @@
-name: CI
+name: Main gate
+
+# The gated pass. Every job here is a required check on main: a pull request
+# from dev merges only when all of them are green, and there is no bypass.
+#
+# It deliberately does not run on dev. dev-pass.yml gives faster feedback there,
+# and dev is allowed to be red.
+#
+# The job names below ARE the required check contexts in the "main is released
+# code" ruleset. Renaming one creates a required check that never reports, which
+# blocks every merge into main while looking correct. Change the ruleset in the
+# same commit or not at all.
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read

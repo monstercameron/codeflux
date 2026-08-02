@@ -24,6 +24,46 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-022
+Date: 2026-08-02
+Status: Two-pass CI in place; dev pass non-gating, main gate unchanged in name
+Change-ID: CL-20260802-013
+Request-or-TODO: User: "lets start create the workflows and the non gated dev
+  pass and the gated main pass"
+Goal: Make dev feedback fast and main feedback authoritative, without breaking
+  the required checks already configured on main
+Assumptions: "Non-gated" means it must not block a merge, not that it should
+  hide failure. It therefore still reports red; dev simply requires no checks
+Decisions: Job names in ci.yml were left byte-identical. The ruleset matches
+  required checks by exact job name, so renaming one would leave main waiting
+  forever on a context nothing produces -- the same trap gate-runner.md warns
+  about. A comment block in ci.yml now states this, because the next person to
+  tidy a job name will not have read this entry. The dev pass uses
+  ${{ !cancelled() }} rather than always() on its steps: always() also runs
+  after a cancellation, which burns a runner to answer a question nobody is
+  waiting for. It runs one Ubuntu runner rather than four platforms, accepting
+  that Windows-specific breakage surfaces later, at the pull request into main.
+  Adding test-integration and test-security to the gate was considered and NOT
+  done: their runtime here is unmeasured, and putting an unmeasured suite behind
+  a merge gate is how a branch becomes unmergeable for reasons nobody predicted
+Files-or-schemas: .github/workflows/ci.yml (renamed to "Main gate", triggers
+  narrowed to main), .github/workflows/dev-pass.yml (new), README.md badges,
+  .github/CONTRIBUTING.md. No schema change
+Validation: All four workflow YAML files parse. Job names enumerated and
+  compared against the seven required contexts in ruleset 20243842; exact match
+Failures-or-discarded-approaches: The README's CI badge was going to silently
+  break. Badges default to the default branch, which is now dev, and the gate no
+  longer runs there, so it would have rendered "no status" forever. It is now
+  pinned to ?branch=main and a separate dev-pass badge points at dev
+Known-limitations: The dev pass is Ubuntu-only, so a change that builds there
+  and not on Windows 11 ARM64 looks green on dev and fails at the gate. That is
+  deliberate but it is a real gap. The gate still excludes test-integration,
+  test-security, and test-browser, so "all checks green" means the six jobs plus
+  CodeQL, not every suite the repository can run
+Next-safe-step: Watch the first dev-pass run on this push, confirm it reports
+  the existing 44 staticcheck findings and the failing package rather than
+  stopping at lint, then use that output to triage them
+
 Dev-Log: DL-20260802-021
 Date: 2026-08-02
 Status: .claude/ configuration, three subagents, and the vendored skill added

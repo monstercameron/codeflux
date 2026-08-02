@@ -31,12 +31,17 @@ targets it unless you deliberately change that. Every contribution arrives as
 its own pull request into `dev` — one coherent change per pull request, the same
 rule commits follow.
 
-CI runs on `dev`, and it is **allowed to be red there**. That is the point of
-having it: `dev` is where a half-finished integration is allowed to exist and be
-looked at. A red `dev` is information, not an emergency.
+**Dev pass** (`dev-pass.yml`) runs there: lint, generate-check, unit tests, and
+build on one runner, for speed. It **gates nothing** — the `dev` ruleset
+requires no status checks — and it is allowed to be red. That is the point:
+`dev` is where a half-finished integration may exist and be looked at, so a red
+dev pass is information rather than an emergency. Every step runs even after an
+earlier one fails, so one push tells you everything that is broken instead of
+only the first thing.
 
 **`main` is the released branch.** It only ever receives `dev`, and only through
-a pull request whose checks are all green:
+a pull request whose checks are all green. **Main gate** (`ci.yml`) supplies six
+of them and CodeQL the seventh:
 
 | Check | Runner |
 | --- | --- |
