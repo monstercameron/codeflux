@@ -42,8 +42,29 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-021
+Change-ID: CL-20260802-022
 Commit: pending
+Date: 2026-08-02
+Type: Concurrent agent lanes are required to take separate Git worktrees
+Request-or-TODO: User: "use the gaps to refine the repo handling", addressing
+  the deadlock recorded as a known limitation in DL-20260802-031
+Outcome: codeflux-dev lint is repository-wide, so the pre-commit hook fails on
+  any file in the tree -- including one another lane is halfway through writing.
+  In a single session that blocked four commits, three of them for files the
+  committing lane had never touched. AGENTS.md now requires one worktree per
+  lane, gives the three commands, and states the two things a worktree does not
+  solve: the dev server binds one fixed port so only one lane can run it, and
+  the rules get stricter rather than looser in a shared checkout -- a gate
+  naming a file you did not touch is another lane's work, to be coordinated
+  rather than fixed, reformatted, or committed to get your own change through
+Affected-behavior: None at runtime
+Compatibility-or-migration: A new worktree needs core.hooksPath set again; the
+  setting is per-clone
+Verification: Prose only; no Go source touched
+Dev-Log: DL-20260802-032
+
+Change-ID: CL-20260802-021
+Commit: e3d72fe
 Date: 2026-08-02
 Type: The pre-commit hook formats, lints, and tests before a commit is allowed
 Request-or-TODO: User: "add pre commit hooks where we lint, format and test code

@@ -279,6 +279,23 @@ Every command accepts `--root`. A repository-local root must be a child of
 implicitly. Use `--json` only when command help declares machine-readable
 output.
 
+### One Lane, One Worktree
+
+**When more than one agent works on this repository at once, each takes its own Git worktree.** A shared checkout does not work here, and the reason is specific rather than aesthetic: `codeflux-dev lint` is repository-wide, so the pre-commit hook fails on *any* file in the tree, including one another lane is halfway through writing. In a single session this blocked four commits, three of them for files the committing lane had never touched.
+
+```
+git worktree add ../codeflux-<lane> dev
+cd ../codeflux-<lane>
+git config core.hooksPath .githooks
+```
+
+- Branch from `dev`, work in the worktree, open the pull request from there.
+- `.artifacts/` is per-worktree, so build and test output cannot collide.
+- **The dev server cannot be shared.** It binds the fixed port `127.0.0.1:47311`, so only one lane runs it at a time; another lane needing one passes `--address 127.0.0.1:PORT` and stops it afterwards.
+- `git worktree remove ../codeflux-<lane>` when the lane is finished. A worktree left behind is the same defect as a server left running.
+
+**In a shared checkout, the rules do not relax — they get harder.** Stage explicit paths only, never `git add -A`. If a gate names a file you did not touch, that is another lane's work in progress: say so and coordinate. Do not fix it, do not reformat it, and do not commit it to get your own change through. The one exception is a purely mechanical `gofmt` that the repository would demand anyway, which stays unstaged so it remains that lane's to commit.
+
 ### Stop What You Start
 
 **Every process you start, you stop before the task ends.** This repository has

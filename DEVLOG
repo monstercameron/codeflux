@@ -25,11 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-032
+Date: 2026-08-02
+Status: Worktree isolation required for concurrent lanes
+Change-ID: CL-20260802-022
+Commit: pending
+Request-or-TODO: User: "use the gaps to refine the repo handling"
+Goal: Stop lanes blocking each other's commits
+Assumptions: Worktrees are the cheaper of the two fixes. The alternative was
+  narrowing the hook's lint to staged packages, which weakens the gate the user
+  had just asked for and still misses cross-package breakage
+Decisions: Prescribe rather than automate. No script creates worktrees, because
+  the failure being fixed is agents starting things they do not clean up, and a
+  worktree left behind is the same defect as a server left running -- so the
+  removal command is given the same prominence as the creation command. The
+  mechanical-gofmt exception was written down explicitly because it happened
+  three times today and the honest rule is narrower than "never touch their
+  files": format it if the repository would demand it anyway, and leave it
+  unstaged so it stays theirs to commit
+Files-or-schemas: AGENTS.md. No schema change
+Validation: Prose only
+Failures-or-discarded-approaches: Scoping the hook's lint to staged packages
+  was considered and not done, for the reason above
+Known-limitations: Worktrees do not fix the ledger identifier collisions -- all
+  lanes still write the same CHANGELOG and DEVLOG on the same branch, so two
+  lanes can still claim the same CL or DL number, which happened once today
+Next-safe-step: Consider deriving ledger identifiers from something collision
+  free, or having lint reject a duplicate identifier
+
 Dev-Log: DL-20260802-031
 Date: 2026-08-02
 Status: Pre-commit hook widened to format, lint, and test
 Change-ID: CL-20260802-021
-Commit: pending
+Commit: e3d72fe
 Request-or-TODO: User: "add pre commit hooks where we lint, format and test code
   before allowing commits so agents dont have to wait for github"
 Goal: Fail locally instead of on GitHub
