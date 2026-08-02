@@ -547,6 +547,21 @@ func StartApplication(
 		return nil, err
 	}
 	codefluxv1.RegisterWorkspaceServiceServer(application.taskServer, workspaceService)
+	// The repository map was built and tested and never called: nothing in the
+	// product read a package, a declaration, or a call, so there was no way to
+	// see what code a repository actually contains or which of its declarations
+	// are documented atoms.
+	codeCollection, err := newCodeCollectionApplication(
+		repositories, checkpointing.worktrees, workspace.ExecRunner{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	codeCollectionService, err := transport.NewCodeCollectionService(codeCollection)
+	if err != nil {
+		return nil, err
+	}
+	codefluxv1.RegisterCodeCollectionServiceServer(application.taskServer, codeCollectionService)
 	application.taskServeDone = make(chan error, 1)
 	go func() {
 		application.taskServeDone <- application.taskServer.Serve(

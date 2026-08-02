@@ -30,6 +30,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-003
+Date: 2026-08-02
+Type: A repository's own code is readable, with its documented atoms marked
+Request-or-TODO: User: "there needs to be a way to see the directory of atoms
+  and inspect the code collection"; touches AUDIT-010 (wire repository mapping
+  into a service) and AUDIT-023 (a server-backed repository symbol picker)
+Outcome: CodeCollectionService serves what a repository contains at an exact
+  revision: its packages, its declarations, and one declaration read closely
+  with its signature, its own comment, its atom documentation when it is an
+  admitted atom, and what calls it. This is the first production consumer of
+  the repository mapper, which had been written, tested, and never called.
+Affected-behavior: The collection is read-only and derived on demand; nothing
+  is persisted and no source is written. Which packages and declarations exist
+  is the Go toolchain's answer at a named revision, and what a declaration says
+  about itself is read from its source file at inspection time; neither is
+  guessed from the other. No response carries a declaration's body, because
+  this is a directory of what the collection offers rather than an editor. An
+  answer always names the revision it describes and says when the working tree
+  has moved past it. A declaration carrying the atom directive whose
+  documentation does not parse is reported as exactly that instead of being
+  counted as an atom. Listings are bounded and say when they are.
+Compatibility-or-migration: None. No schema change and no migration. The
+  service is additive; nothing existing changes behavior.
+Verification: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; go vet;
+  gofmt clean. New tests: a real temporary Git module carrying one fully
+  documented atom, one function that calls it, and one unexported function,
+  asserting the mapper's package and declaration counts, the atom lens, the
+  exported filter, the signature without its body, the documented fields, the
+  recorded caller, and an unknown key reported as an absence; the transport
+  service against a fake application; the rendered states of the surface; and
+  the client projections. Visually inspected in Chromium against this
+  repository at revision 2994deb59e08.
+Dev-Log: DL-20260802-002
+
 Change-ID: CL-20260802-002
 Date: 2026-08-02
 Type: Internal, generated: regenerate the API for concurrently added services

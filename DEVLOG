@@ -24,6 +24,91 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-004
+Date: 2026-08-02
+Status: A repository's own code is browsable, with its documented atoms marked
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "there needs to be a way to see the directory of atoms
+  and inspect the code collection"; touches AUDIT-010 (wire repository mapping
+  into a service) and AUDIT-023 (a server-backed repository file/symbol picker).
+  This entry also records CL-20260802-002, the API regeneration that commit
+  needed. Both commits carry the trailer DL-20260802-002, an identifier a
+  concurrent entry claimed at the same moment; this entry supersedes it and is
+  the record they refer to.
+Goal: Give the console a surface that shows what a repository actually
+  contains -- its packages, its declarations, what each one says about itself,
+  and what calls it -- and mark the declarations that are admitted Codeflux
+  atoms
+Assumptions: The collection is read per repository at its current committed
+  revision and is strictly read-only; an atom directory is a lens on this
+  collection rather than a separate surface, because an atom is a declaration
+  in it
+Decisions: Before building, checked what an atom directory would actually show
+  and reported it: the atom tables are empty, nothing in the product writes
+  them, and the repository carries nineteen //codeflux:atom markers that are
+  almost all prose mentions inside test fixtures. The user chose symbols first
+  with atoms layered. The surface is therefore built on
+  internal/workspace.BuildRepositoryMap, which was written, tested, and never
+  called by anything in the product; this is its first production consumer.
+  Two authorities are kept apart: which packages and declarations exist is the
+  mapper's answer from the Go toolchain at an exact revision, and what a
+  declaration says about itself is read from the source file at inspection
+  time. No response carries a declaration body -- this is a directory of what
+  the collection offers, not an editor. A declaration carrying the atom
+  directive whose documentation does not parse is reported as exactly that
+  rather than counted as an atom. Only files containing the directive are
+  parsed for atoms, so opening the page does not cost a build. The map is
+  cached per repository and rebuilt when the revision or dirtiness moves, with
+  at most four repositories held. The surface is three independently scrolling
+  panes rather than a stacked page, because a detail below several hundred list
+  rows is the one thing somebody clicked and cannot see
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto
+  (CodeCollectionService, ListCodePackages, ListCodeSymbols, InspectCodeSymbol
+  and their views), api/gen,
+  internal/coordinator/code_collection_application.go,
+  internal/coordinator/application.go (registration),
+  internal/transport/code_collection_records.go,
+  internal/transport/code_collection_service.go,
+  web/frontend/codecollection/component.go, web/frontend/routes/routes.go
+  (the /workspace/{repository_id}/code route), web/frontend/shell/shell.go,
+  web/frontend/shell/reference_chrome.go (the Code rail destination),
+  web/client/code_collection_resource.go,
+  web/client/code_collection_mounted_wasm.go,
+  web/client/code_collection_transport_wasm.go, web/client/main.go; no schema
+  change, no migration
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; go vet
+  ./...; generate-check; gofmt clean on every changed file; go test for
+  internal/transport, web/frontend/codecollection, web/frontend/routes,
+  web/frontend/shell, web/client, and the two new coordinator tests. The
+  coordinator tests build a real temporary Git module carrying one fully
+  documented atom, one plain function that calls it, and one unexported
+  function, then assert the mapper's package and declaration counts, the atom
+  lens, the exported filter, the signature without its body, all nineteen
+  documented fields, the recorded caller, and an unknown key reported as an
+  absence. Visually inspected in Chromium against this repository: 95 packages,
+  20,284 declarations, 0 documented atoms at revision 2994deb59e08, the
+  uncommitted-changes warning, internal/policy's declarations with kinds and
+  unexported marks, and Select read closely with its signature, its own
+  comment, and twelve real call sites with file and line
+Failures-or-discarded-approaches: The first atom scan matched no files because
+  it filtered on a file kind the mapper does not emit ("go" rather than
+  "source"/"test"). The first layout used the centred reading column every
+  simple route uses, which pushed the declaration detail hundreds of rows below
+  the fold; rebuilt as a full-height three-pane surface. The signature was
+  first rendered in the shared code block, which clipped a Go signature wider
+  than its pane; it now wraps
+Known-limitations: This repository reports zero documented atoms, which is
+  true: no production declaration carries the directive with parsing
+  documentation. The listing describes the committed revision, so uncommitted
+  work is not in it and the surface says so. Selection is component state
+  rather than URL state, so a declaration cannot yet be linked to. Nothing is
+  persisted: the collection is derived on demand and the atom-documentation
+  tables remain unwritten
+Next-safe-step: Put the selected package and declaration in the URL so a
+  declaration can be linked to and restored, then admit atoms into
+  atom_documentation_revisions so the directory survives a restart and can be
+  retrieved against
+
 Dev-Log: DL-20260801-019
 Date: 2026-08-01
 Status: The settings page reads the coordinator instead of static sentences
