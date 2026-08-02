@@ -19,6 +19,8 @@ func TestAtomDocumentationFixtures(t *testing.T) {
 		{name: "malformed-version", wantError: "malformed documentation schema header"},
 		{name: "keyword-stuffed", wantError: "keyword-stuffed"},
 		{name: "identifier-mismatched", wantError: "must begin with ValidateTaskBudgetBeforeModelRequest"},
+		{name: "wrapped-opening"},
+		{name: "unterminated-opening", wantError: "never reaches a sentence terminator"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

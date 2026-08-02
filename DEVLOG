@@ -29,7 +29,7 @@ Dev-Log: DL-20260802-064
 Date: 2026-08-02
 Status: Hook fixed; the blocked commit now passes
 Change-ID: CL-20260802-054
-Commit: pending
+Commit: b9e286d
 Request-or-TODO: REPO-042
 Goal: Let a commit that touches a lint fixture through the hook
 Assumptions: testdata is not a package, and the fixtures under it are meant to
@@ -50,6 +50,62 @@ Known-limitations: The comment in this hook about the integration build tag is
   now stale -- REPO-030 tagged six files -- and is corrected in that commit
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
+
+Dev-Log: DL-20260802-044
+Date: 2026-08-02
+Status: Repository check green; staticcheck still red on REPO-018
+Change-ID: CL-20260802-034
+Commit: pending
+Request-or-TODO: REPO-031
+Goal: Make the atom-comment opening rule read the opening sentence rather than
+  the first physical line, so a correctly wrapped Go doc comment stops failing
+  codeflux-dev lint and, with it, every lane's pre-commit hook
+Assumptions: A doc comment is wrapped to a width, so an opening sentence that
+  names a long atom identifier and then describes it does not fit on one line.
+  The rule was written against the one-line case and never met the wrapped one
+Decisions: Replaced firstDescriptiveCommentLine with openingAtomSentence, which
+  joins comment lines with a space until the first sentence terminator. It also
+  stops at a blank line, the schema header, the atom marker, and a name
+  exception, so a comment whose opening sentence is genuinely missing yields
+  the truncated opening text rather than swallowing the whole comment and
+  finding a terminator somewhere in the schema body -- that would have turned a
+  narrow rule into one that passes almost anything. The error message now
+  reports what was actually found, because the old message said the comment
+  "must begin with X" when it already did, which sent the previous session
+  looking for a defect in the comment rather than in the rule.
+  Second finding, same file, exposed only once the first was fixed:
+  AttributeSpend was rejected because "Attribute" is absent from
+  concreteActionVerbs. It is a concrete action verb; the allowlist was
+  incomplete. Added the word rather than annotating the atom with
+  //codeflux:atom-name-exception, because an exception directive is a reviewed
+  record that a name breaks a rule, and this name does not break the rule. Kept
+  both fixes in one change: each alone still leaves lint red, so neither alone
+  can be committed through the pre-commit hook
+Files-or-schemas: cmd/codeflux-dev/atoms.go, cmd/codeflux-dev/atoms_test.go,
+  cmd/codeflux-dev/testdata/atomdocs/wrapped-opening.go (new fixture),
+  cmd/codeflux-dev/testdata/atomdocs/unterminated-opening.go (new fixture). No
+  schema change. internal/storage/spend_attribution_repository.go is unchanged,
+  which is the point: the file was already correct
+Validation: go test ./cmd/codeflux-dev/ -run
+  'TestAtomDocumentationFixtures|TestValidateAtomNameFixtures' green, including
+  the two new fixtures. The wrapped-opening fixture passes and the
+  unterminated-opening fixture fails naming the text it found, so the rule is
+  shown to discriminate rather than merely to have stopped complaining. The
+  pre-existing identifier-mismatched and keyword-stuffed fixtures still fail.
+  go run ./cmd/codeflux-dev lint now clears the repository check on
+  spend_attribution_repository.go and proceeds to staticcheck
+Failures-or-discarded-approaches: Discarded joining every comment line before
+  the schema header: an opening sentence with no terminator would then have
+  been rescued by a full stop later in the prose, so a missing opening sentence
+  would have passed. Discarded the atom-name-exception route for
+  AttributeSpend, as above
+Known-limitations: lint is still red, now on staticcheck rather than on the
+  repository check. REPO-018 is the remaining blocker and is tracked separately.
+  The opening-sentence rule still requires the identifier to be followed by a
+  space, so a one-word comment reading "Identifier." is rejected; that case has
+  not appeared and was left alone rather than widened speculatively
+Next-safe-step: Clear the staticcheck findings under REPO-018, then commit this
+  change and REPO-018 separately, in that order
 
 Dev-Log: DL-20260802-043
 Date: 2026-08-02

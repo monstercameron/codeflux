@@ -43,7 +43,7 @@ Dev-Log:
 Entries
 -------
 Change-ID: CL-20260802-054
-Commit: pending
+Commit: b9e286d
 Date: 2026-08-02
 Type: Fix -- pre-commit hook
 Request-or-TODO: REPO-042
@@ -65,6 +65,36 @@ Verification: Found by the hook refusing the REPO-031 commit, which adds two
 Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
+
+Change-ID: CL-20260802-034
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- repository lint rule
+Request-or-TODO: REPO-031
+Outcome: The atom-comment rule reads the opening sentence instead of the first
+  physical line. A doc comment wrapped at the repository's comment width now
+  passes when its opening sentence is present and still fails when it is not,
+  and the failure message names the text that was found rather than asserting
+  the comment must begin with an identifier it already begins with. A second
+  finding in the same file, reachable only once the first was fixed, is
+  included: "Attribute" was missing from the concrete-action-verb allowlist and
+  is now present. Both fixes are in one change because each alone leaves lint
+  red, and a red lint cannot pass the pre-commit hook
+Affected-behavior: codeflux-dev lint, and therefore every lane's pre-commit
+  hook, which has been failing on internal/storage/spend_attribution_repository.go
+  for correct Go style. That file is unchanged. Two new lint fixtures were
+  added; no product behavior changed
+Compatibility-or-migration: None. No schema, no generated source, no public API
+Verification: go test ./cmd/codeflux-dev/ -run
+  'TestAtomDocumentationFixtures|TestValidateAtomNameFixtures' green. The new
+  wrapped-opening fixture passes and the new unterminated-opening fixture fails
+  naming what it found, so the relaxed rule is shown to still discriminate;
+  identifier-mismatched and keyword-stuffed still fail as before. go run
+  ./cmd/codeflux-dev lint clears the repository check and now stops at
+  staticcheck instead
+Known-limitations: lint remains red on the 51 staticcheck findings tracked by
+  REPO-018, so no Go commit is unblocked by this change alone
+Dev-Log: DL-20260802-044
 
 Change-ID: CL-20260802-033
 Commit: 92f1eed

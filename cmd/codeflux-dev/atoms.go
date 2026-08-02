@@ -45,7 +45,7 @@ var (
 	genericAtomNames    = stringSet("Process", "Handle", "Execute", "Run", "Check", "Update", "Helper", "Manager")
 	fillerAtomSuffixes  = stringSet("Helper", "Utility", "Manager", "Processor", "Handler", "Thing", "Impl")
 	concreteActionVerbs = stringSet(
-		"Add", "Apply", "Approve", "Build", "Calculate", "Cancel", "Capture",
+		"Add", "Apply", "Approve", "Attribute", "Build", "Calculate", "Cancel", "Capture",
 		"Check", "Classify", "Compare", "Create", "Decode", "Delete", "Derive",
 		"Detect", "Dispatch", "Encode", "Execute", "Extract", "Fetch", "Generate",
 		"Inspect", "Invalidate", "Load", "Map", "Normalize", "Parse", "Pause",
@@ -147,9 +147,9 @@ func validateAtomSource(path string, source []byte) error {
 
 func validateAtomDeclaration(identifier string, doc *ast.CommentGroup) error {
 	lines := commentGroupLines(doc)
-	opening := firstDescriptiveCommentLine(lines)
+	opening := openingAtomSentence(lines)
 	if !strings.HasPrefix(opening, identifier+" ") || !strings.ContainsAny(opening[len(identifier):], ".!?") {
-		return fmt.Errorf("atom comment must begin with %s and a complete descriptive sentence", identifier)
+		return fmt.Errorf("atom comment must begin with %s and a complete descriptive sentence, found %q", identifier, opening)
 	}
 
 	headerIndex := indexOfLine(lines, atomDocumentationHeader)
@@ -204,13 +204,32 @@ func commentGroupLines(group *ast.CommentGroup) []string {
 	return lines
 }
 
-func firstDescriptiveCommentLine(lines []string) string {
+// openingAtomSentence returns the atom comment's opening sentence, joining the
+// wrapped lines that carry it. A doc comment is wrapped to a width, so an
+// opening sentence naming a long atom identifier and then describing it does not
+// fit on one physical line; reading only the first line would reject correct Go
+// style. Collection stops at the first sentence terminator, and also at a blank
+// line, the schema header, the atom marker, or a name exception, so a comment
+// whose opening sentence is genuinely missing yields the truncated opening text
+// rather than the whole comment.
+func openingAtomSentence(lines []string) string {
+	var collected []string
 	for _, line := range lines {
-		if line != "" && line != atomMarker && !strings.HasPrefix(line, "codeflux:atom-name-exception ") {
-			return line
+		boundary := line == "" || line == atomMarker ||
+			strings.HasPrefix(line, "codeflux:atom-name-exception ") ||
+			strings.Contains(line, "Codeflux atom documentation")
+		if boundary {
+			if len(collected) > 0 {
+				break
+			}
+			continue
+		}
+		collected = append(collected, line)
+		if strings.ContainsAny(line, ".!?") {
+			break
 		}
 	}
-	return ""
+	return strings.Join(collected, " ")
 }
 
 func hasAtomMarker(group *ast.CommentGroup) bool {
