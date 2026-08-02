@@ -42,6 +42,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-031
+Commit: pending
+Date: 2026-08-02
+Type: Control-flow constructs become retrievable atom documentation
+Request-or-TODO: User: "add to document and add to a seeder that sets these as
+  the starter funcs that can be retreived from the database"
+Outcome: internal/atomcatalog declares the fifteen control-flow operations the
+  program graph needs as schema-v1 atom documentation and returns typed records
+  for the storage lane to persist, matching how atomdoc and atomname already
+  behave. Identities are derived from each entry rather than generated, so
+  re-seeding resolves to the same atoms instead of duplicating them on every
+  run; seeding is idempotent because revision identity is content-addressed.
+  Entries are Tier 1 graph-native, which classifies as SQLite-authored, correct
+  for a construct with no Go declaration to extract a comment from. Each entry
+  carries its readiness -- six frozen, five proposed, one undefined -- and its
+  open question into the persisted text, so a retrieval result cannot present an
+  unsettled construct as settled
+Affected-behavior: A new package with no callers. Nothing seeds automatically;
+  SeedControlFlowCatalog is a library call
+Compatibility-or-migration: None. No schema change; the package writes through
+  the existing atom documentation repository
+Verification: Committed with --no-verify under explicit user authorization,
+  because the pre-commit hook fails on REPO-031 -- a lint-rule defect in
+  already-committed code this change does not touch, verified identical with
+  these changes stashed. The hook's checks were run by hand in its place and all
+  passed: gofmt, go vet, go build, and go test over the package. Lint itself was
+  not run and is not claimed. Thirteen tests pass covering
+  entry coverage, copy safety, field substantiveness, open-question propagation,
+  identity stability and distinctness, revision completeness, content
+  addressing, seeding, idempotence, input rejection, and failure naming
+Known-limitations: The contract hash is a placeholder derived from each entry's
+  text, because no atom contract exists and complexity, effects, and
+  capabilities are not contract-expressible under section 14. No TODOS.md task
+  governs the package
+Dev-Log: DL-20260802-041
+
 Change-ID: CL-20260802-032
 Commit: pending
 Date: 2026-08-02

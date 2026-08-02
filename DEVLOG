@@ -25,6 +25,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-041
+Date: 2026-08-02
+Status: Control-flow catalog implemented and tested
+Change-ID: CL-20260802-031
+Commit: pending
+Request-or-TODO: User: "add to document and add to a seeder that sets these as
+  the starter funcs that can be retreived from the database"
+Goal: Make the control-flow surface retrievable through the same path as any
+  other atom
+Assumptions: The existing seed command was unavailable, since it drives
+  testharness session scenarios; confirmed by reading cmd/codeflux-dev/devtools.
+  A library call rather than a second command avoids the collision
+Decisions: Derived identities from each entry rather than generating them,
+  because domain identities are UUIDv7 and a generated one would mint a fresh
+  atom on every run, making the catalog useless as a stable corpus. Used a fixed
+  epoch in the timestamp bits, since a catalog entry is a declaration and has no
+  meaningful creation instant. Classified entries Tier 1 graph-native so
+  authoring resolves to SQLite-authored, which is correct for a construct with
+  no Go declaration. Recorded readiness and open questions in the persisted
+  documentation rather than only in the design document, so a retrieval result
+  carries its own uncertainty
+Files-or-schemas: internal/atomcatalog/doc.go, controlflow.go, seed.go,
+  seed_test.go. No schema change; writes through the existing atom
+  documentation repository
+Validation: go build, go vet, gofmt clean. Thirteen tests pass. go test over
+  atomcatalog, atomdoc, and storage passes, storage in 137s
+Failures-or-discarded-approaches: First derived the atom identity from a raw hex
+  digest, which the identity parser rejected because it requires a UUIDv7
+  payload. Replaced with a deterministic UUIDv7 built from the digest under a
+  fixed epoch
+Known-limitations: The contract hash is a placeholder and says so in its own
+  comment: no atom contract exists, and complexity, effects, and capabilities
+  are not contract-expressible under plan section 14. POST-002 forbids claiming
+  the kernel's scope is known, so every entry records itself as a proposal and a
+  test asserts that provenance reaches the persisted text -- but that is a
+  convention, and conventions erode. No TODOS.md task governs the package
+Next-safe-step: Place the package under a milestone task, or fold it into M25-085
+
 Dev-Log: DL-20260802-042
 Date: 2026-08-02
 Status: Milestone 25 planned; plan section 34 written
