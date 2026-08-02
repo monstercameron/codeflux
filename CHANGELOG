@@ -42,8 +42,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-024
+Change-ID: CL-20260802-025
 Commit: pending
+Date: 2026-08-02
+Type: The day's repository work is backfilled into TODOS.md, including the
+  server-side configuration no commit can carry
+Request-or-TODO: User: "review the latest commits against the todo list and
+  changelog and backfill todos and changes that werent documented"
+Outcome: An audit of every commit since the branch split found the CHANGELOG
+  complete: all seventeen commits carry both trailers, every trailer resolves to
+  an entry, and the only entry without a commit is CL-20260802-018, which is
+  drafted for the blocked fixed-port change and correctly absent from the
+  committed file. TODOS.md was the gap -- the day's work cites no task at all,
+  where AGENTS.md requires a governing ID and says to add the task first when
+  none exists. A dated section, matching the convention of the Completion Audit
+  and Pipeline Refinement sections, records sixteen completed items against
+  their Change-IDs and commits, and eight open ones for the gaps found in the
+  review. REPO-016 records the GitHub server-side configuration -- rulesets and
+  their IDs, required checks, security toggles, Actions restrictions, labels,
+  milestone, and the deliberate disabling of auto-merge -- because none of it
+  exists in Git and this is the only place it is written down
+Affected-behavior: None. Records only
+Compatibility-or-migration: None
+Verification: Each completed item was checked against its commit by trailer
+  before being written. No Go source touched
+Dev-Log: DL-20260802-035
+
+Change-ID: CL-20260802-024
+Commit: 1ef9949
 Date: 2026-08-02
 Type: The user guide stops instructing people to verify a release that does not
   exist, and the issue tracker's role is stated

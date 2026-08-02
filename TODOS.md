@@ -4413,3 +4413,63 @@ Depends on: `MEM-022` for the key, then `PIPE-084` for the records. The key come
 - [ ] `MEM-G07 GATE` No prior seeds into an approval rung and no prior removes a stage, proven by a fixture whose routing evidence recommends both.
 - [ ] `MEM-G08 GATE` The exploration floor is observable in the record: of the runs seeded above the cheapest rung, the report states how many the cheapest rung would have handled, drawn from exploring runs of the same key.
 - [ ] `MEM-G09 GATE` A quarantined artifact never regains authority, and its independently derived successor carries a new identity, no inherited confidence, and the original counterexample, proven end to end through the extraction path rather than only in the domain layer.
+
+# Repository and Agent Operations (2026-08-02)
+
+This work was requested directly by the user and carried no governing task at
+the time, which `AGENTS.md` requires. It is recorded here after the fact so the
+completion ledger matches what was actually done. Every completed item names its
+`Change-ID` and the commit that carries it.
+
+Server-side GitHub configuration is included because it exists nowhere in Git:
+`REPO-016` is the only record that it was changed, and to what.
+
+- [x] `REPO-001` Relicense the project MIT and publish the repository metadata a public project needs.
+  - `CL-20260802-007`, commit `f49f0da`. `LICENSE` replaced (Apache 2.0 to MIT), root `README.md`, `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CODEOWNERS`, `PULL_REQUEST_TEMPLATE.md`, three issue forms, `FUNDING.yml`, `.editorconfig`, `.env.example`, and the CodeQL and dependency-review workflows.
+  - Supersedes the `M01-003` and `M01-004` bootstrap evidence, which recorded the README as intentionally absent and the licence as Apache 2.0.
+- [x] `REPO-002` Track the interface design references as source rather than leaving them untracked.
+  - `CL-20260802-008`, commit `ae4afe7`. Six renderings under `design/references/ui/`, 11.2 MB, already covered by the `*.png binary` attribute.
+- [x] `REPO-003` Stop the redaction suite's synthetic credentials from blocking pushes.
+  - `CL-20260802-010`, commit `0a460b5`. Two Slack fixtures assembled at runtime instead of written as contiguous literals, matching how the Google and GitHub fixtures were already built.
+  - GitHub push protection had refused the push; the literals lived in commits `73f801d` and `6c2393c`, so 25 unpushed commits were rewritten by blob substitution, with the resulting tree verified byte-identical to its backup.
+- [x] `REPO-004` Adopt a two-branch model and set the compiled version to 0.0.1.
+  - `CL-20260802-011`, commit `204c76a`. `dev` is the default and integration branch; `main` takes only `dev` through a pull request with every check green.
+- [x] `REPO-005` Track the Claude Code configuration and vendor the Karpathy guidelines.
+  - `CL-20260802-012`, commit `b614fc5`. `.claude/settings.json`, three subagents, and `skills/karpathy-guidelines/`, pinned at `2c60614` and relying on that file's own `license: MIT` frontmatter, the upstream repository having no `LICENSE`.
+- [x] `REPO-006` Split CI into a non-gating dev pass and the gated main pass.
+  - `CL-20260802-013`, commit `90685d7`. `ci.yml` narrowed to `main`; `dev-pass.yml` added, one runner, every step running even after an earlier failure.
+- [x] `REPO-007` Require feature-atomic commits and carry the real commit hash in both ledgers.
+  - `CL-20260802-014`, commit `fc05c3f`. `Commit:` is written as `pending`, filled in after the commit exists, and swept up by the next feature commit.
+- [x] `REPO-008` Require a driven browser check for any frontend change.
+  - `CL-20260802-015`, commit `bce52d0`. Real clicks and keystrokes; assert the event, the state, and the render; walk the keyboard path; open the screenshot.
+- [x] `REPO-009` Restructure `AGENTS.md` for focus without removing a rule.
+  - `CL-20260802-016`, commit `5c0dda8`. Three overlapping checklists merged into one Task Lifecycle; every removed line checked for survival elsewhere.
+- [x] `REPO-010` Vendor Anthropic's frontend-design skill and require it before surface work.
+  - `CL-20260802-017`, commit `13392a7`. Apache-2.0, copied verbatim with its `LICENSE.txt`, plus the rule that its CSS vocabulary does not override this repository's Go design tokens.
+- [x] `REPO-011` Repair the two instruction-file lint regressions introduced while restructuring.
+  - `CL-20260802-019` commit `ece2c03`, and `CL-20260802-020` commit `246c480`. `CLAUDE.md` returned under its thirty-line limit and the pinned reference restored to both files.
+  - `ece2c03` also carried the `Stop What You Start` section because the whole file was staged rather than the intended hunk: two features in one commit, recorded as a `Correction` in `CL-20260802-021`.
+- [x] `REPO-012` Make the pre-commit hook format, lint, and test before allowing a commit.
+  - `CL-20260802-021`, commit `e3d72fe`. `core.hooksPath` was also set; the hook had existed since `M01-050` and had never run, which is why two lint regressions reached the remote.
+- [x] `REPO-013` Require a separate worktree per concurrent agent lane.
+  - `CL-20260802-022`, commit `a476144`. Repository-wide lint means any lane's unfinished file blocks every other lane's commit.
+- [x] `REPO-014` Report drift between the vendored skills and upstream without updating them.
+  - `CL-20260802-023`, commit `8a1886c`. Weekly, report-only; a failed fetch is reported as unknown rather than passed as a match.
+- [x] `REPO-015` Stop the user guide instructing readers to verify a release that does not exist, and state the tracker roles.
+  - `CL-20260802-024`, commit `1ef9949`. `TODOS.md` is authoritative; GitHub issues are the inbox.
+- [x] `REPO-016` Record the server-side GitHub configuration, which no commit can capture.
+  - Description set, homepage left unset, 15 topics; wiki and projects off, discussions on; delete-branch-on-merge on; merge commits off, squash and rebase on.
+  - Rulesets. `20243842` "main is released code": no bypass, pull request required, seven required checks (`Quality (Windows 11 ARM64)`, `Build and test` on four platforms, `Race tests (Ubuntu 24.04 AMD64)`, `Analyze Go`), strict up-to-date policy, deletion and force-push blocked. `20243850` "dev is the integration branch": repository-admin bypass, pull request required, no status checks, deletion and force-push blocked.
+  - Security: private vulnerability reporting, secret scanning, push protection, Dependabot alerts and security updates all enabled. Non-provider patterns and validity checks were refused by the API and remain disabled.
+  - Actions: GitHub-owned and verified actions only; default workflow token read-only and unable to approve pull requests; fork pull requests from all external contributors require approval.
+  - Auto-merge was enabled and then deliberately disabled: `dev` requires no status checks, so an auto-merged pull request would have landed there unchecked.
+  - 22 labels, and milestone 1, `M24 - End-to-End Vertical Slice and Prototype Exit`.
+  - `backup/pre-secret-rewrite-20260802` exists locally only; pushing it is refused by push protection because it contains the fixture credentials the rewrite removed.
+- [ ] `REPO-017 BLOCKER` Land the first `dev` to `main` pull request. The gate has never passed once, so the branch model is unproven and `main` is frozen behind a red tree.
+- [ ] `REPO-018 BLOCKER` Clear the 44 `staticcheck` findings — 35 `U1000`, 5 `SA1019`, 2 `ST1018`, 1 `S1002`, 1 `S1011` — and the failing `test-fast` package. These block `REPO-017` and every Go commit.
+- [ ] `REPO-019` Land the fixed dev-server port `127.0.0.1:47311`. Written and passing its own checks; `CL-20260802-018` is drafted and uncommitted because the pre-commit hook refuses the tree for other lanes' failures.
+- [ ] `REPO-020` Enforce in `lint` that a commit carries both ledger trailers and that the referenced entries exist. The most-violated rules in this repository are the unenforced ones.
+- [ ] `REPO-021` Prevent ledger identifier collisions between lanes. Sequential `CL-` and `DL-` numbers on a shared branch collided once on 2026-08-02; either derive them collision-free or make `lint` reject a duplicate.
+- [ ] `REPO-022` Add `test-browser` to the main gate once its CI runtime is measured, and add its context to ruleset `20243842` in the same change. Until then `REPO-008` cannot be verified in CI.
+- [ ] `REPO-023` Publish the first release, then remove the note added by `REPO-015`. Requires a tag, artifacts, `SHA256SUMS`, and a signing key, none of which exist.
+- [ ] `REPO-024` Re-check the vendored `frontend-design` skill by hand periodically; the Anthropic marketplace publishes no per-skill version, so `REPO-014` cannot cover it.

@@ -25,11 +25,47 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-035
+Date: 2026-08-02
+Status: TODOS backfilled; CHANGELOG audited and found complete
+Change-ID: CL-20260802-025
+Commit: pending
+Request-or-TODO: User: "review the latest commits against the todo list and
+  changelog and backfill todos and changes that werent documented"
+Goal: Make the completion ledger match what was actually done today
+Assumptions: Backfilling means recording the work honestly after the fact, not
+  pretending a task existed beforehand. The section says so in its first
+  paragraph rather than implying the tasks predated the work
+Decisions: The audit ran both directions -- commit to entry and entry to commit
+  -- rather than only checking that entries exist. That is what found
+  CL-20260802-018 as the single entry with no commit, and confirmed it is
+  correctly absent from the committed CHANGELOG rather than orphaned. The
+  server-side configuration was written into TODOS rather than left as chat
+  history: rulesets, security toggles, and Actions restrictions are real changes
+  to how this repository behaves, they are invisible to git log, and without
+  REPO-016 the only record of them would be a conversation. Open gaps were
+  written as unchecked items with the same identifiers rather than as prose, so
+  they are picked up by the same reading that picks up any other work
+Files-or-schemas: TODOS.md. No schema change
+Validation: Every completed item's Change-ID was resolved to its commit through
+  its trailer before being recorded. The staged blob was built from HEAD plus
+  the appended section, so a concurrent lane's 80 uncommitted lines elsewhere in
+  the file stayed unstaged and intact
+Failures-or-discarded-approaches: A first attempt to build the staged blob read
+  git output under the Windows default codepage and failed on a byte in the
+  file; nothing was written. Retried with explicit UTF-8
+Known-limitations: The completed items are recorded after the fact, so they
+  document rather than authorise the work. REPO-016 has to be maintained by
+  hand: nothing reconciles it against the repository's actual settings, so it
+  will drift the first time a setting is changed without editing it
+Next-safe-step: REPO-018, the 44 findings and the failing package, which blocks
+  REPO-017 and REPO-019
+
 Dev-Log: DL-20260802-034
 Date: 2026-08-02
 Status: Install guide and tracker roles corrected
 Change-ID: CL-20260802-024
-Commit: pending
+Commit: 1ef9949
 Request-or-TODO: User: "use the gaps to refine the repo handling"
 Goal: Remove two places where the documentation claimed more than the project
   can currently do
