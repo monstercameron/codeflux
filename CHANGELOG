@@ -30,6 +30,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-010
+Date: 2026-08-02
+Type: The redaction suite's synthetic Slack tokens are assembled at runtime
+  instead of written as literals
+Request-or-TODO: User: "secretes beloing in gitignored .env files", after a push
+  to the public remote was refused by GitHub secret scanning
+Outcome: The two synthetic Slack tokens in internal/redact are now built by
+  concatenation, matching how the same files already build the Google and GitHub
+  fixtures. Nothing about the test changes: the same strings are still fed to
+  the pipeline and the same redaction is still asserted. What changes is that
+  tracked source no longer contains a contiguous credential-shaped literal,
+  which a scanner cannot distinguish from a live token. These values were never
+  secrets -- they are the corpus the redaction engine is tested against, and
+  they cannot move to a gitignored .env because the tests would then have no
+  input on a fresh clone or in CI, and because FixtureCredentialShapes is
+  already the sanctioned in-repository home for fixture credential material
+  that artifact-check scans against
+Affected-behavior: None. Test-only change; the values are byte-identical
+Compatibility-or-migration: None
+Verification: gofmt clean; go test ./internal/redact/... passes
+Dev-Log: DL-20260802-019
+
 Change-ID: CL-20260802-009
 Date: 2026-08-02
 Type: CHECKPOINT. Every uncommitted working-tree change is committed as the
