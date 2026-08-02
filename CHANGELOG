@@ -45,6 +45,31 @@ Entries
 Change-ID: CL-20260802-028
 Commit: pending
 Date: 2026-08-02
+Type: The pre-commit hook runs unit tests for the changed packages instead of
+  the whole repository
+Request-or-TODO: User: "make sure teh pre commit is only doing unit tests and
+  not integration tests"
+Outcome: The hook ran codeflux-dev test-fast, which is go test over ./... and is
+  not a unit run: internal/coordinator's engine test builds and executes
+  generated programs and takes over nine minutes by itself, which is why
+  test-fast raises its timeout to twenty. It now derives the package list from
+  the staged Go files and tests only those, untagged, so nothing behind the
+  integration build tag is built. Refines CL-20260802-021, which introduced the
+  whole-repository run
+Affected-behavior: Committing Go changes is now proportional to what was changed
+Compatibility-or-migration: None
+Verification: The hook parses under sh -n; package derivation was checked
+  against a representative file list; an untagged run of a single package was
+  executed and passed
+Note: The audit found that no file in the repository carries the integration
+  build tag in either syntax, so codeflux-dev test-integration currently selects
+  exactly the same tests as test-fast. The suite separation exists in the
+  command graph and not in the code, recorded as REPO-030
+Dev-Log: DL-20260802-038
+
+Change-ID: CL-20260802-028
+Commit: pending
+Date: 2026-08-02
 Type: The engine ladder grows to 250 rungs and is judged by properties of the
   work rather than by paths it was told to write to
 Request-or-TODO: User: "expand the list to 150 programs, make sure each new
@@ -105,7 +130,7 @@ Verification: gofmt clean; go vet ./internal/coordinator exits 0; the fourteen
 Dev-Log: DL-20260802-038
 
 Change-ID: CL-20260802-027
-Commit: pending
+Commit: 287fc7b
 Date: 2026-08-02
 Type: A push carrying Go changes is refused below 80% statement coverage
 Request-or-TODO: User: "refine repo rules lets aim for 80% code coverage to push

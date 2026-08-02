@@ -41,9 +41,28 @@ fi
 echo "pre-commit: lint"
 go run ./cmd/codeflux-dev lint
 
-# 3. Test.
-echo "pre-commit: test-fast"
-go run ./cmd/codeflux-dev test-fast
+# 3. Unit tests, for the packages this commit touches only.
+#
+# This runs untagged, so anything behind the `integration` build tag that
+# `codeflux-dev test-integration` adds is never built here. Note that no file
+# currently carries that tag, which means the two suites presently select the
+# same tests — the separation is declared but not yet real. Scoping is therefore
+# what actually keeps this fast, not the tag.
+#
+# The scope is the changed packages rather than ./... because the whole-repository
+# run is not a unit run: internal/coordinator's engine test builds and executes
+# generated programs and takes over nine minutes on its own, as main.go says
+# where it raises the timeout to twenty. Waiting that out on every commit is what
+# makes people reach for --no-verify. Touching internal/coordinator will still
+# pay it, until the heavy tests are tagged.
+#
+# A change here can still break a dependent package. That is caught by the full
+# suite at push time and again by CI; this hook is the fast, narrow layer of that
+# ladder, not the whole of it.
+packages=$(printf '%s\n' "$staged_go" | xargs -n1 dirname | sort -u | sed 's#^#./#')
+echo "pre-commit: unit tests for:"
+printf '  %s\n' $packages
+go test -timeout=5m $packages
 
 # 4. Confirm nothing disposable escaped into the tree.
 echo "pre-commit: artifact-check"

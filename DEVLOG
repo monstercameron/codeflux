@@ -27,6 +27,37 @@ Entries
 -------
 Dev-Log: DL-20260802-038
 Date: 2026-08-02
+Status: Pre-commit narrowed to changed-package unit tests
+Change-ID: CL-20260802-028
+Commit: pending
+Request-or-TODO: User: "make sure teh pre commit is only doing unit tests and
+  not integration tests"
+Goal: Make the commit gate proportional to the change
+Assumptions: The intent is scope and speed, not only the literal build tag. The
+  literal answer alone would have been misleading, because the tag turned out to
+  select nothing
+Decisions: Scope to the packages containing staged Go files. Two alternatives
+  were unavailable: go test -short does nothing here, since testing.Short() is
+  referenced in zero test files; and tagging the heavy tests is a Go change, so
+  it is blocked behind the same red tree as everything else and is filed as
+  REPO-030. A narrow hook cannot see a change that breaks a dependent package;
+  that is accepted deliberately and covered by the full run at push time and by
+  CI, which makes the two hooks the fast and slow rungs of one ladder rather
+  than two overlapping gates
+Files-or-schemas: .githooks/pre-commit, .github/CONTRIBUTING.md, TODOS.md
+Validation: sh -n parses the hook; package derivation checked against a
+  representative list; go test of one package run untagged and passed
+Failures-or-discarded-approaches: The first version of the hook comment claimed
+  integration tests are excluded because they carry the build tag. That is false
+  today -- no file carries it -- and the comment was corrected before commit
+  rather than left as a plausible-sounding justification
+Known-limitations: A commit touching internal/coordinator still pays the nine
+  minutes, because the heavy tests are ordinary untagged tests in an ordinary
+  package. Only REPO-030 fixes that
+Next-safe-step: REPO-030, once Go commits are possible again
+
+Dev-Log: DL-20260802-038
+Date: 2026-08-02
 Status: Complete
 Change-ID: CL-20260802-028
 Request-or-TODO: User requested the engine ladder be extended to 150 and then
@@ -82,7 +113,7 @@ Dev-Log: DL-20260802-037
 Date: 2026-08-02
 Status: Coverage floor added at the push boundary; baseline still unmeasured
 Change-ID: CL-20260802-027
-Commit: pending
+Commit: 287fc7b
 Request-or-TODO: User: "refine repo rules lets aim for 80% code coverage to push
   to dev"
 Goal: Put a coverage floor on what reaches dev
