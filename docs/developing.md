@@ -159,8 +159,23 @@ given; the order is the point.
    handwritten JS, TS, HTML, or CSS.
 2. Every interactive control needs an accessible name; every landmark region
    needs a label; no state may be conveyed by colour alone.
-3. Test layer: a Go test for the pure projection, and a mounted browser check
-   in `internal/frontendtest` for the rendered behaviour.
+3. Test layer: a Go test for the pure projection, **and** a mounted browser
+   check in `internal/frontendtest` that drives the component with real clicks
+   and real keystrokes. Both are required. The projection test proves the
+   projection; only the driven check proves the interface works.
+4. The driven check must assert **the event, the resulting state, and the
+   render** — those are three separate failures with one symptom — walk the
+   keyboard path including focus restoration after an overlay closes, and cover
+   the loading, empty, error, and truncated states rather than only the one you
+   built in.
+5. Screenshot it and **look at the screenshot**. Legibility at rendered scale,
+   overlap, clipping, spacing, focus ring inside the viewport. A capture nobody
+   opened is not evidence, and UI quality is part of the deliverable.
+
+`AGENTS.md`, under "Frontend changes must be driven in a browser", is the
+authoritative statement of this rule. Run the checks with
+`codeflux-dev test-browser`; headless rendering is slow, so the existing checks
+use 15s–120s timeouts on purpose.
 
 ### Adding a graph projection
 
@@ -193,23 +208,3 @@ given; the order is the point.
 4. Test layer: adapter tests against `httptest`, and a scripted-provider
    scenario. Ordinary tests never reach the network.
 
-## Running things
-
-```
-go run ./cmd/codeflux-dev lint             # staticcheck + vet + format
-go run ./cmd/codeflux-dev generate-check   # generated output is current
-go run ./cmd/codeflux-dev test-fast        # the whole default suite
-go run ./cmd/codeflux-dev test-integration # SQLite integration
-go run ./cmd/codeflux-dev test-security    # abuse suites
-go run ./cmd/codeflux-dev test-browser     # browser harness
-go run ./cmd/codeflux-dev benchmark performance
-go run ./cmd/codeflux-dev artifact-check   # artifact + credential scan
-go run ./cmd/codeflux-dev migration-check
-```
-
-CI runs the same commands by the same names. A gate that only existed in the
-workflow would be a gate nobody could run before pushing, so
-`TestM22_124_LocalAndCIShareTheSameCommandGraph` enforces the correspondence.
-
-None of these reach the network. The one command that does —
-`codeflux-dev run-live` — is deliberately not part of any suite.

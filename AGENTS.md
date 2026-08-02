@@ -538,8 +538,30 @@ For each changed behavior:
 - keep live-provider tests opt-in;
 - use fault injection for replay, idempotency, crash, and recovery behavior;
 - run security-boundary tests for paths, origins, permissions, redaction, and payload limits;
-- run keyboard and accessibility checks for user-facing workflows;
+- drive every frontend change through a real browser, per the section below;
 - measure rather than assume graph and streaming performance.
+
+### Frontend changes must be driven in a browser
+
+**If a change touches frontend code, a browser must be driven through it with real clicks and real keystrokes before the work is reported as done.** This is not satisfied by a Go test over a pure projection. A projection test proves the projection; it says nothing about whether a person can actually operate the interface, and every frontend defect that has reached review here was invisible to one.
+
+Mounted checks live in `internal/frontendtest` and drive Playwright. Run them with `go run ./cmd/codeflux-dev test-browser`.
+
+**1. Operate the real control.** Use `.Click()`, `.Fill()`, `.Press()`, `.Keyboard().Press()`, `.Type()`, `.Focus()`, `.SelectOption()` on the control a person would use. Do not reach past the interface to set state directly and then assert the state you just set — that asserts your own assignment, not the component.
+
+**2. Assert the event, the state, and the render — all three.** A handler that fires without changing state, state that changes without re-rendering, and a render that happens on the wrong boundary are three different bugs with the same symptom. Check that the event fired, that the resulting state is what it should be, and that what the user sees reflects it. Where render isolation matters, assert it: a boundary re-rendering that does not own the event is a regression, not a cosmetic detail.
+
+**3. Walk the whole keyboard path.** Tab through every stop in order and confirm focus is visible at each. Activate with Enter and Space, dismiss with Escape, and confirm focus is restored to the control that opened an overlay after it closes. Keyboard is not an accessibility afterthought here; it is a supported way to use the product.
+
+**4. Cover the states the surface can actually reach**, not only the one you built it in: loading, empty, error, truncated, and the long-string case that breaks layouts. The acceptance matrix cross-products routes, bootstrap states, and viewports for exactly this reason — a check that only exercises the default view has tested the easy third of the work.
+
+**5. Look at it.** Take a screenshot and open it. Judge it as a person would: is text legible at its rendered scale rather than merely present in the DOM; does anything overlap, clip, or overflow its container; is spacing consistent with neighbouring surfaces; does the focus ring stay inside the viewport; does motion respect reduced-motion. **Excellent UI/UX quality is part of the deliverable, and it cannot be established from a passing assertion.** A screenshot that was captured but never viewed is not evidence.
+
+**6. Keep the accessibility gates.** Every interactive control has an accessible name, every landmark region has a label, and no state is conveyed by colour alone.
+
+**7. Expect a slow headless renderer.** Existing checks use timeouts from 15s to 120s deliberately. A check that fails intermittently at a short timeout is usually the harness being slow, not the product being broken — raise the timeout, and never paper over it with a fixed sleep, which trades a flake for a slow suite that still flakes.
+
+**Do not report a frontend change as working on the strength of a projection test, a screenshot nobody opened, or a build that compiled.** If the browser check could not be run, say so plainly and say why, rather than reporting the change as verified.
 
 Before reporting completion:
 

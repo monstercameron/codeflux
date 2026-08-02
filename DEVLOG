@@ -25,11 +25,55 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-025
+Date: 2026-08-02
+Status: Frontend verification rule written into the programming guide
+Change-ID: CL-20260802-015
+Commit: pending
+Request-or-TODO: User: "also lets refine the programming guide, if the agent
+  touches any front end code it MUST e2e test it via clicks and keyboard, pay
+  attention to its events and their state and visually inspect the
+  implementation to ensure excellent ui/ux quality"
+Goal: Make a driven browser check mandatory for frontend work, and make visual
+  quality something that is inspected rather than assumed
+Assumptions: "Programming guide" means AGENTS.md's Testing and Verification
+  section, with the matching golden path in docs/developing.md kept in step. The
+  two would otherwise disagree, and docs/developing.md is what somebody reads
+  when actually adding a component
+Decisions: The rule was grounded in the harness that exists rather than written
+  as an aspiration. internal/frontendtest already drives Playwright with Click,
+  Fill, Press, Keyboard().Press, Focus, and SelectOption, already takes
+  screenshots and sets viewports, already cross-products routes by bootstrap
+  states by viewports, and already runs keyboard traversal and focus
+  restoration checks -- so the guide names those instead of inventing a
+  vocabulary nobody implements. Three assertions are demanded rather than one,
+  because an event that fires without changing state, state that changes
+  without re-rendering, and a render on a boundary that does not own the event
+  are separate defects presenting identically. The timeout guidance says to
+  raise the timeout and never to insert a fixed sleep, and cites the 15s-120s
+  range already in use, because a sleep trades a flake for a slow suite that
+  still flakes. The section ends by naming the three false claims -- a
+  projection test, an unopened screenshot, a successful build -- since each is a
+  way of reporting a frontend change as verified without having looked at it
+Files-or-schemas: AGENTS.md, docs/developing.md. No schema change
+Validation: No Go source touched. Every harness capability cited was read out
+  of internal/frontendtest first
+Failures-or-discarded-approaches: Adding a dedicated frontend-verifier subagent
+  was considered and not done. The rule belongs in AGENTS.md, which every agent
+  reads, rather than in a subagent that only gets loaded when someone remembers
+  to invoke it
+Known-limitations: Nothing enforces this either. No gate can tell whether a
+  screenshot was opened or whether the person who opened it judged it fairly,
+  and test-browser is not among the seven required checks on main, so a
+  frontend change can still reach main without a driven check having run in CI
+Next-safe-step: Consider adding test-browser to the main gate once its runtime
+  in CI is measured, which would also require adding its context to the ruleset
+
 Dev-Log: DL-20260802-024
 Date: 2026-08-02
 Status: Feature-atomic commit discipline defined; hash back-fill adopted
 Change-ID: CL-20260802-014
-Commit: pending
+Commit: fc05c3f
 Request-or-TODO: User: "next lets define how the agent does work, I want feature
   atomic commits, so not to congolmerate all teh changes into a single commit, I
   want feature atomic commits, devlog notes, and changelog notes with the commit

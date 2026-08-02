@@ -42,8 +42,43 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-014
+Change-ID: CL-20260802-015
 Commit: pending
+Date: 2026-08-02
+Type: A frontend change now requires a browser driven by real clicks and real
+  keystrokes, and a screenshot somebody actually looked at
+Request-or-TODO: User: "also lets refine the programming guide, if the agent
+  touches any front end code it MUST e2e test it via clicks and keyboard, pay
+  attention to its events and their state and visually inspect the
+  implementation to ensure excellent ui/ux quality"
+Outcome: AGENTS.md gains "Frontend changes must be driven in a browser", which
+  replaces a single soft bullet about keyboard and accessibility checks. A Go
+  test over a pure projection no longer counts as verification of a frontend
+  change: the control a person would use must be operated through the mounted
+  Playwright harness, and the check must assert the event, the resulting state,
+  and the render, because a handler that fires without changing state, state
+  that changes without re-rendering, and a render on the wrong boundary are
+  three different defects with one symptom. The keyboard path is walked in full
+  including focus restoration after an overlay closes; the loading, empty,
+  error, and truncated states are covered rather than only the state the work
+  was built in; and a screenshot must be taken AND opened, judged for legibility
+  at rendered scale, overlap, clipping, spacing, and focus ring containment. The
+  section closes the three false claims: a projection test, an unopened
+  screenshot, and a successful build are none of them evidence that an interface
+  works. docs/developing.md's frontend golden path was rewritten to match and
+  points at AGENTS.md as authoritative
+Affected-behavior: None at runtime. This governs how frontend work is verified
+Compatibility-or-migration: None. Existing mounted checks already satisfy the
+  rule; it is newly stated, not newly invented
+Verification: No Go source touched, so the gates are unaffected. The harness
+  capabilities cited -- Click, Fill, Press, Keyboard().Press, Focus,
+  SelectOption, Screenshot, SetViewportSize, the routes/states/viewports
+  cross-product, and the 15s-120s timeouts -- were each read out of
+  internal/frontendtest rather than assumed
+Dev-Log: DL-20260802-025
+
+Change-ID: CL-20260802-014
+Commit: fc05c3f
 Date: 2026-08-02
 Type: Commits become feature-atomic, and ledger entries carry the real commit
   hash, back-filled
