@@ -2765,6 +2765,8 @@ Plan: §27C Command Functions; Task State and Available Action Matrix; Detailed 
 
 Goal: provide a stable semantic map of the current task without making graph authoring a prerequisite for ordinary coding.
 
+This is the **explanatory** task graph: read-only, derived from what an agent already did, and complete. It is not the functional program graph, which composes atoms into programs and is planned separately in Milestone 25 behind `POST-001`. The two share stable identity, layout, and the visual language; they differ in that this one is read and that one is authored. Milestone 25 reuses the layout, viewport, and inspector work here rather than reinventing it.
+
 Plan references: §5 Functional Graph and Core Graph Entities; §18 Stable Graph Identity; §23 Graph Storage; §27A Graph Modes; Graph Rendering Rules; Node Inspector; Frontend MVP Boundary; §30 Graph Medium Failure.
 
 Depends on: `M18-G01` through `M18-G05`; stable IDs depend on `M02-G01`; database work depends on `M03-G04`.
@@ -3878,6 +3880,256 @@ These stable earlier IDs execute after the ReserveFlow trial so the final protot
 
 ---
 
+# Milestone 25: Functional Program Graph — Disposable Medium Experiment
+
+Goal: run the graph-medium experiment as a disposable artifact that answers one question — is a structured functional graph a better editing and reasoning medium for coding agents than ordinary Go source text — without building any part of the production graph subsystem.
+
+Plan references: §3 Graph-Medium Experiment, Disposable Graph Experiment Freeze, Experimental Controls, Disposable Lowering Conformance, Graph Kill Criterion; §5 Functional Graph and Core Graph Entities; §6 Semantic Tier Zero; §7 Semantic Atom Categories; §12 Effect Discipline; §13 Type-System Scope; §15 Go Lowering; §18 Stable Graph Identity; §19 Review and Source Mapping; §34 Functional Program Graph — Decisions, Surface, and Open Questions.
+
+Design reference: `docs/go-program-graph.md`, whose §16 open questions are the source of the plan decisions below.
+
+Authorization: **every task in this milestone requires `deferred.Authorize("POST-001", …)` to succeed.** `POST-001` is checked complete in the deferred register because the deferral is enforced, not because the capability exists. `M25-001` is the only task that may run before authorization, because refusing to start is what authorization means.
+
+Depends on: `M02-G01` for stable identity; `M03-G04` for SQLite; `M05` for durable events; `M19` for the layout, viewport, and inspector patterns this milestone reuses rather than reinvents; `M21` for the atom documentation and naming lane the contract stubs and catalog sit on; `M16-G01` through `M18-G05` for the frontend shell the program-graph surface mounts into; `M22` for the harness and benchmark scaffolding.
+
+Milestone output: a disposable notation with a grammar and an editor, a validator implementing four structural rules and ten well-formedness preconditions, hand-authored atom contract stubs, an evaluator producing comparable traces, a minimal Go projection, an authoring surface, a frozen conformance suite, and either a passed kill criterion or a recorded failure that ends graph-first editing.
+
+Non-output, and enforced as such: no production graph schema, no atom runtime, no macro system, no Go backend, no kernel. `POST-002` through `POST-005` remain closed throughout.
+
+## Authorization and Plan Decisions
+
+The design work stopped on twelve decisions. Ten block implementation; two are recorded and deferrable. None can be settled by a downstream document.
+
+- [ ] `M25-001 BLOCKER` Obtain `POST-001` authorization through `deferred.Authorize`, recording the trigger evidence — that prototype exit is decided and this runs as a disposable artifact. Every task below is blocked until this passes.
+- [ ] `M25-002 BLOCKER` Decide §34.4.1, control-graph completeness: whether lexical adjacency implies a control edge, or every transition requires an explicit arrow and the frozen molecule is incomplete. Blocks the grammar, Rule 1, Rule 4, and dominance simultaneously; it is the highest-leverage single decision in this milestone.
+- [ ] `M25-003 BLOCKER` Decide §34.4.1's second half: that a control edge targeting a region resolves to that region's single entry node, recursively. Without it no rule can reach a node inside a region, and the molecule's only claim-to-issuance edges target regions.
+- [ ] `M25-004 BLOCKER` Decide §34.4.2, Rule 4 applicability: whether a region's deduplication attribute describes its own node or scopes to the issuances it gates. The readings select different nodes, and the rule has been specified wrongly three times against this ambiguity.
+- [ ] `M25-005 BLOCKER` Decide §34.4.4, where provider deduplication scope is declared. One third of the logical effect identity is uncomputable until this is answered.
+- [ ] `M25-006 BLOCKER` Decide §34.4.8, notation line discipline: reconcile "one node per line" with the four multi-line nodes in the frozen molecule. The grammar cannot be written first.
+- [ ] `M25-007 BLOCKER` Decide §34.4.9, editor completeness: add a seventh operation that sets region attributes, or move region attributes outside the editor and accept that the six operations are not the whole editing surface.
+- [ ] `M25-008 BLOCKER` Decide §34.4.12: repair or replace the frozen worked molecule so it passes the rules derived from §12, or amend the rules. Three defects are recorded; the molecule currently fails its own validator.
+- [ ] `M25-009` Decide §34.4.3, the workflow's signature, result type, and return-payload syntax.
+- [ ] `M25-010` Decide §34.4.5, which outcome triggers a retry region to repeat.
+- [ ] `M25-011` Decide §34.4.6, the durable suspension mechanism: explicit state machine, replay from journal, or replay from the last durable boundary.
+- [ ] `M25-012` Decide §34.4.7, what happens when a compensator itself fails, given that the original failure must survive.
+- [ ] `M25-013` Decide §34.4.10, molecule composition by edit-time substitution or by a call node, and adopt "derive keys before branching" as a stated authoring rule either way.
+- [ ] `M25-014 DEFER` Record §34.4.11, complexity as a contract property, as a post-experiment decision. It affects only the cost layer, which is out of scope here.
+- [ ] `M25-015` Record every decision above in `docs/plan.md` §34 with its resolution and date, so the design document can be revised against answers rather than guesses.
+
+## Representability Assessment
+
+The experiment measures representability corrections as Arm C cost, so an inexpressible construct discovered during the benchmark is a measured failure. Find them first.
+
+- [ ] `M25-016 BLOCKER` Pre-register a sample of the fifty change requests to be modelled before task one, chosen by the intent author and not by the notation designers.
+- [ ] `M25-017` Model the pre-registered sample in the notation and log every construct that cannot be expressed, with the workflow it was needed for.
+- [ ] `M25-018 TEST` Reproduce the five diagnostic programs that exposed the known gaps: collect-all validation errors, conditional value flow, retry with fallback, batch processing continuing past failures, and a database-backed state machine.
+- [ ] `M25-019` Decide, from the assessment, whether the notation is ready. If the sample cannot be modelled, stop; no validator work compensates for a medium that cannot say what programs need to say.
+- [ ] `M25-020` Record the assessment's cost in hours against the Arm C cold-start bucket, separately from per-task modelling time.
+
+## Notation, Grammar, and Editor
+
+- [ ] `M25-021 BLOCKER` Write the concrete grammar: token rules, comment syntax, continuation rules, and how attribute lists bind to a node versus a region. Depends on `M25-006`.
+- [ ] `M25-022` Implement the parser, producing the intermediate representation and a label table scoped to one workflow revision.
+- [ ] `M25-023` Implement the printer, producing notation from the representation.
+- [ ] `M25-024 TEST` Verify round-tripping preserves node identity rather than label spelling, which is the property stable identity actually requires.
+- [ ] `M25-025` Implement `add-node` and `delete-node`, rejecting deletion of a referenced node and writing a tombstone.
+- [ ] `M25-026` Implement `rewire`, resolving labels to identities at parse time.
+- [ ] `M25-027` Implement `wrap-region`, leaving edges crossing the new boundary in place and refusing a selection that would violate the one-innermost-region invariant or a region's single-entry rule.
+- [ ] `M25-028` Implement `bind-atom`, and record which of the four pinned-reference components it cannot supply.
+- [ ] `M25-029` Implement `annotate`, minting a relationship identity and rejecting a duplicate kind, subject, and object rather than creating a second row.
+- [ ] `M25-030` Implement the region-attribute operation decided in `M25-007`.
+- [ ] `M25-031 TEST` Verify the editor can construct the frozen worked molecule from an empty graph using only the frozen operations. This currently fails and is the practical form of `M25-007`.
+
+## Intermediate Representation
+
+- [ ] `M25-032 BLOCKER` Define node, edge, region, port, and relationship identities as opaque, permanent, and never reused, derived from nothing positional.
+- [ ] `M25-033` Define the six node kinds: input, pure, effect, merge, wait durable, and return.
+- [ ] `M25-034` Define the seven region kinds: claim, issue, retry, reconcile, loop, fold, and plain.
+- [ ] `M25-035` Define node attributes and the effective-attribute resolution that prefers a node's own value over its innermost enclosing region's.
+- [ ] `M25-036` Define the two result forms, single-typed and tagged, and restrict matching to the tagged form.
+- [ ] `M25-037` Define variant payload ports and their guards, so a payload port is readable only where its variant was taken or by a merge.
+- [ ] `M25-038` Define variant disposition — confirming, ambiguous, inconclusive — declared in the atom contract rather than inferred from a tag's spelling.
+- [ ] `M25-039` Define control edges, their variant labels, and the region-outcome label carrying bound exhaustion.
+- [ ] `M25-040` Define data edges and their stability classification: durable, stable-iteration, transient.
+- [ ] `M25-041` Define the progress and non-progress edge partition, and which back-edges each lowering materialises.
+- [ ] `M25-042 DATA` Add the disposable schema for the representation, kept separate from production graph storage and deleted with the experiment.
+- [ ] `M25-043 TEST` Verify identity survives relabelling, reordering, and re-layout.
+- [ ] `M25-044 TEST` Verify a deleted node's identity is never reissued.
+
+## Provenance and Identity
+
+- [ ] `M25-045 BLOCKER` Implement provenance as a least fixed point over the subset lattice, not as structural recursion, so it terminates on the data cycle a fold accumulator creates.
+- [ ] `M25-046` Implement derivation instances as the non-merge nodes reachable backwards through merge nodes only, stopping at the first non-merge. This is distinct from full provenance, and conflating them fails the plan's own canonical example.
+- [ ] `M25-047` Implement cone reachability with a visited set, well-defined on cyclic data graphs.
+- [ ] `M25-048` Implement logical effect identity from its three frozen components, with provider scope sourced per `M25-005`.
+- [ ] `M25-049 TEST` Verify a merge contributes no derivation instance of its own, which is what makes a multi-source key detectably non-singleton.
+- [ ] `M25-050 TEST` Verify two structurally identical derivations at different sites count as two instances.
+- [ ] `M25-051 TEST` Verify the fixpoint terminates on a fold accumulator and on a retry counter.
+
+## Structural Rules
+
+Four rules, frozen before task one, with expected results fixed independently of the implementation.
+
+- [ ] `M25-052 BLOCKER` Implement Rule 2, stable shared-key provenance: singleton derivation, cone stability, no external-tier atom, and the enclosing-loop binder clause for effects inside iteration.
+- [ ] `M25-053` Implement the fold-result cone predicate: a fold's result may enter a key cone only when its body performs no effect, draws only on durable or stable-iteration values, and its combinator is order-independent.
+- [ ] `M25-054 BLOCKER` Implement Rule 1, no sequential duplicate issuance, with forward reachability precomputed once per issuance rather than pairwise.
+- [ ] `M25-055` Implement Rule 1's conditional reporting when Rule 2 fails, including the overlap warning for two merges sharing an upstream derivation.
+- [ ] `M25-056 BLOCKER` Implement Rule 4, atomic claim gates issuance, as a must-reach dataflow over the progress graph with conjunction as the meet. Explicit path enumeration is exponential and, without acyclicity, non-terminating.
+- [ ] `M25-057` Implement Rule 4's claim recognition for both a direct confirmed claim and a claim confirmed through reconciliation, checking the key on both the reconciler and the claim.
+- [ ] `M25-058 BLOCKER` Implement Rule 3, reconciliation gates compensation, deleting confirming control edges rather than whole nodes so a reconciler's inconclusive continuation survives.
+- [ ] `M25-059` Implement the frozen diagnostic format, naming the rule, the graph location, and the evidence.
+- [ ] `M25-060` Define the disposition of a failure: a rule or precondition violation blocks lowering; a conditional warning does not and is counted separately.
+- [ ] `M25-061 BLOCKER` Establish that preconditions are validator machinery and are **not** graded as structural violations. The blind adjudicator grades the four structural properties only, identically for both arms, or the primary comparison is asymmetric.
+- [ ] `M25-062 TEST` Hand-trace all four rules against the frozen molecule and record the result. Rule 4 currently cannot be traced there; that is a finding, not a pass.
+
+## Well-Formedness Preconditions
+
+- [ ] `M25-063` W1: the progress subgraph is acyclic. Rule 4's termination and dominance both depend on it.
+- [ ] `M25-064` W2: every region has exactly one entry node, with any number of edges targeting it.
+- [ ] `M25-065` W3: every data edge's type equals both endpoint port types, and a merge's incoming types equal each other and its declared output.
+- [ ] `M25-066` W4: every write effect has exactly one effectively resolved deduplication strategy.
+- [ ] `M25-067` W5: outgoing control edge labels are pairwise distinct per tagged out-port. Rule 1's soundness depends on it.
+- [ ] `M25-068` W6: exactly one node has no incoming control edge, and it is an input node.
+- [ ] `M25-069` W7: every effect's required capability is contained in the workflow header's declared set.
+- [ ] `M25-070` W8: every tagged out-port's variants are covered, and every bounded region has exactly one exhaustion edge.
+- [ ] `M25-071` W9: no attribute key is declared at two region levels in one node's ancestor chain.
+- [ ] `M25-072` W10: a workflow has at least one return node, and its return nodes carry pairwise distinct variant tags.
+- [ ] `M25-073 TEST` Verify each precondition rejects its own violation and accepts the frozen molecule, or record which it rejects.
+
+## Type Layer
+
+- [ ] `M25-074` Implement the type table as project-scoped, since atoms are shared across workflows and a workflow-scoped table would let one atom's declared types mean two things.
+- [ ] `M25-075` Implement nominal type identity with no structural equality, no subtyping, and no implicit coercion; conversions are explicit kernel-atom calls.
+- [ ] `M25-076` Register parametric instantiations as distinct nominal types and measure the multiplication this causes in kernel operation declarations.
+- [ ] `M25-077` Restrict boundary types to the type layer, so foreign types are converted at the adapter rather than crossing.
+- [ ] `M25-078` Author the boundary shadow types the payments corpus requires — a money type and a timestamp type at minimum — and charge them to the Arm C cold-start bucket.
+- [ ] `M25-079 TEST` Verify a boundary signature crossing a foreign type is rejected, and that a registered type transitively carrying foreign internals is rejected at registration.
+
+## Atom Contract Stubs and Catalog
+
+- [ ] `M25-080 BLOCKER` Define the contract stub: identity, version, signature, tier, operation contract identity, response variants with dispositions, capability, determinism, correlation flag, and bindings. Hand-authored and discarded with the notation.
+- [ ] `M25-081` Author a stub for every atom the pre-registered sample touches, and log the hours against Arm C cold start. Arm B has no atom library, so this cost has no counterpart and must not be amortised away.
+- [ ] `M25-082` Implement the computed effect floor from an atom's syntax and transitive imports, with prefix matching, opaque-analysis cases forced to external tier, and per-platform recomputation.
+- [ ] `M25-083` Reject a declared tier that contradicts its computed floor.
+- [ ] `M25-084` Reuse the reviewed-exception mechanism from the naming lane for a legitimate floor trip rather than adding a second bypass.
+- [ ] `M25-085` Extend `internal/atomcatalog` to cover any control-flow construct added by the decisions above, keeping every entry marked as a proposal rather than a kernel declaration.
+- [ ] `M25-086` Register the catalog's control-flow entries in the retrieval corpus and verify they are retrievable through the same path as any other atom.
+- [ ] `M25-087 TEST` Verify catalog identities are derived and stable, so re-seeding is a no-op rather than a duplicate write.
+- [ ] `M25-088` Resolve `REPO-031` before the catalog's declarations reach `lint`, since a wrapped opening sentence currently fails the atom-comment rule and blocks every lane's pre-commit.
+
+## Evaluator, Fixtures, and Traces
+
+- [ ] `M25-089 BLOCKER` Define the trace: an ordered sequence recording the node entered, the variant taken, a bounded rendering and digest of each out-port binding, the edge followed, and the iteration index of every enclosing loop.
+- [ ] `M25-090 BLOCKER` Define the canonical encoding the digest requires: type identity bound into the digest, sorted field names, one fixed rendering per primitive, explicit union tags, length-prefixed collections with absent distinct from empty, canonical ordering for unordered collections, and a type-kind discriminator.
+- [ ] `M25-091` Resolve the six scalar cases the encoding leaves open: NaN payloads, signed zero, float width, unsigned-64 range, Unicode normalisation, and absent versus empty collections.
+- [ ] `M25-092` Route trace renderings through the redaction pipeline for credentials, and specify field-level minimisation for business data, which no existing mechanism covers.
+- [ ] `M25-093` Implement the single-threaded deterministic interpreter over the progress subgraph.
+- [ ] `M25-094 BLOCKER` Implement effect fixtures as ordered sequences keyed by node and invocation ordinal. A fixture modelled as a pure function of inputs cannot express a bounded reconciliation read, which is a frozen conformance case.
+- [ ] `M25-095` Implement durable-wait evaluation as a recorded suspend step followed by the resume edge, so a lowering that fails to suspend is detectable without waiting out the timeout.
+- [ ] `M25-096` Implement bound exhaustion as a region-sourced outcome edge treated as inconclusive.
+- [ ] `M25-097` Reject reaching a merge with no executed incoming branch as an evaluator error rather than yielding a zero value.
+- [ ] `M25-098 TEST` Verify the same fixture drives the evaluator and the generated Go in the same order, which is what makes differential execution meaningful for a stateful mock.
+- [ ] `M25-099` Record the trace's scope limit: one workflow instance on one scripted path, which cannot represent the cross-instance races that logical effect identity excludes instance identity to address.
+
+## Go Lowering
+
+- [ ] `M25-100 BLOCKER` Generate sealed variant types and fixed-arity positional eliminators, so adding a declared variant breaks every call site at compile time.
+- [ ] `M25-101 BLOCKER` Return an outcome wrapper rather than a bare generic value, since a bare return cannot distinguish a voided contract from a legitimate zero.
+- [ ] `M25-102` Enforce that the void flag is set only by an eliminator's fallback and the panic boundary, never by a generated handler for a matched arm.
+- [ ] `M25-103` Confine all dispatch on a sealed type to the generated package and verify by authorship and import analysis. Shape detection cannot distinguish a laundering handler table from an unrelated one.
+- [ ] `M25-104` Add the semantic analyzer forbidding a foreign type from satisfying a marker interface, and record that it cannot reach a separate module.
+- [ ] `M25-105` Generate per-type boundary copiers; reflection silently drops unexported fields.
+- [ ] `M25-106` Generate the supervised call boundary with a deferred recover, a goroutine, and a mandatory timeout, and record plainly that the timeout does not reclaim a blocked goroutine because no host mechanism does.
+- [ ] `M25-107` Lower bounded iteration to loops with materialised bounds and no recursion.
+- [ ] `M25-108` Confine impure access to injected capability interfaces and enforce the generated package's import set.
+- [ ] `M25-109` Map the total error space of every external adapter, defaulting unmapped errors to ambiguous rather than confirmed failure.
+- [ ] `M25-110 TEST` Verify the determinism hazards in generated code: unstable sorting, comparison of uncomparable dynamic types, map iteration, iterator-based key collection, concurrent-map ranging, ready-case selection, pointer-address formatting, monotonic time comparison, signed zero, and nil versus empty collections.
+- [ ] `M25-111 TEST` Run the lowering conformance suite before task one: golden cases per construct and differential execution against a mocked gateway across every confirmed, failed, ambiguous, reconciled, claimed, looped, retried, and merged path.
+- [ ] `M25-112` Budget a lowering-hardening pass with its own exit criteria, since a defect rate above ten percent voids the arm comparison and this is a from-scratch backend tested against adversarially seeded tasks.
+
+## Traceability and Debuggability
+
+- [ ] `M25-113` Emit the source map as a sidecar keyed on node identity, retained per generator run, with comments advisory rather than authoritative.
+- [ ] `M25-114` Embed a node identity in every generated call site in a form that survives into a panic stack trace, so the artifact a developer always has resolves back to the graph.
+- [ ] `M25-115` Implement the graph semantic diff over stable identities, distinguishing deletion from replacement through tombstones.
+- [ ] `M25-116` Implement the obligation diff and surface a weakened obligation more loudly than an added or removed one.
+- [ ] `M25-117` Implement the remaining required diffs: generated Go by syntax tree, capability, effect trace, data provenance, region and merge, effect relationship, and pinned version.
+- [ ] `M25-118` Resolve blame through the generation-versioned sidecar to the revision that changed a node, not the run that rewrote the file.
+- [ ] `M25-119 TEST` Verify source-map position fidelity after formatting, regeneration integrity after an unrelated edit, and historical resolution of a symbol from an earlier generation.
+- [ ] `M25-120` Record the unmitigated debuggability costs: the outcome wrapper's nesting and boundary-copy identity loss.
+
+## Frontend: Program Graph Authoring Surface
+
+The explanatory graph pane is read-only and complete. This is a different surface: an authoring medium whose edits are the measured work. Reuse the layout, viewport, and inspector patterns rather than reinventing them.
+
+- [ ] `M25-121 BLOCKER UX` Mount a program-graph route in the existing shell, separate from the explanatory graph pane, so neither surface inherits the other's assumptions.
+- [ ] `M25-122 UX` **As an editor, I can see a workflow's structure at a glance**, with regions rendered as primary containers carrying their declared attributes, because the graph is region- and obligation-centric and a region rendered as background hides what the validator reads.
+- [ ] `M25-123 UX` Render the six node kinds distinguishably by shape, with status independent of colour, reusing the existing visual language.
+- [ ] `M25-124 UX` Render control edges with their variant labels legible at normal zoom, and distinguish progress from non-progress edges.
+- [ ] `M25-125 UX` Render data edges distinctly from control edges, with stability classification visible on demand rather than always.
+- [ ] `M25-126 UX` **As an editor, I can tell a settled construct from an unsettled one**, so a proposed or undefined construct renders distinguishably from a frozen one and a reviewer is not trained to trust both equally.
+- [ ] `M25-127 BLOCKER UX` **As an editor, I see a validator diagnostic at the node it concerns**, not only in a list. The medium's whole claim is that a validator does not forget what a human does; delivering that through a channel a reader can skip past forfeits it.
+- [ ] `M25-128 UX` Render a diagnostic's evidence inline: the rule, the location, and the derivation set or path it names.
+- [ ] `M25-129 UX` Distinguish a blocking violation from a non-blocking conditional warning, since they land in different experiment buckets.
+- [ ] `M25-130 BLOCKER UX` **As a reviewer, I can see which derivation produced a key**, rendering a key derivation's cone directly rather than requiring the reviewer to trace edges by eye. This is the question the structural rules turn on.
+- [ ] `M25-131 UX` **As a reviewer, I can see why two issuances are considered duplicates**, rendering the two nodes, their shared logical effect identity, and the path between them together.
+- [ ] `M25-132 UX` **As a reviewer, I can see which paths reach an issuance without a confirmed claim**, rendering the uncovered path rather than reporting that one exists.
+- [ ] `M25-133 UX` **As a reviewer, I can see whether a compensator is reachable from an ambiguous outcome**, rendering the path with confirming reconciliation removed.
+- [ ] `M25-134 UX` Implement the editing operations as direct manipulation where each maps to exactly one frozen editor operation, so an edit's cost in the experiment matches an edit in the notation.
+- [ ] `M25-135 UX` Refuse an edit that would violate a well-formedness precondition at the point of the edit, with the reason, rather than accepting it and failing at validation.
+- [ ] `M25-136 UX` Show the region attribute editor for the operation decided in `M25-007`, since without it the surface cannot build the frozen molecule.
+- [ ] `M25-137 UX` **As an editor, I can inspect any node's pinned atom**, showing identity, version, tier, declared response variants with dispositions, and capability.
+- [ ] `M25-138 UX` Show a node's contract stub as a stub, never as a verified contract, and state that its complexity and verification fields are absences with reasons.
+- [ ] `M25-139 UX` **As an editor, I can run the evaluator and step its trace**, showing the node entered, variant taken, and edge followed per step, with the graph highlighting the current step.
+- [ ] `M25-140 UX` Show a trace divergence as the first divergent step and the field path at which two digests differ, without revealing a redacted value.
+- [ ] `M25-141 UX` **As an editor, I can see the generated Go for any node**, resolved through the sidecar, and navigate from a generated construct back to its node.
+- [ ] `M25-142 UX` Render a bounded region's exhaustion path, since a declared bound with an unhandled exhaustion is a validation failure an author should see before running the validator.
+- [ ] `M25-143 UX` State unknown information as unknown rather than leaving a blank, matching the inspector convention the explanatory graph already follows.
+- [ ] `M25-144 TEST` Verify the surface renders every construct in the control-flow table, including the ones marked proposed and undefined.
+- [ ] `M25-145 TEST` Verify keyboard operation and high-contrast rendering for every authoring operation, not only for viewing.
+- [ ] `M25-146 TEST` Benchmark authoring responsiveness at the worked molecule's size and at ten times it, since a medium that is slower to edit loses on the cost criterion regardless of its correctness advantage.
+
+## Conformance Suite
+
+- [ ] `M25-147 BLOCKER` Freeze the conformance cases and their expected results independently of the validator implementation, before task one.
+- [ ] `M25-148 TEST` Implement the frozen cases: duplicate issuance after a merge, mutually exclusive branches, declared retry, effectful bounded loops, shared versus equivalent derivations, per-retry and per-element keys, singleton and multi-source phi provenance, clock and randomness and external-tier values in a key cone, direct versus reconciled compensation, unrelated compensation, bounded reconciliation reads, query-then-issue without a claim, a claim on a different key, in-progress and ambiguous claims reaching issuance, and confirmed acquisition reaching issuance.
+- [ ] `M25-149 TEST` Add a dedicated Rule 4 conformance graph, since the frozen molecule cannot exercise that rule.
+- [ ] `M25-150 TEST` Add cases for each well-formedness precondition, including the four with no coverage today.
+- [ ] `M25-151 TEST` Add cases for the constructs added by the decisions above: fold with and without an effect, retry trigger, element-failure policy, and the workflow result union.
+- [ ] `M25-152 TEST` Add the Go-boundary cases: foreign variant smuggling in all four forms, handler-set laundering in all six verified forms, panic sealing including goroutine escape and blocked-atom timeout, and trace redaction and bounding.
+- [ ] `M25-153` Pre-register the lowering-defect exclusions, and stop the comparison if exclusions exceed ten percent in any arm.
+
+## Experiment Execution
+
+- [ ] `M25-154 BLOCKER` Name the intent author, the editors, and the adjudicator before the corpus is chosen, keeping the notation designers out of the editing role.
+- [ ] `M25-155` Freeze the fifty specifications and hidden tests before notation implementation and task modelling.
+- [ ] `M25-156` Pre-register the cost buckets: notation authoring, validator, lowering, atom contract stubs, shadow types, and editor onboarding — all one-shot, none amortisable against a discarded artifact.
+- [ ] `M25-157 BLOCKER` Estimate total Arm C cost against the twenty-five percent ceiling before task one. If the estimate exceeds it, cut scope or run the narrower payments-only experiment rather than discovering the overrun after fifty tasks.
+- [ ] `M25-158` Log onboarding hours per editor, so a rushed onboarding is distinguishable from a bad notation in the results.
+- [ ] `M25-159` Run the arms with randomised order and the required repetitions, collapsing to a modal outcome before analysis.
+- [ ] `M25-160` Apply the blind triage without knowing the arm, reporting validator defects separately so they cannot be read as evidence about the medium.
+- [ ] `M25-161` Record modelling time, representability corrections, and translation time per workflow as Arm C cost.
+
+## Post-Experiment, Only If the Kill Criterion Passes
+
+- [ ] `M25-162 DEFER` The cost layer: compositional time and space bounds over the graph. Fails the experiment's own relevance test and depends on `M25-014`.
+- [ ] `M25-163 DEFER` Templates as structural macros with named holes. Reuse convenience; the experiment can hand-expand.
+- [ ] `M25-164 DEFER` An external-signal node delivering new data into a suspended workflow. Without it a long-running graph awaiting an external actor must decompose into one workflow per transition, which is a modelling constraint to record rather than a blocker.
+
+## Gate
+
+- [ ] `M25-G01 GATE` Every plan decision in `M25-002` through `M25-013` is recorded with a resolution, and no rule or precondition rests on an unanswered one.
+- [ ] `M25-G02 GATE` The pre-registered representability sample is modelled, and every inexpressible construct is either added to the notation or recorded as a measured limitation.
+- [ ] `M25-G03 GATE` All four structural rules and all ten preconditions are hand-traced against the frozen molecule and their frozen conformance cases, with results matching the expectations frozen before implementation.
+- [ ] `M25-G04 GATE` The editor constructs the frozen worked molecule from an empty graph using only frozen operations.
+- [ ] `M25-G05 GATE` The lowering conformance suite passes before task one, and its pre-registered exclusions are declared.
+- [ ] `M25-G06 GATE` Every validator diagnostic renders at the node it concerns, and a key's derivation cone is inspectable without leaving the authoring surface.
+- [ ] `M25-G07 GATE` Total Arm C cost is estimated against the twenty-five percent ceiling before task one, and the estimate is recorded whether or not it passes.
+- [ ] `M25-G08 GATE` The kill criterion is evaluated on its own terms: fewer structural violations than the disciplined-Go arm at the pre-registered significance level, no more than five points worse on hidden acceptance, no more than twenty-five percent higher total cost, and no severe defect class regressed. A failure ends graph-first editing and retains the contract, capability, refinement, and effect analysis over ordinary Go.
+- [ ] `M25-G09 GATE` `POST-002` through `POST-005` remain closed, and no production graph schema, atom runtime, macro system, or Go backend was built.
+
+---
+
 # Explicitly Deferred Until After Prototype Exit
 
 These are guardrails, not hidden TODOs for the prototype critical path.
@@ -3890,7 +4142,7 @@ real source tree rather than trusting the declaration. Starting any of them
 requires `deferred.Authorize`, which refuses on an unmet trigger and on an unmet
 dependency.
 
-- [x] `POST-001 DEFER` Run the disposable graph-medium experiment before production semantic graph engineering.
+- [x] `POST-001 DEFER` Run the disposable graph-medium experiment before production semantic graph engineering. Milestone 25 is that experiment, planned in full and blocked at `M25-001` until `deferred.Authorize` passes; nothing in it may start before then.
 - [x] `POST-002 DEFER` Scope and freeze the tier-zero kernel only if the graph experiment passes.
 - [x] `POST-003 DEFER` Implement graph-native atoms only after kernel scope is accepted.
 - [x] `POST-004 DEFER` Implement modeled Go atoms and reference models only after correlation controls are specified.
@@ -3942,35 +4194,142 @@ evidence. They do not silently reopen or rewrite the original history; each
 item names the checked claim that must be reconciled before the completion
 ledger can be treated as authoritative.
 
-- [ ] `AUDIT-001 REVIEW DOC` Reconcile `M00-019`: replace the plan's nonexistent `AwaitingAcceptance` success state with the implemented `awaiting-review` state, then add a trace test that every lifecycle state named by the plan parses through `domain.AllTaskStates`.
-- [ ] `AUDIT-002 REVIEW PLAN` Reconcile `M00-G01` and `M00-G02`: add a machine-readable feature/deferred manifest with journey, measurement, milestone, and dependency fields, and make plan tracing reject unmapped features or deferred critical-path dependencies.
-- [ ] `AUDIT-003 REVIEW BLOCKER` Reconcile `M01-026`: make one `codeflux-dev build` invocation generate or verify protobuf output, build the server and worker, and build the GWC/WASM frontend under one artifact root; prove it from a clean clone.
-- [ ] `AUDIT-004 REVIEW SECURITY` Reconcile `M03-003` on the primary Windows platform: apply and test user-only DACLs for the application-data directory, SQLite database, backup, migration-lock, WAL, and SHM files instead of skipping the permission assertion.
-- [ ] `AUDIT-005 REVIEW DATA` Reconcile `M03-067`: seed real graph and vector descendants, run the supported deletion or purge path, and assert the intended restriction/cascade behavior and zero orphan rows.
-- [ ] `AUDIT-006 REVIEW SECURITY` Reconcile `M04-G01`: configure and exercise a deterministic provider through effective config and OS credential lookup, then scan SQLite, WAL, SHM, events, and outputs for the canary secret.
-- [ ] `AUDIT-007 REVIEW SECURITY` Reconcile `M04-G02`: run a full coordinator-to-worker/provider mock task and scan prompts, events, logs, UI payloads, diagnostics, SQLite, WAL, and SHM rather than manually redacting already-isolated boundary values.
-- [ ] `AUDIT-008 REVIEW TEST` Reconcile `M07-057`: register production services in the in-process transport and exercise every RPC success and typed-domain-error path instead of returning empty dynamic responses from an unknown-service handler.
+- [x] `AUDIT-001 REVIEW DOC` Reconcile `M00-019`: replace the plan's nonexistent `AwaitingAcceptance` success state with the implemented `awaiting-review` state, then add a trace test that every lifecycle state named by the plan parses through `domain.AllTaskStates`.
+  - `docs/plan.md` §Acceptance definitions now names `awaiting-review`.
+  - `cmd/codeflux-dev/plan_state_trace_test.go`: `TestAUDIT001_EveryLifecycleStateNamedByThePlanIsDeclared` collects every inline-code token in the plan whose leading word begins a declared state value and requires it to resolve against the union of every machine in `internal/domain`; `TestAUDIT001_TaskLifecycleStatesNamedByThePlanParseThroughAllTaskStates` requires every `awaiting-*` token to parse through `domain.AllTaskStates`. One exemption is recorded with its reason (`RecoveryCard`, a component name).
+  - Verified discriminating: reinstating `AwaitingAcceptance` fails both tests naming the token and its normalized form; restoring the fix passes.
+- [x] `AUDIT-002 REVIEW PLAN` Reconcile `M00-G01` and `M00-G02`: add a machine-readable feature/deferred manifest with journey, measurement, milestone, and dependency fields, and make plan tracing reject unmapped features or deferred critical-path dependencies.
+  - `internal/plantrace`: `PrototypeFeatures` (name, journey, measurement, milestones, depends-on) and `DeferredFeatures` (TODO id, name, branch gate), declared as Go data on the `internal/pipeline` precedent rather than as a sidecar JSON/YAML file.
+  - `plantrace.Validate` rejects a feature with no journey, measurement, or implementing milestone; a milestone that is not an `MNN` identifier; a dependency in neither manifest; a prototype feature depending on deferred work by name or by id (`M00-G02`); a deferral with no branch gate; and a dependency cycle. It returns every finding, not the first.
+  - Wired into `runRepositoryChecks`, so `codeflux-dev lint` — which CI runs — executes both gates on every change. Previously nothing executed them: `docs/check-plan-trace.ps1` is invoked by no workflow and no command.
+  - `internal/plantrace/validate_test.go` proves each rejection fires and that the manifest agrees with `docs/plan.md` and every `POST-* DEFER` item in this file, so the manifest cannot drift into a second source of truth. `cmd/codeflux-dev/scope_manifest_test.go` proves the lint wiring reports them.
+- [x] `AUDIT-003 REVIEW BLOCKER` Reconcile `M01-026`: make one `codeflux-dev build` invocation generate or verify protobuf output, build the server and worker, and build the GWC/WASM frontend under one artifact root; prove it from a clean clone.
+  - `runBuild` now runs `generate-check` first, then `go build ./...`, then the two command binaries, then `buildFrontendAssets` over `./web/client`.
+  - `--root` for `build` names the one root the outputs share rather than a single output directory; without it the layout is unchanged (`.artifacts/bin`, `.artifacts/frontend`). Previously `--root` would have collapsed the binaries and the client into the same directory.
+  - `cmd/codeflux-dev/build_completeness_test.go`: `TestAUDIT003_OneBuildInvocationProducesEveryShippedArtifact` runs the real build into a temporary root and asserts all five artifacts exist and are non-empty; it is opt-in behind `CODEFLUX_BUILD_COMPLETENESS=1` for the reason `M22-G01` states. `TestAUDIT003_BuildVerifiesGeneratedOutputAndTheFrontend` runs in the default suite and fails if a step is removed.
+  - Clean-clone proof: `git clone --no-hardlinks` into `.artifacts/tmp`, working diff applied, `go run ./cmd/codeflux-dev build` exits 0 and produces `bin/codeflux.exe`, `bin/codeflux-worker.exe`, and `frontend/{index.html,wasm_exec.js,bin/main.wasm}`.
+  - No CI change needed: `runPinnedBuf` resolves buf through `go run …@v1.72.0`, so the matrix job that runs `build` without a bootstrap step still works.
+- [x] `AUDIT-004 REVIEW SECURITY` Reconcile `M03-003` on the primary Windows platform: apply and test user-only DACLs for the application-data directory, SQLite database, backup, migration-lock, WAL, and SHM files instead of skipping the permission assertion.
+  - `internal/storage/permissions_windows.go`: `restrictToCurrentUser` sets a DACL naming only the process user, with `PROTECTED_DACL_SECURITY_INFORMATION` so inherited entries are removed rather than merged. Administrators and SYSTEM are deliberately not named — they can take ownership regardless, so naming them would widen the grant without adding a capability and would make the assertion untestable.
+  - `internal/storage/permissions_unix.go` keeps the POSIX path, applied explicitly rather than through the creating call's mode argument, which umask can widen.
+  - Applied to the application-data directory and database (`ensureDatabaseFile`), the `-wal`, `-shm`, and `.migration.lock` sidecars (`restrictDatabaseArtifacts`, called after `Open` establishes WAL mode so the sidecars exist), the backup directory and backup file before the copy runs (`backup.go`), and the migration lock once held (`migrate.go`, since `flock.SetPermissions` is a POSIX mode and inert on Windows).
+  - `internal/storage/permissions_windows_test.go` reads each DACL back and fails on any trustee that is not the current user; it refuses to pass if fewer than three artifacts were checked. `TestAUDIT004_ARestrictedPathRefusesAnInheritedGrant` widens the parent with a Users grant and proves the created database does not inherit it — the case that distinguishes a protected DACL from an unprotected one.
+  - Verified: `go test ./internal/storage/` green (131s).
+- [x] `AUDIT-005 REVIEW DATA` Reconcile `M03-067`: seed real graph and vector descendants, run the supported deletion or purge path, and assert the intended restriction/cascade behavior and zero orphan rows.
+  - `internal/storage/deletion_lineage_test.go` seeds a real `graphs` row and a real atom-documentation revision, then runs the deletion the schema supports and asserts the intended behaviour: **restriction**. No migration declares `ON DELETE` for these relations and foreign keys are enforced by the DSN, so deleting a project or a graph with descendants is refused, atomically, leaving every row in place.
+  - `TestAUDIT005_TheOrphanCheckDetectsAnActualOrphan` is the control the original evidence lacked: `ValidateNoOrphans` passes trivially on any database whose constraints were never violated, so it is shown to fail on a database that does hold an orphan (manufactured with enforcement suspended) before its passing runs are treated as evidence.
+  - Verified: `go test ./internal/storage/ -run TestAUDIT005` green.
+  - **Finding, not fixed here:** `DefaultDeletionPolicy` declares `tombstone-then-purge` for projects and threads and `hard-delete-lineage` for learned artifacts, and **nothing in the repository consumes the type** — there is no project or thread purge path at all. `DeleteMemoryArtifact` is the only implemented lineage deletion. Filed as `AUDIT-005a` rather than folded in, because implementing a purge path is a feature, not a reconciliation.
+- [ ] `AUDIT-005a REVIEW DATA` Implement the project and thread deletion path `DefaultDeletionPolicy` declares, or delete the unused policy type: `DeletionPolicy`, `DeletionModeTombstoneThenPurge`, and `RequireOrphanCheck` have no executor and no consumer, so the declared user-data deletion semantics are unimplemented while reading as settled.
+- [x] `AUDIT-006 REVIEW SECURITY` Reconcile `M04-G01`: configure and exercise a deterministic provider through effective config and OS credential lookup, then scan SQLite, WAL, SHM, events, and outputs for the canary secret.
+  - The gate was unexercisable: `StartApplication` built `credentials.NewPlatformStore()` with no seam, so no test could put a known value on the resolving side of the boundary. Added `ApplicationOptions.CredentialStore`, defaulting to the platform store.
+  - `internal/coordinator/credential_canary_test.go` registers a provider, binds an `os://` reference, resolves a canary through the real `ProviderCredentialSource`, and exercises the provider over the generated `SettingsService` client. It **asserts the canary was actually observed** before asserting its absence, so the scan cannot pass vacuously.
+  - The scan reads the database, `-wal`, and `-shm` as bytes after shutdown rather than querying columns, so a secret in a free-text column, a JSON blob, an index page, or an unreclaimed page is also caught. It fails if no file was scanned.
+  - Verified: `go test ./internal/coordinator/ -run TestAUDIT006` green.
+- [x] `AUDIT-007 REVIEW SECURITY` Reconcile `M04-G02`: run a full coordinator-to-worker/provider mock task and scan prompts, events, logs, UI payloads, diagnostics, SQLite, WAL, and SHM rather than manually redacting already-isolated boundary values.
+  - `internal/coordinator/full_task_secret_scan_test.go` drives a real requirement through intake, approval, preflight binding, worktree creation, a launched worker subprocess, and a scripted provider, then reads back the database, `-wal`, `-shm`, and **every file under the coordinator root** as bytes — worktrees, logs, backups, diagnostics — rather than parsing chosen columns.
+  - The canary is genuinely live: it is bound to a registered provider through an `os://` reference and resolved through the coordinator's own `ProviderCredentialSource`, behind a `countingCredentialStore`. The test fails if the secret was never held or never read, so the scan cannot pass against a value the run never carried — which is the exact weakness of the original evidence.
+  - Verified: `go test ./internal/coordinator/ -run 'TestAUDIT00[67]'` green.
+- [x] `AUDIT-008 REVIEW TEST` Reconcile `M07-057`: register production services in the in-process transport and exercise every RPC success and typed-domain-error path instead of returning empty dynamic responses from an unknown-service handler.
+  - `internal/coordinator/registered_services_test.go` enumerates all 59 declared RPCs across the 9 product services and invokes each against the **real application's task server**, which installs no unknown-service handler. `Unimplemented` is the one answer refused: any other code proves a registered production implementation handled the call and applied its own validation.
+  - A method-count floor guards the enumeration itself, since a collapse in what was enumerated is indistinguishable from the vacuous test this replaces.
+  - `TestAUDIT008_AnUnauthenticatedCallIsRefusedBeforeAnyService` proves the boundary sits in front of the registered services rather than beside them: every declared method answers `Unauthenticated` without a session.
+  - The original `TestEveryProductMethodThroughAuthenticatedInProcessAPI` is kept and re-documented for what it actually checks — routability, interceptors, and request/response type round-tripping — with an explicit note not to re-describe it as API coverage.
+  - Verified: `go test ./internal/coordinator/ -run TestAUDIT008` and `go test ./internal/transport/` green.
 - [ ] `AUDIT-009 REVIEW BLOCKER TEST` Reconcile `M07-082` through `M07-090`, `M07-G01`, and `M07-G04`: run the chronological journeys against the real application, generated services, temporary SQLite/Git, worker/provider/effect ports, and named crash boundaries instead of string-append and in-test map fakes.
-- [ ] `AUDIT-010 REVIEW BLOCKER` Reconcile `M08-043`, `M08-045`, and `M08-G03`: register and wire `WorkspaceService` through repository mapping, context selection, `ContextManifestRepository`, committed events, and the mounted expandable context card.
-- [ ] `AUDIT-011 REVIEW SECURITY` Reconcile `M08-049`: replace caller-supplied approved instruction paths with a durable approval identity bound to project, repository revision, scope, and consumption, with forged/stale/replay tests.
-- [ ] `AUDIT-012 REVIEW BLOCKER` Reconcile `M09-026`: wire `StorageEditEventRecorder` into the production `gitwork` service, route mediated edits through `ApplyEditBatch`, and integration-test atomic edits plus the committed redacted event.
+- [x] `AUDIT-010 REVIEW BLOCKER` Reconcile `M08-043`, `M08-045`, and `M08-G03`: register and wire `WorkspaceService` through repository mapping, context selection, `ContextManifestRepository`, committed events, and the mounted expandable context card.
+  - `workspace.SelectContext` had **zero production callers** and `ContextManifestOperations` was never invoked, so no manifest was ever written and the expandable card had nothing to expand. The agent's first round was a directory listing plus `go.mod` and `README.md` — the same defect `PIPE-053` describes from the retrieval side.
+  - `internal/coordinator/agent_context_selection.go` builds the repository map, runs deterministic selection against the requirement with a budget matched to the loop's own limits, records the manifest with its items and exclusions through `RecordContextManifest`, and returns the selected excerpts as the agent's first-round context. Excerpts are labelled `path:start-end` so the agent can tell a fragment from a whole file.
+  - Degradation is reported, not hidden: a repository that cannot be mapped, a selection that fails, or a selection that matches nothing falls back to the worktree listing **and narrates why** into the session. A run that planned against less has to say so.
+  - Instruction approvals are threaded through `AUDIT-011`'s resolver, so an unapproved repository instruction stays excluded on this path too.
+  - `internal/coordinator/context_selection_wiring_test.go` drives a real run and asserts `context_manifests` and `context_manifest_items` are both non-empty afterwards. A degraded fallback records nothing, so a persisted manifest is evidence selection genuinely ran.
+  - Verified: `go test ./internal/coordinator/ -run 'TestAUDIT010'` green; the pre-existing `TestTheEngineCarriesARequirementThroughToRealWorkOnDisk` still passes with the new first-round context.
+  - **Not covered:** the mounted browser assertion for the card itself. The manifest and its items now exist to render; the browser-side check belongs with the other mounted suites and is filed as `AUDIT-010a`.
+- [ ] `AUDIT-010a REVIEW E2E` Add the mounted browser check for the expandable context card now that `context_manifests` is populated by real runs, closing the presentation half of `M08-045` and `M08-G03`.
+- [x] `AUDIT-011 REVIEW SECURITY` Reconcile `M08-049`: replace caller-supplied approved instruction paths with a durable approval identity bound to project, repository revision, scope, and consumption, with forged/stale/replay tests.
+  - `migrations/000032_repository_instruction_approvals.sql`: `repository_instruction_approvals` binds an approval to project, repository, 40-character revision, repository-relative path, **content SHA-256**, and scope (`single-use` or `revision` — there is deliberately no `always`). Grants are immutable; revocation is a column and consumption is a separate table, matching the schema's existing rule for historical records.
+  - `internal/storage/repository_instruction_approval_repository.go`: grant, find, consume, and revoke. `FindRepositoryInstructionApproval` matches on **all five** bindings, so an approval from another project, repository, revision, path, or byte sequence simply does not resolve. `InstructionApprovalResolver` records consumption *as part of answering*, so a caller cannot replay a single-use approval by declining to record it.
+  - `internal/workspace`: `ContextQuery.ApprovedInstructionPaths []string` is replaced by `InstructionApprovals InstructionApprovalResolver`. **A nil resolver approves nothing** — the old shape defaulted to "approved if the caller says so", and the new one fails toward exclusion, which is the direction a prompt-injection boundary has to fail in. The digest is taken from the bytes on disk at selection time, not from the repository map.
+  - Forged, stale, and replay cases all covered at both layers: `internal/workspace/instruction_approval_test.go` (wrong path, wrong bytes, spent single-use, no resolver at all, plus the separate outer `MapInputsCurrent` refusal recorded so the two controls are not confused) and `internal/storage/repository_instruction_approval_repository_test.go` (every binding, project-boundary crossing, replay, revocation, and seven rejected grant shapes).
+  - Verified: `go build ./...`, `go test ./internal/workspace/` and `./internal/storage/` green; `codeflux-dev migration-check` accepts migration 32.
+  - **Not yet wired:** no production caller constructs the resolver, so instructions are currently excluded everywhere rather than approved through a UI. That is strictly safer than the previous state and is the remaining half — filed as `AUDIT-011a`.
+- [ ] `AUDIT-011a REVIEW` Wire `InstructionApprovalResolverFor` into the production context-selection path and give first-use approval a user-facing grant surface, so a repository instruction can be approved rather than only refused.
+- [x] `AUDIT-012 REVIEW BLOCKER` Reconcile `M09-026`: wire `StorageEditEventRecorder` into the production `gitwork` service, route mediated edits through `ApplyEditBatch`, and integration-test atomic edits plus the committed redacted event.
+  - `SetEditEventRecorder` and `NewStorageEditEventRecorder` had **zero production callers** — every reference was a test binding `memoryEditRecorder` — so the production service applied edit batches with no recorder attached and journalled nothing.
+  - Wired at both construction sites: `newApplicationCheckpointing` and `newRunLauncher` (`run_launcher_wiring.go`). `runLauncherRepositories` now embeds `gitwork.TaskEventAppender`, since a launched run is the path that actually edits a repository.
+  - `internal/gitwork/edit_event_integration_test.go` exercises the real recorder against a real migrated SQLite database with real parent rows: an applied batch produces an `edit_batch_applied` event whose payload carries counts and a 64-character batch digest and **not** a secret embedded in the edited file's content; a batch containing a path escape is refused whole, leaves its valid half unwritten, and journals nothing.
+  - Verified: `go test ./internal/gitwork/ ./internal/storage/ ./internal/plantrace/ ./cmd/codeflux-dev/` all green.
 - [ ] `AUDIT-013 REVIEW BLOCKER` Reconcile `M10-027`: implement the worker ToolService/agent-loop adapter as the sole command executor, remove coordinator-owned direct execution, and prove worker PID and lease attribution end to end.
-- [ ] `AUDIT-014 REVIEW` Reconcile `M10-035`: publish incrementally redacted, bounded command progress while the process is running, with backpressure and cancellation tests, rather than publishing only after process exit.
+- [x] `AUDIT-014 REVIEW` Reconcile `M10-035`: publish incrementally redacted, bounded command progress while the process is running, with backpressure and cancellation tests, rather than publishing only after process exit.
+  - `publishRedactedOutput` ran only after `Finalize()`, so a fifteen-minute test run showed nothing at all until it exited — the exact case a live console exists for.
+  - `internal/executor/live_progress.go` tees process output into the durable redaction stream **first**, then publishes bounded, per-chunk-redacted updates while the process runs. Durable capture never yields to streaming: a failing sink costs the console, not the record.
+  - Chunks flush on **line boundaries only**, and a trailing partial line is held back until it completes. A secret split across a chunk boundary would otherwise be published as two halves that neither pattern matches. This makes streamed output slightly behind the process rather than slightly unsafe, and the limitation is documented at the type rather than left implicit. A single enormous line with no newline still flushes past a chunk so a process cannot stall the stream forever.
+  - Backpressure is a byte budget (`liveProgressBudget`, 256 KiB) with a drop counter, and what it withheld is **stated** — `reportWithheldOutput` publishes the withheld count, because a console that just stops receiving cannot tell a quiet command from a truncated one. Cancellation stops streaming immediately while the durable record still completes.
+  - The final result no longer republishes the whole finalized text, which would have duplicated everything already streamed.
+  - `internal/executor/live_progress_test.go` covers all five: published before exit, partial line held back, budget bounded with the withholding reported, cancellation stops streaming, and durable capture surviving a failing sink.
+  - Verified: `go test ./internal/executor/` green (whole package).
 - [ ] `AUDIT-015 REVIEW SECURITY` Reconcile `M10-026`, `M10-042`, `M10-G01`, and `M10-G02`: implement and register the production ToolService, bind exact durable grant consumption to worker execution, and test attribution, substitution, replay, expiry, and denial end to end.
-- [ ] `AUDIT-016 REVIEW BLOCKER` Reconcile `M11-004`: construct and register production workspace and provider/settings services during application startup and verify their real capabilities over generated RPC clients.
+- [x] `AUDIT-016 REVIEW BLOCKER` Reconcile `M11-004`: construct and register production workspace and provider/settings services during application startup and verify their real capabilities over generated RPC clients.
+  - Registration is proven for all nine services by `AUDIT-008`. Settings and provider capabilities already had a real test (`TestTheSettingsSurfacesAnswerOverTheGeneratedClient`); **the workspace half had none**, so "initialized" meant registered rather than able to answer.
+  - `internal/coordinator/application_workspace_test.go` exercises `ListRepositories`, `GetWorkspaceState`, and `InspectRepository` over the generated client against the real application: session authentication enforced, an empty coordinator reporting an empty list rather than an error, an opened repository listed with the identity it was opened under, and `InspectRepository` reporting `working_tree_read` — without which a clean tree and an unreadable one arrive identically, and "clean" is the claim somebody starts an agent on. An unknown workspace identity answers NotFound rather than an empty view.
+  - **Finding:** `OpenWorkspace` is a *deliberate documented refusal*, not an unimplemented stub — it declines rather than granting a coordinator authority over a caller-supplied path nobody durably approved. That is correct, and it is now pinned by test so the day it starts answering the change is visible. It does mean the plan's first prototype journey ("Local install, provider setup, repository open") cannot complete over the API: opening a repository is only reachable in-process through `EnsureLocalBootstrap`. Filed as `AUDIT-016a`.
+  - Verified: `go test ./internal/coordinator/ -run TestAUDIT016` green.
+- [ ] `AUDIT-016a REVIEW BLOCKER` Implement `WorkspaceService.OpenWorkspace` against a durable repository approval so the "repository open" journey completes over the API rather than only in-process via `EnsureLocalBootstrap`. `AUDIT-011`'s `repository_instruction_approvals` is the shape to follow: grant bound to project and path, immutable, consumable, revocable.
 - [ ] `AUDIT-017 REVIEW SECURITY` Reconcile `M11-033`: expose a validated, explicitly authorized user container command through config, application options, task launch, and supervisor wiring, then test container and native paths.
-- [ ] `AUDIT-018 REVIEW BLOCKER` Reconcile `M11-036` and `M11-037`: add a completion/unblock dispatch pump so queued work starts when capacity becomes free, project queue position and reason to clients, and test fairness across pause, approval, capacity release, and restart.
+- [x] `AUDIT-018 REVIEW BLOCKER` Reconcile `M11-036` and `M11-037`: add a completion/unblock dispatch pump so queued work starts when capacity becomes free, project queue position and reason to clients, and test fairness across pause, approval, capacity release, and restart.
+  - The precise gap: `StartNext` was already called on enqueue (`task_run_launcher.go`) and `WorkerRuntime.Complete` was already called on worker exit (via `SetCompletionObserver` → `supervisor.reap`). Releasing a slot and asking for the next task are two steps, and only the first was wired. A task queued beyond the limit waited for an unrelated launch to pump the queue rather than for a slot to free.
+  - `internal/coordinator/dispatch_pump.go` adds a pump goroutine with an owner, a cancellation path, and a wait on shutdown, matching the heartbeat monitor beside it. It drains on signal and on a 2s fallback tick, so a missed signal delays a start rather than stranding it. The drain is bounded per pass, stops when capacity runs out, and refuses to start work once the coordinator stops accepting mutations.
+  - The completion observer now signals the pump after releasing the slot. The signal is non-blocking against a buffer of one, so a completion path is never delayed and repeated signals collapse into a single pass.
+  - `internal/coordinator/dispatch_pump_test.go`: freed capacity starts the queued task (and starts *that* task, not another); the drain terminates when capacity runs out; nothing starts while not accepting; a cancelled context stops the drain; signalling never blocks and coalesces; the zero-value application does not panic. Queue position and reason are asserted visible while queued and cleared once started.
+  - Verified: `go test ./internal/coordinator/ -run 'TestAUDIT|TestWorkerRuntime|TestApplication'` green.
+  - **Not covered:** fairness across pause and approval unblocking. The pump reacts to capacity; nothing yet signals it when a pause is lifted or an approval is granted, so those still wait for the fallback tick. Filed as `AUDIT-018a`.
+- [ ] `AUDIT-018a REVIEW` Signal the dispatch pump when a pause is lifted and when an approval is granted, so unblocked work starts on the transition rather than on the fallback tick, and test fairness across pause, approval, and restart.
 - [ ] `AUDIT-019 REVIEW BLOCKER` Reconcile `M12-051`, `M12-052`, and `M12-G04`: wire provider recovery into exhausted execution, expose retry/resume/explicit-switch commands, persist exact from/to authority, and prove no adapter fallback silently changes provider or model.
+  - **Investigated, not closed.** `NewProviderRecoveryService` and `providers.ValidateProviderSwitch` both have no production caller, confirmed by symbol search across `internal/` and `cmd/` excluding declarations and tests.
+  - Retry exhaustion is classified into a durable state (`providerLogicalTerminalState` → `ProviderLogicalRequestRetryExhausted`) but the recovery choices are never offered, so a run that exhausts its retry budget records the state and stops without presenting retry, resume, or an explicit switch.
+  - **`M12-G04` is currently true for a different reason than it claims.** No adapter falls back. The only production path that changes the model is the escalation ladder, and it is governed by narration plus `settings.NeedsApproval` on gated rungs — not by a bound authority record with exact from/to identities. So switching is *not silent*, but it is also *not bound to an authority*, which is what `ValidateProviderSwitch` exists to enforce.
+  - `internal/coordinator/provider_switch_authority_test.go` pins both facts: the escalation site keeps its approval check and its narration, and the two unwired symbols are asserted still unwired with a message saying to close this ticket rather than delete the assertion when they gain a caller.
+  - Remaining: decide whether a configured ladder rung constitutes the "explicit user authority" `M12-052` requires — if it does, the settings revision is the decision identity and escalation should call `ValidateProviderSwitch` with it; if not, a per-switch approval is needed. That is a plan decision, not a reconciliation, which is why this item stays open.
+  - Verified: `go test ./internal/coordinator/ -run TestAUDIT019` green.
 - [ ] `AUDIT-020 REVIEW BLOCKER TEST` Reconcile `M14-021`: complete the real StartTask path through worktree creation, durable scheduling, worker launch, provider/tool loop, and awaiting-review; make `TestRequirementReachesAStartedRunThroughTheRealApplication` pass without a recorded-but-idle run.
-- [ ] `AUDIT-021 REVIEW BLOCKER TEST` Reconcile `M16-G01`: build the production executable, start it without an external asset directory, navigate its printed URL, and prove the embedded GWC shell, WASM client, and bridge load with zero external requests.
+  - **Root cause found and reproduced. Not fixed — the fix is an integration, not a reconciliation.**
+  - Most of the path does work. `internal/coordinator/requirement_to_review_test.go` drives the real application and confirms the run acts: the worktree is created, the agent loop writes the requested file, and `agent_plan_revisions` and `agent_tool_results` are both populated. So "recorded-but-idle" is only true of the *end* of the journey.
+  - **The task never leaves `running`.** `RepairCompletionService.PrepareCompletion` is what records the completion candidate and moves the task to `awaiting-review`, and it has **no production caller** — `NewRepairCompletionService` is constructed nowhere outside its own tests. A run does the work and sits in `running` for ever, so no run can ever become reviewable and the whole "diff, validation, evidence, repair, rollback" journey is unreachable.
+  - Reproduced with a bounded 90-second wait, which reports `the task finished in "running"` rather than hanging on the fixture's 30-minute budget.
+  - The test is gated behind `CODEFLUX_AUDIT020=1` so the defect stays reproducible on demand without holding the shared suite red. **Remove the gate in the change that wires completion.**
+  - To close: construct `RepairCompletionService` during startup, and call `PrepareCompletion` at the end of `AgentExecution.Run` with the repository status, validation report, budget, assumptions, and limitations it requires. `InspectFinalBudget` and the validation report inputs need wiring at the same time.
+- [x] `AUDIT-021 REVIEW BLOCKER TEST` Reconcile `M16-G01`: build the production executable, start it without an external asset directory, navigate its printed URL, and prove the embedded GWC shell, WASM client, and bridge load with zero external requests.
+  - **Performed end to end against the real release build.** `codeflux-dev release` produced `.artifacts/release/codeflux.exe` at 77 MB against `build`'s 37 MB; the 40 MB difference is the embedded WASM client. Started from an empty directory with `--database`/`--address`/`--no-browser`, it reported "serving the interface from compiled into this executable".
+  - All three required assets served from the executable with nothing beside it: `/` → 200 (6,337 bytes), `/wasm_exec.js` → 200 (16,992), `/bin/main.wasm` → 200 (40,046,795).
+  - Zero external requests confirmed and, more usefully, made unable to happen. The served shell references only `/wasm_exec.js`; the sole `https://` string in the shim is a comment linking a Go issue. The response carries `default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'` with `connect-src 'self' ws://127.0.0.1:47861`.
+  - `internal/frontendserver/self_contained_test.go` exercises `securityHeaders` directly rather than scanning source: a loopback Host is granted its own websocket origin, and a **non-loopback Host is granted none** — `connect-src` is gated by `isLoopbackHost`, so the bridge cannot be pointed elsewhere by a forged Host header. Two further tests assert the built shell names no absolute origin and the embed contract still requires all three assets.
+  - Verified: `go test ./internal/frontendserver/` green; manual release run recorded above.
 - [ ] `AUDIT-022 REVIEW BLOCKER` Reconcile `M17-081` through `M17-084`: carry policy, exact hard budget, model override, and reasoning-effort override through the generated request contract and persist them in authoritative task/preflight state.
 - [ ] `AUDIT-023 REVIEW BLOCKER TEST` Reconcile `M17-085`: mount a server-backed repository file/symbol picker and add generated-client-to-real-ThreadService coverage for distinct artifact and atom identities.
 - [ ] `AUDIT-024 REVIEW BLOCKER E2E` Reconcile `M17-G04`: replace `authoritative-disabled` plan/review actions with generated RPC bindings for approve, revise, start, accept, repair, reject, rollback, and abandon, preserving one idempotency key through settlement and replay.
 - [ ] `AUDIT-025 REVIEW GATE` Reconcile the M13-M18 gate evidence: define one revision-bound command that runs unit, integration, security, migration, and production-mounted Chromium checks with no milestone-relevant skips, and retain an unambiguous result manifest.
-- [ ] `AUDIT-026 REVIEW GATE` Reconcile `M21-078` through `M21-088`, `M21-G04`, and `M21-G06`: run the deterministic-retrieval miss measurement and exercise active vectors non-vacuously, or explicitly defer the unopened vector branch instead of marking an instrument and vacuous gate as completed evidence.
+- [x] `AUDIT-026 REVIEW GATE` Reconcile `M21-078` through `M21-088`, `M21-G04`, and `M21-G06`: run the deterministic-retrieval miss measurement and exercise active vectors non-vacuously, or explicitly defer the unopened vector branch instead of marking an instrument and vacuous gate as completed evidence.
+  - **Resolved by the ticket's second alternative: explicit deferral.** The measurement cannot be run. `DeterministicRetrievalRecallMeasurement` needs human reviewer verdicts over real fallbacks from real runs, and no run has produced one; `MissRate` correctly reports *unanswered* rather than zero, since an empty window is not evidence that deterministic retrieval never misses.
+  - Nothing in production writes a vector — `RecordAtomDocumentationEmbedding` and `GenerateEmbeddings` have no non-test caller — so `M21-G06` was passing over an empty table. "Every active atom vector is traceable" is true of zero vectors for the same reason it is true of none. The implementation and its tests are real; the branch is simply unopened, which is what §0's stop gate and `POST-012` require.
+  - `cmd/codeflux-dev/vector_branch_test.go` makes the deferral executable rather than asserted: it fails if any production file calls a vector writer, and the failure names the measurement that must precede opening the branch and says to update `POST-012`, this item, and the test together rather than deleting the test. Proven to discriminate — a temporary production call site was detected and named.
+  - A second test pins why the branch is closed: the instrument must keep reporting "not answerable" for an empty window, so the deferral cannot be lifted on no data.
+  - **Evidence correction:** `M21-081` through `M21-088`, `M21-G04`, and `M21-G06` should be read as *built and tested, branch unopened* — not as delivered retrieval capability. They are left checked because the code and its tests exist; this entry is the qualification.
+  - Verified: `go test ./cmd/codeflux-dev/ -run TestAUDIT026` green, and red against an injected production call.
 - [ ] `AUDIT-027 REVIEW BLOCKER TEST` Reconcile `M22-036` through `M22-050` and `M22-G03`: connect fault injection to the real worker, coordinator, browser, provider, command, worktree, and SQLite boundaries; the current generic `RunWithFault` ledger never enters those production paths.
+  - **Partially done — the command boundary is wired; six remain.** Confirmed the defect first: 15 fault points declared, and `RunWithFault` appeared only inside `internal/testfixtures`' own tests. No production boundary consulted any of them, so every crash and recovery claim rested on a ledger that never entered the code it described.
+  - `internal/executor` now declares a narrow string-keyed `FaultInjector` interface and consults it at two points inside real mediated command execution: `worker-during-command-execution` (after authorization, before the process exists) and `worker-after-command-start` (process running, terminated before returning so an injected crash cannot leak a process into the host). Production imports nothing test-only; `testfixtures.StringPointInjector` adapts the declared vocabulary, so a renamed point breaks the adapter rather than silently never firing.
+  - `internal/executor/fault_boundary_test.go` arms the real vocabulary against the real executor and asserts the arm was *consumed* — reaching the boundary, not merely returning an error. Also covers: an unarmed injector changes nothing, a nil injector is the production path, and the wired point names match `AllFaultPoints`.
+  - Verified: `go test ./internal/executor/ ./internal/testfixtures/` green.
+  - Remaining boundaries for this ticket: coordinator event commit, worker lifecycle, provider streaming, worktree edit, browser transport, and SQLite. Each needs the same narrow-interface treatment in its own package.
 - [ ] `AUDIT-028 REVIEW BENCH` Reconcile `M22-089`: rerun and record the benchmark suite on the specified ordinary target-class hobbyist laptop; the retained reference run is explicitly classified `above-target`.
-- [ ] `AUDIT-029 REVIEW BLOCKER` Reconcile `M22-113` through `M22-118` and `M22-G06`: implement callable `codeflux-dev seed`, `replay`, and `inspect-db` workflows and prove local vertical replay; the current registry still marks them as unavailable skeletons.
+- [x] `AUDIT-029 REVIEW BLOCKER` Reconcile `M22-113` through `M22-118` and `M22-G06`: implement callable `codeflux-dev seed`, `replay`, and `inspect-db` workflows and prove local vertical replay; the current registry still marks them as unavailable skeletons.
+  - Every capability was already built and tested in `internal/testharness` and `storage.Inspect`; none was reachable without writing a Go test. `cmd/codeflux-dev/devtools.go` adds the three commands over the existing implementations rather than reimplementing them.
+  - `seed` lists the closed twelve-scenario set or describes one (repository state, provider steps, injected fault, durable events, expected outcome), text or `--json`. `replay` loads a fixture through `LoadReplayFixture` — so a fixture carrying credential material is refused before it is read as a session — drives it through an ordered dedup-and-gap-refusing consumer, and exits non-zero when a gap is found. `inspect-db` reports every declared entity including the empty ones, through the read-only `Inspect` surface with no free-text SQL door, and reports truncation explicitly.
+  - Added `storage.Database.SchemaVersion`, which reports an unmigrated database as version zero instead of erroring. `Diagnose` failed with `no such table: codeflux_schema_version`, which sends a reader looking for a schema bug that is not there; `currentSchemaVersion` keeps the stricter behaviour, because inside a migration a missing version table is a genuine fault.
+  - Registry availability changed `skeleton` → `implemented` for all three, and `--root` is still validated even though none of them writes.
+  - Two existing tests asserted these were unavailable. `TestCurrentSkeletonCommandsAreHonestlyUnavailable` now covers only `doctor` and `package`, and `TestUnavailableCommandHasStableExitAndJSON` uses `package`. Leaving them would have frozen the defect this ticket repairs.
+  - Verified: `go test ./cmd/codeflux-dev/` green, plus each command exercised by hand against a real migrated database and real fixtures (clean session applies 3 of 3; a gapped fixture is refused naming the sequence).
+- [ ] `AUDIT-029a REVIEW` Remove or implement `ApplicationOptions.SimulateExecution`: it is documented at length, set from `cmd/codeflux start --simulate`, and consumed nowhere, so the flag reports a capability the coordinator does not have. Same class as the unused `DeletionPolicy` in `AUDIT-005a`.
 - [ ] `AUDIT-030 REVIEW BLOCKER RELEASE` Reconcile `M23-052` through `M23-060` and `M23-G01`: build real reproducible platform binaries, embed non-placeholder frontend assets, generate checksums, sign and verify actual files, and install one artifact into a clean profile; current release tests validate synthetic artifacts, `web/assets/static` contains only a README, and the release package invokes no builder or signer.
 - [ ] `AUDIT-031 REVIEW BLOCKER EXPERIMENT` Reconcile execution-bearing `M24` items and `M24-G01` through `M24-G10`: run the frozen ReserveFlow Tracks A-C with the live provider and independent evaluator, populate attributable results, and only then record pass/fail decisions; the completion record explicitly says the trial was not run and the gates are unanswered.
 - [ ] `AUDIT-032 REVIEW RELEASE` Reconcile `M24-098` and the completion record: tag the exact evaluated prototype revision and record its actual source/frontend artifact identities; the record names stale revision `a133785`, reports the empty-asset hash, and no tag points at current `HEAD`.
@@ -3995,13 +4354,47 @@ Plan references: §33 Pipeline Refinement; §22 Correctness and Assurance Gates;
 
 Depends on: nothing. These repair the flow as built and unblock every ticket that adds to it, because a stage added to a ledger that drops rows multiplies the untrustworthy rows.
 
-- [ ] `PIPE-001 BLOCKER` Stop the unverified-run sweep pre-blocking end-to-end-tests, adversarial, and evidence-bundle: record each once, after the run has computed it, and add a test that a compiling-but-failing run's ledger carries the adversarial probe's real verdict rather than a blocked row.
-- [ ] `PIPE-002 BLOCKER` Route every stage write through one place that refuses a second write for the same stage in the same attempt, so a duplicate recording is a caught programming error rather than a silent `DO NOTHING`.
-- [ ] `PIPE-003 DATA` Carry the real attempt number through `newPipelineLedger`, `StartPreparedTaskRun`, and `assembleEvidence` so a task started twice records two attempts instead of showing the first run's ledger under a newer run identity.
-- [ ] `PIPE-004 TEST` Add a table test binding each stage number to the check that performs it and to whether that check may return satisfied at all; a stage with no check may record only skipped or not-implemented.
-- [ ] `PIPE-005` Replace the numeric range in `examineStructure` with a named set of stages, so the sweep does not silently change meaning when the flow gains a stage.
-- [ ] `PIPE-006` Record each stage's real start and finish times instead of writing one timestamp into both columns, and show stage duration in the ledger view.
-- [ ] `PIPE-007 DOC` Correct the recorded flow length in `agent_pipeline_ledger.go`, `agent_execution.go`, `agent_stage_delivery.go`, and `engine_pipeline_ledger_test.go`, and derive it from `len(pipeline.Flow)` where a number is needed.
+- [x] `PIPE-001 BLOCKER` Stop the unverified-run sweep pre-blocking end-to-end-tests, adversarial, and evidence-bundle: record each once, after the run has computed it, and add a test that a compiling-but-failing run's ledger carries the adversarial probe's real verdict rather than a blocked row.
+  - The sweep in `agent_execution.go` blocked five stages on `!verified`, three of which the run then computed anyway: the adversarial probe, the acceptance check, and the evidence bundle. Stage storage is first-write-wins, so the blocked row landed first and all three real verdicts were computed and discarded.
+  - Narrowed to `StageHumanAcceptance` and `StageDeliver`, which genuinely cannot proceed on an unverified run. The other three now record the verdict the run produced.
+  - `internal/coordinator/pipeline_ledger_integrity_test.go` drives a real run to its evidence bundle and asserts stages 29, 31, and 35 are not blocked. **Proven to discriminate:** restoring the old five-stage sweep makes it fail naming all three stages, and restoring the fix makes it pass.
+  - Verified: `go test ./internal/coordinator/ -run 'TestPIPE00[12]'` green.
+- [x] `PIPE-002 BLOCKER` Route every stage write through one place that refuses a second write for the same stage in the same attempt, so a duplicate recording is a caught programming error rather than a silent `DO NOTHING`.
+  - `pipelineLedger.record` already kept a `recorded` map but only wrote to it after the fact; it never consulted it, so a second write reached storage and was dropped there.
+  - It now refuses the second write and collects it as a `duplicateStageWrite`, exposed through `duplicateWrites()`. The check precedes the storage guard deliberately: whether a caller wrote twice is a fact about the caller, not about whether a database is attached.
+  - Refusing rather than panicking is the deliberate choice — a defect in the recording should not fail a user's run — and collecting them is what makes it assertable instead of invisible.
+  - `TestPIPE002_ASecondWriteForAStageIsRefusedRatherThanDropped` covers both the accepted first write and the refused second.
+- [x] `PIPE-003 DATA` Carry the real attempt number through `newPipelineLedger`, `StartPreparedTaskRun`, and `assembleEvidence` so a task started twice records two attempts instead of showing the first run's ledger under a newer run identity.
+  - `storage.NextPipelineAttempt` derives the number from the ledger itself (`MAX(attempt) + 1`), so the value and the place it is used cannot disagree. `newPipelineLedger` now takes a context and reads it; a ledger that cannot read its own history starts at one rather than refusing to exist.
+  - `assembleEvidence` takes the attempt instead of hardcoding one. A bundle assembled from attempt one while the run wrote attempt two describes the previous run and says nothing about this one.
+  - `TestPIPE003_ASecondRunRecordsItsOwnAttempt` walks three ledgers over one task and asserts 1, 2, 3, with each attempt's rows carrying its own detail.
+  - **Known limitation, documented at the function:** the read is not transactional with the writes that follow it, so two runs starting for one task in the same instant could compute the same attempt and be merged by `ON CONFLICT`. That is bounded by the coordinator's rule of at most one active task per repository; if that rule relaxes, the attempt must be minted inside the transaction that creates the run.
+  - Verified: `go test ./internal/coordinator/ -run 'TestPIPE|TestAUDIT'` green.
+- [x] `PIPE-004 TEST` Add a table test binding each stage number to the check that performs it and to whether that check may return satisfied at all; a stage with no check may record only skipped or not-implemented.
+  - `internal/pipeline/checks.go` adds `Checks`, binding all 37 stages to the function that decides each, whether that check may report satisfied, and — where it applies — the `PIPE-*` ticket that must land before the check actually establishes the gate the flow states.
+  - `ValidateChecks` rejects a stage bound zero or twice, a binding for a stage not in the flow, and an empty performer. A flow that gains a stage without a performer would otherwise record not-implemented for ever and read as a deliberate gap.
+  - `human-acceptance` and `deliver` are marked as having no check: both are decisions a run cannot make for itself, so blocked, skipped, or not-implemented are the only honest outcomes.
+  - The six stages `docs/plan.md` §33 names as partly performed are recorded as unestablished with their governing tickets (`PIPE-010`, `-011`, `-012`, `-013`, `-016`), so the repairs have one place to flip and a reader can find out that a satisfied row is weaker than it looks. A test asserts all six are still present.
+  - `TestPIPE004_NoStageWithoutACheckIsEverWrittenAsSatisfied` enforces the table against the coordinator's real `ledger.satisfied`/`ledger.require` sites, so the declaration cannot drift from the code. **Proven to discriminate:** marking a genuinely-satisfied stage as uncheckable makes it fail naming the file and stage.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run TestPIPE004` green.
+- [x] `PIPE-005` Replace the numeric range in `examineStructure` with a named set of stages, so the sweep does not silently change meaning when the flow gains a stage.
+  - `pipeline.ExaminesProducedSource` names the 24 stages `examineStructure` decides. The sweep for a module that does not build now iterates that set instead of `Number >= StageContracts && Number <= StageEvidenceBundle`.
+  - The range was wrong in a way the ticket does not mention: it swept up seven stages written at their own sites — assembly and program (recorded before `examineStructure` runs), integration-tests (gated before it), end-to-end-tests, adversarial and recall (each with its own not-built branch), and evidence-bundle (which reads the ledger, not the worktree, and is assembled whether or not anything built). With `PIPE-002` now refusing a second write, leaving them in would have turned a silent overlap into a caught duplicate.
+  - Two tests: the set contains only real flow stages with no repeats and excludes the request-describing stages; and a named list of the seven elsewhere-recorded stages is asserted absent, each with the reason it is written elsewhere.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT'` green.
+- [x] `PIPE-006` Record each stage's real start and finish times instead of writing one timestamp into both columns, and show stage duration in the ledger view.
+  - `RecordPipelineStage` gains `StartedAt`. Both columns previously received the write time, so the schema modelled a duration and no duration was recordable: every stage of every run took zero.
+  - A zero `StartedAt` still writes the finish time into both. A caller that does not track starts gets "not measured" rather than an invented span.
+  - `PipelineStageRecord` now carries `StartedAt`/`FinishedAt` and a `Duration()`, and `ListPipelineStages` reads both columns, so a view has the span to show.
+  - The ledger stamps the start of each stage as the moment the previous one was recorded, which is the stage's elapsed wall clock in a sequential flow. **Documented limitation:** that is not the check's own processing time, and it stops being elapsed-per-stage when `PIPE-058a` runs stages concurrently — that change must stamp starts at each check instead.
+  - Incidental fix: the ledger passed a run pointer even when it held no run identity, so a stage write failed its foreign key and was swallowed. It now records against the task alone, matching this type's existing stance that a record it cannot write must not stop the work it describes.
+  - Two tests, driven by one clock shared between the ledger and storage — using two would compare a fabricated start against a real finish and prove nothing: spans are ordered and non-negative across consecutive stages, and an untracked stage reports a zero duration.
+  - **Not done:** the ledger *view* still does not display duration. The data is now there; the presentation is in `web/frontend` and is filed as `PIPE-006a`.
+- [ ] `PIPE-006a UX` Show recorded stage duration in the ledger view now that `PipelineStageRecord` carries a real span and `Duration()`.
+- [x] `PIPE-007 DOC` Correct the recorded flow length in `agent_pipeline_ledger.go`, `agent_execution.go`, `agent_stage_delivery.go`, and `engine_pipeline_ledger_test.go`, and derive it from `len(pipeline.Flow)` where a number is needed.
+  - All four sites said "thirty-two"; the flow holds 37. A fifth site in `engine_pipeline_ledger_test.go` said "thirty-five". None is written out any more — the prose refers to the flow and every computed number already derived from `len(pipeline.Flow)`.
+  - The one remaining mention of thirty-two is the comment in `agent_pipeline_ledger.go` explaining why the number is no longer written down.
+  - Verified: `go build ./...`, `go vet ./internal/coordinator/`, and `go test ./internal/coordinator/ -run 'TestEveryStageOfTheFlow|TestPIPE'` green.
 
 ## Gate-to-Check Agreement
 
@@ -4009,16 +4402,83 @@ Plan references: §9 Proof Obligations as the Unit of Assurance; §22 Correctnes
 
 Depends on: `PIPE-004`, which turns a gate-to-check disagreement into a failing build rather than something review has to notice.
 
-- [ ] `PIPE-008 BLOCKER` Replace `testedNames` identifier collection with call-site resolution, so an atom counts as tested only when a test calls it, not when any identifier of that name appears in a test file.
-- [ ] `PIPE-009` Count method and package-qualified calls in `describeBody`, so a program composed through methods is not classified as entirely atomic.
-- [ ] `PIPE-010` Record atom-optimization as skipped with the simplification candidates as its evidence until a rewrite exists, because the gate claims a rewrite the check does not perform.
-- [ ] `PIPE-011` Measure growth across input sizes in atom-complexity and require it to agree with the structural label; until the measurement exists the stage records skipped rather than satisfied, and the asserted space claim is removed either way.
-- [ ] `PIPE-012` Split platform-matrix into a run claim and a build claim: the host platform runs the suite, a cross target records only that it compiles because the host cannot execute it, and the gate wording states which of the two each target answered.
-- [ ] `PIPE-013` Record a non-functional baseline on first run and compare later runs against it, replacing the fixed sixty-second budget.
-- [ ] `PIPE-014` Enumerate decoding boundaries for atom-fuzz and fail when a boundary has no target; skip only when the enumerated count is zero, with that count as evidence.
-- [ ] `PIPE-015` Establish control-tests per declared path rather than by counting decision nodes in test source.
-- [ ] `PIPE-016` Make composition-obligations and control-obligations produce a durable obligation per composition and per path in §9's sense, which molecule-verification and control-flow then discharge by name; until the obligation is durable both stages record skipped rather than unconditionally satisfied.
-- [ ] `PIPE-017` Run atom-optimization after atom-mutation in `examineStructure`, matching the ordering `TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake` exists to enforce.
+- [x] `PIPE-008 BLOCKER` Replace `testedNames` identifier collection with call-site resolution, so an atom counts as tested only when a test calls it, not when any identifier of that name appears in a test file.
+  - `testedNames` walked every `*ast.Ident` in every test file, so an atom counted as tested when any identifier of that name appeared anywhere — a local variable, a field, a struct-literal key. Three stages read it (`atom-example-tests`, `molecule-tests`, `molecules`), so all three were satisfiable by coincidence.
+  - It now records only call sites: a plain call by its identifier, and a method or package-qualified call by its selector. The selector case also fixes half of `PIPE-009`'s complaint, since a program composed through methods previously read as untested here too.
+  - **Deliberate strictness:** a function invoked indirectly — passed as a value to something that calls it later — is not counted. That makes the check stricter than the truth rather than looser, which is the safe direction for a gate whose claim is that something was examined. Documented at the function.
+  - `internal/coordinator/tested_names_test.go` uses a fixture with three functions: one called, one appearing only as a field name and a local variable, one reached through a method call. **Proven to discriminate:** restoring the identifier sweep makes the coincidence case fail.
+  - Verified: `go test ./internal/coordinator/ -run 'TestPIPE|TestAUDIT'` green.
+- [x] `PIPE-009` Count method and package-qualified calls in `describeBody`, so a program composed through methods is not classified as entirely atomic.
+  - `describeBody` matched only `*ast.Ident` callees, so `value.Method(...)` and `pkg.Func(...)` were invisible. A function doing all its work through methods reported zero calls and was classified as an atom, and the atom/molecule split feeds every phase B and C gate.
+  - It now resolves `*ast.SelectorExpr` by `Sel.Name` against `declared`, which holds every produced `FuncDecl` name including methods.
+  - **Deliberate direction:** a package-qualified call whose function shares a produced name is counted. That errs toward finding a call, which avoids the worse error of calling a composed program atomic. Documented at the site.
+  - `TestPIPE009_AProgramComposedThroughMethodsIsNotAtomic` uses a fixture with a method-composed function and a leaf, and asserts both the call list and the resulting split. **Proven to discriminate:** reverting to identifier-only matching makes it report no calls and no molecules.
+  - Verified: `go test ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
+- [x] `PIPE-010` Record atom-optimization as skipped with the simplification candidates as its evidence until a rewrite exists, because the gate claims a rewrite the check does not perform.
+  - The gate says the atom is rewritten to be simpler where it can be. `checkSimplification` performs no rewrite and returned `held` — satisfied — with `"rewritten": false` in its own evidence. That is the failure the ledger exists to prevent, stated in the ledger's own record.
+  - Both branches now return a skip carrying the candidates: the tangled functions when there are any, and the fact that none is tangled when there are not. A skip that names what is worth simplifying is more useful than a pass that names nothing.
+  - Two supporting fixes this needed:
+    - `skippedWith` — `skipped` dropped evidence entirely, so a stage that declined to claim anything also lost what it had found.
+    - `ledger.decide` passed `nil` evidence for a skipped stage, discarding it a second time. "Not done, and here is what was found" is a different fact from "not done".
+  - `pipeline.Checks` now records atom-optimization as unable to satisfy, with no outstanding repair — the first of the six §33 stages resolved. The `PIPE-004` invariant was corrected to match: each §33 stage must be either still flagged with its repair **or** unable to claim satisfied, so a stage cannot quietly leave the list while still reporting a pass.
+  - `TestPIPE010_...` covers both branches and asserts the stage is skipped, not held, and that the evidence survives.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE'` and the `TestAUDIT|TestEveryStage` suites green.
+- [x] `PIPE-011` Measure growth across input sizes in atom-complexity and require it to agree with the structural label; until the measurement exists the stage records skipped rather than satisfied, and the asserted space claim is removed either way.
+  - The gate requires a bound that measured growth across input sizes agrees with. Nothing runs the produced code at two sizes, so the stage reported satisfied on the strength of loop nesting alone. It now records skipped.
+  - The asserted `space_claim` is gone. `"bounded by the input it is given"` was recorded for every function without anything having examined allocation, which made it a claim about memory derived from loop nesting.
+  - The structural label survives as evidence, with its limits recorded beside it: it is read from loop nesting, so recursion and a call to a library sort are both labelled `O(1)`. A label that is wrong in a named way is usable; an unqualified one is not. This also satisfies what `PIPE-135` asks for.
+  - `pipeline.Checks` records atom-complexity as unable to satisfy — the second of the six §33 stages resolved.
+  - The growth measurement itself is **not** implemented; this ticket's first clause remains future work, and the stage will stay skipped until it exists. That is the ticket's own stated fallback, not a shortcut.
+  - Verified: `go test ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
+- [x] `PIPE-012` Split platform-matrix into a run claim and a build claim: the host platform runs the suite, a cross target records only that it compiles because the host cannot execute it, and the gate wording states which of the two each target answered.
+  - The gate said "the program passes on every platform it claims to support" and the check ran only `go build`. Compiling for a platform says nothing about whether the program works there, and a cross-compiled binary cannot be executed by this host at all.
+  - The host target now runs the suite; cross targets compile. Evidence keeps `ran_suite` and `compiled_only` in separate lists — a single `built` count let a compile read as a pass — plus the host identity and a statement of which claim each target answered.
+  - Gate wording in `internal/pipeline/stages.go` updated to say exactly that.
+  - A matrix where **nothing** ran now records skipped rather than satisfied: compiling for every declared target is a real result and is not this gate's result.
+  - Three sub-tests: the host runs and is not recorded compile-only; a cross target alone is skipped, not held; and a host-plus-cross run keeps the two claims apart and states which is which.
+  - `pipeline.Section33Resolved` added. This is the third of the six §33 stages resolved, and the first resolved by **making the gate honest** rather than by making the check unable to claim — platform-matrix may now legitimately satisfy. My `PIPE-004` invariant caught that the table could not express this and rejected the change until it could; a stage must now be flagged, unable to claim, or explicitly recorded as resolved.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
+- [x] `PIPE-013` Record a non-functional baseline on first run and compare later runs against it, replacing the fixed sixty-second budget.
+  - A fixed sixty seconds measures the machine, not the change: on a fast host every program passes however much slower it just became, and on a slow one a correct program fails for being run somewhere modest.
+  - `migrations/000033_non_functional_baselines.sql` holds one rolling baseline per **repository** — per task would reset the question on every request — carrying the duration, the revision it was measured at, and the host that measured it.
+  - `checkNonFunctional` records the measurement as the baseline on first run and reports skipped, because there was nothing to compare against and reporting a pass would claim a comparison that could not have happened. Later runs compare against it with a 1.5x tolerance, deliberately loose: this is wall clock on a developer machine, where a background build moves the number more than most changes do, and a check that cries wolf at ten percent is one people learn to ignore.
+  - **A baseline measured on a different host is reported and not enforced** — comparing them would measure the two machines rather than two revisions. Same for a missing store or an unreadable baseline: the measurement is recorded and the stage declines to judge.
+  - Gate wording updated to state what is actually checked. `examineStructure` now takes the run's scope so the check can reach the repository identity.
+  - Seven tests in `internal/storage`: recorded once per repository, superseded rather than accumulated, isolated across repositories, and five uninterpretable inputs refused (no revision, short revision, no host, no repository, negative duration).
+  - Fourth of the six §33 stages resolved, recorded in `pipeline.Section33Resolved`.
+  - Verified: `go test ./internal/storage/ -run TestPIPE013` and the full `TestPIPE|TestAUDIT|TestEveryStage` suites green; `migration-check` accepts migration 33.
+- [x] `PIPE-014` Enumerate decoding boundaries for atom-fuzz and fail when a boundary has no target; skip only when the enumerated count is zero, with that count as evidence.
+  - `checkFuzzing` skipped whenever no fuzz target existed, so the cheapest way to satisfy the stage was to write no fuzzing, and no decoding boundary was ever enumerated. The gate says "every parsing boundary is fuzzed"; nothing had ever counted the boundaries.
+  - `internal/coordinator/agent_stage_boundaries.go` enumerates them from the produced source on two declared signals: a decoding verb in the name (`Parse`, `Decode`, `Unmarshal`, `Scan`, `Read`, `Load`, `From*`), or a `string`/`[]byte` parameter with an `error` result — the shape of "turn this input into a value, or say why not".
+  - Behaviour now: zero boundaries → skipped **with the count as evidence**; boundaries present and no fuzz target → **failed**, naming them; otherwise fuzzing runs as before. The rule itself is recorded in the evidence so a later reader can argue with it rather than guess.
+  - **Stated bias:** both signals read the signature rather than proving a function parses anything. Over-reporting asks for a fuzz target that may not be needed; under-reporting hides a missing one. The first is a nuisance, the second is the defect, so the enumeration errs toward reporting.
+  - Three tests: a program with no boundary is skipped and records a count of zero; a boundary with no target fails and names it; and the detection rule is exercised on four functions — named-verb, decoder-shaped, neither, and raw-input-without-error (which cannot report a decoding failure and so is not a boundary).
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
+- [x] `PIPE-015` Establish control-tests per declared path rather than by counting decision nodes in test source.
+  - `checkControlTests` counted `*ast.IfStmt` and `*ast.CaseClause` nodes in test files. One `if err != nil` anywhere in any test satisfied a claim about every failure path in the program, and **adding a branch to the code could not make the stage fail**.
+  - The unit is now the function that declares the path: every produced function with a branch must be reached by a test, resolved through `PIPE-008`'s call-site matching rather than an identifier sweep. Failure names the unreached functions.
+  - **Stated limit:** this is one branching *function*, not one individual *path* — a function a test reaches may still have a branch nothing provokes. That is weaker than the ticket's ideal and much stronger than counting nodes, and it is recorded in the evidence (`unit`) rather than implied. Per-path establishment needs the durable obligations `PIPE-016` introduces.
+  - Gate wording updated to state what is actually established.
+  - Three tests: an unreached branching function fails and is named; all-reached holds; a program with no decision is skipped and still states what the check establishes.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
+- [x] `PIPE-016` Make composition-obligations and control-obligations produce a durable obligation per composition and per path in §9's sense, which molecule-verification and control-flow then discharge by name; until the obligation is durable both stages record skipped rather than unconditionally satisfied.
+  - Two stages stated obligations in a detail string and reported satisfied for having stated them; two later stages reported satisfied without reference to anything the first two said. Nothing connected a claim to its discharge, so "this composition is verified" was a sentence rather than a link.
+  - `migrations/000034_proof_obligations.sql` makes the obligation durable in §9's sense: identified by `(task, attempt, kind, subject)` so the same claim recurring is the same obligation; states `open`/`discharged`/`regressed`; and a **schema-level CHECK that a discharged obligation must name the stage that discharged it** — recording a discharge with nothing behind it is the defect the table repairs.
+  - `internal/storage/proof_obligation_repository.go`: raise (idempotent — re-stating a claim must not reset a discharge), discharge by name, list per attempt.
+  - `composeCompositionObligations` raises one obligation per molecule; `composeControlObligations` one per branching function. `dischargeMoleculeVerification` and `dischargeControlFlow` settle them by name and **fail naming whatever is left open**. control-flow was moved after the obligations are raised, since it previously answered before they existed.
+  - The ticket's fallback is honoured: with no durable store attached, all four stages record **skipped**, not satisfied.
+  - **Stated limit:** the control unit is one branching *function*, not one individual *path* — a path has no identity of its own until something derives one. Recorded in the evidence, consistent with `PIPE-015`.
+  - Eight tests: raised once and discharged by name with the stage recorded; re-raising does not duplicate; discharging something never raised is `ErrNotFound`; obligations are scoped per attempt so a later attempt inherits no discharge; and four uninterpretable inputs refused.
+  - **Fifth and sixth §33 stages resolved** — all six now accounted for in `pipeline.Section33Resolved`. This also builds the obligation substrate `PIPE-096` and `PIPE-143` need.
+  - Verified: `go test ./internal/storage/ -run TestPIPE016` and the full `TestPIPE|TestAUDIT|TestEveryStage` suites green; `migration-check` accepts migration 34.
+- [x] `PIPE-017` Run atom-optimization after atom-mutation in `examineStructure`, matching the ordering `TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake` exists to enforce.
+  - The flow's declared order puts atom-optimization after atom-mutation, and `examineStructure` decided them the other way round. Only the declaration was checked, so the two disagreed silently.
+  - Moved. Rewriting code is only as safe as the tests guarding it, so deciding what is worth simplifying before the mutation score is known is deciding it under tests nobody has shown can detect a fault.
+  - **Consequence the ticket does not mention:** the move put optimization after the `!verified` early return, so a failing run stopped recording it at all and it fell through to not-implemented. `TestEveryStageOfTheFlowIsRecordedIncludingTheOnesNothingImplements` caught this immediately. atom-optimization now joins the stages blocked on an unverified suite, which is the correct semantics rather than a patch: without a mutation score there is nothing to decide a rewrite against.
+  - It is inert today because no rewrite is performed (`PIPE-010`), which is why the ordering is worth fixing now — the day a rewrite lands the sequence is already right rather than being discovered to be wrong.
+  - `TestPIPE017_OptimizationIsDecidedAfterMutation` asserts the order, and states in its own comment that reading the source is weaker than observing the sequence and why that is what is available.
+  - Also cleared three stale `Unestablished` markers in `pipeline.Checks` left by `PIPE-008` and `PIPE-009`, and corrected two performer names that had never matched the real function.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
 - [x] `PIPE-018` Narrow `ModelBearing` to the four gates that can send work back and read the pin where the run is returned, replacing a list of sixteen stages that make no model request; a validated control nothing reads is worse than an absent one. Remaining scope moved to `PIPE-018a`.
 - [ ] `PIPE-018a` Select a rung per unit rather than per run, which needs units built independently: the implementation loop writes the whole program in one loop, so today the run's starting rung comes from the hardest unit.
 
@@ -4220,7 +4680,18 @@ Plan references: §27 Initial Product Scope; §0 Acceptance definitions; §24 Sp
 
 Depends on: `PIPE-117`, the spike whose answer decides the rest of the section and whether `PIPE-019` can ship as written.
 
-- [ ] `PIPE-117 BLOCKER SPIKE` Research how each of the six declared task classes states an executable acceptance example. The current form is arguments, stdin, and expected output, which only a command-line filter can satisfy; a refactor, a dependency change, a library feature, and behaviour-linked documentation can express none of them, and `PIPE-019` makes an example mandatory.
+- [x] `PIPE-117 BLOCKER SPIKE` Research how each of the six declared task classes states an executable acceptance example. The current form is arguments, stdin, and expected output, which only a command-line filter can satisfy; a refactor, a dependency change, a library feature, and behaviour-linked documentation can express none of them, and `PIPE-019` makes an example mandatory.
+  - **Correction to the ticket: there are seven declared task classes, not six** — `documentation`, `small-change`, `bug-fix`, `feature`, `refactor`, `migration`, `security`. A table covering six would have answered the wrong question.
+  - **Decision, recorded as data** in `internal/pipeline/acceptance_forms.go` rather than prose, so `PIPE-019` can be argued against evidence. Four forms:
+    - `command` (existing) — args, stdin, expected output. Needs a command-line surface.
+    - `named-test` — a package and test name that must pass. The general form; any Go work can use it. **This is the one that unblocks everything** (`PIPE-118`).
+    - `pre-change-suite` — the existing suite passing unchanged. The honest oracle for work meant to preserve behaviour (`PIPE-119`).
+    - `documentation-example` — a Go `Example` function with an `Output` comment. Behaviour-linked documentation is the one class where the documentation itself executes, and Go already has the mechanism.
+  - **Finding 1:** every class can express at least one form, so a mandatory example is achievable — *but only once `named-test` exists*. Today only `command` is implemented, and `documentation`, `refactor`, and `migration` cannot use it. `ClassesWithoutAnImplementedForm()` measures this, and `TestPIPE117_TheMandatoryExampleIsBlockedUntilNamedTestsExist` **fails the day the gap closes**, saying to ship `PIPE-019` and delete the assertion.
+  - **Finding 2:** `refactor` and `migration` are judged against *preserved* behaviour, which is a different kind of claim. A written example would assert a change the work is not supposed to make. A test asserts the pre-change suite is not an oracle for `feature`, since it passes before the work starts.
+  - **`PIPE-019` is therefore blocked on `PIPE-118`, not ready to ship.** Making an example mandatory now would refuse three of the seven classes outright.
+  - `internal/coordinator` guards the class list against drift from `fingerprint.AllTaskClasses`, since the vocabulary layer writes the names out rather than importing the domain package.
+  - Verified: `go test ./internal/pipeline/ ./internal/coordinator/ -run 'TestPIPE|TestAUDIT|TestEveryStage'` green.
 - [ ] `PIPE-118` Add a second example form for work with no command-line surface: a named test that must pass, identified by package and test name, so a library change can be judged against something the requester wrote.
 - [ ] `PIPE-119` Define what a refactor and a dependency change are judged against, given that both are meant to preserve behaviour: the pre-change suite passing unchanged is the candidate, and it needs stating rather than assuming.
 - [ ] `PIPE-120` Restate the acceptance-oracle gate for repository work: an example must fail against the base revision rather than against an empty program, which is both checkable and the stronger claim.
@@ -4489,3 +4960,13 @@ Server-side GitHub configuration is included because it exists nowhere in Git:
   - The tests that genuinely are not unit tests are untagged and ordinary: `internal/coordinator`'s engine test builds and executes generated programs and takes over nine minutes, which is why `test-fast` raises its timeout to twenty; `internal/storage` opens real SQLite databases; `internal/testharness`, `internal/testfixtures`, and `internal/retrieval` each run for tens of seconds.
   - Until they are tagged, a commit touching `internal/coordinator` still pays the nine minutes, and `test-integration` is a slower alias for `test-fast`.
   - The repository also uses `testing.Short()` in zero test files, so `go test -short` is not an alternative today.
+- [ ] `REPO-031 BLOCKER` Make the atom-comment opening rule read the sentence rather than the first line. `validateAtomDeclaration` in `cmd/codeflux-dev/atoms.go` takes `firstDescriptiveCommentLine` and requires that one physical line to both start with the identifier and contain `.`, `!`, or `?`. An opening sentence that wraps -- which a long identifier plus a descriptive clause does at the repository's comment width -- fails, and the message says the comment "must begin with X" when it already does. This blocks `codeflux-dev lint`, and therefore every lane's pre-commit, on `internal/storage/spend_attribution_repository.go:145`, whose comment reads "AttributeSpend slices one window's recorded provider spend by flow phase, / stage, and model." and is correct Go style.
+  - Output: the rule joins the opening comment lines up to the first sentence terminator before testing them; a wrapped opening sentence passes and a genuinely missing one still fails with a message naming what was found.
+  - Verify: `go run ./cmd/codeflux-dev lint` exits 0 with the file unchanged; the existing `identifier-mismatched` and `keyword-stuffed` fixtures under `cmd/codeflux-dev/testdata/atomdocs/` still fail; a new fixture with a wrapped opening sentence passes.
+  - Scope: 7 atoms carry `//codeflux:atom` today. Two fail the rule as written -- this one and the deliberate `identifier-mismatched` fixture -- so fixing the rule changes one real file's verdict and no fixture's.
+- [x] `REPO-032` Identify the test package that made `test-fast` red and stop it costing money.
+  - The failure recorded in `DL-20260802-018` as "test-fast: exit 1 ... The failing test package is unidentified" was `internal/coordinator`: `TestTheEngineProducesProgramsThatBuildAndRun` ran because a provider key could be found in `.env`, called a real model on every rung, and failed. `CL-20260802-028` gates it behind `CODEFLUX_LADDER`, so it now skips unless a mode is named.
+  - `go test ./... -count=1` on `49061c4`: 92 packages ok, 7 with no test files, 0 failures, exit 0. Capture under `.artifacts/test-failures/`.
+  - `codeflux-dev lint` remains red on `REPO-031`, so the full pre-commit gate is still not green.
+- [ ] `REPO-033` Correct the two records that assumed the ladder always runs. `REPO-026` blocks the coverage baseline on "`test-fast` fails, so no complete profile exists", which is no longer true and makes the baseline measurable now. `REPO-030` says a commit touching `internal/coordinator` "still pays the nine minutes"; it pays them only when `CODEFLUX_LADDER` is set, so the tagging argument now rests on `internal/storage`, `internal/testharness`, `internal/testfixtures`, and `internal/retrieval` alone.
+- [ ] `REPO-034 TEST` Decide whether a provider-backed test may exist without an explicit opt-in. `engine_produces_program_test.go` was the only one, and it ran on the strength of a key being present, so any `go test ./...` -- including the pre-push hook's -- spent real money on 250 model runs. It is now gated. Nothing prevents the next one from being written the same way: `lint` could refuse a test that reads `ReadProviderKey` without an environment gate, or the key could be reachable only through a helper that itself requires the opt-in.

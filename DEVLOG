@@ -25,6 +25,47 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-042
+Date: 2026-08-02
+Status: Milestone 25 planned; plan section 34 written
+Change-ID: CL-20260802-032
+Commit: pending
+Request-or-TODO: User: "next give me a detailed list of todos to implement it,
+  analyze the current todos and weave them in, also add details to the plan and
+  create front end stories to render the graph aswell"
+Goal: Turn the design work into ordered, dependency-aware tasks, record the
+  decisions the plan owes, and specify the authoring surface
+Assumptions: The functional graph needs its own milestone rather than an
+  extension of M19, because M19 is the read-only explanatory graph and is
+  complete. Confirmed by reading M19's goal and its 108 closed tasks
+Decisions: Ordered the milestone by what actually blocks -- plan decisions
+  first, then representability, then implementation -- rather than by
+  subsystem, because eight of the twelve decisions block and no amount of
+  validator work compensates for a medium that cannot express a program. Put
+  representability second because the experiment counts representability
+  corrections as Arm C cost, so an inexpressible construct found during the
+  benchmark is a measured failure rather than a discovery. Wrote the frontend
+  tasks as stories where the user-facing claim matters -- a diagnostic at its
+  node, a derivation cone inspectable in place -- because the medium's whole
+  argument is that a validator does not forget what a human does, and delivering
+  that through a list a reader can skip forfeits it. Kept plan section 3's
+  freeze and section 5's architecture untouched and added section 34 beneath
+  them, since the design work found contradictions in both but has no authority
+  to resolve them
+Files-or-schemas: TODOS.md, docs/plan.md. No schema change
+Validation: 173 M25 tasks in seventeen sections, nine gates, counted by script.
+  plan.md section 34 present and linked from section 5. POST-001 and M19 now
+  name the milestone. codeflux-dev lint fails only on REPO-031, verified
+  identical with these changes stashed
+Failures-or-discarded-approaches: First attempted to append plan section 34 with
+  a shell heredoc, which broke on quoting; wrote the section to a file and
+  appended it instead
+Known-limitations: M25-088 sequences REPO-031 because the atom-comment rule
+  blocks lint today and would block the catalog's declarations. No task has been
+  started; M25-001 gates every other task on authorization nobody has sought
+Next-safe-step: Decide M25-002 and M25-004 -- control-graph completeness and
+  Rule 4's applicability. Both block the largest share of downstream work
+
 Dev-Log: DL-20260802-040
 Date: 2026-08-02
 Status: Design document at revision 7; standard-library research complete

@@ -76,7 +76,7 @@ A coding task is **successfully completed** only when the requested observable
 behavior exists at the exact candidate revision, all required validation and
 security checks pass, no unresolved blocker or unauthorized action exists, the
 diff and evidence are internally consistent, and the task reaches
-`AwaitingAcceptance` within its approved hard budget. A model stopping or
+`awaiting-review` within its approved hard budget. A model stopping or
 claiming completion is not task completion. (`M00-019`)
 
 A result is **user accepted** only when the user approves the exact diff,
@@ -1523,6 +1523,8 @@ Agents operate on ordinary source by default, producing inspectable diffs, test 
 For protected Go workflows, the platform may route work through the functional graph and obligation system below. This subsystem is activated only if the graph-medium experiment passes.
 
 ## Functional Graph
+
+**Design detail, resolved decisions, and open questions are in §34.** The frozen experiment notation is in §3; this section states the architecture the experiment tests, and §34 records what designing against both surfaced — including twelve decisions this plan owes and defects in §3's own worked molecule.
 
 Represents:
 
@@ -8205,3 +8207,105 @@ Deposit and withdraw are one obligation
 Phases F and G carry nearly all of the added wall-clock, which is the correct place for it: those are the stages that decide whether a near-perfect claim means anything. Stages 51, 52, and 56 are the expensive ones because each requires running the program rather than reading it. Stages 10, 14, 54, and 59 have no cheap automatic check and must produce a declared artifact that a later stage verifies against, rather than a state nobody can contest.
 
 Against that, three mechanisms take cost out, and they compound with each other rather than merely adding up. Reuse removes stages entirely, and its saving grows with the registry rather than with the machine. The dependency graph overlaps what remains, bounded by the worktree resource classes and, for model-bearing stages, by the provider's own limit. The digest-keyed cache removes the repeated work inside a run, where attempts re-check files they did not change, and across runs, where a recalled atom arrives with its verdicts already recorded. A first run on a new project is the most expensive run it will ever have, and that is the intended shape.
+
+---
+
+# 34. Functional Program Graph: Decisions, Surface, and Open Questions
+
+**Status: behind `POST-001`.** Nothing here authorises implementation. This section records what the design work in `docs/go-program-graph.md` established, what it could not settle, and which unsettled items are decisions this plan owns rather than a downstream document. §3's experiment freeze and §5's architecture are unchanged; this section adds detail beneath them and names the contradictions the design work found in both.
+
+Where this section and `docs/go-program-graph.md` disagree, this plan wins. Where this section and §3's frozen notation disagree, §3 wins and the disagreement is listed in §34.4.
+
+## 34.1 The control-flow surface
+
+Fifteen operations are required to express a program. Each is present in the §3 notation, proposed by the design work, or required and unspecified.
+
+| # | Control flow | Graph form | Readiness |
+| --- | --- | --- | --- |
+| 1 | Sequence | control edge | **undefined** — §34.4.1 |
+| 2 | Branch | `match` on a tagged out-port | frozen |
+| 3 | Join | `merge` node | frozen |
+| 4 | Map | `loop` region | frozen |
+| 5 | Fold | `fold` region | proposed — §34.2.1 |
+| 6 | Retry | `retry` region | frozen; trigger undefined — §34.4.5 |
+| 7 | Poll | `reconcile` region | frozen |
+| 8 | Claim gate | `claim` region | frozen; applicability undefined — §34.4.2 |
+| 9 | Suspend | `wait durable` node | frozen; mechanism undefined — §34.4.6 |
+| 10 | Bounded escape | region exhaustion edge | proposed — §34.2.2 |
+| 11 | Recover | `reconciles` relationship | frozen |
+| 12 | Compensate | `compensates` relationship | frozen; failure case undefined — §34.4.7 |
+| 13 | Seal panic | generated call boundary | proposed |
+| 14 | Terminate | `return` node | frozen; payload syntax undefined — §34.4.3 |
+| 15 | Element-failure policy | loop or fold attribute | proposed — §34.2.3 |
+
+Four of these — retry, claim gate, suspend, and element-failure policy — have no counterpart in any surveyed strict-functional standard library (Standard ML, OCaml, F#, Scala 3, Elm, Roc). Three of those four also carry an open question below. The correlation is worth stating: the constructs this project invented rather than borrowed are the ones that keep requiring decisions, and they are where review effort belongs.
+
+## 34.2 Constructs the design work proposes
+
+### 34.2.1 Fold
+
+§13's type scope requires `Map` and `Fold`. The frozen notation shows only `loop map`, so accumulation has no form: no running total, no reduction, and no iteration in which one element depends on the previous element's result.
+
+Fold is a **region**, not a node. A node whose body is an atom reference hides any effect inside it from the rules in §12, which quantify over effect nodes in the static graph, so an effectful accumulation would escape duplicate-issuance, key-provenance, and claim-gating checks entirely. A region's body is an ordinary node block and stays visible.
+
+A fold's in-flight accumulator is transient and may not enter a key derivation. Its result may, but only when the body performs no effect, draws only on durable or stable-iteration values, and its combinator is declared order-independent. A blanket prohibition would forbid a legitimate pattern: folding durable inputs with an order-independent combinator produces a value exactly as reproducible as any other deterministic derivation.
+
+### 34.2.2 Bounded escape
+
+§13 makes every loop bounded, and a declared bound with no path for reaching it leaves a reachable state with no defined behaviour. A region that exhausts its bound leaves by a control edge sourced at the **region**, not at a node. This keeps a site-specific bound producing a site-specific outcome and leaves atom contracts untouched, which a variant on the enclosed effect node would not: response variants are intrinsic to the atom while a bound varies per use.
+
+Exhaustion is inconclusive rather than confirming, so a path leaving a region this way establishes nothing and cannot gate a compensation.
+
+### 34.2.3 Element-failure policy
+
+Whether a failing element aborts an iteration or is skipped is ordinary intent with no expression. A loop or fold attribute settles it, defaulting to abort, because silently continuing past failures is both the more surprising behaviour and the more damaging default.
+
+## 34.3 The program-graph surface
+
+§27A specifies the explanatory task graph's three modes. The functional program graph is a **different surface** with different demands, and treating them as one pane is a mistake: the explanatory graph describes what an agent did and is read after the fact, while the program graph is an authoring medium whose edits are the work being measured in §3's Arm C.
+
+**What the two share:** stable identity, one stable left-to-right layout, no primary force-directed mode, status independent of colour, and the accessibility floor in §27C's Graph Visual Language. Reuse those rules rather than inventing a second visual language.
+
+**What differs:**
+
+- **Editing is the point.** The explanatory graph is read-only. The program graph is edited through the six operations §3 freezes, and every edit is a measured cost.
+- **Regions are primary, not decoration.** §5 states the graph is region- and obligation-centric rather than node-centric. Claim, issue, retry, reconcile, loop, and fold regions carry the attributes the validator reads; a rendering that treats them as background containers hides the material a reviewer must check.
+- **Validator diagnostics are first-class.** A rule violation names a node and a port. It must render on the graph at that node, not only in a list, or the medium's central claim — that a validator cannot forget what a human does — is delivered through a channel that makes it as easy to miss.
+- **Provenance is the reviewer's main question.** "Which derivation produced this key" is what the rules turn on, so a key derivation's cone needs a direct rendering rather than requiring a reviewer to trace edges by eye.
+- **Unreadiness must be visible.** Constructs marked proposed or undefined in §34.1 must render distinguishably from frozen ones. A notation whose settled and unsettled parts look identical trains editors to trust both equally.
+
+**Frontend acceptance for this surface:** an editor who did not design the notation can author the §3 payment molecule from an empty graph using only the frozen operations, see every validator diagnostic located at the node it concerns, and inspect any key's derivation cone without leaving the pane.
+
+## 34.4 Decisions this plan owes
+
+Each blocked the design work. Each is a decision this plan owns; none can be settled downstream.
+
+**34.4.1 Control-graph completeness.** The notation expresses control edges only inside `match` blocks and arrow forms. Nothing sequences lexically adjacent nodes, and nothing resolves an edge targeting a region to a node inside it. Rule 1's reachability, Rule 4's path analysis, and dominance all walk that graph. Two conventions are required: an edge into a region resolves to the region's single entry node, recursively; and either lexical adjacency implies sequencing, or every transition requires an explicit arrow and §3's worked molecule is incomplete. The second reading is more consistent with the rule that position is not identity.
+
+**34.4.2 Rule 4 applicability.** §12 states the atomic-claim rule for "an effect declaring `LocalAtomicClaim`", but in §3's molecule the *claim region* declares that strategy while the issuance declares `ProviderIdempotency`. Read literally, the rule selects the claim itself. Does a region's deduplication attribute describe its own node, or scope to the issuances it gates? The second reading is better supported by §12's obligation table, which defines the strategy's obligations as properties of the gated issuance — but claim and issue regions are siblings related by control flow, not by nesting, and no mechanism expresses that.
+
+**34.4.3 Workflow signature and result.** No section defines a workflow as a callable unit. It needs a signature, a result type formed from its `return` nodes, and a syntax for delivering a value to a return node. The notation shows none.
+
+**34.4.4 Provider deduplication scope.** §5 defines it as endpoint, tenant, account, or declared idempotency scope, and §12 lists it among the fields each effect declaration includes. No node in §3's molecule carries it, and the workflow header names the identity tuple's shape rather than assigning values. One third of the logical effect identity is currently uncomputable.
+
+**34.4.5 Retry trigger.** A retry region bounds attempts and backoff, but nothing declares which outcome causes a repeat.
+
+**34.4.6 Durable suspension mechanism.** A suspension may outlive the process, so a generated program is an explicit state machine, a replay from journal, or a replay from the last durable boundary. §17 points toward replay by requiring one determinism suite to serve both evaluator conformance and replay safety, but §3's own syntax names an explicit resume target, which is redundant under replay from the start and natural under the other two. The choice changes the shape of every generated function.
+
+**34.4.7 Failed compensator.** §12 defines reconciliation gating compensation but not what happens when the compensator itself fails. The original failure must survive, or compensation destroys the record of what it was compensating for.
+
+**34.4.8 Notation line discipline.** §3 specifies one node per line; four nodes in its own worked molecule span several. The grammar cannot be written until this is settled.
+
+**34.4.9 Editor completeness.** None of §3's six editor operations sets a region attribute, so no sequence of them produces a retry region with a bound or a reconcile region with a poll limit. The frozen editor cannot construct the frozen molecule, or two of the frozen conformance cases.
+
+**34.4.10 Molecule composition.** §7 makes a Tier 1 atom's body a graph. Substituting it at edit time keeps the rules intragraph; a call node makes them interprocedural, which nothing specifies. Edit-time substitution has a consequence worth stating in the rules themselves: substituting one helper at two sites yields two derivation instances, so a shared key-derivation helper fails the provenance rule unless the derivation is hoisted above every branch. **Derive keys before branching** should be a stated authoring rule.
+
+**34.4.11 Complexity as a contract property.** §14's contract language admits scalar bounds, equality, membership, size bounds, transition legality, capability containment, effect cardinality and ordering, and derivation rules. It does not admit time or space bounds. §7's documentation schema requires `complexity_and_limits`, but §7 also states documentation is descriptive evidence and not a correctness-bearing contract. A cost claim derived from documentation therefore cannot rise above an assumed external contract. Admitting complexity to §14's language is the only way a cost obligation carries more.
+
+**34.4.12 Worked-molecule defects.** §3 requires the corrected payment molecule frozen before task one. As written it fails the rules derived from §12: the compensating effect declares no result variants and so is modelled as always succeeding, contradicting the requirement that potentially ambiguous external writes return a three-way outcome; the validation node's result is wired to nothing, so the molecule does not demonstrate the no-effect-on-invalid-input obligation; and neither bounded region models exhaustion. Either the molecule or the rules must change.
+
+## 34.5 Representability must be measured before the experiment
+
+§3 requires Arm C to model fifty real change requests and to log representability corrections as Arm C cost. A construct the notation cannot express is not a scope saving; it is a measured failure of the arm.
+
+Before task one, model a pre-registered sample of those change requests in the notation and log every construct that cannot be expressed. The four gaps in §34.2 were all found by attempting five ordinary programming tasks: collecting all validation errors, conditional value flow, retry with fallback, batch processing that continues past failures, and a database-backed state machine. Three of the five could not be written. That exercise costs an afternoon, and no amount of validator work substitutes for it.

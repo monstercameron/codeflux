@@ -42,6 +42,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-032
+Commit: pending
+Date: 2026-08-02
+Type: The functional program graph gets a planned milestone and the plan records
+  the decisions it is blocked on
+Request-or-TODO: User: "next give me a detailed list of todos to implement it,
+  analyze the current todos and weave them in, also add details to the plan and
+  create front end stories to render the graph aswell"
+Outcome: TODOS.md gains Milestone 25, 173 tasks in seventeen sections covering
+  the disposable graph-medium experiment end to end: authorization, the twelve
+  plan decisions that block it, representability, grammar and editor, the
+  intermediate representation, provenance, four structural rules, ten
+  well-formedness preconditions, the type layer, contract stubs, evaluator and
+  fixtures, Go lowering, traceability, the authoring surface, the conformance
+  suite, experiment execution, and nine gates. Twenty-three of those are
+  frontend stories for a program-graph authoring surface, which is a different
+  surface from M19's read-only explanatory pane: diagnostics render at the node
+  they concern, a key's derivation cone is directly inspectable, and proposed
+  constructs render distinguishably from frozen ones. plan.md gains section 34,
+  recording the fifteen-operation control-flow surface, three proposed
+  constructs, the surface specification, and twelve decisions the plan owes --
+  including that section 3's own frozen molecule fails the rules derived from
+  section 12. POST-001 and M19 now cross-reference the new milestone
+Affected-behavior: None at runtime. Planning and specification only; every M25
+  task is unchecked and M25-001 blocks the rest on deferred.Authorize
+Compatibility-or-migration: None
+Verification: Task and section counts confirmed by grep; codeflux-dev lint fails
+  only on the pre-existing REPO-031 blocker, verified identical with these
+  changes stashed
+Dev-Log: DL-20260802-042
+
 Change-ID: CL-20260802-030
 Commit: pending
 Date: 2026-08-02
