@@ -103,11 +103,18 @@ go run ./cmd/codeflux-dev test-fast    # the default suite
 go run ./cmd/codeflux-dev build
 ```
 
-To run the same lint gate Git-side that CI runs:
+To run the repository's Git-side gates:
 
 ```
 git config core.hooksPath .githooks
 ```
+
+That installs two hooks. **pre-commit** formats staged Go files, then runs
+`lint`, `test-fast`, and `artifact-check`; a commit with no staged Go file skips
+all four. **pre-push** measures statement coverage and refuses a push carrying
+Go changes when it is below **80%**; a push with no Go change skips it, and a
+failing suite is refused rather than measured, because a percentage from a
+partial run describes only the packages that passed.
 
 The browser suite additionally needs Playwright browsers; the harness reports
 what is missing rather than failing obscurely.

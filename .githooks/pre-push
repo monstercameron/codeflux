@@ -1,0 +1,71 @@
+#!/bin/sh
+# Refuse to push Go changes when statement coverage is below the floor.
+#
+# The floor is checked here rather than on commit because coverage is a property
+# of the branch you are publishing, not of each step along the way. A commit that
+# lowers coverage while you are mid-refactor is fine; pushing it is what makes it
+# everyone else's problem.
+#
+# Bypass with --no-verify only when the user has explicitly asked for it.
+
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+MIN_COVERAGE="${CODEFLUX_MIN_COVERAGE:-80}"
+GOTOOLCHAIN=local
+export GOTOOLCHAIN
+
+# git feeds "<local ref> <local sha> <remote ref> <remote sha>" per ref on stdin.
+# Collect the Go files this push would actually publish. A push carrying only
+# ledger entries, documentation, or workflow files has no coverage to measure,
+# and blocking it would only teach people to bypass the hook.
+zero='0000000000000000000000000000000000000000'
+changed_go=''
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue          # branch deletion
+  if [ "$remote_sha" = "$zero" ]; then
+    range="$local_sha"                            # new branch: inspect its tip
+    files=$(git diff-tree --no-commit-id --name-only -r "$range" -- '*.go' || true)
+  else
+    files=$(git diff --name-only "$remote_sha" "$local_sha" -- '*.go' || true)
+  fi
+  changed_go="$changed_go$files"
+done
+
+if [ -z "$changed_go" ]; then
+  echo "pre-push: no Go changes in this push; coverage floor not applicable"
+  exit 0
+fi
+
+echo "pre-push: measuring statement coverage (floor ${MIN_COVERAGE}%)"
+
+profile=".artifacts/coverage/pre-push.out"
+mkdir -p "$(dirname "$profile")"
+
+if ! go test -timeout=20m -coverprofile="$profile" ./... >/dev/null; then
+  echo "pre-push: the suite failed, so coverage was not measured." >&2
+  echo "pre-push: fix the failures first — a coverage number from a partial run" >&2
+  echo "          describes only the packages that happened to pass." >&2
+  exit 1
+fi
+
+total=$(go tool cover -func="$profile" | awk '/^total:/ {gsub(/%/, "", $NF); print $NF}')
+
+if [ -z "$total" ]; then
+  echo "pre-push: could not read a total from the coverage profile" >&2
+  exit 1
+fi
+
+# Integer comparison in tenths, because /bin/sh has no floating point.
+scaled=$(printf '%.0f' "$(echo "$total 10" | awk '{print $1 * $2}')")
+floor=$(printf '%.0f' "$(echo "$MIN_COVERAGE 10" | awk '{print $1 * $2}')")
+
+if [ "$scaled" -lt "$floor" ]; then
+  echo "pre-push: statement coverage is ${total}%, below the ${MIN_COVERAGE}% floor." >&2
+  echo "pre-push: lowest-covered functions:" >&2
+  go tool cover -func="$profile" | sort -k3 -n | head -15 >&2
+  exit 1
+fi
+
+echo "pre-push: statement coverage ${total}% (floor ${MIN_COVERAGE}%)"

@@ -25,11 +25,52 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-037
+Date: 2026-08-02
+Status: Coverage floor added at the push boundary; baseline still unmeasured
+Change-ID: CL-20260802-027
+Commit: pending
+Request-or-TODO: User: "refine repo rules lets aim for 80% code coverage to push
+  to dev"
+Goal: Put a coverage floor on what reaches dev
+Assumptions: "To push to dev" means the push boundary, so a pre-push hook rather
+  than the pre-commit hook or the dev pass. The dev pass gates nothing by design
+Decisions: Implemented entirely in shell. codeflux-dev test-coverage writes a
+  profile and asserts nothing, so enforcing there would have meant a Go change,
+  and Go commits are currently refused by the pre-commit hook for other lanes'
+  failures -- the rule would have been written and unlandable. The shell hook
+  needs no Go change and works today. Comparison is done in tenths through awk
+  because /bin/sh has no floating point. A failing suite exits without reporting
+  a number at all, which matters more than it looks: go test still writes a
+  profile for the packages that passed, so the naive implementation would have
+  printed a plausible percentage computed from a subset
+Files-or-schemas: .githooks/pre-push (new), AGENTS.md, .github/CONTRIBUTING.md,
+  TODOS.md. No schema change
+Validation: sh -n parses the hook. The no-Go skip path was run against a real
+  ref pair and skipped. Go detection was checked against 204c76a~1..204c76a,
+  which contains two Go files, and against 1ef9949..6fe095b, which contains
+  none. The total parser was run against a real profile and returned 26.9, and
+  the tenths comparison was confirmed to block that against a floor of 80
+Failures-or-discarded-approaches: Adding coverage reporting to dev-pass.yml was
+  considered and dropped. It would have meant replacing codeflux-dev test-fast
+  with a direct go test invocation, and
+  TestM22_124_LocalAndCIShareTheSameCommandGraph requires the workflow to call
+  the same commands by the same names
+Known-limitations: THE BASELINE IS UNKNOWN AND ALMOST CERTAINLY WELL BELOW 80%.
+  The suite fails, so no complete profile can be produced; the only profile on
+  disk is a stale partial reporting 26.9% of one package. Until REPO-018 is
+  fixed the hook cannot pass, and until the baseline is known 80% is an
+  aspiration rather than a calibrated floor. The floor also lives only on
+  machines that installed the hooks -- CI does not enforce it, because
+  test-coverage has no threshold to give it
+Next-safe-step: REPO-018, then REPO-026 to establish the baseline, then decide
+  REPO-028 -- a fixed floor or a ratchet
+
 Dev-Log: DL-20260802-036
 Date: 2026-08-02
 Status: README rethemed around atoms
 Change-ID: CL-20260802-026
-Commit: pending
+Commit: 6fe095b
 Request-or-TODO: User: the README sounds pretentious; the project is an
   experimental agent building large programs from well-defined reusable atoms,
   correctness first, betting on FP and atomicity

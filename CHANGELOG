@@ -42,8 +42,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-026
+Change-ID: CL-20260802-027
 Commit: pending
+Date: 2026-08-02
+Type: A push carrying Go changes is refused below 80% statement coverage
+Request-or-TODO: User: "refine repo rules lets aim for 80% code coverage to push
+  to dev"
+Outcome: .githooks/pre-push runs the suite with a coverage profile, reads the
+  total through go tool cover -func, and refuses the push below 80%. The floor
+  is checked on push rather than on commit because coverage describes the branch
+  being published, not every step along the way. A push with no Go change skips
+  the measurement entirely. A failing suite is refused rather than measured: a
+  percentage from a partial run describes only the packages that passed, and
+  reads as reassuring while meaning nothing. CODEFLUX_MIN_COVERAGE overrides the
+  floor for bisecting and for establishing a baseline. The rule is written into
+  AGENTS.md and CONTRIBUTING, both of which state that coverage is a floor and
+  not a target -- statements executed is not behaviour verified, which is what
+  the mutation-score gate is for
+Affected-behavior: Pushing Go changes now runs the suite locally first
+Compatibility-or-migration: The hook only applies to clones that have run
+  git config core.hooksPath .githooks
+Verification: The hook parses under sh -n; the skip path was exercised against a
+  real ref pair; Go-file detection was verified against a range that contains Go
+  changes and one that does not; the total parser was run against a real profile
+  and the tenths comparison confirmed to block at 26.9 against 80
+Dev-Log: DL-20260802-037
+
+Change-ID: CL-20260802-026
+Commit: 6fe095b
 Date: 2026-08-02
 Type: The README leads with the atom thesis instead of the authority model, in
   a plainer voice

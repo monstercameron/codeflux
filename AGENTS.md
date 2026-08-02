@@ -572,7 +572,19 @@ For each changed behavior:
 - use fault injection for replay, idempotency, crash, and recovery behavior;
 - run security-boundary tests for paths, origins, permissions, redaction, and payload limits;
 - drive every frontend change through a real browser, per the section below;
-- measure rather than assume graph and streaming performance.
+- measure rather than assume graph and streaming performance;
+- keep statement coverage at or above the floor before pushing, per the section below.
+
+### Coverage floor
+
+**Statement coverage must be at least 80% before Go changes are pushed to `dev`.** `.githooks/pre-push` measures it and refuses the push below the floor.
+
+It is checked on push rather than on commit because coverage is a property of the branch you are publishing, not of every step along the way. A commit that lowers coverage mid-refactor is fine; pushing it is what makes it everyone else's problem.
+
+- A push carrying no Go change skips the measurement. Documentation, ledger entries, and workflow files have no statements to cover, and blocking them would only teach people to bypass the hook.
+- **A failing suite is not a coverage failure and is not reported as one.** The hook refuses rather than measuring, because a percentage taken from a partial run describes only the packages that happened to pass, and that number reads as reassuring while meaning nothing.
+- `CODEFLUX_MIN_COVERAGE` overrides the floor for a single run. It exists for bisecting and for measuring where the repository actually stands; lowering it to get a push through is not a use.
+- Coverage is a floor, not a target. Statements executed is not behaviour verified — the mutation-score gate is what establishes that the tests can detect a defect, and a package can sit at 90% while testing nothing. Do not write assertions whose purpose is to move the number.
 
 ## Documentation Rules
 

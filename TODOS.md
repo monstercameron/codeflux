@@ -4473,3 +4473,11 @@ Server-side GitHub configuration is included because it exists nowhere in Git:
 - [ ] `REPO-022` Add `test-browser` to the main gate once its CI runtime is measured, and add its context to ruleset `20243842` in the same change. Until then `REPO-008` cannot be verified in CI.
 - [ ] `REPO-023` Publish the first release, then remove the note added by `REPO-015`. Requires a tag, artifacts, `SHA256SUMS`, and a signing key, none of which exist.
 - [ ] `REPO-024` Re-check the vendored `frontend-design` skill by hand periodically; the Anthropic marketplace publishes no per-skill version, so `REPO-014` cannot cover it.
+- [x] `REPO-025` Refuse a push carrying Go changes when statement coverage is below 80%.
+  - `CL-20260802-027`. `.githooks/pre-push` runs the suite with a coverage profile, reads the total through `go tool cover -func`, and compares in tenths because `/bin/sh` has no floating point.
+  - Checked on push rather than on commit: coverage is a property of the branch being published, not of every step along the way.
+  - A push with no Go change skips the measurement. A failing suite is refused rather than measured, since a percentage from a partial run describes only the packages that passed.
+  - `CODEFLUX_MIN_COVERAGE` overrides the floor for bisecting and for establishing the current baseline.
+- [ ] `REPO-026 BLOCKER` Establish the actual coverage baseline. It is unmeasured: `test-fast` fails, so no complete profile exists. The only profile on disk is a stale partial from 2026-07-30 reporting 26.9% of one package, which is not a repository figure. Depends on `REPO-018`.
+- [ ] `REPO-027` Teach `codeflux-dev test-coverage` a `--min-coverage` threshold so CI can enforce the same floor the hook does. Today the command writes a profile and asserts nothing, so the floor exists only on developer machines and only for people who ran `git config core.hooksPath .githooks`. Blocked with `REPO-019` behind `REPO-018`.
+- [ ] `REPO-028` Decide whether the floor should be a ratchet rather than a constant. A fixed 80% is unreachable from the current baseline and will be bypassed until it is met; a ratchet that refuses any decrease is enforceable from day one and converges on the same place.
