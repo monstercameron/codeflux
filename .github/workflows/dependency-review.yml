@@ -1,0 +1,36 @@
+name: Dependency review
+
+# A pull request that adds a dependency is adding code that will run with the
+# user's privileges and beside their provider credential. This gate makes that
+# addition visible at review time rather than at incident time.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Review dependency changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # CodeFlux is MIT. A copyleft dependency would change the terms the
+          # project is distributed under, so it is a decision rather than a
+          # dependency bump.
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0

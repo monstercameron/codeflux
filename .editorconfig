@@ -1,0 +1,27 @@
+; CodeFlux editor defaults. These mirror .gitattributes so a file does not
+; change shape depending on which editor last saved it.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[*.{md,markdown}]
+; Two trailing spaces are a hard line break in Markdown, so trimming them
+; silently rewrites the document.
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[Makefile]
+indent_style = tab

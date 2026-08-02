@@ -8,3 +8,24 @@
 .env.*
 !.env.example
 !.env.*.example
+
+# Compiled output. Binaries belong under .artifacts/, never beside the source
+# that produced them; these rules stop a stray local build from being staged by
+# someone who reached for a broad `git add`.
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/client
+/galleryfixture
+/zzstart
+
+# Editor and operating-system leavings. Committing one is how a repository
+# starts carrying state that belongs to one person's machine.
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

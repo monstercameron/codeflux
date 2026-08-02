@@ -1,0 +1,21 @@
+# Every path has one owner. Review requests are routed here automatically.
+# Reference: https://docs.github.com/articles/about-code-owners
+
+*                       @monstercameron
+
+# Governance documents decide what gets built, in what order, and how. A change
+# to one of these changes the rules the rest of the repository is judged by, so
+# it is always reviewed as a rule change rather than as an ordinary edit.
+/AGENTS.md              @monstercameron
+/CLAUDE.md              @monstercameron
+/CHANGELOG              @monstercameron
+/DEVLOG                 @monstercameron
+/TODOS.md               @monstercameron
+/docs/plan.md           @monstercameron
+
+# Licence, security policy, and CI gates.
+/LICENSE                @monstercameron
+/.github/               @monstercameron
+
+# Migrations are immutable once merged.
+/migrations/            @monstercameron

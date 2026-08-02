@@ -1,0 +1,79 @@
+name: Feature request
+description: Propose a capability CodeFlux does not have.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CodeFlux is built against a sequenced plan, and several capabilities are
+        **deliberately deferred** so that their absence is a decision rather
+        than an oversight: container and VM isolation, multi-user and team
+        features, deep verification, hosted or remote operation, automatic
+        updates, and provider fallback and routing.
+
+        Proposing one of those is still welcome — but the useful proposal
+        argues for changing the sequence, not for adding the feature.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before filing
+      options:
+        - label: >-
+            I read the deferred-work list in docs/using.md and either this is
+            not on it, or I explain below why the deferral should change.
+          required: true
+        - label: I searched existing issues.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you unable to do today? Describe the situation you were in,
+        not the feature you want. The best proposals are indistinguishable from
+        bug reports until the last paragraph.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you are proposing
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried or considered instead
+      description: >-
+        Including doing it by hand. If the manual workaround is fine, say so —
+        that is useful information and does not disqualify the request.
+
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: Does this cross a stated product boundary?
+      description: >-
+        See the non-negotiable boundaries in AGENTS.md. Answering honestly
+        speeds up triage; it does not automatically close the issue.
+      options:
+        - "No, I do not believe so"
+        - "Yes — it would need handwritten JS/TS/HTML/CSS"
+        - "Yes — it would need a store other than SQLite, or a sidecar file"
+        - "Yes — it is on the deferred list"
+        - "Yes — it would make CodeFlux multi-user, hosted, or remote"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: How would we know it worked?
+      description: >-
+        What would have to be true for this to be judged a success, and what
+        evidence would show it? A capability whose success cannot be stated is
+        one this project cannot gate.

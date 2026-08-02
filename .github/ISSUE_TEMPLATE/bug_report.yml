@@ -1,0 +1,147 @@
+name: Bug report
+description: Something CodeFlux did that it should not have done, or did not do that it should have.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop if this is a security issue.** Do not file it here — use
+        [private reporting](https://github.com/monstercameron/codeflux/security/advisories/new)
+        instead. Anything about an unauthorized action, a misleading approval
+        prompt, or a leaked credential is a security issue.
+
+        Please skim the
+        [known limitations](https://github.com/monstercameron/codeflux/blob/main/docs/using.md#known-limitations)
+        first. Several frequently reported behaviors are documented decisions —
+        CodeFlux is not a sandbox, forecasts are estimates, and the graph is an
+        explanation rather than a proof.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before filing
+      options:
+        - label: This is not a security issue.
+          required: true
+        - label: I read the known limitations and this is not one of them.
+          required: true
+        - label: I searched existing issues.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: >-
+        The observable outcome. What did CodeFlux do, and what did you see?
+      placeholder: >-
+        The task reached AwaitingAcceptance, but the diff shown for review did
+        not include the migration the plan said it would add.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        The smallest sequence that shows it. If a specific repository state
+        matters, say what it was — a dirty worktree, a detached HEAD, a
+        submodule, a large file, a non-Go project.
+      value: |
+        1. `codeflux start`
+        2. Open repository: <what kind of repository>
+        3. Task text: <the exact words you used>
+        4. …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Does it reproduce?
+      options:
+        - Every time
+        - Most of the time
+        - Rarely
+        - Once, and I have not been able to repeat it
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of CodeFlux
+      options:
+        - Not sure
+        - CLI (start, doctor, provider, backup, diagnostics)
+        - Browser interface / chat thread
+        - Execution graph
+        - Planning and approval
+        - Permissions and authority
+        - Tool execution and validation
+        - Git worktrees, acceptance, rollback
+        - Cost, forecasts, budgets
+        - Project memory
+        - Crash recovery
+        - Storage / SQLite
+        - Provider adapter
+        - Build, CI, or developer tooling
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: CodeFlux version or commit
+      description: The version it reports, or the commit you built.
+      placeholder: "1ecb50b, or the version shown by `codeflux --version`"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows 11 ARM64
+        - Windows 11 / Server 2025 AMD64
+        - macOS ARM64
+        - Linux AMD64
+        - Other (say which below)
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+      placeholder: "anthropic / claude-opus-5"
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`codeflux doctor` output"
+      description: >-
+        Paste the output. It is safe to share — it reports prerequisite
+        statuses, not credentials.
+      render: text
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Anything else
+      description: >-
+        Relevant log excerpts, or a diagnostics bundle
+        (`codeflux diagnostics export`), which carries versions, counts, and
+        statuses only.
+
+        Redact anything you would not publish. Requirement text and file
+        contents are yours, and this issue is public.

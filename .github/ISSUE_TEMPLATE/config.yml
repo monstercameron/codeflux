@@ -1,0 +1,18 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/monstercameron/codeflux/security/advisories/new
+    about: >-
+      Never open a public issue for a vulnerability. This creates a draft
+      advisory visible only to you and the maintainer. See SECURITY.md for what
+      is in scope.
+  - name: Ask a question or discuss an idea
+    url: https://github.com/monstercameron/codeflux/discussions
+    about: >-
+      Open-ended questions, design discussion, and "should this exist?" belong
+      here rather than in the issue tracker.
+  - name: Read the user guide first
+    url: https://github.com/monstercameron/codeflux/blob/main/docs/using.md
+    about: >-
+      Installing, connecting a provider, permissions, budgets, recovery, and
+      the known limitations. Several common reports are documented behavior.

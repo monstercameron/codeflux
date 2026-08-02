@@ -1,0 +1,70 @@
+name: Documentation correction
+description: The docs describe behavior the code does not have, or omit behavior it does.
+labels: ["documentation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project treats its documentation as a claim about the system. A
+        place where the docs and the code disagree is a defect in one of them,
+        and which one is often the interesting question.
+
+  - type: dropdown
+    id: document
+    attributes:
+      label: Which document
+      options:
+        - README.md
+        - docs/using.md
+        - docs/developing.md
+        - docs/storage.md
+        - docs/benchmarks.md
+        - docs/plan.md
+        - AGENTS.md
+        - CONTRIBUTING.md / SECURITY.md / CODE_OF_CONDUCT.md
+        - A doc comment in the source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      description: Section heading, line, or a permalink.
+    validations:
+      required: true
+
+  - type: textarea
+    id: says
+    attributes:
+      label: What it says
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What the code actually does
+      description: >-
+        Point at the source or the observed behavior. If you are reporting that
+        something is merely unclear rather than wrong, say that instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: which-is-wrong
+    attributes:
+      label: Which do you think is wrong?
+      options:
+        - The documentation
+        - The code
+        - Not sure — they just disagree
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording
+      description: Optional, and appreciated.

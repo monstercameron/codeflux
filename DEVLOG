@@ -24,6 +24,230 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-016
+Date: 2026-08-02
+Status: Repository metadata published; licence changed to MIT
+Change-ID: CL-20260802-007
+Request-or-TODO: User: "https://github.com/monstercameron/codeflux lets make
+  this a pro level repo lets add all the repo level metadata and then when done
+  there lets create a god tier readme together note teh license is mit"; then
+  "add a mermaid chart of the code gen pipeline"
+Goal: Give the public repository the metadata a reader, a contributor, and a
+  security reporter each need, and a README that argues the product rather than
+  listing its features
+Assumptions: The user owns the copyright and may relicense. The instruction to
+  add "all the repo level metadata" is the explicit authorization AGENTS.md
+  requires before a Markdown file may be created; it was confirmed rather than
+  inferred, along with the licence change, because the repository recorded
+  Apache 2.0 and the request said MIT
+Decisions: Community health files live under .github/ rather than the root, so
+  the root keeps its governance documents and nothing else. The security policy
+  draws its scope line where the product's own threat model draws it: a
+  poisoned repository persuading a model to PROPOSE something hostile is
+  documented behaviour, while an action executed without the exact authority
+  required, or an approval prompt that under-describes what will run, is a
+  vulnerability. The contact route is GitHub private advisories rather than a
+  personal email address, so the maintainer's address is not published. The
+  README leads with structural authority because that is the claim the rest of
+  the design follows from, and its status section states the failing gates
+  rather than implying a green tree. Design reference images were NOT used as a
+  README hero: they are mockups carrying invented data, and a project whose
+  documentation argues that the graph is an explanation rather than a proof
+  cannot open with a picture of software that does not exist. No terminal
+  transcript was fabricated for the same reason
+Files-or-schemas: LICENSE (Apache 2.0 -> MIT), README.md (new), .editorconfig
+  (new), .env.example (new), .gitignore, .github/SECURITY.md,
+  .github/CONTRIBUTING.md, .github/CODE_OF_CONDUCT.md, .github/CODEOWNERS,
+  .github/PULL_REQUEST_TEMPLATE.md, .github/FUNDING.yml,
+  .github/ISSUE_TEMPLATE/{config,bug_report,feature_request,documentation}.yml,
+  .github/workflows/{codeql,dependency-review}.yml. No schema change
+Validation: gofmt clean; go build ./... exits 0, which is what the CodeQL
+  workflow's manual build step depends on; all nine YAML files parse; git
+  check-ignore confirms every stray root binary and .env are ignored and that
+  nothing artifact-shaped is tracked. The Mermaid diagrams were checked for
+  fence balance and quoted labels but were NOT rendered: no Mermaid CLI is
+  present and installing one pulls a headless browser, which was not authorized
+Failures-or-discarded-approaches: The GitHub API refused to enable
+  secret-scanning non-provider patterns and validity checks, which appear
+  unavailable on this plan; secret scanning, push protection, Dependabot alerts
+  and updates, and private vulnerability reporting were enabled successfully.
+  An earlier draft of the README stated 2,006 completed tasks; parsing TODOS.md
+  gave 1,846 for milestones 00-23 and the figure was corrected before commit
+Known-limitations: FUNDING.yml assumes GitHub Sponsors is enabled for the
+  account and should be deleted if it is not. GitHub will report the repository
+  as Apache 2.0 until this commit is pushed. The README's claim that the flow
+  has 37 stages describes what internal/pipeline declares, not what the
+  coordinator performs; the README says so explicitly
+Next-safe-step: Capture a real screenshot of the running interface and place it
+  above the README's opening argument, replacing nothing and claiming nothing
+  the product does not do
+
+Dev-Log: DL-20260802-015
+Date: 2026-08-02
+Status: The bar's instrument panels close themselves
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "the popover doesnt have onblur or mouse out event
+  handling so it just stays opne, fix that". Follows DL-20260802-014
+Goal: Give the top bar's disclosure panels a way to close
+Assumptions: The popover meant is the instrument disclosure in the application
+  bar, which is the one the previous entry worked on. The task-control
+  disclosure in web/frontend/taskcontrols expands in place rather than floating,
+  so it is not affected and was left alone
+Decisions: The control was a bare <details>, which has no way out: the panel
+  stayed until the summary was clicked a second time. It is now a button plus
+  primitives.Popover, which closes on Escape, on a click anywhere outside
+  itself, and returns focus to the trigger on the way out. That primitive was
+  already in the repository, already tested, and simply had no call site yet.
+  Deliberately not hand-rolled as onblur or mouseleave handlers, for reasons
+  that are properties of the DOM rather than preferences: closing on the
+  trigger's blur fires the instant focus moves INTO the panel, and closing on
+  the trigger's mouseleave fires while the pointer is travelling toward it --
+  either one makes the panel unreachable, which is the same class of fault as
+  the clipping fixed in the previous entry. Escape could not be written here in
+  any case: GWC's key handlers cannot read which key was pressed, so the only
+  place an Escape rule can live is inside the overlay machinery, which is
+  exactly where primitives.Popover puts it. Each instrument became its own
+  component instance so the four in the bar own separate open state instead of
+  sharing one and opening together. The panel mounts only while open, following
+  the lesson recorded on taskActionsPopoverWhenOpen: a closed overlay that still
+  mounts once emptied a whole route frame, and one present while shut goes on
+  intercepting clicks aimed past it
+Files-or-schemas: web/frontend/shell/reference_chrome.go,
+  web/frontend/shell/context_control_internal_test.go. No schema, no proto, no
+  API change outside this package
+Validation: go build over ./web/..., ./internal/transport, ./internal/storage
+  and ./internal/pipeline is clean; GOOS=js GOARCH=wasm go build ./web/client is
+  clean; go test ./web/frontend/... all pass, including the pre-existing shell
+  suite. Four new internal tests assert the dismissal contract on the overlay
+  the panel is built from -- Escape, outside click, focus restore, non-modal --
+  that the dismiss handler actually closes the control, that a closed panel
+  mounts no overlay and renders nothing, that acting on the panel closes it
+  before navigating, and that the trigger reports aria-expanded and
+  aria-haspopup
+Failures-or-discarded-approaches: Considered keeping <details> and driving its
+  open attribute from state; rejected because the element toggles itself on
+  summary activation, so the DOM and the state fight unless the default is
+  suppressed, and GWC exposes no way to do that. Considered mouseleave on the
+  wrapper, which is safe while the panel is a real DOM child; rejected once the
+  panel became an anchored overlay, because an overlay positioned outside the
+  wrapper would make the pointer leaving the wrapper mean nothing
+Known-limitations: primitives.Popover had no call site before this, so its
+  anchored positioning path is exercised here for the first time. The assertions
+  are on the overlay contract, not on a real browser: they prove the panel asks
+  for Escape and outside-click dismissal, not that a key press closes it. The
+  repository's mounted Chromium check is where that belongs
+Concurrency-note: The other session's untracked internal/coordinator/
+  agent_adversarial.go does not compile at the time of writing (undefined:
+  path), so go build ./... over the whole module fails on their file. Every
+  package touched here builds and tests clean
+Next-safe-step: Exercise Escape and an outside click against the mounted
+  Chromium build, so a real dismissal is what proves this rather than a contract
+  read
+
+Dev-Log: DL-20260802-015
+Date: 2026-08-02
+Status: The source viewer differentiates the majority of what is on screen,
+  not only the tokens the scanner names for free
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "visually inspect it", after "I need to see syntax
+  highlighting ... so I dont see this plain shit again". Follows DL-20260802-014
+Goal: Look at the rendered page rather than the token counts, and fix what the
+  look actually reveals
+Assumptions: None; this was decided by reading a 2x capture of the code region
+Decisions: The inspection found the real fault -- in Go most tokens are
+  identifiers and punctuation, and every one of them was painted the same
+  white, so about sixty percent of the surface carried no information and the
+  page read as unhighlighted; the declared-name colour was also indistinguish-
+  able from plain at 11px, differing only in weight. Punctuation now has its
+  own dim colour so structure recedes below the names it holds; a name before
+  "(" is coloured as a call and shares the declaration's amber, because a
+  reader following a call to its definition is following one thing; a
+  predeclared name stays a builtin even when called, since what matters about
+  len is that it came with the language. The whole file is now scanned before
+  anything is coloured, because what an identifier is depends on the token
+  after it. Type names and plain values stay uncoloured on purpose -- a
+  scanner cannot tell a type from a variable, and a highlighter that guesses
+  is lying about the code it is showing.
+Files-or-schemas: web/frontend/design/syntax.go; web/frontend/filetree/
+  highlight.go; web/frontend/filetree/content.go
+Validation: Eight syntax colours pass AA on both the plain and the raised
+  surface in all three themes; nine highlighter checks including the byte-for-
+  byte round trip; the end-to-end console suite re-run green; inspected on
+  127.0.0.1:47311 at 2x -- keywords magenta, calls and declarations amber,
+  builtins blue, literals green, comments grey, punctuation dim
+Failures-or-discarded-approaches: The first deploy of this change showed
+  punctuation and calls still rendering plain white: the class-to-colour switch
+  had not been edited, only the classifier. Caught by reading the computed
+  colours off the page rather than trusting the build.
+Known-limitations: Types, fields, and package qualifiers read as plain text.
+  Colouring them needs type information the scanner does not have.
+Next-safe-step: None required. If types should be coloured, that needs
+  go/types over the loaded packages the mapper already builds.
+
+Dev-Log: DL-20260802-014
+Date: 2026-08-02
+Status: The top bar's controls take their own clicks again
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "the top bar of teh front end has z index issues for the
+  clickable elements, fix that"
+Goal: Make every clickable thing in the application bar reachable
+Assumptions: None material; both faults are visible in the stylesheet the
+  components build, and both were reproduced as failing assertions before the
+  fix
+Decisions: Two distinct faults produced the same symptom. First, the bar
+  declared neither position nor z-index while the application frame under it is
+  position: relative -- and CSS paints positioned elements above non-positioned
+  content whatever the document order says, so the frame and everything
+  positioned inside it (the compact sidebar and the composer at 20, the graph
+  overlays) painted over a bar that comes first in the markup and took the
+  clicks aimed at it. The bar is now position: relative at a named layer 50,
+  above every layer inside the frame and below the skip link's 100, which has to
+  stay reachable on the first Tab. Position is asserted alongside the number
+  because a z-index on a static element is inert, which is the shape this bug
+  would take again if the position were dropped. Second, the instrument strip
+  set overflow: hidden, and a clipping ancestor trims an absolutely positioned
+  descendant away whatever z-index that descendant declares -- so each
+  instrument's disclosure panel, which hangs below the bar at z-index 40, was
+  drawn and then cut off and its button could not be reached. The clip is gone
+  and the row is held inside its grid track where it belongs, by each value
+  ellipsizing itself. That was already the intent: contextValueClass declared
+  text-overflow: ellipsis but also flex-shrink: 0, and a flex item additionally
+  defaults to min-width auto, so the ellipsis could never engage and clipping
+  from above was the only thing keeping the row in. The value now shrinks, and
+  the label span carries the truncation while the chevron does not, because a
+  disclosure whose marker is the first thing dropped stops reading as one. The
+  strip's class was extracted to instrumentStripClass so the no-clipping
+  invariant is assertable rather than a comment
+Files-or-schemas: web/frontend/shell/reference_chrome.go,
+  web/frontend/shell/chrome_stacking_internal_test.go. No schema, no proto, no
+  Go API change outside this package
+Validation: go build ./... clean; GOOS=js GOARCH=wasm go build ./web/client
+  clean; go test ./web/frontend/... all pass, including the pre-existing shell
+  suite. Three new internal tests capture the CSS the framework actually emits,
+  through css.SetSink with css.Reset first -- without the reset a class another
+  test already built emits nothing and the assertion would pass against an empty
+  string. They assert the bar is positioned, that its layer strictly outranks
+  the sidebar's and stays under the skip link's, that the strip emits no
+  overflow rule, and that a value can shrink and ellipsize
+Failures-or-discarded-approaches: Considered keeping the strip's clip and giving
+  the panel position: fixed to escape it; rejected because fixed drops the
+  anchor to its trigger and would need script to place it. Considered
+  overflow-x: hidden alone; rejected because a specified overflow-x with visible
+  overflow-y computes to auto, so it clips vertically anyway and the panel would
+  still be cut. Confirmed empirically that rendered markup carries only a hashed
+  class name and no CSS, so the stylesheet had to be captured through the sink
+  rather than asserted from markup
+Known-limitations: The assertions are on the emitted stylesheet, not on a real
+  layout: they prove the bar declares a winning layer and that nothing clips the
+  panels, not that a click lands. A browser check would close that, and the
+  repository's Chromium path is the place for it. The search dialog's backdrop
+  still declares no z-index of its own; it now sits inside the bar's layer and
+  so covers the frame, which is correct, but it is relying on the bar's layer
+  rather than stating its own
+Next-safe-step: Assert the same two invariants in the mounted Chromium check, so
+  a real click on a top-bar control is what proves this rather than a stylesheet
+  read
+
 Dev-Log: DL-20260802-012
 Date: 2026-08-02
 Status: The settings sheet is sized like a document rather than a dashboard
@@ -75,6 +299,44 @@ Known-limitations: Only the settings surface opts into the compact weight. Other
   open
 Next-safe-step: Measure the same way on the pages that hold dense readouts --
   the run timeline and the evidence report -- and decide the floor once
+
+Dev-Log: DL-20260802-014
+Date: 2026-08-02
+Status: The tree holds a real repository, and the console instance a person is
+  watching has to be restarted to serve a new client
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "I dont see syntax highlighting for the golang code in
+  the code page". Follows DL-20260802-013
+Goal: Find out why a finished surface was invisible, and make the tree correct
+  for a repository the size of this one
+Assumptions: The user is watching one of the other running consoles rather than
+  the isolated demo instance this session drives
+Decisions: The frontend server reads its asset set once in NewHandler and
+  serves it from memory, so an instance started before a client build keeps
+  serving the old one until it is restarted -- nothing was wrong with the
+  build; file listings get their own bound (MaximumCodeFilePage = 5000) because
+  a file row is a path and five numbers and the package-sized 500 cut this
+  repository's 1147 files into an arbitrary slice; the typed filter is now sent
+  to the coordinator as well as applied locally, so a search covers the whole
+  repository rather than whichever page arrived; the last listing is held so a
+  re-read for a new term redraws the tree it had instead of blanking it
+Files-or-schemas: internal/transport/code_collection_records.go;
+  internal/coordinator/code_collection_files.go; web/client/file_tree.go;
+  web/client/file_tree_mounted_wasm.go
+Validation: Confirmed the deployed wasm contained the new client (grepped its
+  markers) while the instance on :47399 still rendered the old package listing,
+  which located the fault in the server's start-time asset snapshot; started an
+  instance on 127.0.0.1:47312 against this repository -- 1147 files, tree,
+  filter narrowing to "5 of 1147 files", and Go highlighting across a 559-line
+  file; coordinator and end-to-end console tests re-run green
+Failures-or-discarded-approaches: A wasm build failed once because this session
+  and another were writing the same .artifacts/designpass/bin/main.wasm; moved
+  this session's asset set into its own scratchpad directory
+Known-limitations: A repository past 5000 files is still truncated, and the
+  header says so rather than hiding it. Restarting another session's console is
+  not something this session does, so the instance a person is watching has to
+  be restarted by whoever owns it.
+Next-safe-step: Restart the console being watched, or use 127.0.0.1:47312.
 
 Dev-Log: DL-20260802-013
 Date: 2026-08-02

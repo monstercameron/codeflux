@@ -30,6 +30,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-007
+Date: 2026-08-02
+Type: The repository gains the public-facing metadata a published project needs,
+  and is relicensed from Apache 2.0 to MIT
+Request-or-TODO: User: "lets make this a pro level repo lets add all the repo
+  level metadata and then when done there lets create a god tier readme
+  together note teh license is mit"; then "add a mermaid chart of the code gen
+  pipeline"
+Outcome: LICENSE is now MIT, replacing Apache 2.0 at the user's explicit
+  direction after the discrepancy was raised; every commit to this point was
+  single-authorship, so no third-party consent was required, and the Apache
+  patent grant is deliberately given up for MIT's shorter terms. A root
+  README.md is added under explicit authorization, superseding M01-003's record
+  that its absence was intentional: it argues the product from the authority
+  model outward, carries three Mermaid diagrams of the 37-stage delivery flow,
+  the model ladder, and every stage by phase, and states plainly that
+  internal/pipeline declares the flow while the coordinator performs only part
+  of it. Community health metadata lands under .github/: a security policy that
+  separates a proposed hostile action from one executed without authority, a
+  contributing guide naming the rules that actually block a change, a code of
+  conduct, CODEOWNERS, a pull-request template, and three issue forms.
+  .gitignore gains rules for compiled output and editor leavings, .editorconfig
+  mirrors .gitattributes, and .env.example documents the five accepted
+  CODEFLUX_* settings without carrying a credential
+Affected-behavior: None. No Go source, no schema, and no runtime path is
+  touched by this commit
+Compatibility-or-migration: The licence under which the project is distributed
+  changes from Apache 2.0 to MIT as of this commit. Copies taken before it
+  remain under the terms they were received under
+Verification: gofmt, go build ./..., and the YAML parse of all nine workflow and
+  template files pass. The repository-wide lint and test gates do NOT pass at
+  this revision; see CL-20260802-009, which records that failing state and the
+  reason it was committed anyway
+Dev-Log: DL-20260802-016
+
 Change-ID: CL-20260802-004
 Date: 2026-08-02
 Type: The run-settings package is committed so the surfaces that read it can be
