@@ -384,6 +384,12 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	// The settings surface hands a changed run configuration to the engine that
+	// enforces it, so a run started after a change does what the change said
+	// rather than what the process was started with. It stays nil on a
+	// coordinator with no engine to hand one to, and the settings path reports
+	// that rather than offering controls that would change nothing.
+	var flowSettings flowSettingsApplier
 	// Intake requires a base revision, a toolchain version, a validation
 	// profile, and a baseline model. Every one is a fact about this machine and
 	// this build rather than a decision, so the coordinator reads them here. A
@@ -475,7 +481,7 @@ func StartApplication(
 	// page could report nothing about the policy governing every run, the
 	// providers the coordinator has recorded, or whether a credential those
 	// providers need can actually be obtained.
-	settingsConfiguration, err := newSettingsApplication(repositories, credentialStore)
+	settingsConfiguration, err := newSettingsApplication(repositories, credentialStore, flowSettings)
 	if err != nil {
 		return nil, err
 	}

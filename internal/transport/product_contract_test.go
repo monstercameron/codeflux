@@ -30,6 +30,7 @@ func TestProductServiceMethodSurface(t *testing.T) {
 		},
 		"codeflux.v1.SettingsService": {
 			"GetModels", "GetPolicy", "SetPolicy", "SetBudgetDefaults", "ConfigureProvider", "TestProvider",
+			"GetFlowSettings", "SetFlowSettings", "GetSpendSummary",
 			"RecordFrontendTelemetry", "ListFrontendTelemetry", "DeleteFrontendTelemetry",
 		},
 		"codeflux.v1.SessionService": {"GetSessionSnapshot", "SubscribeSession"},

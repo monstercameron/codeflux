@@ -31,6 +31,11 @@ type SettingsConfigurationApplication interface {
 	// TestProviderCredential reports whether the coordinator can obtain the
 	// credential a provider call would present.
 	TestProviderCredential(context.Context, domain.ProviderID) (ProviderCredentialTest, error)
+	// ReadFlowSettings reports every choice the run flow leaves open, with the
+	// value in force and the description a page renders it from.
+	ReadFlowSettings(context.Context) (FlowSettingsRecord, error)
+	// WriteFlowSettings records new values and applies them to the engine.
+	WriteFlowSettings(context.Context, WriteFlowSettings) (FlowSettingsRecord, error)
 }
 
 // PolicyRecord is the execution policy in force.
@@ -306,4 +311,174 @@ func mapSettingsError(err error, safe string) error {
 	default:
 		return status.Error(codes.Internal, safe)
 	}
+}
+
+// FlowSetting is one choice the run flow leaves open, with its description and
+// its current value.
+//
+// Description and value travel together because the two drift apart
+// otherwise: a bound changed in the engine and not in the interface produces a
+// control that offers a value the engine will refuse.
+type FlowSetting struct {
+	Key     string
+	Label   string
+	Help    string
+	Kind    string
+	Choices []string
+	Minimum int32
+	Maximum int32
+	Group   string
+	Text    string
+	Number  int32
+	Enabled bool
+	// Items carries a setting whose value is a list of the choices: a set,
+	// where only membership matters, or a sequence, where the order is the
+	// setting. Both arrive here in order, and a client rendering a sequence has
+	// to preserve it.
+	Items []string
+	// Pairs carries a setting that gives named keys their own choice.
+	Pairs []FlowSettingPair
+	// AtDefault reports that the value in force is the one the engine ships
+	// with, so a surface can show where this machine has departed from them.
+	AtDefault bool
+}
+
+// FlowSettingsRecord is every flow setting and the revision it came from.
+type FlowSettingsRecord struct {
+	Settings []FlowSetting
+	// Unrenderable names settings the engine declares in a shape this
+	// boundary cannot carry. They are reported rather than dropped silently,
+	// because a settings page missing a row nobody mentioned is a page that
+	// quietly understates what governs a run.
+	Unrenderable []string
+	// Revision is the settings revision these values came from. Zero means no
+	// layer has been written and compiled defaults are in force.
+	Revision uint64
+}
+
+// FlowSettingPair is one named key and the choice given to it.
+//
+// A map would say the same thing and would say it in a different order every
+// time it was rendered or compared, which turns an unchanged configuration
+// into a changed one.
+type FlowSettingPair struct {
+	Key   string
+	Value string
+}
+
+// FlowSettingChange names one setting and its new value.
+type FlowSettingChange struct {
+	Key     string
+	Text    string
+	Number  int32
+	Enabled bool
+	Items   []string
+	Pairs   []FlowSettingPair
+}
+
+// WriteFlowSettings is one attributable change to the run flow.
+type WriteFlowSettings struct {
+	Changes          []FlowSettingChange
+	IdempotencyKey   string
+	ExpectedRevision *uint64
+}
+
+// GetFlowSettings returns every choice the run flow leaves open.
+func (service *SettingsService) GetFlowSettings(
+	ctx context.Context,
+	_ *codefluxv1.GetFlowSettingsRequest,
+) (*codefluxv1.GetFlowSettingsResponse, error) {
+	record, err := service.configuration.ReadFlowSettings(ctx)
+	if err != nil {
+		return nil, mapSettingsError(err, "the flow settings could not be read")
+	}
+	return &codefluxv1.GetFlowSettingsResponse{
+		Settings: flowSettingsToProto(record.Settings), Revision: record.Revision,
+		Unrenderable: record.Unrenderable,
+	}, nil
+}
+
+// SetFlowSettings records new values and applies them to the running engine.
+//
+// A value the engine would refuse is refused here, by name, rather than
+// clamped: silently correcting one setting produces a run that does not do
+// what its configuration says.
+func (service *SettingsService) SetFlowSettings(
+	ctx context.Context,
+	request *codefluxv1.SetFlowSettingsRequest,
+) (*codefluxv1.SetFlowSettingsResponse, error) {
+	key, expected, err := settingsMutationControl(request.GetControl())
+	if err != nil {
+		return nil, err
+	}
+	if len(request.GetChanges()) == 0 {
+		return nil, &RequestValidationError{Field: "changes", Reason: "must not be empty"}
+	}
+	changes := make([]FlowSettingChange, 0, len(request.GetChanges()))
+	for _, change := range request.GetChanges() {
+		if change.GetKey() == "" {
+			return nil, &RequestValidationError{
+				Field: "changes.key", Reason: "must not be empty",
+			}
+		}
+		pairs := make([]FlowSettingPair, 0, len(change.GetPairValues()))
+		for _, pair := range change.GetPairValues() {
+			if pair.GetKey() == "" {
+				return nil, &RequestValidationError{
+					Field:  "changes.pair_values.key",
+					Reason: "must not be empty",
+				}
+			}
+			pairs = append(pairs, FlowSettingPair{
+				Key: pair.GetKey(), Value: pair.GetValue(),
+			})
+		}
+		changes = append(changes, FlowSettingChange{
+			Key:     change.GetKey(),
+			Text:    change.GetTextValue(),
+			Number:  change.GetNumberValue(),
+			Enabled: change.GetSwitchValue(),
+			Items:   change.GetItemValues(),
+			Pairs:   pairs,
+		})
+	}
+	record, err := service.configuration.WriteFlowSettings(ctx, WriteFlowSettings{
+		Changes: changes, IdempotencyKey: key, ExpectedRevision: expected,
+	})
+	if err != nil {
+		return nil, mapSettingsError(err, "the flow settings could not be changed")
+	}
+	return &codefluxv1.SetFlowSettingsResponse{
+		Settings: flowSettingsToProto(record.Settings), Revision: record.Revision,
+		Unrenderable: record.Unrenderable,
+	}, nil
+}
+
+// flowSettingsToProto converts the described settings.
+func flowSettingsToProto(settings []FlowSetting) []*codefluxv1.FlowSettingView {
+	views := make([]*codefluxv1.FlowSettingView, 0, len(settings))
+	for _, setting := range settings {
+		pairs := make([]*codefluxv1.FlowSettingPair, 0, len(setting.Pairs))
+		for _, pair := range setting.Pairs {
+			pairs = append(pairs, &codefluxv1.FlowSettingPair{
+				Key: pair.Key, Value: pair.Value,
+			})
+		}
+		views = append(views, &codefluxv1.FlowSettingView{
+			Key: setting.Key, Label: setting.Label,
+			Help:        settingsRedactedText(setting.Help),
+			Kind:        setting.Kind,
+			Choices:     setting.Choices,
+			Minimum:     setting.Minimum,
+			Maximum:     setting.Maximum,
+			Group:       setting.Group,
+			TextValue:   setting.Text,
+			NumberValue: setting.Number,
+			SwitchValue: setting.Enabled,
+			ItemValues:  setting.Items,
+			PairValues:  pairs,
+			AtDefault:   setting.AtDefault,
+		})
+	}
+	return views
 }

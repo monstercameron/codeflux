@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,24 @@ type settingsConfigurationFake struct {
 	test        ProviderCredentialTest
 	testErr     error
 	testedAgent domain.ProviderID
+	flow        FlowSettingsRecord
+	flowErr     error
+	written     WriteFlowSettings
+	writeErr    error
+}
+
+func (fake *settingsConfigurationFake) ReadFlowSettings(
+	context.Context,
+) (FlowSettingsRecord, error) {
+	return fake.flow, fake.flowErr
+}
+
+func (fake *settingsConfigurationFake) WriteFlowSettings(
+	_ context.Context,
+	command WriteFlowSettings,
+) (FlowSettingsRecord, error) {
+	fake.written = command
+	return fake.flow, fake.writeErr
 }
 
 func (fake *settingsConfigurationFake) ReadEffectivePolicy(context.Context) (PolicyRecord, error) {
@@ -343,5 +362,121 @@ func TestACallerCausedSettingsFailureIsNotReportedAsInternal(t *testing.T) {
 	)
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("want InvalidArgument, got %v", err)
+	}
+}
+
+func TestTheRunSettingsCarryTheirDescriptionToTheClient(t *testing.T) {
+	fake := &settingsConfigurationFake{flow: FlowSettingsRecord{
+		Revision: 7,
+		Settings: []FlowSetting{
+			{
+				Key: "ambiguity", Label: "When a request reads two ways",
+				Help: "Ask stops and puts the question to you.",
+				Kind: "choice", Choices: []string{"ask", "assume"},
+				Group: "Intake", Text: "ask",
+			},
+			{
+				Key: "maximum_attempts", Label: "Attempts before stopping",
+				Kind: "number", Minimum: 1, Maximum: 12, Number: 6,
+				Group: "Refinement",
+			},
+		},
+	}}
+	response, err := newSettingsServiceForTest(t, fake).GetFlowSettings(
+		t.Context(), &codefluxv1.GetFlowSettingsRequest{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.GetRevision() != 7 || len(response.GetSettings()) != 2 {
+		t.Fatalf("response lost a field: %+v", response)
+	}
+	choice := response.GetSettings()[0]
+	if choice.GetKind() != "choice" || len(choice.GetChoices()) != 2 ||
+		choice.GetTextValue() != "ask" || choice.GetGroup() != "Intake" ||
+		choice.GetHelp().GetValue() == "" {
+		t.Fatalf("the choice lost a field: %+v", choice)
+	}
+	// The bound travels with the value: a client drawing a control from its own
+	// copy would eventually offer a number the engine refuses.
+	number := response.GetSettings()[1]
+	if number.GetMinimum() != 1 || number.GetMaximum() != 12 || number.GetNumberValue() != 6 {
+		t.Fatalf("the bound lost a field: %+v", number)
+	}
+}
+
+func TestChangingRunSettingsCarriesEveryChangeAndItsControl(t *testing.T) {
+	fake := &settingsConfigurationFake{flow: FlowSettingsRecord{Revision: 8}}
+	service := newSettingsServiceForTest(t, fake)
+	expected := uint64(7)
+	response, err := service.SetFlowSettings(t.Context(), &codefluxv1.SetFlowSettingsRequest{
+		Control: &codefluxv1.MutationControl{
+			IdempotencyKey: "flow-1", ExpectedRevision: &expected,
+		},
+		Changes: []*codefluxv1.FlowSettingChange{
+			{Key: "ambiguity", TextValue: "assume"},
+			{Key: "maximum_attempts", NumberValue: 9},
+			{Key: "adversarial_review", SwitchValue: false},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.GetRevision() != 8 {
+		t.Fatalf("revision = %d", response.GetRevision())
+	}
+	if fake.written.IdempotencyKey != "flow-1" ||
+		fake.written.ExpectedRevision == nil || *fake.written.ExpectedRevision != 7 ||
+		len(fake.written.Changes) != 3 {
+		t.Fatalf("the command lost a field: %+v", fake.written)
+	}
+	if fake.written.Changes[0].Text != "assume" || fake.written.Changes[1].Number != 9 {
+		t.Fatalf("the changes lost a value: %+v", fake.written.Changes)
+	}
+}
+
+func TestChangingRunSettingsRefusesACommandItCannotAttribute(t *testing.T) {
+	service := newSettingsServiceForTest(t, &settingsConfigurationFake{})
+
+	// Without a retained idempotency key a repeated command cannot be
+	// recognized as the same command.
+	if _, err := service.SetFlowSettings(t.Context(), &codefluxv1.SetFlowSettingsRequest{
+		Changes: []*codefluxv1.FlowSettingChange{{Key: "ambiguity", TextValue: "ask"}},
+	}); err == nil {
+		t.Fatal("a change without an idempotency key must be refused")
+	}
+	// A command carrying no change would write a revision that changed nothing.
+	if _, err := service.SetFlowSettings(t.Context(), &codefluxv1.SetFlowSettingsRequest{
+		Control: &codefluxv1.MutationControl{IdempotencyKey: "flow-empty"},
+	}); err == nil {
+		t.Fatal("a change list with nothing in it must be refused")
+	}
+	// A change naming no setting cannot be applied to anything.
+	if _, err := service.SetFlowSettings(t.Context(), &codefluxv1.SetFlowSettingsRequest{
+		Control: &codefluxv1.MutationControl{IdempotencyKey: "flow-keyless"},
+		Changes: []*codefluxv1.FlowSettingChange{{NumberValue: 3}},
+	}); err == nil {
+		t.Fatal("a change with no key must be refused")
+	}
+}
+
+func TestARefusedRunSettingReachesTheCallerAsTheirMistake(t *testing.T) {
+	fake := &settingsConfigurationFake{writeErr: &RequestValidationError{
+		Field: "changes", Reason: "Attempts before stopping is 400, outside 1 to 12",
+	}}
+	_, err := newSettingsServiceForTest(t, fake).SetFlowSettings(
+		t.Context(),
+		&codefluxv1.SetFlowSettingsRequest{
+			Control: &codefluxv1.MutationControl{IdempotencyKey: "flow-bad"},
+			Changes: []*codefluxv1.FlowSettingChange{{Key: "maximum_attempts", NumberValue: 400}},
+		},
+	)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("want InvalidArgument, got %v", err)
+	}
+	// The engine's own words name the setting and the bound, which is what
+	// somebody who typed the value needs to read.
+	if !strings.Contains(status.Convert(err).Message(), "outside 1 to 12") {
+		t.Fatalf("message = %q", status.Convert(err).Message())
 	}
 }

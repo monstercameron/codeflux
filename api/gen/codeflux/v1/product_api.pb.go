@@ -7361,6 +7361,520 @@ func (x *DeleteFrontendTelemetryResponse) GetRemaining() uint64 {
 	return 0
 }
 
+// SpendCost is one exact recorded cost, presented at a scale fine enough for a
+// single model call.
+//
+// amount is absent when the cost is unknown, following Money: an unknown cost
+// is never a zero. A single call routinely costs a fraction of one minor unit,
+// so amount carries extra decimal places rather than whole cents, and exact
+// says whether that scale held the recorded rational value or rounded it.
+type SpendCost struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Amount        *Money                 `protobuf:"bytes,1,opt,name=amount,proto3" json:"amount,omitempty"`
+	Exact         bool                   `protobuf:"varint,2,opt,name=exact,proto3" json:"exact,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SpendCost) Reset() {
+	*x = SpendCost{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SpendCost) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SpendCost) ProtoMessage() {}
+
+func (x *SpendCost) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SpendCost.ProtoReflect.Descriptor instead.
+func (*SpendCost) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *SpendCost) GetAmount() *Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *SpendCost) GetExact() bool {
+	if x != nil {
+		return x.Exact
+	}
+	return false
+}
+
+// SpendSliceView is usage and cost for one grouping key.
+//
+// The unknown counts are separate fields rather than an absence, because the
+// caller needs both halves: what was spent, and how many calls could not be
+// measured or priced at all.
+type SpendSliceView struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Calls             uint64                 `protobuf:"varint,1,opt,name=calls,proto3" json:"calls,omitempty"`
+	InputTokens       uint64                 `protobuf:"varint,2,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
+	CachedInputTokens uint64                 `protobuf:"varint,3,opt,name=cached_input_tokens,json=cachedInputTokens,proto3" json:"cached_input_tokens,omitempty"`
+	CacheWriteTokens  uint64                 `protobuf:"varint,4,opt,name=cache_write_tokens,json=cacheWriteTokens,proto3" json:"cache_write_tokens,omitempty"`
+	OutputTokens      uint64                 `protobuf:"varint,5,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
+	ReasoningTokens   uint64                 `protobuf:"varint,6,opt,name=reasoning_tokens,json=reasoningTokens,proto3" json:"reasoning_tokens,omitempty"`
+	KnownCost         *SpendCost             `protobuf:"bytes,7,opt,name=known_cost,json=knownCost,proto3" json:"known_cost,omitempty"`
+	UsageUnknownCalls uint64                 `protobuf:"varint,8,opt,name=usage_unknown_calls,json=usageUnknownCalls,proto3" json:"usage_unknown_calls,omitempty"`
+	CostUnknownCalls  uint64                 `protobuf:"varint,9,opt,name=cost_unknown_calls,json=costUnknownCalls,proto3" json:"cost_unknown_calls,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SpendSliceView) Reset() {
+	*x = SpendSliceView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SpendSliceView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SpendSliceView) ProtoMessage() {}
+
+func (x *SpendSliceView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SpendSliceView.ProtoReflect.Descriptor instead.
+func (*SpendSliceView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *SpendSliceView) GetCalls() uint64 {
+	if x != nil {
+		return x.Calls
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetInputTokens() uint64 {
+	if x != nil {
+		return x.InputTokens
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetCachedInputTokens() uint64 {
+	if x != nil {
+		return x.CachedInputTokens
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetCacheWriteTokens() uint64 {
+	if x != nil {
+		return x.CacheWriteTokens
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetOutputTokens() uint64 {
+	if x != nil {
+		return x.OutputTokens
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetReasoningTokens() uint64 {
+	if x != nil {
+		return x.ReasoningTokens
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetKnownCost() *SpendCost {
+	if x != nil {
+		return x.KnownCost
+	}
+	return nil
+}
+
+func (x *SpendSliceView) GetUsageUnknownCalls() uint64 {
+	if x != nil {
+		return x.UsageUnknownCalls
+	}
+	return 0
+}
+
+func (x *SpendSliceView) GetCostUnknownCalls() uint64 {
+	if x != nil {
+		return x.CostUnknownCalls
+	}
+	return 0
+}
+
+// PhaseSpendView is what one movement of the flow cost: the atoms, the
+// molecules, the program.
+type PhaseSpendView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phase         string                 `protobuf:"bytes,1,opt,name=phase,proto3" json:"phase,omitempty"`
+	Spend         *SpendSliceView        `protobuf:"bytes,2,opt,name=spend,proto3" json:"spend,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PhaseSpendView) Reset() {
+	*x = PhaseSpendView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PhaseSpendView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PhaseSpendView) ProtoMessage() {}
+
+func (x *PhaseSpendView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PhaseSpendView.ProtoReflect.Descriptor instead.
+func (*PhaseSpendView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *PhaseSpendView) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *PhaseSpendView) GetSpend() *SpendSliceView {
+	if x != nil {
+		return x.Spend
+	}
+	return nil
+}
+
+type StageSpendView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StageNumber   uint32                 `protobuf:"varint,1,opt,name=stage_number,json=stageNumber,proto3" json:"stage_number,omitempty"`
+	StageName     string                 `protobuf:"bytes,2,opt,name=stage_name,json=stageName,proto3" json:"stage_name,omitempty"`
+	Phase         string                 `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"`
+	Spend         *SpendSliceView        `protobuf:"bytes,4,opt,name=spend,proto3" json:"spend,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StageSpendView) Reset() {
+	*x = StageSpendView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StageSpendView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StageSpendView) ProtoMessage() {}
+
+func (x *StageSpendView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StageSpendView.ProtoReflect.Descriptor instead.
+func (*StageSpendView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *StageSpendView) GetStageNumber() uint32 {
+	if x != nil {
+		return x.StageNumber
+	}
+	return 0
+}
+
+func (x *StageSpendView) GetStageName() string {
+	if x != nil {
+		return x.StageName
+	}
+	return ""
+}
+
+func (x *StageSpendView) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *StageSpendView) GetSpend() *SpendSliceView {
+	if x != nil {
+		return x.Spend
+	}
+	return nil
+}
+
+type ModelSpendView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId    string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	Model         string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	ModelVersion  string                 `protobuf:"bytes,3,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
+	Spend         *SpendSliceView        `protobuf:"bytes,4,opt,name=spend,proto3" json:"spend,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelSpendView) Reset() {
+	*x = ModelSpendView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelSpendView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelSpendView) ProtoMessage() {}
+
+func (x *ModelSpendView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelSpendView.ProtoReflect.Descriptor instead.
+func (*ModelSpendView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *ModelSpendView) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ModelSpendView) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ModelSpendView) GetModelVersion() string {
+	if x != nil {
+		return x.ModelVersion
+	}
+	return ""
+}
+
+func (x *ModelSpendView) GetSpend() *SpendSliceView {
+	if x != nil {
+		return x.Spend
+	}
+	return nil
+}
+
+type GetSpendSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *StableIdentity        `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Since         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=since,proto3" json:"since,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=until,proto3" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSpendSummaryRequest) Reset() {
+	*x = GetSpendSummaryRequest{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[112]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendSummaryRequest) ProtoMessage() {}
+
+func (x *GetSpendSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[112]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendSummaryRequest.ProtoReflect.Descriptor instead.
+func (*GetSpendSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{112}
+}
+
+func (x *GetSpendSummaryRequest) GetWorkspaceId() *StableIdentity {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryRequest) GetSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Since
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+type GetSpendSummaryResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// total covers every recorded call in the window, including the calls no
+	// stage claimed. by_phase and by_stage therefore need not sum to it.
+	Total   *SpendSliceView   `protobuf:"bytes,1,opt,name=total,proto3" json:"total,omitempty"`
+	ByPhase []*PhaseSpendView `protobuf:"bytes,2,rep,name=by_phase,json=byPhase,proto3" json:"by_phase,omitempty"`
+	ByStage []*StageSpendView `protobuf:"bytes,3,rep,name=by_stage,json=byStage,proto3" json:"by_stage,omitempty"`
+	// by_model is exact: the model is recorded on the request itself.
+	ByModel []*ModelSpendView `protobuf:"bytes,4,rep,name=by_model,json=byModel,proto3" json:"by_model,omitempty"`
+	// unattributed is the difference between total and the phases, reported so
+	// that a gap is explained rather than merely visible.
+	Unattributed *SpendSliceView `protobuf:"bytes,5,opt,name=unattributed,proto3" json:"unattributed,omitempty"`
+	// stage_attribution_approximate is true whenever by_phase and by_stage were
+	// derived by matching call times against stage records rather than from a
+	// stage recorded on the call. The client must label them as estimates.
+	StageAttributionApproximate bool `protobuf:"varint,6,opt,name=stage_attribution_approximate,json=stageAttributionApproximate,proto3" json:"stage_attribution_approximate,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *GetSpendSummaryResponse) Reset() {
+	*x = GetSpendSummaryResponse{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendSummaryResponse) ProtoMessage() {}
+
+func (x *GetSpendSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendSummaryResponse.ProtoReflect.Descriptor instead.
+func (*GetSpendSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{113}
+}
+
+func (x *GetSpendSummaryResponse) GetTotal() *SpendSliceView {
+	if x != nil {
+		return x.Total
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryResponse) GetByPhase() []*PhaseSpendView {
+	if x != nil {
+		return x.ByPhase
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryResponse) GetByStage() []*StageSpendView {
+	if x != nil {
+		return x.ByStage
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryResponse) GetByModel() []*ModelSpendView {
+	if x != nil {
+		return x.ByModel
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryResponse) GetUnattributed() *SpendSliceView {
+	if x != nil {
+		return x.Unattributed
+	}
+	return nil
+}
+
+func (x *GetSpendSummaryResponse) GetStageAttributionApproximate() bool {
+	if x != nil {
+		return x.StageAttributionApproximate
+	}
+	return false
+}
+
 type GetSessionSnapshotRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     *StableIdentity        `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -7370,7 +7884,7 @@ type GetSessionSnapshotRequest struct {
 
 func (x *GetSessionSnapshotRequest) Reset() {
 	*x = GetSessionSnapshotRequest{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[107]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7382,7 +7896,7 @@ func (x *GetSessionSnapshotRequest) String() string {
 func (*GetSessionSnapshotRequest) ProtoMessage() {}
 
 func (x *GetSessionSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[107]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7395,7 +7909,7 @@ func (x *GetSessionSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{107}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *GetSessionSnapshotRequest) GetSessionId() *StableIdentity {
@@ -7414,7 +7928,7 @@ type GetSessionSnapshotResponse struct {
 
 func (x *GetSessionSnapshotResponse) Reset() {
 	*x = GetSessionSnapshotResponse{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[108]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7426,7 +7940,7 @@ func (x *GetSessionSnapshotResponse) String() string {
 func (*GetSessionSnapshotResponse) ProtoMessage() {}
 
 func (x *GetSessionSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[108]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7439,7 +7953,7 @@ func (x *GetSessionSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetSessionSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{108}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *GetSessionSnapshotResponse) GetSnapshot() *SessionProjectionSnapshot {
@@ -7490,7 +8004,7 @@ type SessionProjectionSnapshot struct {
 
 func (x *SessionProjectionSnapshot) Reset() {
 	*x = SessionProjectionSnapshot{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[109]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7502,7 +8016,7 @@ func (x *SessionProjectionSnapshot) String() string {
 func (*SessionProjectionSnapshot) ProtoMessage() {}
 
 func (x *SessionProjectionSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[109]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7515,7 +8029,7 @@ func (x *SessionProjectionSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionProjectionSnapshot.ProtoReflect.Descriptor instead.
 func (*SessionProjectionSnapshot) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{109}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *SessionProjectionSnapshot) GetSessionId() *StableIdentity {
@@ -7734,7 +8248,7 @@ type SessionRevisionBindings struct {
 
 func (x *SessionRevisionBindings) Reset() {
 	*x = SessionRevisionBindings{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[110]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7746,7 +8260,7 @@ func (x *SessionRevisionBindings) String() string {
 func (*SessionRevisionBindings) ProtoMessage() {}
 
 func (x *SessionRevisionBindings) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[110]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7759,7 +8273,7 @@ func (x *SessionRevisionBindings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionRevisionBindings.ProtoReflect.Descriptor instead.
 func (*SessionRevisionBindings) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{110}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *SessionRevisionBindings) GetDiffRevision() uint64 {
@@ -7807,7 +8321,7 @@ type SubscribeSessionRequest struct {
 
 func (x *SubscribeSessionRequest) Reset() {
 	*x = SubscribeSessionRequest{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[111]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7819,7 +8333,7 @@ func (x *SubscribeSessionRequest) String() string {
 func (*SubscribeSessionRequest) ProtoMessage() {}
 
 func (x *SubscribeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[111]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7832,7 +8346,7 @@ func (x *SubscribeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeSessionRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{111}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *SubscribeSessionRequest) GetSessionId() *StableIdentity {
@@ -7859,7 +8373,7 @@ type SubscribeSessionResponse struct {
 
 func (x *SubscribeSessionResponse) Reset() {
 	*x = SubscribeSessionResponse{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[112]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7871,7 +8385,7 @@ func (x *SubscribeSessionResponse) String() string {
 func (*SubscribeSessionResponse) ProtoMessage() {}
 
 func (x *SubscribeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[112]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7884,7 +8398,7 @@ func (x *SubscribeSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeSessionResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{112}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *SubscribeSessionResponse) GetEvent() *SessionEvent {
@@ -7912,7 +8426,7 @@ type SessionReplayBoundary struct {
 
 func (x *SessionReplayBoundary) Reset() {
 	*x = SessionReplayBoundary{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[113]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7924,7 +8438,7 @@ func (x *SessionReplayBoundary) String() string {
 func (*SessionReplayBoundary) ProtoMessage() {}
 
 func (x *SessionReplayBoundary) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[113]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7937,7 +8451,7 @@ func (x *SessionReplayBoundary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionReplayBoundary.ProtoReflect.Descriptor instead.
 func (*SessionReplayBoundary) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{113}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *SessionReplayBoundary) GetThroughSequence() uint64 {
@@ -7945,6 +8459,361 @@ func (x *SessionReplayBoundary) GetThroughSequence() uint64 {
 		return x.ThroughSequence
 	}
 	return 0
+}
+
+// CodeFileView is one file in the collection.
+type CodeFileView struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceRelativePath string                 `protobuf:"bytes,1,opt,name=workspace_relative_path,json=workspaceRelativePath,proto3" json:"workspace_relative_path,omitempty"`
+	// kind is "source", "test" or whatever else the mapper recorded, and
+	// generated marks a file nobody wrote by hand.
+	Kind          string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Generated     bool   `protobuf:"varint,3,opt,name=generated,proto3" json:"generated,omitempty"`
+	ImportPath    string `protobuf:"bytes,4,opt,name=import_path,json=importPath,proto3" json:"import_path,omitempty"`
+	SymbolCount   uint32 `protobuf:"varint,5,opt,name=symbol_count,json=symbolCount,proto3" json:"symbol_count,omitempty"`
+	AtomCount     uint32 `protobuf:"varint,6,opt,name=atom_count,json=atomCount,proto3" json:"atom_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeFileView) Reset() {
+	*x = CodeFileView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeFileView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeFileView) ProtoMessage() {}
+
+func (x *CodeFileView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeFileView.ProtoReflect.Descriptor instead.
+func (*CodeFileView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *CodeFileView) GetWorkspaceRelativePath() string {
+	if x != nil {
+		return x.WorkspaceRelativePath
+	}
+	return ""
+}
+
+func (x *CodeFileView) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *CodeFileView) GetGenerated() bool {
+	if x != nil {
+		return x.Generated
+	}
+	return false
+}
+
+func (x *CodeFileView) GetImportPath() string {
+	if x != nil {
+		return x.ImportPath
+	}
+	return ""
+}
+
+func (x *CodeFileView) GetSymbolCount() uint32 {
+	if x != nil {
+		return x.SymbolCount
+	}
+	return 0
+}
+
+func (x *CodeFileView) GetAtomCount() uint32 {
+	if x != nil {
+		return x.AtomCount
+	}
+	return 0
+}
+
+type ListCodeFilesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RepositoryId  *StableIdentity        `protobuf:"bytes,1,opt,name=repository_id,json=repositoryId,proto3" json:"repository_id,omitempty"`
+	Search        string                 `protobuf:"bytes,2,opt,name=search,proto3" json:"search,omitempty"`
+	Page          *PageRequest           `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCodeFilesRequest) Reset() {
+	*x = ListCodeFilesRequest{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCodeFilesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCodeFilesRequest) ProtoMessage() {}
+
+func (x *ListCodeFilesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCodeFilesRequest.ProtoReflect.Descriptor instead.
+func (*ListCodeFilesRequest) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *ListCodeFilesRequest) GetRepositoryId() *StableIdentity {
+	if x != nil {
+		return x.RepositoryId
+	}
+	return nil
+}
+
+func (x *ListCodeFilesRequest) GetSearch() string {
+	if x != nil {
+		return x.Search
+	}
+	return ""
+}
+
+func (x *ListCodeFilesRequest) GetPage() *PageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListCodeFilesResponse struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Revision      *CodeCollectionRevisionView `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Files         []*CodeFileView             `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	Page          *PageInfo                   `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	TotalFiles    uint32                      `protobuf:"varint,4,opt,name=total_files,json=totalFiles,proto3" json:"total_files,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCodeFilesResponse) Reset() {
+	*x = ListCodeFilesResponse{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCodeFilesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCodeFilesResponse) ProtoMessage() {}
+
+func (x *ListCodeFilesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCodeFilesResponse.ProtoReflect.Descriptor instead.
+func (*ListCodeFilesResponse) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *ListCodeFilesResponse) GetRevision() *CodeCollectionRevisionView {
+	if x != nil {
+		return x.Revision
+	}
+	return nil
+}
+
+func (x *ListCodeFilesResponse) GetFiles() []*CodeFileView {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *ListCodeFilesResponse) GetPage() *PageInfo {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *ListCodeFilesResponse) GetTotalFiles() uint32 {
+	if x != nil {
+		return x.TotalFiles
+	}
+	return 0
+}
+
+type ReadCodeFileRequest struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	RepositoryId          *StableIdentity        `protobuf:"bytes,1,opt,name=repository_id,json=repositoryId,proto3" json:"repository_id,omitempty"`
+	WorkspaceRelativePath string                 `protobuf:"bytes,2,opt,name=workspace_relative_path,json=workspaceRelativePath,proto3" json:"workspace_relative_path,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *ReadCodeFileRequest) Reset() {
+	*x = ReadCodeFileRequest{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadCodeFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadCodeFileRequest) ProtoMessage() {}
+
+func (x *ReadCodeFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadCodeFileRequest.ProtoReflect.Descriptor instead.
+func (*ReadCodeFileRequest) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *ReadCodeFileRequest) GetRepositoryId() *StableIdentity {
+	if x != nil {
+		return x.RepositoryId
+	}
+	return nil
+}
+
+func (x *ReadCodeFileRequest) GetWorkspaceRelativePath() string {
+	if x != nil {
+		return x.WorkspaceRelativePath
+	}
+	return ""
+}
+
+type ReadCodeFileResponse struct {
+	state    protoimpl.MessageState      `protogen:"open.v1"`
+	Revision *CodeCollectionRevisionView `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	File     *CodeFileView               `protobuf:"bytes,2,opt,name=file,proto3" json:"file,omitempty"`
+	// text is the file exactly as it is on disk, truncated at a bound that the
+	// response reports rather than hides.
+	Text      *RedactedText `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	LineCount uint32        `protobuf:"varint,4,opt,name=line_count,json=lineCount,proto3" json:"line_count,omitempty"`
+	Truncated bool          `protobuf:"varint,5,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// declarations are what this file declares, in the order they appear, so a
+	// reader can jump to one and see which are atoms.
+	Declarations  []*CodeSymbolView `protobuf:"bytes,6,rep,name=declarations,proto3" json:"declarations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadCodeFileResponse) Reset() {
+	*x = ReadCodeFileResponse{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadCodeFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadCodeFileResponse) ProtoMessage() {}
+
+func (x *ReadCodeFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadCodeFileResponse.ProtoReflect.Descriptor instead.
+func (*ReadCodeFileResponse) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *ReadCodeFileResponse) GetRevision() *CodeCollectionRevisionView {
+	if x != nil {
+		return x.Revision
+	}
+	return nil
+}
+
+func (x *ReadCodeFileResponse) GetFile() *CodeFileView {
+	if x != nil {
+		return x.File
+	}
+	return nil
+}
+
+func (x *ReadCodeFileResponse) GetText() *RedactedText {
+	if x != nil {
+		return x.Text
+	}
+	return nil
+}
+
+func (x *ReadCodeFileResponse) GetLineCount() uint32 {
+	if x != nil {
+		return x.LineCount
+	}
+	return 0
+}
+
+func (x *ReadCodeFileResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *ReadCodeFileResponse) GetDeclarations() []*CodeSymbolView {
+	if x != nil {
+		return x.Declarations
+	}
+	return nil
 }
 
 // CodeCollectionRevisionView states which repository revision an answer
@@ -7961,7 +8830,7 @@ type CodeCollectionRevisionView struct {
 
 func (x *CodeCollectionRevisionView) Reset() {
 	*x = CodeCollectionRevisionView{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[114]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7973,7 +8842,7 @@ func (x *CodeCollectionRevisionView) String() string {
 func (*CodeCollectionRevisionView) ProtoMessage() {}
 
 func (x *CodeCollectionRevisionView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[114]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7986,7 +8855,7 @@ func (x *CodeCollectionRevisionView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodeCollectionRevisionView.ProtoReflect.Descriptor instead.
 func (*CodeCollectionRevisionView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{114}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *CodeCollectionRevisionView) GetRevision() string {
@@ -8025,7 +8894,7 @@ type CodePackageView struct {
 
 func (x *CodePackageView) Reset() {
 	*x = CodePackageView{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[115]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8037,7 +8906,7 @@ func (x *CodePackageView) String() string {
 func (*CodePackageView) ProtoMessage() {}
 
 func (x *CodePackageView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[115]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8050,7 +8919,7 @@ func (x *CodePackageView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodePackageView.ProtoReflect.Descriptor instead.
 func (*CodePackageView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{115}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *CodePackageView) GetImportPath() string {
@@ -8117,15 +8986,22 @@ type CodeSymbolView struct {
 	// atom reports an admitted atom: the declaration carries the directive and
 	// its documentation parsed. atom_problem carries why a directive-bearing
 	// declaration was not admitted.
-	Atom          bool   `protobuf:"varint,9,opt,name=atom,proto3" json:"atom,omitempty"`
-	AtomProblem   string `protobuf:"bytes,10,opt,name=atom_problem,json=atomProblem,proto3" json:"atom_problem,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Atom        bool   `protobuf:"varint,9,opt,name=atom,proto3" json:"atom,omitempty"`
+	AtomProblem string `protobuf:"bytes,10,opt,name=atom_problem,json=atomProblem,proto3" json:"atom_problem,omitempty"`
+	// matched_name and matched_promise say why a search returned this row: the
+	// term is in the declaration's own name, or it is in the documented text
+	// quoted here. A result list that cannot say why a row is in it is one a
+	// person has to take on faith, and a correct answer then reads as a broken
+	// search. Both are empty outside a search.
+	MatchedName    bool          `protobuf:"varint,11,opt,name=matched_name,json=matchedName,proto3" json:"matched_name,omitempty"`
+	MatchedPromise *RedactedText `protobuf:"bytes,12,opt,name=matched_promise,json=matchedPromise,proto3" json:"matched_promise,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CodeSymbolView) Reset() {
 	*x = CodeSymbolView{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[116]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8137,7 +9013,7 @@ func (x *CodeSymbolView) String() string {
 func (*CodeSymbolView) ProtoMessage() {}
 
 func (x *CodeSymbolView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[116]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8150,7 +9026,7 @@ func (x *CodeSymbolView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodeSymbolView.ProtoReflect.Descriptor instead.
 func (*CodeSymbolView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{116}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *CodeSymbolView) GetKey() string {
@@ -8223,6 +9099,20 @@ func (x *CodeSymbolView) GetAtomProblem() string {
 	return ""
 }
 
+func (x *CodeSymbolView) GetMatchedName() bool {
+	if x != nil {
+		return x.MatchedName
+	}
+	return false
+}
+
+func (x *CodeSymbolView) GetMatchedPromise() *RedactedText {
+	if x != nil {
+		return x.MatchedPromise
+	}
+	return nil
+}
+
 type CodeSymbolReferenceView struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	Name                  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -8234,7 +9124,7 @@ type CodeSymbolReferenceView struct {
 
 func (x *CodeSymbolReferenceView) Reset() {
 	*x = CodeSymbolReferenceView{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[117]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8246,7 +9136,7 @@ func (x *CodeSymbolReferenceView) String() string {
 func (*CodeSymbolReferenceView) ProtoMessage() {}
 
 func (x *CodeSymbolReferenceView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[117]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8259,7 +9149,7 @@ func (x *CodeSymbolReferenceView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodeSymbolReferenceView.ProtoReflect.Descriptor instead.
 func (*CodeSymbolReferenceView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{117}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *CodeSymbolReferenceView) GetName() string {
@@ -8294,7 +9184,7 @@ type CodeAtomFieldView struct {
 
 func (x *CodeAtomFieldView) Reset() {
 	*x = CodeAtomFieldView{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[118]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8306,7 +9196,7 @@ func (x *CodeAtomFieldView) String() string {
 func (*CodeAtomFieldView) ProtoMessage() {}
 
 func (x *CodeAtomFieldView) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[118]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8319,7 +9209,7 @@ func (x *CodeAtomFieldView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodeAtomFieldView.ProtoReflect.Descriptor instead.
 func (*CodeAtomFieldView) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{118}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *CodeAtomFieldView) GetLabel() string {
@@ -8354,7 +9244,7 @@ type ListCodePackagesRequest struct {
 
 func (x *ListCodePackagesRequest) Reset() {
 	*x = ListCodePackagesRequest{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[119]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8366,7 +9256,7 @@ func (x *ListCodePackagesRequest) String() string {
 func (*ListCodePackagesRequest) ProtoMessage() {}
 
 func (x *ListCodePackagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[119]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8379,7 +9269,7 @@ func (x *ListCodePackagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCodePackagesRequest.ProtoReflect.Descriptor instead.
 func (*ListCodePackagesRequest) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{119}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *ListCodePackagesRequest) GetRepositoryId() *StableIdentity {
@@ -8417,7 +9307,7 @@ type ListCodePackagesResponse struct {
 
 func (x *ListCodePackagesResponse) Reset() {
 	*x = ListCodePackagesResponse{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[120]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8429,7 +9319,7 @@ func (x *ListCodePackagesResponse) String() string {
 func (*ListCodePackagesResponse) ProtoMessage() {}
 
 func (x *ListCodePackagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[120]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8442,7 +9332,7 @@ func (x *ListCodePackagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCodePackagesResponse.ProtoReflect.Descriptor instead.
 func (*ListCodePackagesResponse) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{120}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *ListCodePackagesResponse) GetRevision() *CodeCollectionRevisionView {
@@ -8501,7 +9391,7 @@ type ListCodeSymbolsRequest struct {
 
 func (x *ListCodeSymbolsRequest) Reset() {
 	*x = ListCodeSymbolsRequest{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[121]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8513,7 +9403,7 @@ func (x *ListCodeSymbolsRequest) String() string {
 func (*ListCodeSymbolsRequest) ProtoMessage() {}
 
 func (x *ListCodeSymbolsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[121]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8526,7 +9416,7 @@ func (x *ListCodeSymbolsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCodeSymbolsRequest.ProtoReflect.Descriptor instead.
 func (*ListCodeSymbolsRequest) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{121}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *ListCodeSymbolsRequest) GetRepositoryId() *StableIdentity {
@@ -8572,18 +9462,25 @@ func (x *ListCodeSymbolsRequest) GetPage() *PageRequest {
 }
 
 type ListCodeSymbolsResponse struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	Revision      *CodeCollectionRevisionView `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
-	Symbols       []*CodeSymbolView           `protobuf:"bytes,2,rep,name=symbols,proto3" json:"symbols,omitempty"`
-	Page          *PageInfo                   `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
-	TotalMatched  uint32                      `protobuf:"varint,4,opt,name=total_matched,json=totalMatched,proto3" json:"total_matched,omitempty"`
+	state        protoimpl.MessageState      `protogen:"open.v1"`
+	Revision     *CodeCollectionRevisionView `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Symbols      []*CodeSymbolView           `protobuf:"bytes,2,rep,name=symbols,proto3" json:"symbols,omitempty"`
+	Page         *PageInfo                   `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	TotalMatched uint32                      `protobuf:"varint,4,opt,name=total_matched,json=totalMatched,proto3" json:"total_matched,omitempty"`
+	// total_atoms is how many admitted atoms the collection holds, regardless of
+	// what this query matched. A surface that reported only the matches told a
+	// person who searched for one atom that the repository contained one.
+	TotalAtoms uint32 `protobuf:"varint,5,opt,name=total_atoms,json=totalAtoms,proto3" json:"total_atoms,omitempty"`
+	// search_query is the SQL this search performed, with the match expression
+	// and the bound written in. It is empty when nothing was searched.
+	SearchQuery   string `protobuf:"bytes,6,opt,name=search_query,json=searchQuery,proto3" json:"search_query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListCodeSymbolsResponse) Reset() {
 	*x = ListCodeSymbolsResponse{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[122]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8595,7 +9492,7 @@ func (x *ListCodeSymbolsResponse) String() string {
 func (*ListCodeSymbolsResponse) ProtoMessage() {}
 
 func (x *ListCodeSymbolsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[122]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8608,7 +9505,7 @@ func (x *ListCodeSymbolsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCodeSymbolsResponse.ProtoReflect.Descriptor instead.
 func (*ListCodeSymbolsResponse) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{122}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *ListCodeSymbolsResponse) GetRevision() *CodeCollectionRevisionView {
@@ -8639,6 +9536,20 @@ func (x *ListCodeSymbolsResponse) GetTotalMatched() uint32 {
 	return 0
 }
 
+func (x *ListCodeSymbolsResponse) GetTotalAtoms() uint32 {
+	if x != nil {
+		return x.TotalAtoms
+	}
+	return 0
+}
+
+func (x *ListCodeSymbolsResponse) GetSearchQuery() string {
+	if x != nil {
+		return x.SearchQuery
+	}
+	return ""
+}
+
 type InspectCodeSymbolRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RepositoryId  *StableIdentity        `protobuf:"bytes,1,opt,name=repository_id,json=repositoryId,proto3" json:"repository_id,omitempty"`
@@ -8649,7 +9560,7 @@ type InspectCodeSymbolRequest struct {
 
 func (x *InspectCodeSymbolRequest) Reset() {
 	*x = InspectCodeSymbolRequest{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[123]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8661,7 +9572,7 @@ func (x *InspectCodeSymbolRequest) String() string {
 func (*InspectCodeSymbolRequest) ProtoMessage() {}
 
 func (x *InspectCodeSymbolRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[123]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8674,7 +9585,7 @@ func (x *InspectCodeSymbolRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectCodeSymbolRequest.ProtoReflect.Descriptor instead.
 func (*InspectCodeSymbolRequest) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{123}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *InspectCodeSymbolRequest) GetRepositoryId() *StableIdentity {
@@ -8718,14 +9629,39 @@ type InspectCodeSymbolResponse struct {
 	// tests are the declarations in test files that reference this one. They are
 	// separated from callers because "what exercises this" and "what depends on
 	// this" are different questions, and only one of them is evidence.
-	Tests         []*CodeSymbolReferenceView `protobuf:"bytes,15,rep,name=tests,proto3" json:"tests,omitempty"`
+	Tests []*CodeSymbolReferenceView `protobuf:"bytes,15,rep,name=tests,proto3" json:"tests,omitempty"`
+	// naming_checked reports that the product's own atom-naming grammar was run
+	// against this declaration's name; naming_finding is empty when the name
+	// passes and states the violation when it does not. A name is part of an
+	// atom's contract: it is what a caller reads first and the only part they
+	// cannot avoid reading.
+	NamingChecked bool          `protobuf:"varint,16,opt,name=naming_checked,json=namingChecked,proto3" json:"naming_checked,omitempty"`
+	NamingFinding *RedactedText `protobuf:"bytes,17,opt,name=naming_finding,json=namingFinding,proto3" json:"naming_finding,omitempty"`
+	// structure is what the run's own atom stages measure about this
+	// declaration: the loop nesting StageAtomComplexity turns into a time bound,
+	// the decision points StageAtomCaseSynthesis turns into cases to cover, and
+	// the purity StageAtoms tests for.
+	Structure *CodeSymbolStructureView `protobuf:"bytes,18,opt,name=structure,proto3" json:"structure,omitempty"`
+	// documented_fields and missing_fields are the schema's own canonical field
+	// list, split by whether this atom declares them. An atom that documents
+	// twelve of nineteen fields is a different thing from one that documents all
+	// of them, and only the list says which seven are missing.
+	DocumentedFields []string `protobuf:"bytes,19,rep,name=documented_fields,json=documentedFields,proto3" json:"documented_fields,omitempty"`
+	MissingFields    []string `protobuf:"bytes,20,rep,name=missing_fields,json=missingFields,proto3" json:"missing_fields,omitempty"`
+	// access_query is the SQL that reads this atom back out of the coordinator's
+	// atom index, and index_schema is the table it runs against. They are the
+	// statements the coordinator itself executes rather than a rendering of
+	// them: a query rewritten for display drifts from the one that ran, and then
+	// the console teaches something that is no longer true.
+	AccessQuery   string `protobuf:"bytes,21,opt,name=access_query,json=accessQuery,proto3" json:"access_query,omitempty"`
+	IndexSchema   string `protobuf:"bytes,22,opt,name=index_schema,json=indexSchema,proto3" json:"index_schema,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InspectCodeSymbolResponse) Reset() {
 	*x = InspectCodeSymbolResponse{}
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[124]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8737,7 +9673,7 @@ func (x *InspectCodeSymbolResponse) String() string {
 func (*InspectCodeSymbolResponse) ProtoMessage() {}
 
 func (x *InspectCodeSymbolResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codeflux_v1_product_api_proto_msgTypes[124]
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8750,7 +9686,7 @@ func (x *InspectCodeSymbolResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectCodeSymbolResponse.ProtoReflect.Descriptor instead.
 func (*InspectCodeSymbolResponse) Descriptor() ([]byte, []int) {
-	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{124}
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *InspectCodeSymbolResponse) GetRevision() *CodeCollectionRevisionView {
@@ -8854,6 +9790,689 @@ func (x *InspectCodeSymbolResponse) GetSourceTruncated() bool {
 func (x *InspectCodeSymbolResponse) GetTests() []*CodeSymbolReferenceView {
 	if x != nil {
 		return x.Tests
+	}
+	return nil
+}
+
+func (x *InspectCodeSymbolResponse) GetNamingChecked() bool {
+	if x != nil {
+		return x.NamingChecked
+	}
+	return false
+}
+
+func (x *InspectCodeSymbolResponse) GetNamingFinding() *RedactedText {
+	if x != nil {
+		return x.NamingFinding
+	}
+	return nil
+}
+
+func (x *InspectCodeSymbolResponse) GetStructure() *CodeSymbolStructureView {
+	if x != nil {
+		return x.Structure
+	}
+	return nil
+}
+
+func (x *InspectCodeSymbolResponse) GetDocumentedFields() []string {
+	if x != nil {
+		return x.DocumentedFields
+	}
+	return nil
+}
+
+func (x *InspectCodeSymbolResponse) GetMissingFields() []string {
+	if x != nil {
+		return x.MissingFields
+	}
+	return nil
+}
+
+func (x *InspectCodeSymbolResponse) GetAccessQuery() string {
+	if x != nil {
+		return x.AccessQuery
+	}
+	return ""
+}
+
+func (x *InspectCodeSymbolResponse) GetIndexSchema() string {
+	if x != nil {
+		return x.IndexSchema
+	}
+	return ""
+}
+
+// CodeSymbolStructureView is the structural measurement of one declaration.
+//
+// measured separates "nothing was measured" from "measured, and the answer is
+// zero": a declaration with no loops is O(1), one that was never looked at is
+// unknown, and those are not the same claim.
+type CodeSymbolStructureView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Measured      bool                   `protobuf:"varint,1,opt,name=measured,proto3" json:"measured,omitempty"`
+	TimeBound     string                 `protobuf:"bytes,2,opt,name=time_bound,json=timeBound,proto3" json:"time_bound,omitempty"`
+	SpaceClaim    string                 `protobuf:"bytes,3,opt,name=space_claim,json=spaceClaim,proto3" json:"space_claim,omitempty"`
+	LoopDepth     uint32                 `protobuf:"varint,4,opt,name=loop_depth,json=loopDepth,proto3" json:"loop_depth,omitempty"`
+	Branches      uint32                 `protobuf:"varint,5,opt,name=branches,proto3" json:"branches,omitempty"`
+	Pure          bool                   `protobuf:"varint,6,opt,name=pure,proto3" json:"pure,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeSymbolStructureView) Reset() {
+	*x = CodeSymbolStructureView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[137]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeSymbolStructureView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeSymbolStructureView) ProtoMessage() {}
+
+func (x *CodeSymbolStructureView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[137]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeSymbolStructureView.ProtoReflect.Descriptor instead.
+func (*CodeSymbolStructureView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{137}
+}
+
+func (x *CodeSymbolStructureView) GetMeasured() bool {
+	if x != nil {
+		return x.Measured
+	}
+	return false
+}
+
+func (x *CodeSymbolStructureView) GetTimeBound() string {
+	if x != nil {
+		return x.TimeBound
+	}
+	return ""
+}
+
+func (x *CodeSymbolStructureView) GetSpaceClaim() string {
+	if x != nil {
+		return x.SpaceClaim
+	}
+	return ""
+}
+
+func (x *CodeSymbolStructureView) GetLoopDepth() uint32 {
+	if x != nil {
+		return x.LoopDepth
+	}
+	return 0
+}
+
+func (x *CodeSymbolStructureView) GetBranches() uint32 {
+	if x != nil {
+		return x.Branches
+	}
+	return 0
+}
+
+func (x *CodeSymbolStructureView) GetPure() bool {
+	if x != nil {
+		return x.Pure
+	}
+	return false
+}
+
+// FlowSettingView is one choice the run flow leaves to the person running it,
+// carrying both what it is and what it is currently set to.
+//
+// The description travels with the value because the two drift apart
+// otherwise: a bound changed in the engine and not in the interface produces a
+// control that offers a value the engine will refuse. A client renders this
+// without knowing what any individual setting means.
+type FlowSettingView struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Label string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	// help says what the setting costs and what it buys, in the terms of
+	// someone deciding whether to change it.
+	Help *RedactedText `protobuf:"bytes,3,opt,name=help,proto3" json:"help,omitempty"`
+	// kind is "choice", "number", "switch", "set", "sequence" or "mapping" and
+	// decides how the setting is rendered and which value field carries it.
+	Kind    string   `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	Choices []string `protobuf:"bytes,5,rep,name=choices,proto3" json:"choices,omitempty"`
+	Minimum int32    `protobuf:"varint,6,opt,name=minimum,proto3" json:"minimum,omitempty"`
+	Maximum int32    `protobuf:"varint,7,opt,name=maximum,proto3" json:"maximum,omitempty"`
+	// group lets a page put related controls together without inventing its own
+	// taxonomy.
+	Group       string `protobuf:"bytes,8,opt,name=group,proto3" json:"group,omitempty"`
+	TextValue   string `protobuf:"bytes,9,opt,name=text_value,json=textValue,proto3" json:"text_value,omitempty"`
+	NumberValue int32  `protobuf:"varint,10,opt,name=number_value,json=numberValue,proto3" json:"number_value,omitempty"`
+	SwitchValue bool   `protobuf:"varint,11,opt,name=switch_value,json=switchValue,proto3" json:"switch_value,omitempty"`
+	// at_default reports that the value in force is the one the engine ships
+	// with. A settings surface can then show where this machine has departed
+	// from the defaults, which is the question somebody reviewing a
+	// configuration is actually asking.
+	AtDefault bool `protobuf:"varint,12,opt,name=at_default,json=atDefault,proto3" json:"at_default,omitempty"`
+	// item_values carries a "set" or a "sequence". For a sequence the order is
+	// the setting, so a client must render and return it unchanged unless the
+	// person reorders it.
+	ItemValues []string `protobuf:"bytes,13,rep,name=item_values,json=itemValues,proto3" json:"item_values,omitempty"`
+	// pair_values carries a "mapping": named keys each given one of the choices.
+	PairValues    []*FlowSettingPair `protobuf:"bytes,14,rep,name=pair_values,json=pairValues,proto3" json:"pair_values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowSettingView) Reset() {
+	*x = FlowSettingView{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[138]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowSettingView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowSettingView) ProtoMessage() {}
+
+func (x *FlowSettingView) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[138]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowSettingView.ProtoReflect.Descriptor instead.
+func (*FlowSettingView) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{138}
+}
+
+func (x *FlowSettingView) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *FlowSettingView) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *FlowSettingView) GetHelp() *RedactedText {
+	if x != nil {
+		return x.Help
+	}
+	return nil
+}
+
+func (x *FlowSettingView) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *FlowSettingView) GetChoices() []string {
+	if x != nil {
+		return x.Choices
+	}
+	return nil
+}
+
+func (x *FlowSettingView) GetMinimum() int32 {
+	if x != nil {
+		return x.Minimum
+	}
+	return 0
+}
+
+func (x *FlowSettingView) GetMaximum() int32 {
+	if x != nil {
+		return x.Maximum
+	}
+	return 0
+}
+
+func (x *FlowSettingView) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *FlowSettingView) GetTextValue() string {
+	if x != nil {
+		return x.TextValue
+	}
+	return ""
+}
+
+func (x *FlowSettingView) GetNumberValue() int32 {
+	if x != nil {
+		return x.NumberValue
+	}
+	return 0
+}
+
+func (x *FlowSettingView) GetSwitchValue() bool {
+	if x != nil {
+		return x.SwitchValue
+	}
+	return false
+}
+
+func (x *FlowSettingView) GetAtDefault() bool {
+	if x != nil {
+		return x.AtDefault
+	}
+	return false
+}
+
+func (x *FlowSettingView) GetItemValues() []string {
+	if x != nil {
+		return x.ItemValues
+	}
+	return nil
+}
+
+func (x *FlowSettingView) GetPairValues() []*FlowSettingPair {
+	if x != nil {
+		return x.PairValues
+	}
+	return nil
+}
+
+// FlowSettingPair is one named key and the choice given to it.
+//
+// A map field would say the same thing and would say it in a different order
+// on every read, which turns an unchanged configuration into a changed one
+// everywhere the two are compared.
+type FlowSettingPair struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowSettingPair) Reset() {
+	*x = FlowSettingPair{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[139]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowSettingPair) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowSettingPair) ProtoMessage() {}
+
+func (x *FlowSettingPair) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[139]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowSettingPair.ProtoReflect.Descriptor instead.
+func (*FlowSettingPair) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{139}
+}
+
+func (x *FlowSettingPair) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *FlowSettingPair) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type GetFlowSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   *StableIdentity        `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFlowSettingsRequest) Reset() {
+	*x = GetFlowSettingsRequest{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[140]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFlowSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFlowSettingsRequest) ProtoMessage() {}
+
+func (x *GetFlowSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[140]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFlowSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetFlowSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{140}
+}
+
+func (x *GetFlowSettingsRequest) GetWorkspaceId() *StableIdentity {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return nil
+}
+
+type GetFlowSettingsResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Settings []*FlowSettingView     `protobuf:"bytes,1,rep,name=settings,proto3" json:"settings,omitempty"`
+	// revision is the settings revision these values came from. Zero means no
+	// layer has been written and compiled defaults are in force.
+	Revision uint64 `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	// unrenderable names settings the engine declares in a shape this contract
+	// cannot carry. They are reported rather than dropped silently, because a
+	// page missing a row nobody mentioned understates what governs a run.
+	Unrenderable  []string `protobuf:"bytes,3,rep,name=unrenderable,proto3" json:"unrenderable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFlowSettingsResponse) Reset() {
+	*x = GetFlowSettingsResponse{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[141]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFlowSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFlowSettingsResponse) ProtoMessage() {}
+
+func (x *GetFlowSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[141]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFlowSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetFlowSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{141}
+}
+
+func (x *GetFlowSettingsResponse) GetSettings() []*FlowSettingView {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *GetFlowSettingsResponse) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *GetFlowSettingsResponse) GetUnrenderable() []string {
+	if x != nil {
+		return x.Unrenderable
+	}
+	return nil
+}
+
+// FlowSettingChange names one setting and its new value. Only the field
+// matching the setting's kind is read.
+type FlowSettingChange struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Key         string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	TextValue   string                 `protobuf:"bytes,2,opt,name=text_value,json=textValue,proto3" json:"text_value,omitempty"`
+	NumberValue int32                  `protobuf:"varint,3,opt,name=number_value,json=numberValue,proto3" json:"number_value,omitempty"`
+	SwitchValue bool                   `protobuf:"varint,4,opt,name=switch_value,json=switchValue,proto3" json:"switch_value,omitempty"`
+	// item_values replaces the whole list. An empty list clears the setting
+	// rather than leaving it alone, so a client that means "no change" omits the
+	// change entirely.
+	ItemValues []string `protobuf:"bytes,5,rep,name=item_values,json=itemValues,proto3" json:"item_values,omitempty"`
+	// pair_values replaces the whole mapping, on the same rule.
+	PairValues    []*FlowSettingPair `protobuf:"bytes,6,rep,name=pair_values,json=pairValues,proto3" json:"pair_values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowSettingChange) Reset() {
+	*x = FlowSettingChange{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[142]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowSettingChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowSettingChange) ProtoMessage() {}
+
+func (x *FlowSettingChange) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[142]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowSettingChange.ProtoReflect.Descriptor instead.
+func (*FlowSettingChange) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{142}
+}
+
+func (x *FlowSettingChange) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *FlowSettingChange) GetTextValue() string {
+	if x != nil {
+		return x.TextValue
+	}
+	return ""
+}
+
+func (x *FlowSettingChange) GetNumberValue() int32 {
+	if x != nil {
+		return x.NumberValue
+	}
+	return 0
+}
+
+func (x *FlowSettingChange) GetSwitchValue() bool {
+	if x != nil {
+		return x.SwitchValue
+	}
+	return false
+}
+
+func (x *FlowSettingChange) GetItemValues() []string {
+	if x != nil {
+		return x.ItemValues
+	}
+	return nil
+}
+
+func (x *FlowSettingChange) GetPairValues() []*FlowSettingPair {
+	if x != nil {
+		return x.PairValues
+	}
+	return nil
+}
+
+type SetFlowSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Control       *MutationControl       `protobuf:"bytes,1,opt,name=control,proto3" json:"control,omitempty"`
+	WorkspaceId   *StableIdentity        `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Changes       []*FlowSettingChange   `protobuf:"bytes,3,rep,name=changes,proto3" json:"changes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFlowSettingsRequest) Reset() {
+	*x = SetFlowSettingsRequest{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[143]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFlowSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFlowSettingsRequest) ProtoMessage() {}
+
+func (x *SetFlowSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[143]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFlowSettingsRequest.ProtoReflect.Descriptor instead.
+func (*SetFlowSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{143}
+}
+
+func (x *SetFlowSettingsRequest) GetControl() *MutationControl {
+	if x != nil {
+		return x.Control
+	}
+	return nil
+}
+
+func (x *SetFlowSettingsRequest) GetWorkspaceId() *StableIdentity {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return nil
+}
+
+func (x *SetFlowSettingsRequest) GetChanges() []*FlowSettingChange {
+	if x != nil {
+		return x.Changes
+	}
+	return nil
+}
+
+type SetFlowSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Settings      []*FlowSettingView     `protobuf:"bytes,1,rep,name=settings,proto3" json:"settings,omitempty"`
+	Revision      uint64                 `protobuf:"varint,2,opt,name=revision,proto3" json:"revision,omitempty"`
+	Unrenderable  []string               `protobuf:"bytes,3,rep,name=unrenderable,proto3" json:"unrenderable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFlowSettingsResponse) Reset() {
+	*x = SetFlowSettingsResponse{}
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[144]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFlowSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFlowSettingsResponse) ProtoMessage() {}
+
+func (x *SetFlowSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codeflux_v1_product_api_proto_msgTypes[144]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFlowSettingsResponse.ProtoReflect.Descriptor instead.
+func (*SetFlowSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_codeflux_v1_product_api_proto_rawDescGZIP(), []int{144}
+}
+
+func (x *SetFlowSettingsResponse) GetSettings() []*FlowSettingView {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *SetFlowSettingsResponse) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *SetFlowSettingsResponse) GetUnrenderable() []string {
+	if x != nil {
+		return x.Unrenderable
 	}
 	return nil
 }
@@ -9374,7 +10993,47 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\fconfirmation\x18\x04 \x01(\x0e20.codeflux.v1.FrontendTelemetryDeleteConfirmationR\fconfirmation\"Y\n" +
 	"\x1fDeleteFrontendTelemetryResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\x04R\adeleted\x12\x1c\n" +
-	"\tremaining\x18\x02 \x01(\x04R\tremaining\"W\n" +
+	"\tremaining\x18\x02 \x01(\x04R\tremaining\"M\n" +
+	"\tSpendCost\x12*\n" +
+	"\x06amount\x18\x01 \x01(\v2\x12.codeflux.v1.MoneyR\x06amount\x12\x14\n" +
+	"\x05exact\x18\x02 \x01(\bR\x05exact\"\x8c\x03\n" +
+	"\x0eSpendSliceView\x12\x14\n" +
+	"\x05calls\x18\x01 \x01(\x04R\x05calls\x12!\n" +
+	"\finput_tokens\x18\x02 \x01(\x04R\vinputTokens\x12.\n" +
+	"\x13cached_input_tokens\x18\x03 \x01(\x04R\x11cachedInputTokens\x12,\n" +
+	"\x12cache_write_tokens\x18\x04 \x01(\x04R\x10cacheWriteTokens\x12#\n" +
+	"\routput_tokens\x18\x05 \x01(\x04R\foutputTokens\x12)\n" +
+	"\x10reasoning_tokens\x18\x06 \x01(\x04R\x0freasoningTokens\x125\n" +
+	"\n" +
+	"known_cost\x18\a \x01(\v2\x16.codeflux.v1.SpendCostR\tknownCost\x12.\n" +
+	"\x13usage_unknown_calls\x18\b \x01(\x04R\x11usageUnknownCalls\x12,\n" +
+	"\x12cost_unknown_calls\x18\t \x01(\x04R\x10costUnknownCalls\"Y\n" +
+	"\x0ePhaseSpendView\x12\x14\n" +
+	"\x05phase\x18\x01 \x01(\tR\x05phase\x121\n" +
+	"\x05spend\x18\x02 \x01(\v2\x1b.codeflux.v1.SpendSliceViewR\x05spend\"\x9b\x01\n" +
+	"\x0eStageSpendView\x12!\n" +
+	"\fstage_number\x18\x01 \x01(\rR\vstageNumber\x12\x1d\n" +
+	"\n" +
+	"stage_name\x18\x02 \x01(\tR\tstageName\x12\x14\n" +
+	"\x05phase\x18\x03 \x01(\tR\x05phase\x121\n" +
+	"\x05spend\x18\x04 \x01(\v2\x1b.codeflux.v1.SpendSliceViewR\x05spend\"\x9f\x01\n" +
+	"\x0eModelSpendView\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
+	"providerId\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12#\n" +
+	"\rmodel_version\x18\x03 \x01(\tR\fmodelVersion\x121\n" +
+	"\x05spend\x18\x04 \x01(\v2\x1b.codeflux.v1.SpendSliceViewR\x05spend\"\xbc\x01\n" +
+	"\x16GetSpendSummaryRequest\x12>\n" +
+	"\fworkspace_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\vworkspaceId\x120\n" +
+	"\x05since\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\x120\n" +
+	"\x05until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"\xf9\x02\n" +
+	"\x17GetSpendSummaryResponse\x121\n" +
+	"\x05total\x18\x01 \x01(\v2\x1b.codeflux.v1.SpendSliceViewR\x05total\x126\n" +
+	"\bby_phase\x18\x02 \x03(\v2\x1b.codeflux.v1.PhaseSpendViewR\abyPhase\x126\n" +
+	"\bby_stage\x18\x03 \x03(\v2\x1b.codeflux.v1.StageSpendViewR\abyStage\x126\n" +
+	"\bby_model\x18\x04 \x03(\v2\x1b.codeflux.v1.ModelSpendViewR\abyModel\x12?\n" +
+	"\funattributed\x18\x05 \x01(\v2\x1b.codeflux.v1.SpendSliceViewR\funattributed\x12B\n" +
+	"\x1dstage_attribution_approximate\x18\x06 \x01(\bR\x1bstageAttributionApproximate\"W\n" +
 	"\x19GetSessionSnapshotRequest\x12:\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\tsessionId\"`\n" +
@@ -9432,7 +11091,37 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\x05event\x18\x01 \x01(\v2\x19.codeflux.v1.SessionEventR\x05event\x12K\n" +
 	"\x0freplay_boundary\x18\x02 \x01(\v2\".codeflux.v1.SessionReplayBoundaryR\x0ereplayBoundary\"B\n" +
 	"\x15SessionReplayBoundary\x12)\n" +
-	"\x10through_sequence\x18\x01 \x01(\x04R\x0fthroughSequence\"\x85\x01\n" +
+	"\x10through_sequence\x18\x01 \x01(\x04R\x0fthroughSequence\"\xdb\x01\n" +
+	"\fCodeFileView\x126\n" +
+	"\x17workspace_relative_path\x18\x01 \x01(\tR\x15workspaceRelativePath\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1c\n" +
+	"\tgenerated\x18\x03 \x01(\bR\tgenerated\x12\x1f\n" +
+	"\vimport_path\x18\x04 \x01(\tR\n" +
+	"importPath\x12!\n" +
+	"\fsymbol_count\x18\x05 \x01(\rR\vsymbolCount\x12\x1d\n" +
+	"\n" +
+	"atom_count\x18\x06 \x01(\rR\tatomCount\"\x9e\x01\n" +
+	"\x14ListCodeFilesRequest\x12@\n" +
+	"\rrepository_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\frepositoryId\x12\x16\n" +
+	"\x06search\x18\x02 \x01(\tR\x06search\x12,\n" +
+	"\x04page\x18\x03 \x01(\v2\x18.codeflux.v1.PageRequestR\x04page\"\xd9\x01\n" +
+	"\x15ListCodeFilesResponse\x12C\n" +
+	"\brevision\x18\x01 \x01(\v2'.codeflux.v1.CodeCollectionRevisionViewR\brevision\x12/\n" +
+	"\x05files\x18\x02 \x03(\v2\x19.codeflux.v1.CodeFileViewR\x05files\x12)\n" +
+	"\x04page\x18\x03 \x01(\v2\x15.codeflux.v1.PageInfoR\x04page\x12\x1f\n" +
+	"\vtotal_files\x18\x04 \x01(\rR\n" +
+	"totalFiles\"\x8f\x01\n" +
+	"\x13ReadCodeFileRequest\x12@\n" +
+	"\rrepository_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\frepositoryId\x126\n" +
+	"\x17workspace_relative_path\x18\x02 \x01(\tR\x15workspaceRelativePath\"\xb7\x02\n" +
+	"\x14ReadCodeFileResponse\x12C\n" +
+	"\brevision\x18\x01 \x01(\v2'.codeflux.v1.CodeCollectionRevisionViewR\brevision\x12-\n" +
+	"\x04file\x18\x02 \x01(\v2\x19.codeflux.v1.CodeFileViewR\x04file\x12-\n" +
+	"\x04text\x18\x03 \x01(\v2\x19.codeflux.v1.RedactedTextR\x04text\x12\x1d\n" +
+	"\n" +
+	"line_count\x18\x04 \x01(\rR\tlineCount\x12\x1c\n" +
+	"\ttruncated\x18\x05 \x01(\bR\ttruncated\x12?\n" +
+	"\fdeclarations\x18\x06 \x03(\v2\x1b.codeflux.v1.CodeSymbolViewR\fdeclarations\"\x85\x01\n" +
 	"\x1aCodeCollectionRevisionView\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\tR\brevision\x12\x14\n" +
 	"\x05dirty\x18\x02 \x01(\bR\x05dirty\x125\n" +
@@ -9448,7 +11137,7 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\x0ftest_file_count\x18\x05 \x01(\rR\rtestFileCount\x12!\n" +
 	"\fsymbol_count\x18\x06 \x01(\rR\vsymbolCount\x12\x1d\n" +
 	"\n" +
-	"atom_count\x18\a \x01(\rR\tatomCount\"\xa6\x02\n" +
+	"atom_count\x18\a \x01(\rR\tatomCount\"\x8d\x03\n" +
 	"\x0eCodeSymbolView\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -9461,7 +11150,9 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\bexported\x18\b \x01(\bR\bexported\x12\x12\n" +
 	"\x04atom\x18\t \x01(\bR\x04atom\x12!\n" +
 	"\fatom_problem\x18\n" +
-	" \x01(\tR\vatomProblem\"y\n" +
+	" \x01(\tR\vatomProblem\x12!\n" +
+	"\fmatched_name\x18\v \x01(\bR\vmatchedName\x12B\n" +
+	"\x0fmatched_promise\x18\f \x01(\v2\x19.codeflux.v1.RedactedTextR\x0ematchedPromise\"y\n" +
 	"\x17CodeSymbolReferenceView\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x126\n" +
 	"\x17workspace_relative_path\x18\x02 \x01(\tR\x15workspaceRelativePath\x12\x12\n" +
@@ -9490,15 +11181,18 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\rexported_only\x18\x04 \x01(\bR\fexportedOnly\x12\x1d\n" +
 	"\n" +
 	"atoms_only\x18\x05 \x01(\bR\tatomsOnly\x12,\n" +
-	"\x04page\x18\x06 \x01(\v2\x18.codeflux.v1.PageRequestR\x04page\"\xe5\x01\n" +
+	"\x04page\x18\x06 \x01(\v2\x18.codeflux.v1.PageRequestR\x04page\"\xa9\x02\n" +
 	"\x17ListCodeSymbolsResponse\x12C\n" +
 	"\brevision\x18\x01 \x01(\v2'.codeflux.v1.CodeCollectionRevisionViewR\brevision\x125\n" +
 	"\asymbols\x18\x02 \x03(\v2\x1b.codeflux.v1.CodeSymbolViewR\asymbols\x12)\n" +
 	"\x04page\x18\x03 \x01(\v2\x15.codeflux.v1.PageInfoR\x04page\x12#\n" +
-	"\rtotal_matched\x18\x04 \x01(\rR\ftotalMatched\"n\n" +
+	"\rtotal_matched\x18\x04 \x01(\rR\ftotalMatched\x12\x1f\n" +
+	"\vtotal_atoms\x18\x05 \x01(\rR\n" +
+	"totalAtoms\x12!\n" +
+	"\fsearch_query\x18\x06 \x01(\tR\vsearchQuery\"n\n" +
 	"\x18InspectCodeSymbolRequest\x12@\n" +
 	"\rrepository_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\frepositoryId\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"\xc1\x06\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"\x88\t\n" +
 	"\x19InspectCodeSymbolResponse\x12C\n" +
 	"\brevision\x18\x01 \x01(\v2'.codeflux.v1.CodeCollectionRevisionViewR\brevision\x123\n" +
 	"\x06symbol\x18\x02 \x01(\v2\x1b.codeflux.v1.CodeSymbolViewR\x06symbol\x127\n" +
@@ -9518,7 +11212,71 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\x06source\x18\f \x01(\v2\x19.codeflux.v1.RedactedTextR\x06source\x12*\n" +
 	"\x11source_start_line\x18\r \x01(\rR\x0fsourceStartLine\x12)\n" +
 	"\x10source_truncated\x18\x0e \x01(\bR\x0fsourceTruncated\x12:\n" +
-	"\x05tests\x18\x0f \x03(\v2$.codeflux.v1.CodeSymbolReferenceViewR\x05tests*\xf9\x05\n" +
+	"\x05tests\x18\x0f \x03(\v2$.codeflux.v1.CodeSymbolReferenceViewR\x05tests\x12%\n" +
+	"\x0enaming_checked\x18\x10 \x01(\bR\rnamingChecked\x12@\n" +
+	"\x0enaming_finding\x18\x11 \x01(\v2\x19.codeflux.v1.RedactedTextR\rnamingFinding\x12B\n" +
+	"\tstructure\x18\x12 \x01(\v2$.codeflux.v1.CodeSymbolStructureViewR\tstructure\x12+\n" +
+	"\x11documented_fields\x18\x13 \x03(\tR\x10documentedFields\x12%\n" +
+	"\x0emissing_fields\x18\x14 \x03(\tR\rmissingFields\x12!\n" +
+	"\faccess_query\x18\x15 \x01(\tR\vaccessQuery\x12!\n" +
+	"\findex_schema\x18\x16 \x01(\tR\vindexSchema\"\xc4\x01\n" +
+	"\x17CodeSymbolStructureView\x12\x1a\n" +
+	"\bmeasured\x18\x01 \x01(\bR\bmeasured\x12\x1d\n" +
+	"\n" +
+	"time_bound\x18\x02 \x01(\tR\ttimeBound\x12\x1f\n" +
+	"\vspace_claim\x18\x03 \x01(\tR\n" +
+	"spaceClaim\x12\x1d\n" +
+	"\n" +
+	"loop_depth\x18\x04 \x01(\rR\tloopDepth\x12\x1a\n" +
+	"\bbranches\x18\x05 \x01(\rR\bbranches\x12\x12\n" +
+	"\x04pure\x18\x06 \x01(\bR\x04pure\"\xc4\x03\n" +
+	"\x0fFlowSettingView\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12-\n" +
+	"\x04help\x18\x03 \x01(\v2\x19.codeflux.v1.RedactedTextR\x04help\x12\x12\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x18\n" +
+	"\achoices\x18\x05 \x03(\tR\achoices\x12\x18\n" +
+	"\aminimum\x18\x06 \x01(\x05R\aminimum\x12\x18\n" +
+	"\amaximum\x18\a \x01(\x05R\amaximum\x12\x14\n" +
+	"\x05group\x18\b \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"text_value\x18\t \x01(\tR\ttextValue\x12!\n" +
+	"\fnumber_value\x18\n" +
+	" \x01(\x05R\vnumberValue\x12!\n" +
+	"\fswitch_value\x18\v \x01(\bR\vswitchValue\x12\x1d\n" +
+	"\n" +
+	"at_default\x18\f \x01(\bR\tatDefault\x12\x1f\n" +
+	"\vitem_values\x18\r \x03(\tR\n" +
+	"itemValues\x12=\n" +
+	"\vpair_values\x18\x0e \x03(\v2\x1c.codeflux.v1.FlowSettingPairR\n" +
+	"pairValues\"9\n" +
+	"\x0fFlowSettingPair\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"X\n" +
+	"\x16GetFlowSettingsRequest\x12>\n" +
+	"\fworkspace_id\x18\x01 \x01(\v2\x1b.codeflux.v1.StableIdentityR\vworkspaceId\"\x93\x01\n" +
+	"\x17GetFlowSettingsResponse\x128\n" +
+	"\bsettings\x18\x01 \x03(\v2\x1c.codeflux.v1.FlowSettingViewR\bsettings\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\x04R\brevision\x12\"\n" +
+	"\funrenderable\x18\x03 \x03(\tR\funrenderable\"\xea\x01\n" +
+	"\x11FlowSettingChange\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1d\n" +
+	"\n" +
+	"text_value\x18\x02 \x01(\tR\ttextValue\x12!\n" +
+	"\fnumber_value\x18\x03 \x01(\x05R\vnumberValue\x12!\n" +
+	"\fswitch_value\x18\x04 \x01(\bR\vswitchValue\x12\x1f\n" +
+	"\vitem_values\x18\x05 \x03(\tR\n" +
+	"itemValues\x12=\n" +
+	"\vpair_values\x18\x06 \x03(\v2\x1c.codeflux.v1.FlowSettingPairR\n" +
+	"pairValues\"\xca\x01\n" +
+	"\x16SetFlowSettingsRequest\x126\n" +
+	"\acontrol\x18\x01 \x01(\v2\x1c.codeflux.v1.MutationControlR\acontrol\x12>\n" +
+	"\fworkspace_id\x18\x02 \x01(\v2\x1b.codeflux.v1.StableIdentityR\vworkspaceId\x128\n" +
+	"\achanges\x18\x03 \x03(\v2\x1e.codeflux.v1.FlowSettingChangeR\achanges\"\x93\x01\n" +
+	"\x17SetFlowSettingsResponse\x128\n" +
+	"\bsettings\x18\x01 \x03(\v2\x1c.codeflux.v1.FlowSettingViewR\bsettings\x12\x1a\n" +
+	"\brevision\x18\x02 \x01(\x04R\brevision\x12\"\n" +
+	"\funrenderable\x18\x03 \x03(\tR\funrenderable*\xf9\x05\n" +
 	"\x15FrontendTelemetryKind\x12'\n" +
 	"#FRONTEND_TELEMETRY_KIND_UNSPECIFIED\x10\x00\x12*\n" +
 	"&FRONTEND_TELEMETRY_KIND_FIRST_RUN_STEP\x10\x01\x12*\n" +
@@ -9653,24 +11411,29 @@ const file_codeflux_v1_product_api_proto_rawDesc = "" +
 	"\fOpenInEditor\x12 .codeflux.v1.OpenInEditorRequest\x1a!.codeflux.v1.OpenInEditorResponse2\xdd\x01\n" +
 	"\rMemoryService\x12h\n" +
 	"\x13ListMemoryArtifacts\x12'.codeflux.v1.ListMemoryArtifactsRequest\x1a(.codeflux.v1.ListMemoryArtifactsResponse\x12b\n" +
-	"\x11GetMemoryArtifact\x12%.codeflux.v1.GetMemoryArtifactRequest\x1a&.codeflux.v1.GetMemoryArtifactResponse2\xee\x06\n" +
+	"\x11GetMemoryArtifact\x12%.codeflux.v1.GetMemoryArtifactRequest\x1a&.codeflux.v1.GetMemoryArtifactResponse2\x88\t\n" +
 	"\x0fSettingsService\x12J\n" +
 	"\tGetModels\x12\x1d.codeflux.v1.GetModelsRequest\x1a\x1e.codeflux.v1.GetModelsResponse\x12J\n" +
 	"\tGetPolicy\x12\x1d.codeflux.v1.GetPolicyRequest\x1a\x1e.codeflux.v1.GetPolicyResponse\x12J\n" +
 	"\tSetPolicy\x12\x1d.codeflux.v1.SetPolicyRequest\x1a\x1e.codeflux.v1.SetPolicyResponse\x12b\n" +
 	"\x11SetBudgetDefaults\x12%.codeflux.v1.SetBudgetDefaultsRequest\x1a&.codeflux.v1.SetBudgetDefaultsResponse\x12b\n" +
 	"\x11ConfigureProvider\x12%.codeflux.v1.ConfigureProviderRequest\x1a&.codeflux.v1.ConfigureProviderResponse\x12S\n" +
-	"\fTestProvider\x12 .codeflux.v1.TestProviderRequest\x1a!.codeflux.v1.TestProviderResponse\x12t\n" +
+	"\fTestProvider\x12 .codeflux.v1.TestProviderRequest\x1a!.codeflux.v1.TestProviderResponse\x12\\\n" +
+	"\x0fGetFlowSettings\x12#.codeflux.v1.GetFlowSettingsRequest\x1a$.codeflux.v1.GetFlowSettingsResponse\x12\\\n" +
+	"\x0fSetFlowSettings\x12#.codeflux.v1.SetFlowSettingsRequest\x1a$.codeflux.v1.SetFlowSettingsResponse\x12t\n" +
 	"\x17RecordFrontendTelemetry\x12+.codeflux.v1.RecordFrontendTelemetryRequest\x1a,.codeflux.v1.RecordFrontendTelemetryResponse\x12n\n" +
 	"\x15ListFrontendTelemetry\x12).codeflux.v1.ListFrontendTelemetryRequest\x1a*.codeflux.v1.ListFrontendTelemetryResponse\x12t\n" +
-	"\x17DeleteFrontendTelemetry\x12+.codeflux.v1.DeleteFrontendTelemetryRequest\x1a,.codeflux.v1.DeleteFrontendTelemetryResponse2\xda\x01\n" +
+	"\x17DeleteFrontendTelemetry\x12+.codeflux.v1.DeleteFrontendTelemetryRequest\x1a,.codeflux.v1.DeleteFrontendTelemetryResponse\x12\\\n" +
+	"\x0fGetSpendSummary\x12#.codeflux.v1.GetSpendSummaryRequest\x1a$.codeflux.v1.GetSpendSummaryResponse2\xda\x01\n" +
 	"\x0eSessionService\x12e\n" +
 	"\x12GetSessionSnapshot\x12&.codeflux.v1.GetSessionSnapshotRequest\x1a'.codeflux.v1.GetSessionSnapshotResponse\x12a\n" +
-	"\x10SubscribeSession\x12$.codeflux.v1.SubscribeSessionRequest\x1a%.codeflux.v1.SubscribeSessionResponse0\x012\xba\x02\n" +
+	"\x10SubscribeSession\x12$.codeflux.v1.SubscribeSessionRequest\x1a%.codeflux.v1.SubscribeSessionResponse0\x012\xe7\x03\n" +
 	"\x15CodeCollectionService\x12_\n" +
 	"\x10ListCodePackages\x12$.codeflux.v1.ListCodePackagesRequest\x1a%.codeflux.v1.ListCodePackagesResponse\x12\\\n" +
 	"\x0fListCodeSymbols\x12#.codeflux.v1.ListCodeSymbolsRequest\x1a$.codeflux.v1.ListCodeSymbolsResponse\x12b\n" +
-	"\x11InspectCodeSymbol\x12%.codeflux.v1.InspectCodeSymbolRequest\x1a&.codeflux.v1.InspectCodeSymbolResponseB6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
+	"\x11InspectCodeSymbol\x12%.codeflux.v1.InspectCodeSymbolRequest\x1a&.codeflux.v1.InspectCodeSymbolResponse\x12V\n" +
+	"\rListCodeFiles\x12!.codeflux.v1.ListCodeFilesRequest\x1a\".codeflux.v1.ListCodeFilesResponse\x12S\n" +
+	"\fReadCodeFile\x12 .codeflux.v1.ReadCodeFileRequest\x1a!.codeflux.v1.ReadCodeFileResponseB6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
 
 var (
 	file_codeflux_v1_product_api_proto_rawDescOnce sync.Once
@@ -9685,7 +11448,7 @@ func file_codeflux_v1_product_api_proto_rawDescGZIP() []byte {
 }
 
 var file_codeflux_v1_product_api_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_codeflux_v1_product_api_proto_msgTypes = make([]protoimpl.MessageInfo, 125)
+var file_codeflux_v1_product_api_proto_msgTypes = make([]protoimpl.MessageInfo, 145)
 var file_codeflux_v1_product_api_proto_goTypes = []any{
 	(FrontendTelemetryKind)(0),                 // 0: codeflux.v1.FrontendTelemetryKind
 	(FrontendTelemetryOutcome)(0),              // 1: codeflux.v1.FrontendTelemetryOutcome
@@ -9801,432 +11564,497 @@ var file_codeflux_v1_product_api_proto_goTypes = []any{
 	(*ListFrontendTelemetryResponse)(nil),      // 111: codeflux.v1.ListFrontendTelemetryResponse
 	(*DeleteFrontendTelemetryRequest)(nil),     // 112: codeflux.v1.DeleteFrontendTelemetryRequest
 	(*DeleteFrontendTelemetryResponse)(nil),    // 113: codeflux.v1.DeleteFrontendTelemetryResponse
-	(*GetSessionSnapshotRequest)(nil),          // 114: codeflux.v1.GetSessionSnapshotRequest
-	(*GetSessionSnapshotResponse)(nil),         // 115: codeflux.v1.GetSessionSnapshotResponse
-	(*SessionProjectionSnapshot)(nil),          // 116: codeflux.v1.SessionProjectionSnapshot
-	(*SessionRevisionBindings)(nil),            // 117: codeflux.v1.SessionRevisionBindings
-	(*SubscribeSessionRequest)(nil),            // 118: codeflux.v1.SubscribeSessionRequest
-	(*SubscribeSessionResponse)(nil),           // 119: codeflux.v1.SubscribeSessionResponse
-	(*SessionReplayBoundary)(nil),              // 120: codeflux.v1.SessionReplayBoundary
-	(*CodeCollectionRevisionView)(nil),         // 121: codeflux.v1.CodeCollectionRevisionView
-	(*CodePackageView)(nil),                    // 122: codeflux.v1.CodePackageView
-	(*CodeSymbolView)(nil),                     // 123: codeflux.v1.CodeSymbolView
-	(*CodeSymbolReferenceView)(nil),            // 124: codeflux.v1.CodeSymbolReferenceView
-	(*CodeAtomFieldView)(nil),                  // 125: codeflux.v1.CodeAtomFieldView
-	(*ListCodePackagesRequest)(nil),            // 126: codeflux.v1.ListCodePackagesRequest
-	(*ListCodePackagesResponse)(nil),           // 127: codeflux.v1.ListCodePackagesResponse
-	(*ListCodeSymbolsRequest)(nil),             // 128: codeflux.v1.ListCodeSymbolsRequest
-	(*ListCodeSymbolsResponse)(nil),            // 129: codeflux.v1.ListCodeSymbolsResponse
-	(*InspectCodeSymbolRequest)(nil),           // 130: codeflux.v1.InspectCodeSymbolRequest
-	(*InspectCodeSymbolResponse)(nil),          // 131: codeflux.v1.InspectCodeSymbolResponse
-	(*MutationControl)(nil),                    // 132: codeflux.v1.MutationControl
-	(*WorkspaceView)(nil),                      // 133: codeflux.v1.WorkspaceView
-	(*StableIdentity)(nil),                     // 134: codeflux.v1.StableIdentity
-	(*PageRequest)(nil),                        // 135: codeflux.v1.PageRequest
-	(*RepositorySummary)(nil),                  // 136: codeflux.v1.RepositorySummary
-	(*PageInfo)(nil),                           // 137: codeflux.v1.PageInfo
-	(*RedactedText)(nil),                       // 138: codeflux.v1.RedactedText
-	(*ThreadView)(nil),                         // 139: codeflux.v1.ThreadView
-	(*MessageView)(nil),                        // 140: codeflux.v1.MessageView
-	(*TaskView)(nil),                           // 141: codeflux.v1.TaskView
-	(*Money)(nil),                              // 142: codeflux.v1.Money
-	(*BudgetView)(nil),                         // 143: codeflux.v1.BudgetView
-	(*GraphSliceView)(nil),                     // 144: codeflux.v1.GraphSliceView
-	(*GraphNodeView)(nil),                      // 145: codeflux.v1.GraphNodeView
-	(*GraphRevisionChangeView)(nil),            // 146: codeflux.v1.GraphRevisionChangeView
-	(*DiffSummaryView)(nil),                    // 147: codeflux.v1.DiffSummaryView
-	(*ValidationReportView)(nil),               // 148: codeflux.v1.ValidationReportView
-	(*SafePath)(nil),                           // 149: codeflux.v1.SafePath
-	(*timestamppb.Timestamp)(nil),              // 150: google.protobuf.Timestamp
-	(*ModelView)(nil),                          // 151: codeflux.v1.ModelView
-	(*PolicyView)(nil),                         // 152: codeflux.v1.PolicyView
-	(*ProviderView)(nil),                       // 153: codeflux.v1.ProviderView
-	(*durationpb.Duration)(nil),                // 154: google.protobuf.Duration
-	(*PlanEvent)(nil),                          // 155: codeflux.v1.PlanEvent
-	(*ApprovalEvent)(nil),                      // 156: codeflux.v1.ApprovalEvent
-	(*BudgetEvent)(nil),                        // 157: codeflux.v1.BudgetEvent
-	(*ValidationEvent)(nil),                    // 158: codeflux.v1.ValidationEvent
-	(*CheckpointEvent)(nil),                    // 159: codeflux.v1.CheckpointEvent
-	(*RecoveryRequiredEvent)(nil),              // 160: codeflux.v1.RecoveryRequiredEvent
-	(*ChangeAcceptanceEvent)(nil),              // 161: codeflux.v1.ChangeAcceptanceEvent
-	(*ToolEvent)(nil),                          // 162: codeflux.v1.ToolEvent
-	(*SessionEvent)(nil),                       // 163: codeflux.v1.SessionEvent
+	(*SpendCost)(nil),                          // 114: codeflux.v1.SpendCost
+	(*SpendSliceView)(nil),                     // 115: codeflux.v1.SpendSliceView
+	(*PhaseSpendView)(nil),                     // 116: codeflux.v1.PhaseSpendView
+	(*StageSpendView)(nil),                     // 117: codeflux.v1.StageSpendView
+	(*ModelSpendView)(nil),                     // 118: codeflux.v1.ModelSpendView
+	(*GetSpendSummaryRequest)(nil),             // 119: codeflux.v1.GetSpendSummaryRequest
+	(*GetSpendSummaryResponse)(nil),            // 120: codeflux.v1.GetSpendSummaryResponse
+	(*GetSessionSnapshotRequest)(nil),          // 121: codeflux.v1.GetSessionSnapshotRequest
+	(*GetSessionSnapshotResponse)(nil),         // 122: codeflux.v1.GetSessionSnapshotResponse
+	(*SessionProjectionSnapshot)(nil),          // 123: codeflux.v1.SessionProjectionSnapshot
+	(*SessionRevisionBindings)(nil),            // 124: codeflux.v1.SessionRevisionBindings
+	(*SubscribeSessionRequest)(nil),            // 125: codeflux.v1.SubscribeSessionRequest
+	(*SubscribeSessionResponse)(nil),           // 126: codeflux.v1.SubscribeSessionResponse
+	(*SessionReplayBoundary)(nil),              // 127: codeflux.v1.SessionReplayBoundary
+	(*CodeFileView)(nil),                       // 128: codeflux.v1.CodeFileView
+	(*ListCodeFilesRequest)(nil),               // 129: codeflux.v1.ListCodeFilesRequest
+	(*ListCodeFilesResponse)(nil),              // 130: codeflux.v1.ListCodeFilesResponse
+	(*ReadCodeFileRequest)(nil),                // 131: codeflux.v1.ReadCodeFileRequest
+	(*ReadCodeFileResponse)(nil),               // 132: codeflux.v1.ReadCodeFileResponse
+	(*CodeCollectionRevisionView)(nil),         // 133: codeflux.v1.CodeCollectionRevisionView
+	(*CodePackageView)(nil),                    // 134: codeflux.v1.CodePackageView
+	(*CodeSymbolView)(nil),                     // 135: codeflux.v1.CodeSymbolView
+	(*CodeSymbolReferenceView)(nil),            // 136: codeflux.v1.CodeSymbolReferenceView
+	(*CodeAtomFieldView)(nil),                  // 137: codeflux.v1.CodeAtomFieldView
+	(*ListCodePackagesRequest)(nil),            // 138: codeflux.v1.ListCodePackagesRequest
+	(*ListCodePackagesResponse)(nil),           // 139: codeflux.v1.ListCodePackagesResponse
+	(*ListCodeSymbolsRequest)(nil),             // 140: codeflux.v1.ListCodeSymbolsRequest
+	(*ListCodeSymbolsResponse)(nil),            // 141: codeflux.v1.ListCodeSymbolsResponse
+	(*InspectCodeSymbolRequest)(nil),           // 142: codeflux.v1.InspectCodeSymbolRequest
+	(*InspectCodeSymbolResponse)(nil),          // 143: codeflux.v1.InspectCodeSymbolResponse
+	(*CodeSymbolStructureView)(nil),            // 144: codeflux.v1.CodeSymbolStructureView
+	(*FlowSettingView)(nil),                    // 145: codeflux.v1.FlowSettingView
+	(*FlowSettingPair)(nil),                    // 146: codeflux.v1.FlowSettingPair
+	(*GetFlowSettingsRequest)(nil),             // 147: codeflux.v1.GetFlowSettingsRequest
+	(*GetFlowSettingsResponse)(nil),            // 148: codeflux.v1.GetFlowSettingsResponse
+	(*FlowSettingChange)(nil),                  // 149: codeflux.v1.FlowSettingChange
+	(*SetFlowSettingsRequest)(nil),             // 150: codeflux.v1.SetFlowSettingsRequest
+	(*SetFlowSettingsResponse)(nil),            // 151: codeflux.v1.SetFlowSettingsResponse
+	(*MutationControl)(nil),                    // 152: codeflux.v1.MutationControl
+	(*WorkspaceView)(nil),                      // 153: codeflux.v1.WorkspaceView
+	(*StableIdentity)(nil),                     // 154: codeflux.v1.StableIdentity
+	(*PageRequest)(nil),                        // 155: codeflux.v1.PageRequest
+	(*RepositorySummary)(nil),                  // 156: codeflux.v1.RepositorySummary
+	(*PageInfo)(nil),                           // 157: codeflux.v1.PageInfo
+	(*RedactedText)(nil),                       // 158: codeflux.v1.RedactedText
+	(*ThreadView)(nil),                         // 159: codeflux.v1.ThreadView
+	(*MessageView)(nil),                        // 160: codeflux.v1.MessageView
+	(*TaskView)(nil),                           // 161: codeflux.v1.TaskView
+	(*Money)(nil),                              // 162: codeflux.v1.Money
+	(*BudgetView)(nil),                         // 163: codeflux.v1.BudgetView
+	(*GraphSliceView)(nil),                     // 164: codeflux.v1.GraphSliceView
+	(*GraphNodeView)(nil),                      // 165: codeflux.v1.GraphNodeView
+	(*GraphRevisionChangeView)(nil),            // 166: codeflux.v1.GraphRevisionChangeView
+	(*DiffSummaryView)(nil),                    // 167: codeflux.v1.DiffSummaryView
+	(*ValidationReportView)(nil),               // 168: codeflux.v1.ValidationReportView
+	(*SafePath)(nil),                           // 169: codeflux.v1.SafePath
+	(*timestamppb.Timestamp)(nil),              // 170: google.protobuf.Timestamp
+	(*ModelView)(nil),                          // 171: codeflux.v1.ModelView
+	(*PolicyView)(nil),                         // 172: codeflux.v1.PolicyView
+	(*ProviderView)(nil),                       // 173: codeflux.v1.ProviderView
+	(*durationpb.Duration)(nil),                // 174: google.protobuf.Duration
+	(*PlanEvent)(nil),                          // 175: codeflux.v1.PlanEvent
+	(*ApprovalEvent)(nil),                      // 176: codeflux.v1.ApprovalEvent
+	(*BudgetEvent)(nil),                        // 177: codeflux.v1.BudgetEvent
+	(*ValidationEvent)(nil),                    // 178: codeflux.v1.ValidationEvent
+	(*CheckpointEvent)(nil),                    // 179: codeflux.v1.CheckpointEvent
+	(*RecoveryRequiredEvent)(nil),              // 180: codeflux.v1.RecoveryRequiredEvent
+	(*ChangeAcceptanceEvent)(nil),              // 181: codeflux.v1.ChangeAcceptanceEvent
+	(*ToolEvent)(nil),                          // 182: codeflux.v1.ToolEvent
+	(*SessionEvent)(nil),                       // 183: codeflux.v1.SessionEvent
 }
 var file_codeflux_v1_product_api_proto_depIdxs = []int32{
-	132, // 0: codeflux.v1.OpenWorkspaceRequest.control:type_name -> codeflux.v1.MutationControl
-	133, // 1: codeflux.v1.OpenWorkspaceResponse.workspace:type_name -> codeflux.v1.WorkspaceView
-	134, // 2: codeflux.v1.GetWorkspaceStateRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	133, // 3: codeflux.v1.GetWorkspaceStateResponse.workspace:type_name -> codeflux.v1.WorkspaceView
-	135, // 4: codeflux.v1.ListRepositoriesRequest.page:type_name -> codeflux.v1.PageRequest
-	136, // 5: codeflux.v1.ListRepositoriesResponse.repositories:type_name -> codeflux.v1.RepositorySummary
-	137, // 6: codeflux.v1.ListRepositoriesResponse.page:type_name -> codeflux.v1.PageInfo
-	134, // 7: codeflux.v1.InspectRepositoryRequest.repository_id:type_name -> codeflux.v1.StableIdentity
-	136, // 8: codeflux.v1.InspectRepositoryResponse.repository:type_name -> codeflux.v1.RepositorySummary
-	138, // 9: codeflux.v1.InspectRepositoryResponse.warnings:type_name -> codeflux.v1.RedactedText
-	132, // 10: codeflux.v1.CreateThreadRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 11: codeflux.v1.CreateThreadRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	139, // 12: codeflux.v1.CreateThreadResponse.thread:type_name -> codeflux.v1.ThreadView
-	134, // 13: codeflux.v1.ListThreadsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	135, // 14: codeflux.v1.ListThreadsRequest.page:type_name -> codeflux.v1.PageRequest
-	139, // 15: codeflux.v1.ListThreadsResponse.threads:type_name -> codeflux.v1.ThreadView
-	137, // 16: codeflux.v1.ListThreadsResponse.page:type_name -> codeflux.v1.PageInfo
-	134, // 17: codeflux.v1.GetThreadPageRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	135, // 18: codeflux.v1.GetThreadPageRequest.page:type_name -> codeflux.v1.PageRequest
-	139, // 19: codeflux.v1.GetThreadPageResponse.thread:type_name -> codeflux.v1.ThreadView
-	140, // 20: codeflux.v1.GetThreadPageResponse.messages:type_name -> codeflux.v1.MessageView
-	137, // 21: codeflux.v1.GetThreadPageResponse.page:type_name -> codeflux.v1.PageInfo
-	132, // 22: codeflux.v1.SendMessageRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 23: codeflux.v1.SendMessageRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	134, // 24: codeflux.v1.SendMessageRequest.attachment_ids:type_name -> codeflux.v1.StableIdentity
-	140, // 25: codeflux.v1.SendMessageResponse.message:type_name -> codeflux.v1.MessageView
-	141, // 26: codeflux.v1.SendMessageResponse.draft_task:type_name -> codeflux.v1.TaskView
-	132, // 27: codeflux.v1.RenameThreadRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 28: codeflux.v1.RenameThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	139, // 29: codeflux.v1.RenameThreadResponse.thread:type_name -> codeflux.v1.ThreadView
-	132, // 30: codeflux.v1.ArchiveThreadRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 31: codeflux.v1.ArchiveThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	139, // 32: codeflux.v1.ArchiveThreadResponse.thread:type_name -> codeflux.v1.ThreadView
-	132, // 33: codeflux.v1.CreateTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 34: codeflux.v1.CreateTaskRequest.thread_id:type_name -> codeflux.v1.StableIdentity
-	134, // 35: codeflux.v1.CreateTaskRequest.source_message_id:type_name -> codeflux.v1.StableIdentity
-	141, // 36: codeflux.v1.CreateTaskResponse.task:type_name -> codeflux.v1.TaskView
-	134, // 37: codeflux.v1.GetTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 38: codeflux.v1.GetTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 39: codeflux.v1.ApprovePlanRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 40: codeflux.v1.ApprovePlanRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 41: codeflux.v1.ApprovePlanResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 42: codeflux.v1.StartTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 43: codeflux.v1.StartTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 44: codeflux.v1.StartTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 45: codeflux.v1.PauseTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 46: codeflux.v1.PauseTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 47: codeflux.v1.PauseTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 48: codeflux.v1.ResumeTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 49: codeflux.v1.ResumeTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 50: codeflux.v1.ResumeTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 51: codeflux.v1.CancelTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 52: codeflux.v1.CancelTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	141, // 53: codeflux.v1.CancelTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 54: codeflux.v1.ApproveActionRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 55: codeflux.v1.ApproveActionRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 56: codeflux.v1.ApproveActionRequest.approval_id:type_name -> codeflux.v1.StableIdentity
-	141, // 57: codeflux.v1.ApproveActionResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 58: codeflux.v1.SetBudgetRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 59: codeflux.v1.SetBudgetRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	142, // 60: codeflux.v1.SetBudgetRequest.hard_limit:type_name -> codeflux.v1.Money
-	143, // 61: codeflux.v1.SetBudgetResponse.budget:type_name -> codeflux.v1.BudgetView
-	132, // 62: codeflux.v1.RequestRepairRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 63: codeflux.v1.RequestRepairRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 64: codeflux.v1.RequestRepairRequest.evidence_ids:type_name -> codeflux.v1.StableIdentity
+	152, // 0: codeflux.v1.OpenWorkspaceRequest.control:type_name -> codeflux.v1.MutationControl
+	153, // 1: codeflux.v1.OpenWorkspaceResponse.workspace:type_name -> codeflux.v1.WorkspaceView
+	154, // 2: codeflux.v1.GetWorkspaceStateRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	153, // 3: codeflux.v1.GetWorkspaceStateResponse.workspace:type_name -> codeflux.v1.WorkspaceView
+	155, // 4: codeflux.v1.ListRepositoriesRequest.page:type_name -> codeflux.v1.PageRequest
+	156, // 5: codeflux.v1.ListRepositoriesResponse.repositories:type_name -> codeflux.v1.RepositorySummary
+	157, // 6: codeflux.v1.ListRepositoriesResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 7: codeflux.v1.InspectRepositoryRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	156, // 8: codeflux.v1.InspectRepositoryResponse.repository:type_name -> codeflux.v1.RepositorySummary
+	158, // 9: codeflux.v1.InspectRepositoryResponse.warnings:type_name -> codeflux.v1.RedactedText
+	152, // 10: codeflux.v1.CreateThreadRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 11: codeflux.v1.CreateThreadRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	159, // 12: codeflux.v1.CreateThreadResponse.thread:type_name -> codeflux.v1.ThreadView
+	154, // 13: codeflux.v1.ListThreadsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	155, // 14: codeflux.v1.ListThreadsRequest.page:type_name -> codeflux.v1.PageRequest
+	159, // 15: codeflux.v1.ListThreadsResponse.threads:type_name -> codeflux.v1.ThreadView
+	157, // 16: codeflux.v1.ListThreadsResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 17: codeflux.v1.GetThreadPageRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	155, // 18: codeflux.v1.GetThreadPageRequest.page:type_name -> codeflux.v1.PageRequest
+	159, // 19: codeflux.v1.GetThreadPageResponse.thread:type_name -> codeflux.v1.ThreadView
+	160, // 20: codeflux.v1.GetThreadPageResponse.messages:type_name -> codeflux.v1.MessageView
+	157, // 21: codeflux.v1.GetThreadPageResponse.page:type_name -> codeflux.v1.PageInfo
+	152, // 22: codeflux.v1.SendMessageRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 23: codeflux.v1.SendMessageRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	154, // 24: codeflux.v1.SendMessageRequest.attachment_ids:type_name -> codeflux.v1.StableIdentity
+	160, // 25: codeflux.v1.SendMessageResponse.message:type_name -> codeflux.v1.MessageView
+	161, // 26: codeflux.v1.SendMessageResponse.draft_task:type_name -> codeflux.v1.TaskView
+	152, // 27: codeflux.v1.RenameThreadRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 28: codeflux.v1.RenameThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	159, // 29: codeflux.v1.RenameThreadResponse.thread:type_name -> codeflux.v1.ThreadView
+	152, // 30: codeflux.v1.ArchiveThreadRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 31: codeflux.v1.ArchiveThreadRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	159, // 32: codeflux.v1.ArchiveThreadResponse.thread:type_name -> codeflux.v1.ThreadView
+	152, // 33: codeflux.v1.CreateTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 34: codeflux.v1.CreateTaskRequest.thread_id:type_name -> codeflux.v1.StableIdentity
+	154, // 35: codeflux.v1.CreateTaskRequest.source_message_id:type_name -> codeflux.v1.StableIdentity
+	161, // 36: codeflux.v1.CreateTaskResponse.task:type_name -> codeflux.v1.TaskView
+	154, // 37: codeflux.v1.GetTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 38: codeflux.v1.GetTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 39: codeflux.v1.ApprovePlanRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 40: codeflux.v1.ApprovePlanRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 41: codeflux.v1.ApprovePlanResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 42: codeflux.v1.StartTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 43: codeflux.v1.StartTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 44: codeflux.v1.StartTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 45: codeflux.v1.PauseTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 46: codeflux.v1.PauseTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 47: codeflux.v1.PauseTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 48: codeflux.v1.ResumeTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 49: codeflux.v1.ResumeTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 50: codeflux.v1.ResumeTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 51: codeflux.v1.CancelTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 52: codeflux.v1.CancelTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	161, // 53: codeflux.v1.CancelTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 54: codeflux.v1.ApproveActionRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 55: codeflux.v1.ApproveActionRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 56: codeflux.v1.ApproveActionRequest.approval_id:type_name -> codeflux.v1.StableIdentity
+	161, // 57: codeflux.v1.ApproveActionResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 58: codeflux.v1.SetBudgetRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 59: codeflux.v1.SetBudgetRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	162, // 60: codeflux.v1.SetBudgetRequest.hard_limit:type_name -> codeflux.v1.Money
+	163, // 61: codeflux.v1.SetBudgetResponse.budget:type_name -> codeflux.v1.BudgetView
+	152, // 62: codeflux.v1.RequestRepairRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 63: codeflux.v1.RequestRepairRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 64: codeflux.v1.RequestRepairRequest.evidence_ids:type_name -> codeflux.v1.StableIdentity
 	46,  // 65: codeflux.v1.RequestRepairRequest.targets:type_name -> codeflux.v1.ReviewRepairTarget
-	134, // 66: codeflux.v1.RequestRepairRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	134, // 67: codeflux.v1.RequestRepairRequest.feedback_message_id:type_name -> codeflux.v1.StableIdentity
-	141, // 68: codeflux.v1.RequestRepairResponse.task:type_name -> codeflux.v1.TaskView
-	134, // 69: codeflux.v1.RequestRepairResponse.pre_repair_checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	132, // 70: codeflux.v1.RollbackTaskRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 71: codeflux.v1.RollbackTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 72: codeflux.v1.RollbackTaskRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	138, // 73: codeflux.v1.RollbackTaskRequest.reason:type_name -> codeflux.v1.RedactedText
-	141, // 74: codeflux.v1.RollbackTaskResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 75: codeflux.v1.PreserveRecoveryPatchRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 76: codeflux.v1.PreserveRecoveryPatchRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 77: codeflux.v1.PreserveRecoveryPatchResponse.task_id:type_name -> codeflux.v1.StableIdentity
-	132, // 78: codeflux.v1.ReconcileRecoveryRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 79: codeflux.v1.ReconcileRecoveryRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 80: codeflux.v1.ReconcileRecoveryResponse.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 81: codeflux.v1.ReconcileRecoveryResponse.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	132, // 82: codeflux.v1.SafeResumeRecoveryRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 83: codeflux.v1.SafeResumeRecoveryRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 84: codeflux.v1.SafeResumeRecoveryResponse.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 85: codeflux.v1.SafeResumeRecoveryResponse.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	134, // 86: codeflux.v1.GetGraphSliceRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 87: codeflux.v1.GetGraphSliceRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 88: codeflux.v1.GetGraphSliceRequest.expected_graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	144, // 89: codeflux.v1.GetGraphSliceResponse.graph:type_name -> codeflux.v1.GraphSliceView
-	134, // 90: codeflux.v1.ExpandGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 91: codeflux.v1.ExpandGraphRequest.root_node_ids:type_name -> codeflux.v1.StableIdentity
-	134, // 92: codeflux.v1.ExpandGraphRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 93: codeflux.v1.ExpandGraphRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	144, // 94: codeflux.v1.ExpandGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
-	134, // 95: codeflux.v1.GetNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 96: codeflux.v1.GetNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
-	134, // 97: codeflux.v1.GetNodeRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 98: codeflux.v1.GetNodeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	145, // 99: codeflux.v1.GetNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
-	134, // 100: codeflux.v1.GetNodeResponse.related_message_ids:type_name -> codeflux.v1.StableIdentity
-	134, // 101: codeflux.v1.GetNodeResponse.evidence_ids:type_name -> codeflux.v1.StableIdentity
-	134, // 102: codeflux.v1.SearchGraphRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 103: codeflux.v1.SearchGraphRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 104: codeflux.v1.SearchGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	144, // 105: codeflux.v1.SearchGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
-	134, // 106: codeflux.v1.ExplainNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 107: codeflux.v1.ExplainNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
-	134, // 108: codeflux.v1.ExplainNodeRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 109: codeflux.v1.ExplainNodeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	145, // 110: codeflux.v1.ExplainNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
-	138, // 111: codeflux.v1.ExplainNodeResponse.explanation:type_name -> codeflux.v1.RedactedText
-	134, // 112: codeflux.v1.CompareGraphRevisionsRequest.from_graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 113: codeflux.v1.CompareGraphRevisionsRequest.to_graph_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 114: codeflux.v1.CompareGraphRevisionsRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 115: codeflux.v1.CompareGraphRevisionsRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	145, // 116: codeflux.v1.CompareGraphRevisionsResponse.added_nodes:type_name -> codeflux.v1.GraphNodeView
-	145, // 117: codeflux.v1.CompareGraphRevisionsResponse.changed_nodes:type_name -> codeflux.v1.GraphNodeView
-	134, // 118: codeflux.v1.CompareGraphRevisionsResponse.removed_node_ids:type_name -> codeflux.v1.StableIdentity
-	146, // 119: codeflux.v1.CompareGraphRevisionsResponse.changes:type_name -> codeflux.v1.GraphRevisionChangeView
-	134, // 120: codeflux.v1.CompareGraphRevisionsResponse.from_graph_id:type_name -> codeflux.v1.StableIdentity
-	134, // 121: codeflux.v1.CompareGraphRevisionsResponse.to_graph_id:type_name -> codeflux.v1.StableIdentity
-	134, // 122: codeflux.v1.GetDiffSummaryRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 66: codeflux.v1.RequestRepairRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	154, // 67: codeflux.v1.RequestRepairRequest.feedback_message_id:type_name -> codeflux.v1.StableIdentity
+	161, // 68: codeflux.v1.RequestRepairResponse.task:type_name -> codeflux.v1.TaskView
+	154, // 69: codeflux.v1.RequestRepairResponse.pre_repair_checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	152, // 70: codeflux.v1.RollbackTaskRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 71: codeflux.v1.RollbackTaskRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 72: codeflux.v1.RollbackTaskRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	158, // 73: codeflux.v1.RollbackTaskRequest.reason:type_name -> codeflux.v1.RedactedText
+	161, // 74: codeflux.v1.RollbackTaskResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 75: codeflux.v1.PreserveRecoveryPatchRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 76: codeflux.v1.PreserveRecoveryPatchRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 77: codeflux.v1.PreserveRecoveryPatchResponse.task_id:type_name -> codeflux.v1.StableIdentity
+	152, // 78: codeflux.v1.ReconcileRecoveryRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 79: codeflux.v1.ReconcileRecoveryRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 80: codeflux.v1.ReconcileRecoveryResponse.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 81: codeflux.v1.ReconcileRecoveryResponse.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	152, // 82: codeflux.v1.SafeResumeRecoveryRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 83: codeflux.v1.SafeResumeRecoveryRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 84: codeflux.v1.SafeResumeRecoveryResponse.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 85: codeflux.v1.SafeResumeRecoveryResponse.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	154, // 86: codeflux.v1.GetGraphSliceRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 87: codeflux.v1.GetGraphSliceRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 88: codeflux.v1.GetGraphSliceRequest.expected_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	164, // 89: codeflux.v1.GetGraphSliceResponse.graph:type_name -> codeflux.v1.GraphSliceView
+	154, // 90: codeflux.v1.ExpandGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 91: codeflux.v1.ExpandGraphRequest.root_node_ids:type_name -> codeflux.v1.StableIdentity
+	154, // 92: codeflux.v1.ExpandGraphRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 93: codeflux.v1.ExpandGraphRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	164, // 94: codeflux.v1.ExpandGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
+	154, // 95: codeflux.v1.GetNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 96: codeflux.v1.GetNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
+	154, // 97: codeflux.v1.GetNodeRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 98: codeflux.v1.GetNodeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	165, // 99: codeflux.v1.GetNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
+	154, // 100: codeflux.v1.GetNodeResponse.related_message_ids:type_name -> codeflux.v1.StableIdentity
+	154, // 101: codeflux.v1.GetNodeResponse.evidence_ids:type_name -> codeflux.v1.StableIdentity
+	154, // 102: codeflux.v1.SearchGraphRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 103: codeflux.v1.SearchGraphRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 104: codeflux.v1.SearchGraphRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	164, // 105: codeflux.v1.SearchGraphResponse.graph:type_name -> codeflux.v1.GraphSliceView
+	154, // 106: codeflux.v1.ExplainNodeRequest.graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 107: codeflux.v1.ExplainNodeRequest.node_id:type_name -> codeflux.v1.StableIdentity
+	154, // 108: codeflux.v1.ExplainNodeRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 109: codeflux.v1.ExplainNodeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	165, // 110: codeflux.v1.ExplainNodeResponse.node:type_name -> codeflux.v1.GraphNodeView
+	158, // 111: codeflux.v1.ExplainNodeResponse.explanation:type_name -> codeflux.v1.RedactedText
+	154, // 112: codeflux.v1.CompareGraphRevisionsRequest.from_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 113: codeflux.v1.CompareGraphRevisionsRequest.to_graph_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 114: codeflux.v1.CompareGraphRevisionsRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 115: codeflux.v1.CompareGraphRevisionsRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	165, // 116: codeflux.v1.CompareGraphRevisionsResponse.added_nodes:type_name -> codeflux.v1.GraphNodeView
+	165, // 117: codeflux.v1.CompareGraphRevisionsResponse.changed_nodes:type_name -> codeflux.v1.GraphNodeView
+	154, // 118: codeflux.v1.CompareGraphRevisionsResponse.removed_node_ids:type_name -> codeflux.v1.StableIdentity
+	166, // 119: codeflux.v1.CompareGraphRevisionsResponse.changes:type_name -> codeflux.v1.GraphRevisionChangeView
+	154, // 120: codeflux.v1.CompareGraphRevisionsResponse.from_graph_id:type_name -> codeflux.v1.StableIdentity
+	154, // 121: codeflux.v1.CompareGraphRevisionsResponse.to_graph_id:type_name -> codeflux.v1.StableIdentity
+	154, // 122: codeflux.v1.GetDiffSummaryRequest.task_id:type_name -> codeflux.v1.StableIdentity
 	45,  // 123: codeflux.v1.ReviewServiceRequestRepairRequest.request:type_name -> codeflux.v1.RequestRepairRequest
 	47,  // 124: codeflux.v1.ReviewServiceRequestRepairResponse.result:type_name -> codeflux.v1.RequestRepairResponse
 	48,  // 125: codeflux.v1.ReviewServiceRollbackTaskRequest.request:type_name -> codeflux.v1.RollbackTaskRequest
 	49,  // 126: codeflux.v1.ReviewServiceRollbackTaskResponse.result:type_name -> codeflux.v1.RollbackTaskResponse
-	147, // 127: codeflux.v1.GetDiffSummaryResponse.diff:type_name -> codeflux.v1.DiffSummaryView
-	134, // 128: codeflux.v1.GetValidationReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	148, // 129: codeflux.v1.GetValidationReportResponse.report:type_name -> codeflux.v1.ValidationReportView
-	134, // 130: codeflux.v1.GetEvidenceReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 131: codeflux.v1.ReviewValidationLinkView.validation_id:type_name -> codeflux.v1.StableIdentity
-	138, // 132: codeflux.v1.ReviewValidationLinkView.label:type_name -> codeflux.v1.RedactedText
-	138, // 133: codeflux.v1.ReviewValidationLinkView.summary:type_name -> codeflux.v1.RedactedText
-	149, // 134: codeflux.v1.ReviewDiffFileView.path:type_name -> codeflux.v1.SafePath
-	149, // 135: codeflux.v1.ReviewDiffFileView.previous_path:type_name -> codeflux.v1.SafePath
-	138, // 136: codeflux.v1.ReviewDiffFileView.line_counts_unknown_reason:type_name -> codeflux.v1.RedactedText
-	138, // 137: codeflux.v1.ReviewDiffFileView.scope_unknown_reason:type_name -> codeflux.v1.RedactedText
+	167, // 127: codeflux.v1.GetDiffSummaryResponse.diff:type_name -> codeflux.v1.DiffSummaryView
+	154, // 128: codeflux.v1.GetValidationReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	168, // 129: codeflux.v1.GetValidationReportResponse.report:type_name -> codeflux.v1.ValidationReportView
+	154, // 130: codeflux.v1.GetEvidenceReportRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 131: codeflux.v1.ReviewValidationLinkView.validation_id:type_name -> codeflux.v1.StableIdentity
+	158, // 132: codeflux.v1.ReviewValidationLinkView.label:type_name -> codeflux.v1.RedactedText
+	158, // 133: codeflux.v1.ReviewValidationLinkView.summary:type_name -> codeflux.v1.RedactedText
+	169, // 134: codeflux.v1.ReviewDiffFileView.path:type_name -> codeflux.v1.SafePath
+	169, // 135: codeflux.v1.ReviewDiffFileView.previous_path:type_name -> codeflux.v1.SafePath
+	158, // 136: codeflux.v1.ReviewDiffFileView.line_counts_unknown_reason:type_name -> codeflux.v1.RedactedText
+	158, // 137: codeflux.v1.ReviewDiffFileView.scope_unknown_reason:type_name -> codeflux.v1.RedactedText
 	77,  // 138: codeflux.v1.ReviewDiffFileView.plan_steps:type_name -> codeflux.v1.ReviewPlanStepLinkView
-	134, // 139: codeflux.v1.ReviewDiffFileView.tool_event_ids:type_name -> codeflux.v1.StableIdentity
+	154, // 139: codeflux.v1.ReviewDiffFileView.tool_event_ids:type_name -> codeflux.v1.StableIdentity
 	78,  // 140: codeflux.v1.ReviewDiffFileView.validations:type_name -> codeflux.v1.ReviewValidationLinkView
-	134, // 141: codeflux.v1.ReviewDiffView.task_id:type_name -> codeflux.v1.StableIdentity
-	138, // 142: codeflux.v1.ReviewDiffView.unified_diff:type_name -> codeflux.v1.RedactedText
+	154, // 141: codeflux.v1.ReviewDiffView.task_id:type_name -> codeflux.v1.StableIdentity
+	158, // 142: codeflux.v1.ReviewDiffView.unified_diff:type_name -> codeflux.v1.RedactedText
 	79,  // 143: codeflux.v1.ReviewDiffView.files:type_name -> codeflux.v1.ReviewDiffFileView
 	80,  // 144: codeflux.v1.GetEvidenceReportResponse.diff:type_name -> codeflux.v1.ReviewDiffView
-	132, // 145: codeflux.v1.AcceptChangeRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 146: codeflux.v1.AcceptChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	138, // 147: codeflux.v1.AcceptChangeRequest.commit_message:type_name -> codeflux.v1.RedactedText
-	138, // 148: codeflux.v1.AcceptChangeRequest.reason:type_name -> codeflux.v1.RedactedText
-	141, // 149: codeflux.v1.AcceptChangeResponse.task:type_name -> codeflux.v1.TaskView
-	138, // 150: codeflux.v1.AcceptChangeResponse.acceptance_summary:type_name -> codeflux.v1.RedactedText
-	132, // 151: codeflux.v1.RejectChangeRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 152: codeflux.v1.RejectChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 153: codeflux.v1.RejectChangeRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
-	141, // 154: codeflux.v1.RejectChangeResponse.task:type_name -> codeflux.v1.TaskView
-	132, // 155: codeflux.v1.OpenInEditorRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 156: codeflux.v1.OpenInEditorRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	149, // 157: codeflux.v1.OpenInEditorResponse.path:type_name -> codeflux.v1.SafePath
-	134, // 158: codeflux.v1.ListMemoryArtifactsRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	135, // 159: codeflux.v1.ListMemoryArtifactsRequest.page:type_name -> codeflux.v1.PageRequest
-	134, // 160: codeflux.v1.MemoryArtifactSummary.artifact_id:type_name -> codeflux.v1.StableIdentity
-	134, // 161: codeflux.v1.MemoryArtifactSummary.revision_id:type_name -> codeflux.v1.StableIdentity
-	138, // 162: codeflux.v1.MemoryArtifactSummary.summary:type_name -> codeflux.v1.RedactedText
-	134, // 163: codeflux.v1.MemoryArtifactSummary.scope_repository_id:type_name -> codeflux.v1.StableIdentity
-	150, // 164: codeflux.v1.MemoryArtifactSummary.created_at:type_name -> google.protobuf.Timestamp
+	152, // 145: codeflux.v1.AcceptChangeRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 146: codeflux.v1.AcceptChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	158, // 147: codeflux.v1.AcceptChangeRequest.commit_message:type_name -> codeflux.v1.RedactedText
+	158, // 148: codeflux.v1.AcceptChangeRequest.reason:type_name -> codeflux.v1.RedactedText
+	161, // 149: codeflux.v1.AcceptChangeResponse.task:type_name -> codeflux.v1.TaskView
+	158, // 150: codeflux.v1.AcceptChangeResponse.acceptance_summary:type_name -> codeflux.v1.RedactedText
+	152, // 151: codeflux.v1.RejectChangeRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 152: codeflux.v1.RejectChangeRequest.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 153: codeflux.v1.RejectChangeRequest.checkpoint_id:type_name -> codeflux.v1.StableIdentity
+	161, // 154: codeflux.v1.RejectChangeResponse.task:type_name -> codeflux.v1.TaskView
+	152, // 155: codeflux.v1.OpenInEditorRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 156: codeflux.v1.OpenInEditorRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	169, // 157: codeflux.v1.OpenInEditorResponse.path:type_name -> codeflux.v1.SafePath
+	154, // 158: codeflux.v1.ListMemoryArtifactsRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	155, // 159: codeflux.v1.ListMemoryArtifactsRequest.page:type_name -> codeflux.v1.PageRequest
+	154, // 160: codeflux.v1.MemoryArtifactSummary.artifact_id:type_name -> codeflux.v1.StableIdentity
+	154, // 161: codeflux.v1.MemoryArtifactSummary.revision_id:type_name -> codeflux.v1.StableIdentity
+	158, // 162: codeflux.v1.MemoryArtifactSummary.summary:type_name -> codeflux.v1.RedactedText
+	154, // 163: codeflux.v1.MemoryArtifactSummary.scope_repository_id:type_name -> codeflux.v1.StableIdentity
+	170, // 164: codeflux.v1.MemoryArtifactSummary.created_at:type_name -> google.protobuf.Timestamp
 	89,  // 165: codeflux.v1.ListMemoryArtifactsResponse.artifacts:type_name -> codeflux.v1.MemoryArtifactSummary
-	137, // 166: codeflux.v1.ListMemoryArtifactsResponse.page:type_name -> codeflux.v1.PageInfo
-	134, // 167: codeflux.v1.GetMemoryArtifactRequest.project_id:type_name -> codeflux.v1.StableIdentity
-	134, // 168: codeflux.v1.GetMemoryArtifactRequest.artifact_id:type_name -> codeflux.v1.StableIdentity
-	134, // 169: codeflux.v1.MemoryArtifactLineageView.derived_from:type_name -> codeflux.v1.StableIdentity
-	134, // 170: codeflux.v1.MemoryArtifactLineageView.influenced_by:type_name -> codeflux.v1.StableIdentity
-	134, // 171: codeflux.v1.MemoryArtifactLineageView.origin_artifact_id:type_name -> codeflux.v1.StableIdentity
-	134, // 172: codeflux.v1.MemoryArtifactLineageView.supporting_episodes:type_name -> codeflux.v1.StableIdentity
-	138, // 173: codeflux.v1.MemoryArtifactField.value:type_name -> codeflux.v1.RedactedText
+	157, // 166: codeflux.v1.ListMemoryArtifactsResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 167: codeflux.v1.GetMemoryArtifactRequest.project_id:type_name -> codeflux.v1.StableIdentity
+	154, // 168: codeflux.v1.GetMemoryArtifactRequest.artifact_id:type_name -> codeflux.v1.StableIdentity
+	154, // 169: codeflux.v1.MemoryArtifactLineageView.derived_from:type_name -> codeflux.v1.StableIdentity
+	154, // 170: codeflux.v1.MemoryArtifactLineageView.influenced_by:type_name -> codeflux.v1.StableIdentity
+	154, // 171: codeflux.v1.MemoryArtifactLineageView.origin_artifact_id:type_name -> codeflux.v1.StableIdentity
+	154, // 172: codeflux.v1.MemoryArtifactLineageView.supporting_episodes:type_name -> codeflux.v1.StableIdentity
+	158, // 173: codeflux.v1.MemoryArtifactField.value:type_name -> codeflux.v1.RedactedText
 	89,  // 174: codeflux.v1.GetMemoryArtifactResponse.summary:type_name -> codeflux.v1.MemoryArtifactSummary
 	93,  // 175: codeflux.v1.GetMemoryArtifactResponse.fields:type_name -> codeflux.v1.MemoryArtifactField
 	92,  // 176: codeflux.v1.GetMemoryArtifactResponse.lineage:type_name -> codeflux.v1.MemoryArtifactLineageView
-	134, // 177: codeflux.v1.GetMemoryArtifactResponse.supersedes_revision_id:type_name -> codeflux.v1.StableIdentity
-	134, // 178: codeflux.v1.GetModelsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	151, // 179: codeflux.v1.GetModelsResponse.models:type_name -> codeflux.v1.ModelView
-	134, // 180: codeflux.v1.GetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	152, // 181: codeflux.v1.GetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
-	132, // 182: codeflux.v1.SetPolicyRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 183: codeflux.v1.SetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	152, // 184: codeflux.v1.SetPolicyRequest.policy:type_name -> codeflux.v1.PolicyView
-	152, // 185: codeflux.v1.SetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
-	132, // 186: codeflux.v1.SetBudgetDefaultsRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 187: codeflux.v1.SetBudgetDefaultsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	142, // 188: codeflux.v1.SetBudgetDefaultsRequest.default_hard_limit:type_name -> codeflux.v1.Money
-	142, // 189: codeflux.v1.SetBudgetDefaultsResponse.default_hard_limit:type_name -> codeflux.v1.Money
-	132, // 190: codeflux.v1.ConfigureProviderRequest.control:type_name -> codeflux.v1.MutationControl
-	134, // 191: codeflux.v1.ConfigureProviderRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
-	134, // 192: codeflux.v1.ConfigureProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
-	153, // 193: codeflux.v1.ConfigureProviderResponse.provider:type_name -> codeflux.v1.ProviderView
-	134, // 194: codeflux.v1.TestProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
-	138, // 195: codeflux.v1.TestProviderResponse.summary:type_name -> codeflux.v1.RedactedText
+	154, // 177: codeflux.v1.GetMemoryArtifactResponse.supersedes_revision_id:type_name -> codeflux.v1.StableIdentity
+	154, // 178: codeflux.v1.GetModelsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	171, // 179: codeflux.v1.GetModelsResponse.models:type_name -> codeflux.v1.ModelView
+	154, // 180: codeflux.v1.GetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	172, // 181: codeflux.v1.GetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
+	152, // 182: codeflux.v1.SetPolicyRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 183: codeflux.v1.SetPolicyRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	172, // 184: codeflux.v1.SetPolicyRequest.policy:type_name -> codeflux.v1.PolicyView
+	172, // 185: codeflux.v1.SetPolicyResponse.policy:type_name -> codeflux.v1.PolicyView
+	152, // 186: codeflux.v1.SetBudgetDefaultsRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 187: codeflux.v1.SetBudgetDefaultsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	162, // 188: codeflux.v1.SetBudgetDefaultsRequest.default_hard_limit:type_name -> codeflux.v1.Money
+	162, // 189: codeflux.v1.SetBudgetDefaultsResponse.default_hard_limit:type_name -> codeflux.v1.Money
+	152, // 190: codeflux.v1.ConfigureProviderRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 191: codeflux.v1.ConfigureProviderRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	154, // 192: codeflux.v1.ConfigureProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
+	173, // 193: codeflux.v1.ConfigureProviderResponse.provider:type_name -> codeflux.v1.ProviderView
+	154, // 194: codeflux.v1.TestProviderRequest.provider_id:type_name -> codeflux.v1.StableIdentity
+	158, // 195: codeflux.v1.TestProviderResponse.summary:type_name -> codeflux.v1.RedactedText
 	0,   // 196: codeflux.v1.FrontendTelemetryEvent.kind:type_name -> codeflux.v1.FrontendTelemetryKind
-	150, // 197: codeflux.v1.FrontendTelemetryEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	154, // 198: codeflux.v1.FrontendTelemetryEvent.duration:type_name -> google.protobuf.Duration
+	170, // 197: codeflux.v1.FrontendTelemetryEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	174, // 198: codeflux.v1.FrontendTelemetryEvent.duration:type_name -> google.protobuf.Duration
 	1,   // 199: codeflux.v1.FrontendTelemetryEvent.outcome:type_name -> codeflux.v1.FrontendTelemetryOutcome
 	2,   // 200: codeflux.v1.FrontendTelemetryEvent.component:type_name -> codeflux.v1.FrontendTelemetryComponent
 	3,   // 201: codeflux.v1.FrontendTelemetryEvent.graph_mode:type_name -> codeflux.v1.FrontendTelemetryGraphMode
 	4,   // 202: codeflux.v1.FrontendTelemetryEvent.failure_class:type_name -> codeflux.v1.FrontendTelemetryFailureClass
-	134, // 203: codeflux.v1.FrontendTelemetryEvent.task_id:type_name -> codeflux.v1.StableIdentity
-	134, // 204: codeflux.v1.FrontendTelemetryEvent.thread_id:type_name -> codeflux.v1.StableIdentity
-	134, // 205: codeflux.v1.FrontendTelemetryEvent.session_id:type_name -> codeflux.v1.StableIdentity
-	132, // 206: codeflux.v1.RecordFrontendTelemetryRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 203: codeflux.v1.FrontendTelemetryEvent.task_id:type_name -> codeflux.v1.StableIdentity
+	154, // 204: codeflux.v1.FrontendTelemetryEvent.thread_id:type_name -> codeflux.v1.StableIdentity
+	154, // 205: codeflux.v1.FrontendTelemetryEvent.session_id:type_name -> codeflux.v1.StableIdentity
+	152, // 206: codeflux.v1.RecordFrontendTelemetryRequest.control:type_name -> codeflux.v1.MutationControl
 	107, // 207: codeflux.v1.RecordFrontendTelemetryRequest.event:type_name -> codeflux.v1.FrontendTelemetryEvent
 	107, // 208: codeflux.v1.RecordFrontendTelemetryResponse.event:type_name -> codeflux.v1.FrontendTelemetryEvent
-	135, // 209: codeflux.v1.ListFrontendTelemetryRequest.page:type_name -> codeflux.v1.PageRequest
+	155, // 209: codeflux.v1.ListFrontendTelemetryRequest.page:type_name -> codeflux.v1.PageRequest
 	0,   // 210: codeflux.v1.ListFrontendTelemetryRequest.kinds:type_name -> codeflux.v1.FrontendTelemetryKind
-	150, // 211: codeflux.v1.ListFrontendTelemetryRequest.since:type_name -> google.protobuf.Timestamp
-	150, // 212: codeflux.v1.ListFrontendTelemetryRequest.until:type_name -> google.protobuf.Timestamp
+	170, // 211: codeflux.v1.ListFrontendTelemetryRequest.since:type_name -> google.protobuf.Timestamp
+	170, // 212: codeflux.v1.ListFrontendTelemetryRequest.until:type_name -> google.protobuf.Timestamp
 	107, // 213: codeflux.v1.ListFrontendTelemetryResponse.events:type_name -> codeflux.v1.FrontendTelemetryEvent
-	137, // 214: codeflux.v1.ListFrontendTelemetryResponse.page:type_name -> codeflux.v1.PageInfo
-	132, // 215: codeflux.v1.DeleteFrontendTelemetryRequest.control:type_name -> codeflux.v1.MutationControl
+	157, // 214: codeflux.v1.ListFrontendTelemetryResponse.page:type_name -> codeflux.v1.PageInfo
+	152, // 215: codeflux.v1.DeleteFrontendTelemetryRequest.control:type_name -> codeflux.v1.MutationControl
 	5,   // 216: codeflux.v1.DeleteFrontendTelemetryRequest.scope:type_name -> codeflux.v1.FrontendTelemetryDeleteScope
-	150, // 217: codeflux.v1.DeleteFrontendTelemetryRequest.before:type_name -> google.protobuf.Timestamp
+	170, // 217: codeflux.v1.DeleteFrontendTelemetryRequest.before:type_name -> google.protobuf.Timestamp
 	6,   // 218: codeflux.v1.DeleteFrontendTelemetryRequest.confirmation:type_name -> codeflux.v1.FrontendTelemetryDeleteConfirmation
-	134, // 219: codeflux.v1.GetSessionSnapshotRequest.session_id:type_name -> codeflux.v1.StableIdentity
-	116, // 220: codeflux.v1.GetSessionSnapshotResponse.snapshot:type_name -> codeflux.v1.SessionProjectionSnapshot
-	134, // 221: codeflux.v1.SessionProjectionSnapshot.session_id:type_name -> codeflux.v1.StableIdentity
-	134, // 222: codeflux.v1.SessionProjectionSnapshot.thread_id:type_name -> codeflux.v1.StableIdentity
-	134, // 223: codeflux.v1.SessionProjectionSnapshot.task_id:type_name -> codeflux.v1.StableIdentity
-	150, // 224: codeflux.v1.SessionProjectionSnapshot.observed_at:type_name -> google.protobuf.Timestamp
-	155, // 225: codeflux.v1.SessionProjectionSnapshot.plan:type_name -> codeflux.v1.PlanEvent
-	156, // 226: codeflux.v1.SessionProjectionSnapshot.pending_approval:type_name -> codeflux.v1.ApprovalEvent
-	157, // 227: codeflux.v1.SessionProjectionSnapshot.budget:type_name -> codeflux.v1.BudgetEvent
-	158, // 228: codeflux.v1.SessionProjectionSnapshot.validation:type_name -> codeflux.v1.ValidationEvent
-	159, // 229: codeflux.v1.SessionProjectionSnapshot.checkpoint:type_name -> codeflux.v1.CheckpointEvent
-	150, // 230: codeflux.v1.SessionProjectionSnapshot.checkpoint_created_at:type_name -> google.protobuf.Timestamp
-	160, // 231: codeflux.v1.SessionProjectionSnapshot.recovery:type_name -> codeflux.v1.RecoveryRequiredEvent
-	161, // 232: codeflux.v1.SessionProjectionSnapshot.change_acceptance:type_name -> codeflux.v1.ChangeAcceptanceEvent
-	162, // 233: codeflux.v1.SessionProjectionSnapshot.tool:type_name -> codeflux.v1.ToolEvent
-	117, // 234: codeflux.v1.SessionProjectionSnapshot.review_bindings:type_name -> codeflux.v1.SessionRevisionBindings
-	134, // 235: codeflux.v1.SubscribeSessionRequest.session_id:type_name -> codeflux.v1.StableIdentity
-	163, // 236: codeflux.v1.SubscribeSessionResponse.event:type_name -> codeflux.v1.SessionEvent
-	120, // 237: codeflux.v1.SubscribeSessionResponse.replay_boundary:type_name -> codeflux.v1.SessionReplayBoundary
-	138, // 238: codeflux.v1.CodeCollectionRevisionView.warnings:type_name -> codeflux.v1.RedactedText
-	138, // 239: codeflux.v1.CodeAtomFieldView.text:type_name -> codeflux.v1.RedactedText
-	138, // 240: codeflux.v1.CodeAtomFieldView.items:type_name -> codeflux.v1.RedactedText
-	134, // 241: codeflux.v1.ListCodePackagesRequest.repository_id:type_name -> codeflux.v1.StableIdentity
-	135, // 242: codeflux.v1.ListCodePackagesRequest.page:type_name -> codeflux.v1.PageRequest
-	121, // 243: codeflux.v1.ListCodePackagesResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
-	122, // 244: codeflux.v1.ListCodePackagesResponse.packages:type_name -> codeflux.v1.CodePackageView
-	137, // 245: codeflux.v1.ListCodePackagesResponse.page:type_name -> codeflux.v1.PageInfo
-	134, // 246: codeflux.v1.ListCodeSymbolsRequest.repository_id:type_name -> codeflux.v1.StableIdentity
-	135, // 247: codeflux.v1.ListCodeSymbolsRequest.page:type_name -> codeflux.v1.PageRequest
-	121, // 248: codeflux.v1.ListCodeSymbolsResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
-	123, // 249: codeflux.v1.ListCodeSymbolsResponse.symbols:type_name -> codeflux.v1.CodeSymbolView
-	137, // 250: codeflux.v1.ListCodeSymbolsResponse.page:type_name -> codeflux.v1.PageInfo
-	134, // 251: codeflux.v1.InspectCodeSymbolRequest.repository_id:type_name -> codeflux.v1.StableIdentity
-	121, // 252: codeflux.v1.InspectCodeSymbolResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
-	123, // 253: codeflux.v1.InspectCodeSymbolResponse.symbol:type_name -> codeflux.v1.CodeSymbolView
-	138, // 254: codeflux.v1.InspectCodeSymbolResponse.signature:type_name -> codeflux.v1.RedactedText
-	138, // 255: codeflux.v1.InspectCodeSymbolResponse.documentation:type_name -> codeflux.v1.RedactedText
-	125, // 256: codeflux.v1.InspectCodeSymbolResponse.atom_fields:type_name -> codeflux.v1.CodeAtomFieldView
-	124, // 257: codeflux.v1.InspectCodeSymbolResponse.callers:type_name -> codeflux.v1.CodeSymbolReferenceView
-	124, // 258: codeflux.v1.InspectCodeSymbolResponse.callees:type_name -> codeflux.v1.CodeSymbolReferenceView
-	138, // 259: codeflux.v1.InspectCodeSymbolResponse.source:type_name -> codeflux.v1.RedactedText
-	124, // 260: codeflux.v1.InspectCodeSymbolResponse.tests:type_name -> codeflux.v1.CodeSymbolReferenceView
-	7,   // 261: codeflux.v1.WorkspaceService.OpenWorkspace:input_type -> codeflux.v1.OpenWorkspaceRequest
-	9,   // 262: codeflux.v1.WorkspaceService.GetWorkspaceState:input_type -> codeflux.v1.GetWorkspaceStateRequest
-	11,  // 263: codeflux.v1.WorkspaceService.ListRepositories:input_type -> codeflux.v1.ListRepositoriesRequest
-	13,  // 264: codeflux.v1.WorkspaceService.InspectRepository:input_type -> codeflux.v1.InspectRepositoryRequest
-	15,  // 265: codeflux.v1.ThreadService.CreateThread:input_type -> codeflux.v1.CreateThreadRequest
-	17,  // 266: codeflux.v1.ThreadService.ListThreads:input_type -> codeflux.v1.ListThreadsRequest
-	19,  // 267: codeflux.v1.ThreadService.GetThreadPage:input_type -> codeflux.v1.GetThreadPageRequest
-	21,  // 268: codeflux.v1.ThreadService.SendMessage:input_type -> codeflux.v1.SendMessageRequest
-	23,  // 269: codeflux.v1.ThreadService.RenameThread:input_type -> codeflux.v1.RenameThreadRequest
-	25,  // 270: codeflux.v1.ThreadService.ArchiveThread:input_type -> codeflux.v1.ArchiveThreadRequest
-	27,  // 271: codeflux.v1.TaskService.CreateTask:input_type -> codeflux.v1.CreateTaskRequest
-	29,  // 272: codeflux.v1.TaskService.GetTask:input_type -> codeflux.v1.GetTaskRequest
-	31,  // 273: codeflux.v1.TaskService.ApprovePlan:input_type -> codeflux.v1.ApprovePlanRequest
-	33,  // 274: codeflux.v1.TaskService.StartTask:input_type -> codeflux.v1.StartTaskRequest
-	35,  // 275: codeflux.v1.TaskService.PauseTask:input_type -> codeflux.v1.PauseTaskRequest
-	37,  // 276: codeflux.v1.TaskService.ResumeTask:input_type -> codeflux.v1.ResumeTaskRequest
-	39,  // 277: codeflux.v1.TaskService.CancelTask:input_type -> codeflux.v1.CancelTaskRequest
-	41,  // 278: codeflux.v1.TaskService.ApproveAction:input_type -> codeflux.v1.ApproveActionRequest
-	43,  // 279: codeflux.v1.TaskService.SetBudget:input_type -> codeflux.v1.SetBudgetRequest
-	45,  // 280: codeflux.v1.TaskService.RequestRepair:input_type -> codeflux.v1.RequestRepairRequest
-	48,  // 281: codeflux.v1.TaskService.RollbackTask:input_type -> codeflux.v1.RollbackTaskRequest
-	50,  // 282: codeflux.v1.TaskService.PreserveRecoveryPatch:input_type -> codeflux.v1.PreserveRecoveryPatchRequest
-	52,  // 283: codeflux.v1.TaskService.ReconcileRecovery:input_type -> codeflux.v1.ReconcileRecoveryRequest
-	54,  // 284: codeflux.v1.TaskService.SafeResumeRecovery:input_type -> codeflux.v1.SafeResumeRecoveryRequest
-	56,  // 285: codeflux.v1.GraphService.GetGraphSlice:input_type -> codeflux.v1.GetGraphSliceRequest
-	58,  // 286: codeflux.v1.GraphService.ExpandGraph:input_type -> codeflux.v1.ExpandGraphRequest
-	60,  // 287: codeflux.v1.GraphService.GetNode:input_type -> codeflux.v1.GetNodeRequest
-	62,  // 288: codeflux.v1.GraphService.SearchGraph:input_type -> codeflux.v1.SearchGraphRequest
-	64,  // 289: codeflux.v1.GraphService.ExplainNode:input_type -> codeflux.v1.ExplainNodeRequest
-	66,  // 290: codeflux.v1.GraphService.CompareGraphRevisions:input_type -> codeflux.v1.CompareGraphRevisionsRequest
-	68,  // 291: codeflux.v1.ReviewService.GetDiffSummary:input_type -> codeflux.v1.GetDiffSummaryRequest
-	74,  // 292: codeflux.v1.ReviewService.GetValidationReport:input_type -> codeflux.v1.GetValidationReportRequest
-	76,  // 293: codeflux.v1.ReviewService.GetEvidenceReport:input_type -> codeflux.v1.GetEvidenceReportRequest
-	82,  // 294: codeflux.v1.ReviewService.AcceptChange:input_type -> codeflux.v1.AcceptChangeRequest
-	69,  // 295: codeflux.v1.ReviewService.RequestRepair:input_type -> codeflux.v1.ReviewServiceRequestRepairRequest
-	84,  // 296: codeflux.v1.ReviewService.RejectChange:input_type -> codeflux.v1.RejectChangeRequest
-	71,  // 297: codeflux.v1.ReviewService.RollbackTask:input_type -> codeflux.v1.ReviewServiceRollbackTaskRequest
-	86,  // 298: codeflux.v1.ReviewService.OpenInEditor:input_type -> codeflux.v1.OpenInEditorRequest
-	88,  // 299: codeflux.v1.MemoryService.ListMemoryArtifacts:input_type -> codeflux.v1.ListMemoryArtifactsRequest
-	91,  // 300: codeflux.v1.MemoryService.GetMemoryArtifact:input_type -> codeflux.v1.GetMemoryArtifactRequest
-	95,  // 301: codeflux.v1.SettingsService.GetModels:input_type -> codeflux.v1.GetModelsRequest
-	97,  // 302: codeflux.v1.SettingsService.GetPolicy:input_type -> codeflux.v1.GetPolicyRequest
-	99,  // 303: codeflux.v1.SettingsService.SetPolicy:input_type -> codeflux.v1.SetPolicyRequest
-	101, // 304: codeflux.v1.SettingsService.SetBudgetDefaults:input_type -> codeflux.v1.SetBudgetDefaultsRequest
-	103, // 305: codeflux.v1.SettingsService.ConfigureProvider:input_type -> codeflux.v1.ConfigureProviderRequest
-	105, // 306: codeflux.v1.SettingsService.TestProvider:input_type -> codeflux.v1.TestProviderRequest
-	108, // 307: codeflux.v1.SettingsService.RecordFrontendTelemetry:input_type -> codeflux.v1.RecordFrontendTelemetryRequest
-	110, // 308: codeflux.v1.SettingsService.ListFrontendTelemetry:input_type -> codeflux.v1.ListFrontendTelemetryRequest
-	112, // 309: codeflux.v1.SettingsService.DeleteFrontendTelemetry:input_type -> codeflux.v1.DeleteFrontendTelemetryRequest
-	114, // 310: codeflux.v1.SessionService.GetSessionSnapshot:input_type -> codeflux.v1.GetSessionSnapshotRequest
-	118, // 311: codeflux.v1.SessionService.SubscribeSession:input_type -> codeflux.v1.SubscribeSessionRequest
-	126, // 312: codeflux.v1.CodeCollectionService.ListCodePackages:input_type -> codeflux.v1.ListCodePackagesRequest
-	128, // 313: codeflux.v1.CodeCollectionService.ListCodeSymbols:input_type -> codeflux.v1.ListCodeSymbolsRequest
-	130, // 314: codeflux.v1.CodeCollectionService.InspectCodeSymbol:input_type -> codeflux.v1.InspectCodeSymbolRequest
-	8,   // 315: codeflux.v1.WorkspaceService.OpenWorkspace:output_type -> codeflux.v1.OpenWorkspaceResponse
-	10,  // 316: codeflux.v1.WorkspaceService.GetWorkspaceState:output_type -> codeflux.v1.GetWorkspaceStateResponse
-	12,  // 317: codeflux.v1.WorkspaceService.ListRepositories:output_type -> codeflux.v1.ListRepositoriesResponse
-	14,  // 318: codeflux.v1.WorkspaceService.InspectRepository:output_type -> codeflux.v1.InspectRepositoryResponse
-	16,  // 319: codeflux.v1.ThreadService.CreateThread:output_type -> codeflux.v1.CreateThreadResponse
-	18,  // 320: codeflux.v1.ThreadService.ListThreads:output_type -> codeflux.v1.ListThreadsResponse
-	20,  // 321: codeflux.v1.ThreadService.GetThreadPage:output_type -> codeflux.v1.GetThreadPageResponse
-	22,  // 322: codeflux.v1.ThreadService.SendMessage:output_type -> codeflux.v1.SendMessageResponse
-	24,  // 323: codeflux.v1.ThreadService.RenameThread:output_type -> codeflux.v1.RenameThreadResponse
-	26,  // 324: codeflux.v1.ThreadService.ArchiveThread:output_type -> codeflux.v1.ArchiveThreadResponse
-	28,  // 325: codeflux.v1.TaskService.CreateTask:output_type -> codeflux.v1.CreateTaskResponse
-	30,  // 326: codeflux.v1.TaskService.GetTask:output_type -> codeflux.v1.GetTaskResponse
-	32,  // 327: codeflux.v1.TaskService.ApprovePlan:output_type -> codeflux.v1.ApprovePlanResponse
-	34,  // 328: codeflux.v1.TaskService.StartTask:output_type -> codeflux.v1.StartTaskResponse
-	36,  // 329: codeflux.v1.TaskService.PauseTask:output_type -> codeflux.v1.PauseTaskResponse
-	38,  // 330: codeflux.v1.TaskService.ResumeTask:output_type -> codeflux.v1.ResumeTaskResponse
-	40,  // 331: codeflux.v1.TaskService.CancelTask:output_type -> codeflux.v1.CancelTaskResponse
-	42,  // 332: codeflux.v1.TaskService.ApproveAction:output_type -> codeflux.v1.ApproveActionResponse
-	44,  // 333: codeflux.v1.TaskService.SetBudget:output_type -> codeflux.v1.SetBudgetResponse
-	47,  // 334: codeflux.v1.TaskService.RequestRepair:output_type -> codeflux.v1.RequestRepairResponse
-	49,  // 335: codeflux.v1.TaskService.RollbackTask:output_type -> codeflux.v1.RollbackTaskResponse
-	51,  // 336: codeflux.v1.TaskService.PreserveRecoveryPatch:output_type -> codeflux.v1.PreserveRecoveryPatchResponse
-	53,  // 337: codeflux.v1.TaskService.ReconcileRecovery:output_type -> codeflux.v1.ReconcileRecoveryResponse
-	55,  // 338: codeflux.v1.TaskService.SafeResumeRecovery:output_type -> codeflux.v1.SafeResumeRecoveryResponse
-	57,  // 339: codeflux.v1.GraphService.GetGraphSlice:output_type -> codeflux.v1.GetGraphSliceResponse
-	59,  // 340: codeflux.v1.GraphService.ExpandGraph:output_type -> codeflux.v1.ExpandGraphResponse
-	61,  // 341: codeflux.v1.GraphService.GetNode:output_type -> codeflux.v1.GetNodeResponse
-	63,  // 342: codeflux.v1.GraphService.SearchGraph:output_type -> codeflux.v1.SearchGraphResponse
-	65,  // 343: codeflux.v1.GraphService.ExplainNode:output_type -> codeflux.v1.ExplainNodeResponse
-	67,  // 344: codeflux.v1.GraphService.CompareGraphRevisions:output_type -> codeflux.v1.CompareGraphRevisionsResponse
-	73,  // 345: codeflux.v1.ReviewService.GetDiffSummary:output_type -> codeflux.v1.GetDiffSummaryResponse
-	75,  // 346: codeflux.v1.ReviewService.GetValidationReport:output_type -> codeflux.v1.GetValidationReportResponse
-	81,  // 347: codeflux.v1.ReviewService.GetEvidenceReport:output_type -> codeflux.v1.GetEvidenceReportResponse
-	83,  // 348: codeflux.v1.ReviewService.AcceptChange:output_type -> codeflux.v1.AcceptChangeResponse
-	70,  // 349: codeflux.v1.ReviewService.RequestRepair:output_type -> codeflux.v1.ReviewServiceRequestRepairResponse
-	85,  // 350: codeflux.v1.ReviewService.RejectChange:output_type -> codeflux.v1.RejectChangeResponse
-	72,  // 351: codeflux.v1.ReviewService.RollbackTask:output_type -> codeflux.v1.ReviewServiceRollbackTaskResponse
-	87,  // 352: codeflux.v1.ReviewService.OpenInEditor:output_type -> codeflux.v1.OpenInEditorResponse
-	90,  // 353: codeflux.v1.MemoryService.ListMemoryArtifacts:output_type -> codeflux.v1.ListMemoryArtifactsResponse
-	94,  // 354: codeflux.v1.MemoryService.GetMemoryArtifact:output_type -> codeflux.v1.GetMemoryArtifactResponse
-	96,  // 355: codeflux.v1.SettingsService.GetModels:output_type -> codeflux.v1.GetModelsResponse
-	98,  // 356: codeflux.v1.SettingsService.GetPolicy:output_type -> codeflux.v1.GetPolicyResponse
-	100, // 357: codeflux.v1.SettingsService.SetPolicy:output_type -> codeflux.v1.SetPolicyResponse
-	102, // 358: codeflux.v1.SettingsService.SetBudgetDefaults:output_type -> codeflux.v1.SetBudgetDefaultsResponse
-	104, // 359: codeflux.v1.SettingsService.ConfigureProvider:output_type -> codeflux.v1.ConfigureProviderResponse
-	106, // 360: codeflux.v1.SettingsService.TestProvider:output_type -> codeflux.v1.TestProviderResponse
-	109, // 361: codeflux.v1.SettingsService.RecordFrontendTelemetry:output_type -> codeflux.v1.RecordFrontendTelemetryResponse
-	111, // 362: codeflux.v1.SettingsService.ListFrontendTelemetry:output_type -> codeflux.v1.ListFrontendTelemetryResponse
-	113, // 363: codeflux.v1.SettingsService.DeleteFrontendTelemetry:output_type -> codeflux.v1.DeleteFrontendTelemetryResponse
-	115, // 364: codeflux.v1.SessionService.GetSessionSnapshot:output_type -> codeflux.v1.GetSessionSnapshotResponse
-	119, // 365: codeflux.v1.SessionService.SubscribeSession:output_type -> codeflux.v1.SubscribeSessionResponse
-	127, // 366: codeflux.v1.CodeCollectionService.ListCodePackages:output_type -> codeflux.v1.ListCodePackagesResponse
-	129, // 367: codeflux.v1.CodeCollectionService.ListCodeSymbols:output_type -> codeflux.v1.ListCodeSymbolsResponse
-	131, // 368: codeflux.v1.CodeCollectionService.InspectCodeSymbol:output_type -> codeflux.v1.InspectCodeSymbolResponse
-	315, // [315:369] is the sub-list for method output_type
-	261, // [261:315] is the sub-list for method input_type
-	261, // [261:261] is the sub-list for extension type_name
-	261, // [261:261] is the sub-list for extension extendee
-	0,   // [0:261] is the sub-list for field type_name
+	162, // 219: codeflux.v1.SpendCost.amount:type_name -> codeflux.v1.Money
+	114, // 220: codeflux.v1.SpendSliceView.known_cost:type_name -> codeflux.v1.SpendCost
+	115, // 221: codeflux.v1.PhaseSpendView.spend:type_name -> codeflux.v1.SpendSliceView
+	115, // 222: codeflux.v1.StageSpendView.spend:type_name -> codeflux.v1.SpendSliceView
+	115, // 223: codeflux.v1.ModelSpendView.spend:type_name -> codeflux.v1.SpendSliceView
+	154, // 224: codeflux.v1.GetSpendSummaryRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	170, // 225: codeflux.v1.GetSpendSummaryRequest.since:type_name -> google.protobuf.Timestamp
+	170, // 226: codeflux.v1.GetSpendSummaryRequest.until:type_name -> google.protobuf.Timestamp
+	115, // 227: codeflux.v1.GetSpendSummaryResponse.total:type_name -> codeflux.v1.SpendSliceView
+	116, // 228: codeflux.v1.GetSpendSummaryResponse.by_phase:type_name -> codeflux.v1.PhaseSpendView
+	117, // 229: codeflux.v1.GetSpendSummaryResponse.by_stage:type_name -> codeflux.v1.StageSpendView
+	118, // 230: codeflux.v1.GetSpendSummaryResponse.by_model:type_name -> codeflux.v1.ModelSpendView
+	115, // 231: codeflux.v1.GetSpendSummaryResponse.unattributed:type_name -> codeflux.v1.SpendSliceView
+	154, // 232: codeflux.v1.GetSessionSnapshotRequest.session_id:type_name -> codeflux.v1.StableIdentity
+	123, // 233: codeflux.v1.GetSessionSnapshotResponse.snapshot:type_name -> codeflux.v1.SessionProjectionSnapshot
+	154, // 234: codeflux.v1.SessionProjectionSnapshot.session_id:type_name -> codeflux.v1.StableIdentity
+	154, // 235: codeflux.v1.SessionProjectionSnapshot.thread_id:type_name -> codeflux.v1.StableIdentity
+	154, // 236: codeflux.v1.SessionProjectionSnapshot.task_id:type_name -> codeflux.v1.StableIdentity
+	170, // 237: codeflux.v1.SessionProjectionSnapshot.observed_at:type_name -> google.protobuf.Timestamp
+	175, // 238: codeflux.v1.SessionProjectionSnapshot.plan:type_name -> codeflux.v1.PlanEvent
+	176, // 239: codeflux.v1.SessionProjectionSnapshot.pending_approval:type_name -> codeflux.v1.ApprovalEvent
+	177, // 240: codeflux.v1.SessionProjectionSnapshot.budget:type_name -> codeflux.v1.BudgetEvent
+	178, // 241: codeflux.v1.SessionProjectionSnapshot.validation:type_name -> codeflux.v1.ValidationEvent
+	179, // 242: codeflux.v1.SessionProjectionSnapshot.checkpoint:type_name -> codeflux.v1.CheckpointEvent
+	170, // 243: codeflux.v1.SessionProjectionSnapshot.checkpoint_created_at:type_name -> google.protobuf.Timestamp
+	180, // 244: codeflux.v1.SessionProjectionSnapshot.recovery:type_name -> codeflux.v1.RecoveryRequiredEvent
+	181, // 245: codeflux.v1.SessionProjectionSnapshot.change_acceptance:type_name -> codeflux.v1.ChangeAcceptanceEvent
+	182, // 246: codeflux.v1.SessionProjectionSnapshot.tool:type_name -> codeflux.v1.ToolEvent
+	124, // 247: codeflux.v1.SessionProjectionSnapshot.review_bindings:type_name -> codeflux.v1.SessionRevisionBindings
+	154, // 248: codeflux.v1.SubscribeSessionRequest.session_id:type_name -> codeflux.v1.StableIdentity
+	183, // 249: codeflux.v1.SubscribeSessionResponse.event:type_name -> codeflux.v1.SessionEvent
+	127, // 250: codeflux.v1.SubscribeSessionResponse.replay_boundary:type_name -> codeflux.v1.SessionReplayBoundary
+	154, // 251: codeflux.v1.ListCodeFilesRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	155, // 252: codeflux.v1.ListCodeFilesRequest.page:type_name -> codeflux.v1.PageRequest
+	133, // 253: codeflux.v1.ListCodeFilesResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
+	128, // 254: codeflux.v1.ListCodeFilesResponse.files:type_name -> codeflux.v1.CodeFileView
+	157, // 255: codeflux.v1.ListCodeFilesResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 256: codeflux.v1.ReadCodeFileRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	133, // 257: codeflux.v1.ReadCodeFileResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
+	128, // 258: codeflux.v1.ReadCodeFileResponse.file:type_name -> codeflux.v1.CodeFileView
+	158, // 259: codeflux.v1.ReadCodeFileResponse.text:type_name -> codeflux.v1.RedactedText
+	135, // 260: codeflux.v1.ReadCodeFileResponse.declarations:type_name -> codeflux.v1.CodeSymbolView
+	158, // 261: codeflux.v1.CodeCollectionRevisionView.warnings:type_name -> codeflux.v1.RedactedText
+	158, // 262: codeflux.v1.CodeSymbolView.matched_promise:type_name -> codeflux.v1.RedactedText
+	158, // 263: codeflux.v1.CodeAtomFieldView.text:type_name -> codeflux.v1.RedactedText
+	158, // 264: codeflux.v1.CodeAtomFieldView.items:type_name -> codeflux.v1.RedactedText
+	154, // 265: codeflux.v1.ListCodePackagesRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	155, // 266: codeflux.v1.ListCodePackagesRequest.page:type_name -> codeflux.v1.PageRequest
+	133, // 267: codeflux.v1.ListCodePackagesResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
+	134, // 268: codeflux.v1.ListCodePackagesResponse.packages:type_name -> codeflux.v1.CodePackageView
+	157, // 269: codeflux.v1.ListCodePackagesResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 270: codeflux.v1.ListCodeSymbolsRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	155, // 271: codeflux.v1.ListCodeSymbolsRequest.page:type_name -> codeflux.v1.PageRequest
+	133, // 272: codeflux.v1.ListCodeSymbolsResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
+	135, // 273: codeflux.v1.ListCodeSymbolsResponse.symbols:type_name -> codeflux.v1.CodeSymbolView
+	157, // 274: codeflux.v1.ListCodeSymbolsResponse.page:type_name -> codeflux.v1.PageInfo
+	154, // 275: codeflux.v1.InspectCodeSymbolRequest.repository_id:type_name -> codeflux.v1.StableIdentity
+	133, // 276: codeflux.v1.InspectCodeSymbolResponse.revision:type_name -> codeflux.v1.CodeCollectionRevisionView
+	135, // 277: codeflux.v1.InspectCodeSymbolResponse.symbol:type_name -> codeflux.v1.CodeSymbolView
+	158, // 278: codeflux.v1.InspectCodeSymbolResponse.signature:type_name -> codeflux.v1.RedactedText
+	158, // 279: codeflux.v1.InspectCodeSymbolResponse.documentation:type_name -> codeflux.v1.RedactedText
+	137, // 280: codeflux.v1.InspectCodeSymbolResponse.atom_fields:type_name -> codeflux.v1.CodeAtomFieldView
+	136, // 281: codeflux.v1.InspectCodeSymbolResponse.callers:type_name -> codeflux.v1.CodeSymbolReferenceView
+	136, // 282: codeflux.v1.InspectCodeSymbolResponse.callees:type_name -> codeflux.v1.CodeSymbolReferenceView
+	158, // 283: codeflux.v1.InspectCodeSymbolResponse.source:type_name -> codeflux.v1.RedactedText
+	136, // 284: codeflux.v1.InspectCodeSymbolResponse.tests:type_name -> codeflux.v1.CodeSymbolReferenceView
+	158, // 285: codeflux.v1.InspectCodeSymbolResponse.naming_finding:type_name -> codeflux.v1.RedactedText
+	144, // 286: codeflux.v1.InspectCodeSymbolResponse.structure:type_name -> codeflux.v1.CodeSymbolStructureView
+	158, // 287: codeflux.v1.FlowSettingView.help:type_name -> codeflux.v1.RedactedText
+	146, // 288: codeflux.v1.FlowSettingView.pair_values:type_name -> codeflux.v1.FlowSettingPair
+	154, // 289: codeflux.v1.GetFlowSettingsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	145, // 290: codeflux.v1.GetFlowSettingsResponse.settings:type_name -> codeflux.v1.FlowSettingView
+	146, // 291: codeflux.v1.FlowSettingChange.pair_values:type_name -> codeflux.v1.FlowSettingPair
+	152, // 292: codeflux.v1.SetFlowSettingsRequest.control:type_name -> codeflux.v1.MutationControl
+	154, // 293: codeflux.v1.SetFlowSettingsRequest.workspace_id:type_name -> codeflux.v1.StableIdentity
+	149, // 294: codeflux.v1.SetFlowSettingsRequest.changes:type_name -> codeflux.v1.FlowSettingChange
+	145, // 295: codeflux.v1.SetFlowSettingsResponse.settings:type_name -> codeflux.v1.FlowSettingView
+	7,   // 296: codeflux.v1.WorkspaceService.OpenWorkspace:input_type -> codeflux.v1.OpenWorkspaceRequest
+	9,   // 297: codeflux.v1.WorkspaceService.GetWorkspaceState:input_type -> codeflux.v1.GetWorkspaceStateRequest
+	11,  // 298: codeflux.v1.WorkspaceService.ListRepositories:input_type -> codeflux.v1.ListRepositoriesRequest
+	13,  // 299: codeflux.v1.WorkspaceService.InspectRepository:input_type -> codeflux.v1.InspectRepositoryRequest
+	15,  // 300: codeflux.v1.ThreadService.CreateThread:input_type -> codeflux.v1.CreateThreadRequest
+	17,  // 301: codeflux.v1.ThreadService.ListThreads:input_type -> codeflux.v1.ListThreadsRequest
+	19,  // 302: codeflux.v1.ThreadService.GetThreadPage:input_type -> codeflux.v1.GetThreadPageRequest
+	21,  // 303: codeflux.v1.ThreadService.SendMessage:input_type -> codeflux.v1.SendMessageRequest
+	23,  // 304: codeflux.v1.ThreadService.RenameThread:input_type -> codeflux.v1.RenameThreadRequest
+	25,  // 305: codeflux.v1.ThreadService.ArchiveThread:input_type -> codeflux.v1.ArchiveThreadRequest
+	27,  // 306: codeflux.v1.TaskService.CreateTask:input_type -> codeflux.v1.CreateTaskRequest
+	29,  // 307: codeflux.v1.TaskService.GetTask:input_type -> codeflux.v1.GetTaskRequest
+	31,  // 308: codeflux.v1.TaskService.ApprovePlan:input_type -> codeflux.v1.ApprovePlanRequest
+	33,  // 309: codeflux.v1.TaskService.StartTask:input_type -> codeflux.v1.StartTaskRequest
+	35,  // 310: codeflux.v1.TaskService.PauseTask:input_type -> codeflux.v1.PauseTaskRequest
+	37,  // 311: codeflux.v1.TaskService.ResumeTask:input_type -> codeflux.v1.ResumeTaskRequest
+	39,  // 312: codeflux.v1.TaskService.CancelTask:input_type -> codeflux.v1.CancelTaskRequest
+	41,  // 313: codeflux.v1.TaskService.ApproveAction:input_type -> codeflux.v1.ApproveActionRequest
+	43,  // 314: codeflux.v1.TaskService.SetBudget:input_type -> codeflux.v1.SetBudgetRequest
+	45,  // 315: codeflux.v1.TaskService.RequestRepair:input_type -> codeflux.v1.RequestRepairRequest
+	48,  // 316: codeflux.v1.TaskService.RollbackTask:input_type -> codeflux.v1.RollbackTaskRequest
+	50,  // 317: codeflux.v1.TaskService.PreserveRecoveryPatch:input_type -> codeflux.v1.PreserveRecoveryPatchRequest
+	52,  // 318: codeflux.v1.TaskService.ReconcileRecovery:input_type -> codeflux.v1.ReconcileRecoveryRequest
+	54,  // 319: codeflux.v1.TaskService.SafeResumeRecovery:input_type -> codeflux.v1.SafeResumeRecoveryRequest
+	56,  // 320: codeflux.v1.GraphService.GetGraphSlice:input_type -> codeflux.v1.GetGraphSliceRequest
+	58,  // 321: codeflux.v1.GraphService.ExpandGraph:input_type -> codeflux.v1.ExpandGraphRequest
+	60,  // 322: codeflux.v1.GraphService.GetNode:input_type -> codeflux.v1.GetNodeRequest
+	62,  // 323: codeflux.v1.GraphService.SearchGraph:input_type -> codeflux.v1.SearchGraphRequest
+	64,  // 324: codeflux.v1.GraphService.ExplainNode:input_type -> codeflux.v1.ExplainNodeRequest
+	66,  // 325: codeflux.v1.GraphService.CompareGraphRevisions:input_type -> codeflux.v1.CompareGraphRevisionsRequest
+	68,  // 326: codeflux.v1.ReviewService.GetDiffSummary:input_type -> codeflux.v1.GetDiffSummaryRequest
+	74,  // 327: codeflux.v1.ReviewService.GetValidationReport:input_type -> codeflux.v1.GetValidationReportRequest
+	76,  // 328: codeflux.v1.ReviewService.GetEvidenceReport:input_type -> codeflux.v1.GetEvidenceReportRequest
+	82,  // 329: codeflux.v1.ReviewService.AcceptChange:input_type -> codeflux.v1.AcceptChangeRequest
+	69,  // 330: codeflux.v1.ReviewService.RequestRepair:input_type -> codeflux.v1.ReviewServiceRequestRepairRequest
+	84,  // 331: codeflux.v1.ReviewService.RejectChange:input_type -> codeflux.v1.RejectChangeRequest
+	71,  // 332: codeflux.v1.ReviewService.RollbackTask:input_type -> codeflux.v1.ReviewServiceRollbackTaskRequest
+	86,  // 333: codeflux.v1.ReviewService.OpenInEditor:input_type -> codeflux.v1.OpenInEditorRequest
+	88,  // 334: codeflux.v1.MemoryService.ListMemoryArtifacts:input_type -> codeflux.v1.ListMemoryArtifactsRequest
+	91,  // 335: codeflux.v1.MemoryService.GetMemoryArtifact:input_type -> codeflux.v1.GetMemoryArtifactRequest
+	95,  // 336: codeflux.v1.SettingsService.GetModels:input_type -> codeflux.v1.GetModelsRequest
+	97,  // 337: codeflux.v1.SettingsService.GetPolicy:input_type -> codeflux.v1.GetPolicyRequest
+	99,  // 338: codeflux.v1.SettingsService.SetPolicy:input_type -> codeflux.v1.SetPolicyRequest
+	101, // 339: codeflux.v1.SettingsService.SetBudgetDefaults:input_type -> codeflux.v1.SetBudgetDefaultsRequest
+	103, // 340: codeflux.v1.SettingsService.ConfigureProvider:input_type -> codeflux.v1.ConfigureProviderRequest
+	105, // 341: codeflux.v1.SettingsService.TestProvider:input_type -> codeflux.v1.TestProviderRequest
+	147, // 342: codeflux.v1.SettingsService.GetFlowSettings:input_type -> codeflux.v1.GetFlowSettingsRequest
+	150, // 343: codeflux.v1.SettingsService.SetFlowSettings:input_type -> codeflux.v1.SetFlowSettingsRequest
+	108, // 344: codeflux.v1.SettingsService.RecordFrontendTelemetry:input_type -> codeflux.v1.RecordFrontendTelemetryRequest
+	110, // 345: codeflux.v1.SettingsService.ListFrontendTelemetry:input_type -> codeflux.v1.ListFrontendTelemetryRequest
+	112, // 346: codeflux.v1.SettingsService.DeleteFrontendTelemetry:input_type -> codeflux.v1.DeleteFrontendTelemetryRequest
+	119, // 347: codeflux.v1.SettingsService.GetSpendSummary:input_type -> codeflux.v1.GetSpendSummaryRequest
+	121, // 348: codeflux.v1.SessionService.GetSessionSnapshot:input_type -> codeflux.v1.GetSessionSnapshotRequest
+	125, // 349: codeflux.v1.SessionService.SubscribeSession:input_type -> codeflux.v1.SubscribeSessionRequest
+	138, // 350: codeflux.v1.CodeCollectionService.ListCodePackages:input_type -> codeflux.v1.ListCodePackagesRequest
+	140, // 351: codeflux.v1.CodeCollectionService.ListCodeSymbols:input_type -> codeflux.v1.ListCodeSymbolsRequest
+	142, // 352: codeflux.v1.CodeCollectionService.InspectCodeSymbol:input_type -> codeflux.v1.InspectCodeSymbolRequest
+	129, // 353: codeflux.v1.CodeCollectionService.ListCodeFiles:input_type -> codeflux.v1.ListCodeFilesRequest
+	131, // 354: codeflux.v1.CodeCollectionService.ReadCodeFile:input_type -> codeflux.v1.ReadCodeFileRequest
+	8,   // 355: codeflux.v1.WorkspaceService.OpenWorkspace:output_type -> codeflux.v1.OpenWorkspaceResponse
+	10,  // 356: codeflux.v1.WorkspaceService.GetWorkspaceState:output_type -> codeflux.v1.GetWorkspaceStateResponse
+	12,  // 357: codeflux.v1.WorkspaceService.ListRepositories:output_type -> codeflux.v1.ListRepositoriesResponse
+	14,  // 358: codeflux.v1.WorkspaceService.InspectRepository:output_type -> codeflux.v1.InspectRepositoryResponse
+	16,  // 359: codeflux.v1.ThreadService.CreateThread:output_type -> codeflux.v1.CreateThreadResponse
+	18,  // 360: codeflux.v1.ThreadService.ListThreads:output_type -> codeflux.v1.ListThreadsResponse
+	20,  // 361: codeflux.v1.ThreadService.GetThreadPage:output_type -> codeflux.v1.GetThreadPageResponse
+	22,  // 362: codeflux.v1.ThreadService.SendMessage:output_type -> codeflux.v1.SendMessageResponse
+	24,  // 363: codeflux.v1.ThreadService.RenameThread:output_type -> codeflux.v1.RenameThreadResponse
+	26,  // 364: codeflux.v1.ThreadService.ArchiveThread:output_type -> codeflux.v1.ArchiveThreadResponse
+	28,  // 365: codeflux.v1.TaskService.CreateTask:output_type -> codeflux.v1.CreateTaskResponse
+	30,  // 366: codeflux.v1.TaskService.GetTask:output_type -> codeflux.v1.GetTaskResponse
+	32,  // 367: codeflux.v1.TaskService.ApprovePlan:output_type -> codeflux.v1.ApprovePlanResponse
+	34,  // 368: codeflux.v1.TaskService.StartTask:output_type -> codeflux.v1.StartTaskResponse
+	36,  // 369: codeflux.v1.TaskService.PauseTask:output_type -> codeflux.v1.PauseTaskResponse
+	38,  // 370: codeflux.v1.TaskService.ResumeTask:output_type -> codeflux.v1.ResumeTaskResponse
+	40,  // 371: codeflux.v1.TaskService.CancelTask:output_type -> codeflux.v1.CancelTaskResponse
+	42,  // 372: codeflux.v1.TaskService.ApproveAction:output_type -> codeflux.v1.ApproveActionResponse
+	44,  // 373: codeflux.v1.TaskService.SetBudget:output_type -> codeflux.v1.SetBudgetResponse
+	47,  // 374: codeflux.v1.TaskService.RequestRepair:output_type -> codeflux.v1.RequestRepairResponse
+	49,  // 375: codeflux.v1.TaskService.RollbackTask:output_type -> codeflux.v1.RollbackTaskResponse
+	51,  // 376: codeflux.v1.TaskService.PreserveRecoveryPatch:output_type -> codeflux.v1.PreserveRecoveryPatchResponse
+	53,  // 377: codeflux.v1.TaskService.ReconcileRecovery:output_type -> codeflux.v1.ReconcileRecoveryResponse
+	55,  // 378: codeflux.v1.TaskService.SafeResumeRecovery:output_type -> codeflux.v1.SafeResumeRecoveryResponse
+	57,  // 379: codeflux.v1.GraphService.GetGraphSlice:output_type -> codeflux.v1.GetGraphSliceResponse
+	59,  // 380: codeflux.v1.GraphService.ExpandGraph:output_type -> codeflux.v1.ExpandGraphResponse
+	61,  // 381: codeflux.v1.GraphService.GetNode:output_type -> codeflux.v1.GetNodeResponse
+	63,  // 382: codeflux.v1.GraphService.SearchGraph:output_type -> codeflux.v1.SearchGraphResponse
+	65,  // 383: codeflux.v1.GraphService.ExplainNode:output_type -> codeflux.v1.ExplainNodeResponse
+	67,  // 384: codeflux.v1.GraphService.CompareGraphRevisions:output_type -> codeflux.v1.CompareGraphRevisionsResponse
+	73,  // 385: codeflux.v1.ReviewService.GetDiffSummary:output_type -> codeflux.v1.GetDiffSummaryResponse
+	75,  // 386: codeflux.v1.ReviewService.GetValidationReport:output_type -> codeflux.v1.GetValidationReportResponse
+	81,  // 387: codeflux.v1.ReviewService.GetEvidenceReport:output_type -> codeflux.v1.GetEvidenceReportResponse
+	83,  // 388: codeflux.v1.ReviewService.AcceptChange:output_type -> codeflux.v1.AcceptChangeResponse
+	70,  // 389: codeflux.v1.ReviewService.RequestRepair:output_type -> codeflux.v1.ReviewServiceRequestRepairResponse
+	85,  // 390: codeflux.v1.ReviewService.RejectChange:output_type -> codeflux.v1.RejectChangeResponse
+	72,  // 391: codeflux.v1.ReviewService.RollbackTask:output_type -> codeflux.v1.ReviewServiceRollbackTaskResponse
+	87,  // 392: codeflux.v1.ReviewService.OpenInEditor:output_type -> codeflux.v1.OpenInEditorResponse
+	90,  // 393: codeflux.v1.MemoryService.ListMemoryArtifacts:output_type -> codeflux.v1.ListMemoryArtifactsResponse
+	94,  // 394: codeflux.v1.MemoryService.GetMemoryArtifact:output_type -> codeflux.v1.GetMemoryArtifactResponse
+	96,  // 395: codeflux.v1.SettingsService.GetModels:output_type -> codeflux.v1.GetModelsResponse
+	98,  // 396: codeflux.v1.SettingsService.GetPolicy:output_type -> codeflux.v1.GetPolicyResponse
+	100, // 397: codeflux.v1.SettingsService.SetPolicy:output_type -> codeflux.v1.SetPolicyResponse
+	102, // 398: codeflux.v1.SettingsService.SetBudgetDefaults:output_type -> codeflux.v1.SetBudgetDefaultsResponse
+	104, // 399: codeflux.v1.SettingsService.ConfigureProvider:output_type -> codeflux.v1.ConfigureProviderResponse
+	106, // 400: codeflux.v1.SettingsService.TestProvider:output_type -> codeflux.v1.TestProviderResponse
+	148, // 401: codeflux.v1.SettingsService.GetFlowSettings:output_type -> codeflux.v1.GetFlowSettingsResponse
+	151, // 402: codeflux.v1.SettingsService.SetFlowSettings:output_type -> codeflux.v1.SetFlowSettingsResponse
+	109, // 403: codeflux.v1.SettingsService.RecordFrontendTelemetry:output_type -> codeflux.v1.RecordFrontendTelemetryResponse
+	111, // 404: codeflux.v1.SettingsService.ListFrontendTelemetry:output_type -> codeflux.v1.ListFrontendTelemetryResponse
+	113, // 405: codeflux.v1.SettingsService.DeleteFrontendTelemetry:output_type -> codeflux.v1.DeleteFrontendTelemetryResponse
+	120, // 406: codeflux.v1.SettingsService.GetSpendSummary:output_type -> codeflux.v1.GetSpendSummaryResponse
+	122, // 407: codeflux.v1.SessionService.GetSessionSnapshot:output_type -> codeflux.v1.GetSessionSnapshotResponse
+	126, // 408: codeflux.v1.SessionService.SubscribeSession:output_type -> codeflux.v1.SubscribeSessionResponse
+	139, // 409: codeflux.v1.CodeCollectionService.ListCodePackages:output_type -> codeflux.v1.ListCodePackagesResponse
+	141, // 410: codeflux.v1.CodeCollectionService.ListCodeSymbols:output_type -> codeflux.v1.ListCodeSymbolsResponse
+	143, // 411: codeflux.v1.CodeCollectionService.InspectCodeSymbol:output_type -> codeflux.v1.InspectCodeSymbolResponse
+	130, // 412: codeflux.v1.CodeCollectionService.ListCodeFiles:output_type -> codeflux.v1.ListCodeFilesResponse
+	132, // 413: codeflux.v1.CodeCollectionService.ReadCodeFile:output_type -> codeflux.v1.ReadCodeFileResponse
+	355, // [355:414] is the sub-list for method output_type
+	296, // [296:355] is the sub-list for method input_type
+	296, // [296:296] is the sub-list for extension type_name
+	296, // [296:296] is the sub-list for extension extendee
+	0,   // [0:296] is the sub-list for field type_name
 }
 
 func init() { file_codeflux_v1_product_api_proto_init() }
@@ -10244,7 +12072,7 @@ func file_codeflux_v1_product_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codeflux_v1_product_api_proto_rawDesc), len(file_codeflux_v1_product_api_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   125,
+			NumMessages:   145,
 			NumExtensions: 0,
 			NumServices:   9,
 		},

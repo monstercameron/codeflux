@@ -1943,9 +1943,12 @@ const (
 	SettingsService_SetBudgetDefaults_FullMethodName       = "/codeflux.v1.SettingsService/SetBudgetDefaults"
 	SettingsService_ConfigureProvider_FullMethodName       = "/codeflux.v1.SettingsService/ConfigureProvider"
 	SettingsService_TestProvider_FullMethodName            = "/codeflux.v1.SettingsService/TestProvider"
+	SettingsService_GetFlowSettings_FullMethodName         = "/codeflux.v1.SettingsService/GetFlowSettings"
+	SettingsService_SetFlowSettings_FullMethodName         = "/codeflux.v1.SettingsService/SetFlowSettings"
 	SettingsService_RecordFrontendTelemetry_FullMethodName = "/codeflux.v1.SettingsService/RecordFrontendTelemetry"
 	SettingsService_ListFrontendTelemetry_FullMethodName   = "/codeflux.v1.SettingsService/ListFrontendTelemetry"
 	SettingsService_DeleteFrontendTelemetry_FullMethodName = "/codeflux.v1.SettingsService/DeleteFrontendTelemetry"
+	SettingsService_GetSpendSummary_FullMethodName         = "/codeflux.v1.SettingsService/GetSpendSummary"
 )
 
 // SettingsServiceClient is the client API for SettingsService service.
@@ -1958,9 +1961,12 @@ type SettingsServiceClient interface {
 	SetBudgetDefaults(ctx context.Context, in *SetBudgetDefaultsRequest, opts ...grpc.CallOption) (*SetBudgetDefaultsResponse, error)
 	ConfigureProvider(ctx context.Context, in *ConfigureProviderRequest, opts ...grpc.CallOption) (*ConfigureProviderResponse, error)
 	TestProvider(ctx context.Context, in *TestProviderRequest, opts ...grpc.CallOption) (*TestProviderResponse, error)
+	GetFlowSettings(ctx context.Context, in *GetFlowSettingsRequest, opts ...grpc.CallOption) (*GetFlowSettingsResponse, error)
+	SetFlowSettings(ctx context.Context, in *SetFlowSettingsRequest, opts ...grpc.CallOption) (*SetFlowSettingsResponse, error)
 	RecordFrontendTelemetry(ctx context.Context, in *RecordFrontendTelemetryRequest, opts ...grpc.CallOption) (*RecordFrontendTelemetryResponse, error)
 	ListFrontendTelemetry(ctx context.Context, in *ListFrontendTelemetryRequest, opts ...grpc.CallOption) (*ListFrontendTelemetryResponse, error)
 	DeleteFrontendTelemetry(ctx context.Context, in *DeleteFrontendTelemetryRequest, opts ...grpc.CallOption) (*DeleteFrontendTelemetryResponse, error)
+	GetSpendSummary(ctx context.Context, in *GetSpendSummaryRequest, opts ...grpc.CallOption) (*GetSpendSummaryResponse, error)
 }
 
 type settingsServiceClient struct {
@@ -2031,6 +2037,26 @@ func (c *settingsServiceClient) TestProvider(ctx context.Context, in *TestProvid
 	return out, nil
 }
 
+func (c *settingsServiceClient) GetFlowSettings(ctx context.Context, in *GetFlowSettingsRequest, opts ...grpc.CallOption) (*GetFlowSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFlowSettingsResponse)
+	err := c.cc.Invoke(ctx, SettingsService_GetFlowSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *settingsServiceClient) SetFlowSettings(ctx context.Context, in *SetFlowSettingsRequest, opts ...grpc.CallOption) (*SetFlowSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetFlowSettingsResponse)
+	err := c.cc.Invoke(ctx, SettingsService_SetFlowSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *settingsServiceClient) RecordFrontendTelemetry(ctx context.Context, in *RecordFrontendTelemetryRequest, opts ...grpc.CallOption) (*RecordFrontendTelemetryResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecordFrontendTelemetryResponse)
@@ -2061,6 +2087,16 @@ func (c *settingsServiceClient) DeleteFrontendTelemetry(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *settingsServiceClient) GetSpendSummary(ctx context.Context, in *GetSpendSummaryRequest, opts ...grpc.CallOption) (*GetSpendSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSpendSummaryResponse)
+	err := c.cc.Invoke(ctx, SettingsService_GetSpendSummary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SettingsServiceServer is the server API for SettingsService service.
 // All implementations must embed UnimplementedSettingsServiceServer
 // for forward compatibility.
@@ -2071,9 +2107,12 @@ type SettingsServiceServer interface {
 	SetBudgetDefaults(context.Context, *SetBudgetDefaultsRequest) (*SetBudgetDefaultsResponse, error)
 	ConfigureProvider(context.Context, *ConfigureProviderRequest) (*ConfigureProviderResponse, error)
 	TestProvider(context.Context, *TestProviderRequest) (*TestProviderResponse, error)
+	GetFlowSettings(context.Context, *GetFlowSettingsRequest) (*GetFlowSettingsResponse, error)
+	SetFlowSettings(context.Context, *SetFlowSettingsRequest) (*SetFlowSettingsResponse, error)
 	RecordFrontendTelemetry(context.Context, *RecordFrontendTelemetryRequest) (*RecordFrontendTelemetryResponse, error)
 	ListFrontendTelemetry(context.Context, *ListFrontendTelemetryRequest) (*ListFrontendTelemetryResponse, error)
 	DeleteFrontendTelemetry(context.Context, *DeleteFrontendTelemetryRequest) (*DeleteFrontendTelemetryResponse, error)
+	GetSpendSummary(context.Context, *GetSpendSummaryRequest) (*GetSpendSummaryResponse, error)
 	mustEmbedUnimplementedSettingsServiceServer()
 }
 
@@ -2102,6 +2141,12 @@ func (UnimplementedSettingsServiceServer) ConfigureProvider(context.Context, *Co
 func (UnimplementedSettingsServiceServer) TestProvider(context.Context, *TestProviderRequest) (*TestProviderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestProvider not implemented")
 }
+func (UnimplementedSettingsServiceServer) GetFlowSettings(context.Context, *GetFlowSettingsRequest) (*GetFlowSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFlowSettings not implemented")
+}
+func (UnimplementedSettingsServiceServer) SetFlowSettings(context.Context, *SetFlowSettingsRequest) (*SetFlowSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetFlowSettings not implemented")
+}
 func (UnimplementedSettingsServiceServer) RecordFrontendTelemetry(context.Context, *RecordFrontendTelemetryRequest) (*RecordFrontendTelemetryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordFrontendTelemetry not implemented")
 }
@@ -2110,6 +2155,9 @@ func (UnimplementedSettingsServiceServer) ListFrontendTelemetry(context.Context,
 }
 func (UnimplementedSettingsServiceServer) DeleteFrontendTelemetry(context.Context, *DeleteFrontendTelemetryRequest) (*DeleteFrontendTelemetryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteFrontendTelemetry not implemented")
+}
+func (UnimplementedSettingsServiceServer) GetSpendSummary(context.Context, *GetSpendSummaryRequest) (*GetSpendSummaryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSpendSummary not implemented")
 }
 func (UnimplementedSettingsServiceServer) mustEmbedUnimplementedSettingsServiceServer() {}
 func (UnimplementedSettingsServiceServer) testEmbeddedByValue()                         {}
@@ -2240,6 +2288,42 @@ func _SettingsService_TestProvider_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingsService_GetFlowSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFlowSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).GetFlowSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_GetFlowSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).GetFlowSettings(ctx, req.(*GetFlowSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SettingsService_SetFlowSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetFlowSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).SetFlowSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_SetFlowSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).SetFlowSettings(ctx, req.(*SetFlowSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SettingsService_RecordFrontendTelemetry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RecordFrontendTelemetryRequest)
 	if err := dec(in); err != nil {
@@ -2294,6 +2378,24 @@ func _SettingsService_DeleteFrontendTelemetry_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SettingsService_GetSpendSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSpendSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SettingsServiceServer).GetSpendSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SettingsService_GetSpendSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SettingsServiceServer).GetSpendSummary(ctx, req.(*GetSpendSummaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SettingsService_ServiceDesc is the grpc.ServiceDesc for SettingsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2326,6 +2428,14 @@ var SettingsService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SettingsService_TestProvider_Handler,
 		},
 		{
+			MethodName: "GetFlowSettings",
+			Handler:    _SettingsService_GetFlowSettings_Handler,
+		},
+		{
+			MethodName: "SetFlowSettings",
+			Handler:    _SettingsService_SetFlowSettings_Handler,
+		},
+		{
 			MethodName: "RecordFrontendTelemetry",
 			Handler:    _SettingsService_RecordFrontendTelemetry_Handler,
 		},
@@ -2336,6 +2446,10 @@ var SettingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteFrontendTelemetry",
 			Handler:    _SettingsService_DeleteFrontendTelemetry_Handler,
+		},
+		{
+			MethodName: "GetSpendSummary",
+			Handler:    _SettingsService_GetSpendSummary_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -2490,6 +2604,8 @@ const (
 	CodeCollectionService_ListCodePackages_FullMethodName  = "/codeflux.v1.CodeCollectionService/ListCodePackages"
 	CodeCollectionService_ListCodeSymbols_FullMethodName   = "/codeflux.v1.CodeCollectionService/ListCodeSymbols"
 	CodeCollectionService_InspectCodeSymbol_FullMethodName = "/codeflux.v1.CodeCollectionService/InspectCodeSymbol"
+	CodeCollectionService_ListCodeFiles_FullMethodName     = "/codeflux.v1.CodeCollectionService/ListCodeFiles"
+	CodeCollectionService_ReadCodeFile_FullMethodName      = "/codeflux.v1.CodeCollectionService/ReadCodeFile"
 )
 
 // CodeCollectionServiceClient is the client API for CodeCollectionService service.
@@ -2505,6 +2621,15 @@ type CodeCollectionServiceClient interface {
 	ListCodePackages(ctx context.Context, in *ListCodePackagesRequest, opts ...grpc.CallOption) (*ListCodePackagesResponse, error)
 	ListCodeSymbols(ctx context.Context, in *ListCodeSymbolsRequest, opts ...grpc.CallOption) (*ListCodeSymbolsResponse, error)
 	InspectCodeSymbol(ctx context.Context, in *InspectCodeSymbolRequest, opts ...grpc.CallOption) (*InspectCodeSymbolResponse, error)
+	// ListCodeFiles returns every file the repository map recorded, so a client
+	// can draw the collection as the tree it is on disk rather than as the flat
+	// list of packages the mapper happens to group it into.
+	ListCodeFiles(ctx context.Context, in *ListCodeFilesRequest, opts ...grpc.CallOption) (*ListCodeFilesResponse, error)
+	// ReadCodeFile returns one file's text. It is the one read in this service
+	// that carries source, and it is bounded: a directory of code that cannot
+	// show a file is a directory nobody can act on, but a read with no ceiling
+	// is a way to hand a browser an arbitrarily large file.
+	ReadCodeFile(ctx context.Context, in *ReadCodeFileRequest, opts ...grpc.CallOption) (*ReadCodeFileResponse, error)
 }
 
 type codeCollectionServiceClient struct {
@@ -2545,6 +2670,26 @@ func (c *codeCollectionServiceClient) InspectCodeSymbol(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *codeCollectionServiceClient) ListCodeFiles(ctx context.Context, in *ListCodeFilesRequest, opts ...grpc.CallOption) (*ListCodeFilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCodeFilesResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_ListCodeFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeCollectionServiceClient) ReadCodeFile(ctx context.Context, in *ReadCodeFileRequest, opts ...grpc.CallOption) (*ReadCodeFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadCodeFileResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_ReadCodeFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeCollectionServiceServer is the server API for CodeCollectionService service.
 // All implementations must embed UnimplementedCodeCollectionServiceServer
 // for forward compatibility.
@@ -2558,6 +2703,15 @@ type CodeCollectionServiceServer interface {
 	ListCodePackages(context.Context, *ListCodePackagesRequest) (*ListCodePackagesResponse, error)
 	ListCodeSymbols(context.Context, *ListCodeSymbolsRequest) (*ListCodeSymbolsResponse, error)
 	InspectCodeSymbol(context.Context, *InspectCodeSymbolRequest) (*InspectCodeSymbolResponse, error)
+	// ListCodeFiles returns every file the repository map recorded, so a client
+	// can draw the collection as the tree it is on disk rather than as the flat
+	// list of packages the mapper happens to group it into.
+	ListCodeFiles(context.Context, *ListCodeFilesRequest) (*ListCodeFilesResponse, error)
+	// ReadCodeFile returns one file's text. It is the one read in this service
+	// that carries source, and it is bounded: a directory of code that cannot
+	// show a file is a directory nobody can act on, but a read with no ceiling
+	// is a way to hand a browser an arbitrarily large file.
+	ReadCodeFile(context.Context, *ReadCodeFileRequest) (*ReadCodeFileResponse, error)
 	mustEmbedUnimplementedCodeCollectionServiceServer()
 }
 
@@ -2576,6 +2730,12 @@ func (UnimplementedCodeCollectionServiceServer) ListCodeSymbols(context.Context,
 }
 func (UnimplementedCodeCollectionServiceServer) InspectCodeSymbol(context.Context, *InspectCodeSymbolRequest) (*InspectCodeSymbolResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InspectCodeSymbol not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) ListCodeFiles(context.Context, *ListCodeFilesRequest) (*ListCodeFilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCodeFiles not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) ReadCodeFile(context.Context, *ReadCodeFileRequest) (*ReadCodeFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadCodeFile not implemented")
 }
 func (UnimplementedCodeCollectionServiceServer) mustEmbedUnimplementedCodeCollectionServiceServer() {}
 func (UnimplementedCodeCollectionServiceServer) testEmbeddedByValue()                               {}
@@ -2652,6 +2812,42 @@ func _CodeCollectionService_InspectCodeSymbol_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeCollectionService_ListCodeFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCodeFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).ListCodeFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_ListCodeFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).ListCodeFiles(ctx, req.(*ListCodeFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeCollectionService_ReadCodeFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadCodeFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).ReadCodeFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_ReadCodeFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).ReadCodeFile(ctx, req.(*ReadCodeFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeCollectionService_ServiceDesc is the grpc.ServiceDesc for CodeCollectionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2670,6 +2866,14 @@ var CodeCollectionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InspectCodeSymbol",
 			Handler:    _CodeCollectionService_InspectCodeSymbol_Handler,
+		},
+		{
+			MethodName: "ListCodeFiles",
+			Handler:    _CodeCollectionService_ListCodeFiles_Handler,
+		},
+		{
+			MethodName: "ReadCodeFile",
+			Handler:    _CodeCollectionService_ReadCodeFile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -33,12 +33,18 @@ type settingsApplication struct {
 	// timeout is the one a provider request runs under.
 	compiledPreset         domain.PolicyPreset
 	compiledRequestTimeout time.Duration
+	// flow is the running engine, which adopts a changed configuration without
+	// a restart. It is nil when no agent is configured, and the surface still
+	// serves: a person can read and change what a run will do before the first
+	// run exists.
+	flow flowSettingsApplier
 }
 
 // newSettingsApplication composes the three authorities.
 func newSettingsApplication(
 	repositories *storage.Repositories,
 	credentialStore credentials.Store,
+	flow flowSettingsApplier,
 ) (settingsApplication, error) {
 	if repositories == nil {
 		return settingsApplication{}, errors.New("repositories are required")
@@ -51,6 +57,7 @@ func newSettingsApplication(
 		credentials:            credentialStore,
 		compiledPreset:         domain.PolicyPresetBalanced,
 		compiledRequestTimeout: providers.DefaultRequestTimeout,
+		flow:                   flow,
 	}, nil
 }
 

@@ -717,9 +717,12 @@ service SettingsService {
   rpc SetBudgetDefaults(SetBudgetDefaultsRequest) returns (SetBudgetDefaultsResponse);
   rpc ConfigureProvider(ConfigureProviderRequest) returns (ConfigureProviderResponse);
   rpc TestProvider(TestProviderRequest) returns (TestProviderResponse);
+  rpc GetFlowSettings(GetFlowSettingsRequest) returns (GetFlowSettingsResponse);
+  rpc SetFlowSettings(SetFlowSettingsRequest) returns (SetFlowSettingsResponse);
   rpc RecordFrontendTelemetry(RecordFrontendTelemetryRequest) returns (RecordFrontendTelemetryResponse);
   rpc ListFrontendTelemetry(ListFrontendTelemetryRequest) returns (ListFrontendTelemetryResponse);
   rpc DeleteFrontendTelemetry(DeleteFrontendTelemetryRequest) returns (DeleteFrontendTelemetryResponse);
+  rpc GetSpendSummary(GetSpendSummaryRequest) returns (GetSpendSummaryResponse);
 }
 
 message GetModelsRequest {
@@ -928,6 +931,79 @@ message DeleteFrontendTelemetryResponse {
   uint64 remaining = 2;
 }
 
+// SpendCost is one exact recorded cost, presented at a scale fine enough for a
+// single model call.
+//
+// amount is absent when the cost is unknown, following Money: an unknown cost
+// is never a zero. A single call routinely costs a fraction of one minor unit,
+// so amount carries extra decimal places rather than whole cents, and exact
+// says whether that scale held the recorded rational value or rounded it.
+message SpendCost {
+  Money amount = 1;
+  bool exact = 2;
+}
+
+// SpendSliceView is usage and cost for one grouping key.
+//
+// The unknown counts are separate fields rather than an absence, because the
+// caller needs both halves: what was spent, and how many calls could not be
+// measured or priced at all.
+message SpendSliceView {
+  uint64 calls = 1;
+  uint64 input_tokens = 2;
+  uint64 cached_input_tokens = 3;
+  uint64 cache_write_tokens = 4;
+  uint64 output_tokens = 5;
+  uint64 reasoning_tokens = 6;
+  SpendCost known_cost = 7;
+  uint64 usage_unknown_calls = 8;
+  uint64 cost_unknown_calls = 9;
+}
+
+// PhaseSpendView is what one movement of the flow cost: the atoms, the
+// molecules, the program.
+message PhaseSpendView {
+  string phase = 1;
+  SpendSliceView spend = 2;
+}
+
+message StageSpendView {
+  uint32 stage_number = 1;
+  string stage_name = 2;
+  string phase = 3;
+  SpendSliceView spend = 4;
+}
+
+message ModelSpendView {
+  string provider_id = 1;
+  string model = 2;
+  string model_version = 3;
+  SpendSliceView spend = 4;
+}
+
+message GetSpendSummaryRequest {
+  StableIdentity workspace_id = 1;
+  google.protobuf.Timestamp since = 2;
+  google.protobuf.Timestamp until = 3;
+}
+
+message GetSpendSummaryResponse {
+  // total covers every recorded call in the window, including the calls no
+  // stage claimed. by_phase and by_stage therefore need not sum to it.
+  SpendSliceView total = 1;
+  repeated PhaseSpendView by_phase = 2;
+  repeated StageSpendView by_stage = 3;
+  // by_model is exact: the model is recorded on the request itself.
+  repeated ModelSpendView by_model = 4;
+  // unattributed is the difference between total and the phases, reported so
+  // that a gap is explained rather than merely visible.
+  SpendSliceView unattributed = 5;
+  // stage_attribution_approximate is true whenever by_phase and by_stage were
+  // derived by matching call times against stage records rather than from a
+  // stage recorded on the call. The client must label them as estimates.
+  bool stage_attribution_approximate = 6;
+}
+
 service SessionService {
   rpc GetSessionSnapshot(GetSessionSnapshotRequest) returns (GetSessionSnapshotResponse);
   rpc SubscribeSession(SubscribeSessionRequest) returns (stream SubscribeSessionResponse);
@@ -1010,6 +1086,58 @@ service CodeCollectionService {
   rpc ListCodePackages(ListCodePackagesRequest) returns (ListCodePackagesResponse);
   rpc ListCodeSymbols(ListCodeSymbolsRequest) returns (ListCodeSymbolsResponse);
   rpc InspectCodeSymbol(InspectCodeSymbolRequest) returns (InspectCodeSymbolResponse);
+  // ListCodeFiles returns every file the repository map recorded, so a client
+  // can draw the collection as the tree it is on disk rather than as the flat
+  // list of packages the mapper happens to group it into.
+  rpc ListCodeFiles(ListCodeFilesRequest) returns (ListCodeFilesResponse);
+  // ReadCodeFile returns one file's text. It is the one read in this service
+  // that carries source, and it is bounded: a directory of code that cannot
+  // show a file is a directory nobody can act on, but a read with no ceiling
+  // is a way to hand a browser an arbitrarily large file.
+  rpc ReadCodeFile(ReadCodeFileRequest) returns (ReadCodeFileResponse);
+}
+
+// CodeFileView is one file in the collection.
+message CodeFileView {
+  string workspace_relative_path = 1;
+  // kind is "source", "test" or whatever else the mapper recorded, and
+  // generated marks a file nobody wrote by hand.
+  string kind = 2;
+  bool generated = 3;
+  string import_path = 4;
+  uint32 symbol_count = 5;
+  uint32 atom_count = 6;
+}
+
+message ListCodeFilesRequest {
+  StableIdentity repository_id = 1;
+  string search = 2;
+  PageRequest page = 3;
+}
+
+message ListCodeFilesResponse {
+  CodeCollectionRevisionView revision = 1;
+  repeated CodeFileView files = 2;
+  PageInfo page = 3;
+  uint32 total_files = 4;
+}
+
+message ReadCodeFileRequest {
+  StableIdentity repository_id = 1;
+  string workspace_relative_path = 2;
+}
+
+message ReadCodeFileResponse {
+  CodeCollectionRevisionView revision = 1;
+  CodeFileView file = 2;
+  // text is the file exactly as it is on disk, truncated at a bound that the
+  // response reports rather than hides.
+  RedactedText text = 3;
+  uint32 line_count = 4;
+  bool truncated = 5;
+  // declarations are what this file declares, in the order they appear, so a
+  // reader can jump to one and see which are atoms.
+  repeated CodeSymbolView declarations = 6;
 }
 
 // CodeCollectionRevisionView states which repository revision an answer
@@ -1047,6 +1175,13 @@ message CodeSymbolView {
   // declaration was not admitted.
   bool atom = 9;
   string atom_problem = 10;
+  // matched_name and matched_promise say why a search returned this row: the
+  // term is in the declaration's own name, or it is in the documented text
+  // quoted here. A result list that cannot say why a row is in it is one a
+  // person has to take on faith, and a correct answer then reads as a broken
+  // search. Both are empty outside a search.
+  bool matched_name = 11;
+  RedactedText matched_promise = 12;
 }
 
 message CodeSymbolReferenceView {
@@ -1090,6 +1225,13 @@ message ListCodeSymbolsResponse {
   repeated CodeSymbolView symbols = 2;
   PageInfo page = 3;
   uint32 total_matched = 4;
+  // total_atoms is how many admitted atoms the collection holds, regardless of
+  // what this query matched. A surface that reported only the matches told a
+  // person who searched for one atom that the repository contained one.
+  uint32 total_atoms = 5;
+  // search_query is the SQL this search performed, with the match expression
+  // and the bound written in. It is empty when nothing was searched.
+  string search_query = 6;
 }
 
 message InspectCodeSymbolRequest {
@@ -1124,4 +1266,133 @@ message InspectCodeSymbolResponse {
   // separated from callers because "what exercises this" and "what depends on
   // this" are different questions, and only one of them is evidence.
   repeated CodeSymbolReferenceView tests = 15;
+  // naming_checked reports that the product's own atom-naming grammar was run
+  // against this declaration's name; naming_finding is empty when the name
+  // passes and states the violation when it does not. A name is part of an
+  // atom's contract: it is what a caller reads first and the only part they
+  // cannot avoid reading.
+  bool naming_checked = 16;
+  RedactedText naming_finding = 17;
+  // structure is what the run's own atom stages measure about this
+  // declaration: the loop nesting StageAtomComplexity turns into a time bound,
+  // the decision points StageAtomCaseSynthesis turns into cases to cover, and
+  // the purity StageAtoms tests for.
+  CodeSymbolStructureView structure = 18;
+  // documented_fields and missing_fields are the schema's own canonical field
+  // list, split by whether this atom declares them. An atom that documents
+  // twelve of nineteen fields is a different thing from one that documents all
+  // of them, and only the list says which seven are missing.
+  repeated string documented_fields = 19;
+  repeated string missing_fields = 20;
+  // access_query is the SQL that reads this atom back out of the coordinator's
+  // atom index, and index_schema is the table it runs against. They are the
+  // statements the coordinator itself executes rather than a rendering of
+  // them: a query rewritten for display drifts from the one that ran, and then
+  // the console teaches something that is no longer true.
+  string access_query = 21;
+  string index_schema = 22;
+}
+
+// CodeSymbolStructureView is the structural measurement of one declaration.
+//
+// measured separates "nothing was measured" from "measured, and the answer is
+// zero": a declaration with no loops is O(1), one that was never looked at is
+// unknown, and those are not the same claim.
+message CodeSymbolStructureView {
+  bool measured = 1;
+  string time_bound = 2;
+  string space_claim = 3;
+  uint32 loop_depth = 4;
+  uint32 branches = 5;
+  bool pure = 6;
+}
+
+// FlowSettingView is one choice the run flow leaves to the person running it,
+// carrying both what it is and what it is currently set to.
+//
+// The description travels with the value because the two drift apart
+// otherwise: a bound changed in the engine and not in the interface produces a
+// control that offers a value the engine will refuse. A client renders this
+// without knowing what any individual setting means.
+message FlowSettingView {
+  string key = 1;
+  string label = 2;
+  // help says what the setting costs and what it buys, in the terms of
+  // someone deciding whether to change it.
+  RedactedText help = 3;
+  // kind is "choice", "number", "switch", "set", "sequence" or "mapping" and
+  // decides how the setting is rendered and which value field carries it.
+  string kind = 4;
+  repeated string choices = 5;
+  int32 minimum = 6;
+  int32 maximum = 7;
+  // group lets a page put related controls together without inventing its own
+  // taxonomy.
+  string group = 8;
+  string text_value = 9;
+  int32 number_value = 10;
+  bool switch_value = 11;
+  // at_default reports that the value in force is the one the engine ships
+  // with. A settings surface can then show where this machine has departed
+  // from the defaults, which is the question somebody reviewing a
+  // configuration is actually asking.
+  bool at_default = 12;
+  // item_values carries a "set" or a "sequence". For a sequence the order is
+  // the setting, so a client must render and return it unchanged unless the
+  // person reorders it.
+  repeated string item_values = 13;
+  // pair_values carries a "mapping": named keys each given one of the choices.
+  repeated FlowSettingPair pair_values = 14;
+}
+
+// FlowSettingPair is one named key and the choice given to it.
+//
+// A map field would say the same thing and would say it in a different order
+// on every read, which turns an unchanged configuration into a changed one
+// everywhere the two are compared.
+message FlowSettingPair {
+  string key = 1;
+  string value = 2;
+}
+
+message GetFlowSettingsRequest {
+  StableIdentity workspace_id = 1;
+}
+
+message GetFlowSettingsResponse {
+  repeated FlowSettingView settings = 1;
+  // revision is the settings revision these values came from. Zero means no
+  // layer has been written and compiled defaults are in force.
+  uint64 revision = 2;
+  // unrenderable names settings the engine declares in a shape this contract
+  // cannot carry. They are reported rather than dropped silently, because a
+  // page missing a row nobody mentioned understates what governs a run.
+  repeated string unrenderable = 3;
+}
+
+// FlowSettingChange names one setting and its new value. Only the field
+// matching the setting's kind is read.
+message FlowSettingChange {
+  string key = 1;
+  string text_value = 2;
+  int32 number_value = 3;
+  bool switch_value = 4;
+  // item_values replaces the whole list. An empty list clears the setting
+  // rather than leaving it alone, so a client that means "no change" omits the
+  // change entirely.
+  repeated string item_values = 5;
+  // pair_values replaces the whole mapping, on the same rule.
+  repeated FlowSettingPair pair_values = 6;
+}
+
+message SetFlowSettingsRequest {
+  MutationControl control = 1;
+  StableIdentity workspace_id = 2;
+  repeated FlowSettingChange changes = 3;
+}
+
+message SetFlowSettingsResponse {
+  repeated FlowSettingView settings = 1;
+  uint64 revision = 2;
+  repeated string unrenderable = 3;
 }

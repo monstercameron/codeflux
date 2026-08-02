@@ -152,7 +152,7 @@ func TestAStoredUserSettingsLayerBeatsTheCompiledDefault(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = application.Shutdown(context.Background()) })
 
-	settings, err := newSettingsApplication(application.repos, application.credentials)
+	settings, err := newSettingsApplication(application.repos, application.credentials, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

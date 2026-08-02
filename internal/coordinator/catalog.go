@@ -258,7 +258,32 @@ var rpcContracts = []RPCContract{
 		[]string{"workspaces", "effect-intents", "effect-outcomes"},
 		[]string{"tool_started", "tool_completed"}, "editor-launch"),
 
+	// What a repository contains at an exact revision, and one declaration read
+	// closely. Every one is a read of a checked-out tree at a recorded revision
+	// rather than of a cache, so none of them can report a symbol the revision
+	// does not hold.
+	rpcQuery("CodeCollectionService/ListCodePackages",
+		"CodeCollectionService.ListCodePackages", "repositories", "workspaces"),
+	rpcQuery("CodeCollectionService/ListCodeSymbols",
+		"CodeCollectionService.ListCodeSymbols", "repositories", "workspaces"),
+	rpcQuery("CodeCollectionService/InspectCodeSymbol",
+		"CodeCollectionService.InspectCodeSymbol", "repositories", "workspaces"),
+	rpcQuery("CodeCollectionService/ListCodeFiles",
+		"CodeCollectionService.ListCodeFiles", "repositories", "workspaces"),
+	rpcQuery("CodeCollectionService/ReadCodeFile",
+		"CodeCollectionService.ReadCodeFile", "repositories", "workspaces"),
+
+	rpcQuery("MemoryService/ListMemoryArtifacts", "MemoryService.ListMemoryArtifacts",
+		"memory-artifacts", "memory-artifact-revisions"),
+	rpcQuery("MemoryService/GetMemoryArtifact", "MemoryService.GetMemoryArtifact",
+		"memory-artifacts", "memory-artifact-revisions", "memory-artifact-lineage"),
+
 	rpcQuery("SettingsService/GetModels", "ProviderService.GetModelCatalog", "provider-configurations"),
+	// What the provider calls in a window cost. It reads the per-call ledger
+	// rather than a running total, so a window with no call is a known zero
+	// rather than an unknown one.
+	rpcQuery("SettingsService/GetSpendSummary", "SettingsService.GetSpendSummary",
+		"provider-attempt-accounting"),
 	rpcQuery("SettingsService/GetPolicy", "SettingsService.GetEffectiveSettings", "settings"),
 	rpcMutation("SettingsService/SetPolicy", "SettingsService.UpdateUserSettings",
 		"explicit-user-authority", "workspace/policy/key", "required-current-settings",
@@ -266,6 +291,15 @@ var rpcContracts = []RPCContract{
 	rpcMutation("SettingsService/SetBudgetDefaults", "SettingsService.SetBudgetDefaults",
 		"explicit-user-authority", "workspace/budget-default/key", "required-current-settings",
 		"settings transaction", []string{"settings", "session-events"}, []string{"budget_updated"}, "none"),
+	// The run flow's own choices: how many attempts a run gets, which rungs it
+	// climbs, what a produced program may reach for. They share the settings
+	// layer and its revision with the rest of the configuration, because they
+	// are one set of choices this machine has made and a run binds to the
+	// revision that governed it.
+	rpcQuery("SettingsService/GetFlowSettings", "SettingsService.GetFlowSettings", "settings"),
+	rpcMutation("SettingsService/SetFlowSettings", "SettingsService.SetFlowSettings",
+		"explicit-user-authority", "workspace/flow-setting/key", "required-current-settings",
+		"settings transaction", []string{"settings", "session-events"}, []string{"policy_updated"}, "none"),
 	rpcEffect("SettingsService/ConfigureProvider", "ProviderService.ConfigureProvider",
 		"credential-admin", "workspace/provider/key", "required-current-provider-config",
 		[]string{"provider-configurations", "credential-references", "effect-intents", "effect-outcomes"},
