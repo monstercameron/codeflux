@@ -64,6 +64,8 @@ When an item still requires more than one independently verifiable output, split
 | M22 | [§24 Specification Review](docs/plan.md#24-specification-review), [§25 Metrics](docs/plan.md#25-metrics), [§26 Benchmark Timing](docs/plan.md#26-benchmark-timing), [§27D Prototype Developer Experience](docs/plan.md#27d-prototype-developer-experience) |
 | M23 | [§27 Persistence, Recovery, Diagnostics, and Updates](docs/plan.md#persistence-recovery-diagnostics-and-updates), [§27A Local Security](docs/plan.md#local-security), [§30 Kill and Pivot Criteria](docs/plan.md#30-kill-and-pivot-criteria) |
 | M24 | [§28 Initial Demonstrations](docs/plan.md#28-initial-demonstrations), [§28 ReserveFlow Dogfood API Refinement Trial](docs/plan.md#reserveflow-dogfood-api-refinement-trial), [§29 Revised Development Sequence](docs/plan.md#29-revised-development-sequence), [§30 Kill and Pivot Criteria](docs/plan.md#30-kill-and-pivot-criteria) |
+| PIPE | [§33 Pipeline Refinement](docs/plan.md#33-pipeline-refinement), [§22 Correctness and Assurance Gates](docs/plan.md#22-correctness-and-assurance-gates), [§24 Specification Review](docs/plan.md#24-specification-review), [§9 Proof Obligations as the Unit of Assurance](docs/plan.md#9-proof-obligations-as-the-unit-of-assurance) |
+| MEM | [§31 Evidence-Driven Reuse and Learning](docs/plan.md#31-evidence-driven-reuse-and-learning), [Extraction Triggers and the Candidacy Funnel](docs/plan.md#extraction-triggers-and-the-candidacy-funnel), [Injection Surfaces and Timing](docs/plan.md#injection-surfaces-and-timing), [Routing Evidence Keys](docs/plan.md#routing-evidence-keys), [§33 Model Selection](docs/plan.md#model-selection) |
 
 ## Dependency Spine
 
@@ -93,6 +95,8 @@ M00 scope freeze
  -> M22 test and benchmark harness
  -> M23 packaging and hardening
  -> M24 vertical-slice exit and ReserveFlow dogfood refinement trial
+ -> PIPE pipeline refinement
+ -> MEM memory and learning layer
 ```
 
 ## How to Use This Checklist
@@ -123,6 +127,11 @@ M00 scope freeze
 | `TEST` | Primarily verification work |
 | `DOC` | Documentation or operator-facing guidance |
 | `DEFER` | Explicitly outside the first prototype |
+| `REVIEW` | Reconciles a previously checked claim with what the source actually does |
+| `RELEASE` | Changes packaging, artifacts, signing, or what a user installs |
+| `BENCH` | Produces or reruns a recorded measurement |
+| `E2E` | Exercised end to end through the real application rather than a fake |
+| `EXPERIMENT` | Runs a designed trial whose result decides a branch point |
 
 ## Prototype Definition of Done
 
@@ -251,8 +260,9 @@ Repository bootstrap evidence:
 
 - Module path: `codeflux.dev/codeflux`.
 - Minimum language version: Go 1.26.0; CI/tool bootstrap must use the current patched Go 1.26 release rather than silently accepting an older security patch.
-- Root `README.md`: intentionally absent because the user did not explicitly request that file; this does not block M01.
-- License: Apache License 2.0.
+- Root `README.md`: explicitly requested by the user on 2026-08-02 and created under that authorization, superseding the earlier record of intentional absence.
+- License: MIT, relicensed from Apache License 2.0 on 2026-08-02 at the user's explicit direction. All commits to that point were single-authorship, so no third-party consent was required. The Apache patent grant is deliberately given up in exchange for MIT's shorter terms.
+- Community health metadata added 2026-08-02 under the same authorization: `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CODEOWNERS`, `PULL_REQUEST_TEMPLATE.md`, and the `ISSUE_TEMPLATE` forms, plus `.editorconfig` and the CodeQL and dependency-review workflows. The Markdown files among these were explicitly requested and are not an agent-inferred documentation need.
 - Text normalization: LF by default, CRLF only for Windows batch command files, and common binary assets marked binary.
 - [x] `M01-007` Create `cmd/codeflux` for the user-facing executable.
 - [x] `M01-008` Create `internal/coordinator` for coordinator application logic.
@@ -3964,3 +3974,442 @@ ledger can be treated as authoritative.
 - [ ] `AUDIT-030 REVIEW BLOCKER RELEASE` Reconcile `M23-052` through `M23-060` and `M23-G01`: build real reproducible platform binaries, embed non-placeholder frontend assets, generate checksums, sign and verify actual files, and install one artifact into a clean profile; current release tests validate synthetic artifacts, `web/assets/static` contains only a README, and the release package invokes no builder or signer.
 - [ ] `AUDIT-031 REVIEW BLOCKER EXPERIMENT` Reconcile execution-bearing `M24` items and `M24-G01` through `M24-G10`: run the frozen ReserveFlow Tracks A-C with the live provider and independent evaluator, populate attributable results, and only then record pass/fail decisions; the completion record explicitly says the trial was not run and the gates are unanswered.
 - [ ] `AUDIT-032 REVIEW RELEASE` Reconcile `M24-098` and the completion record: tag the exact evaluated prototype revision and record its actual source/frontend artifact identities; the record names stale revision `a133785`, reports the empty-asset hash, and no tag points at current `HEAD`.
+
+---
+
+# Pipeline Refinement (2026-08-02)
+
+Goal: make every stage of the delivery flow record only what its check establishes, then extend the flow to cover the subject matter it has no vocabulary for.
+
+The product this serves is a strict coding agent whose correctness argument rests on three things: atomicity, so every unit can be specified, tested, and reused on its own terms; structure, so a claim about a program is derived from its parse tree and its measured behaviour rather than from prose about it; and declared contracts, so what a unit promises exists before the unit does and can be checked against it afterwards. Every ticket below is either restoring one of those three where the flow claims it and does not have it, or removing a cost that makes the strict path slower than the loose one. Correctness is the constraint; speed and cost are optimised inside it, never against it.
+
+Plan references: §33 Pipeline Refinement; §22 Correctness and Assurance Gates; §24 Specification Review; §9 Proof Obligations as the Unit of Assurance.
+
+Depends on: no new implementation dependency. The defect repairs apply to the flow as built and can start immediately; the new stages depend on `PIPE-001` through `PIPE-004`, because adding stages to a ledger that cannot yet be trusted multiplies the untrustworthy rows.
+
+Milestone output: a sixty-six stage flow in `internal/pipeline`, a coordinator that performs or honestly declines each stage, a ledger whose every satisfied row is backed by a check that establishes its gate, and a skip audit that reports what the run did not do as a headline figure.
+
+## Ledger Integrity
+
+Plan references: §33 Pipeline Refinement; §22 Correctness and Assurance Gates; §10 Guarantee Provenance.
+
+Depends on: nothing. These repair the flow as built and unblock every ticket that adds to it, because a stage added to a ledger that drops rows multiplies the untrustworthy rows.
+
+- [ ] `PIPE-001 BLOCKER` Stop the unverified-run sweep pre-blocking end-to-end-tests, adversarial, and evidence-bundle: record each once, after the run has computed it, and add a test that a compiling-but-failing run's ledger carries the adversarial probe's real verdict rather than a blocked row.
+- [ ] `PIPE-002 BLOCKER` Route every stage write through one place that refuses a second write for the same stage in the same attempt, so a duplicate recording is a caught programming error rather than a silent `DO NOTHING`.
+- [ ] `PIPE-003 DATA` Carry the real attempt number through `newPipelineLedger`, `StartPreparedTaskRun`, and `assembleEvidence` so a task started twice records two attempts instead of showing the first run's ledger under a newer run identity.
+- [ ] `PIPE-004 TEST` Add a table test binding each stage number to the check that performs it and to whether that check may return satisfied at all; a stage with no check may record only skipped or not-implemented.
+- [ ] `PIPE-005` Replace the numeric range in `examineStructure` with a named set of stages, so the sweep does not silently change meaning when the flow gains a stage.
+- [ ] `PIPE-006` Record each stage's real start and finish times instead of writing one timestamp into both columns, and show stage duration in the ledger view.
+- [ ] `PIPE-007 DOC` Correct the recorded flow length in `agent_pipeline_ledger.go`, `agent_execution.go`, `agent_stage_delivery.go`, and `engine_pipeline_ledger_test.go`, and derive it from `len(pipeline.Flow)` where a number is needed.
+
+## Gate-to-Check Agreement
+
+Plan references: §9 Proof Obligations as the Unit of Assurance; §22 Correctness and Assurance Gates; §33 Pipeline Refinement.
+
+Depends on: `PIPE-004`, which turns a gate-to-check disagreement into a failing build rather than something review has to notice.
+
+- [ ] `PIPE-008 BLOCKER` Replace `testedNames` identifier collection with call-site resolution, so an atom counts as tested only when a test calls it, not when any identifier of that name appears in a test file.
+- [ ] `PIPE-009` Count method and package-qualified calls in `describeBody`, so a program composed through methods is not classified as entirely atomic.
+- [ ] `PIPE-010` Record atom-optimization as skipped with the simplification candidates as its evidence until a rewrite exists, because the gate claims a rewrite the check does not perform.
+- [ ] `PIPE-011` Measure growth across input sizes in atom-complexity and require it to agree with the structural label; until the measurement exists the stage records skipped rather than satisfied, and the asserted space claim is removed either way.
+- [ ] `PIPE-012` Split platform-matrix into a run claim and a build claim: the host platform runs the suite, a cross target records only that it compiles because the host cannot execute it, and the gate wording states which of the two each target answered.
+- [ ] `PIPE-013` Record a non-functional baseline on first run and compare later runs against it, replacing the fixed sixty-second budget.
+- [ ] `PIPE-014` Enumerate decoding boundaries for atom-fuzz and fail when a boundary has no target; skip only when the enumerated count is zero, with that count as evidence.
+- [ ] `PIPE-015` Establish control-tests per declared path rather than by counting decision nodes in test source.
+- [ ] `PIPE-016` Make composition-obligations and control-obligations produce a durable obligation per composition and per path in §9's sense, which molecule-verification and control-flow then discharge by name; until the obligation is durable both stages record skipped rather than unconditionally satisfied.
+- [ ] `PIPE-017` Run atom-optimization after atom-mutation in `examineStructure`, matching the ordering `TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake` exists to enforce.
+- [x] `PIPE-018` Narrow `ModelBearing` to the four gates that can send work back and read the pin where the run is returned, replacing a list of sixteen stages that make no model request; a validated control nothing reads is worse than an absent one. Remaining scope moved to `PIPE-018a`.
+- [ ] `PIPE-018a` Select a rung per unit rather than per run, which needs units built independently: the implementation loop writes the whole program in one loop, so today the run's starting rung comes from the hardest unit.
+
+## Specification Grounding
+
+Plan references: §24 Specification Review; §14 Contracts and Invariants; §0 Acceptance definitions; §33 Pipeline Refinement.
+
+Depends on: `PIPE-045` for a number the ledger accepts, and `PIPE-117`, whose answer decides whether a mandatory acceptance example is expressible for every task class.
+
+- [ ] `PIPE-019 BLOCKER` Require at least one executable acceptance example at the instructions stage and remove the declared-absence escape, so no run can satisfy the flow against a request nothing external checks.
+- [ ] `PIPE-020` Add the acceptance-oracle stage: every example runs and fails against an empty program, proving the example discriminates before anything is built on it.
+- [ ] `PIPE-021 UX` Add the specification-review stage: a person accepts the contracts, data model, and threat model before any code is written, with the same accept, reject, and revise actions the delivery review already has.
+- [ ] `PIPE-022` Add the data-model stage recording the types, their invariants, and the states made unrepresentable, and write the contracts stage in those types.
+- [ ] `PIPE-023` Add the resource-and-effect declaration stage naming every acquired resource with the path on which it is released, as the artifact `PIPE-030` verifies against.
+- [ ] `PIPE-024 SECURITY` Add the threat-model stage recording trust boundaries, untrusted inputs, secrets, and values that may never be emitted, as the artifact `PIPE-036` verifies against.
+- [ ] `PIPE-025` Add the concurrency-model stage recording what runs concurrently, what is shared, and which ordering and atomicity properties are required, as the artifact `PIPE-029` verifies against.
+- [ ] `PIPE-026` Add the dependency-budget stage recording which third-party code is admitted, pinned, and justified against writing it instead.
+
+## Depth at Every Level
+
+Plan references: §7 Semantic Atom Categories; §9 Proof Obligations as the Unit of Assurance; §33 Pipeline Refinement.
+
+Depends on: `PIPE-023` and `PIPE-025` for the declarations these verify against, and `PIPE-045`.
+
+- [ ] `PIPE-027` Add molecule-property-tests requiring at least one property per composition obligation, stated over the composition rather than over its parts.
+- [ ] `PIPE-028` Add molecule-mutation so composition tests are shown to detect composition defects, not only atom defects.
+- [ ] `PIPE-029` Add concurrency-verification running the race detector and testing the `PIPE-025` ordering and atomicity claims under interleaving.
+- [ ] `PIPE-030` Add resource-lifetime proving every `PIPE-023` declared resource is released on every path, with no handle, goroutine, or memory growth under repetition.
+- [ ] `PIPE-031` Add failure-path-injection forcing every declared failure path to occur and asserting it behaves as its obligation says.
+- [ ] `PIPE-032` Add program-fuzz over the produced program's own external boundary: arguments, standard input, files, and interfaces.
+
+## Program, Environment, and Failure
+
+Plan references: §12 Effect Discipline; §22 Correctness and Assurance Gates; §27 Commands, Secrets, and Malicious Repository Content.
+
+Depends on: `PIPE-024` and `PIPE-026` for the declarations these verify against, `PIPE-045`, and `PIPE-131`, because every stage here runs the produced program.
+
+- [ ] `PIPE-033 SECURITY` Add dependency-audit checking pinning, known vulnerabilities, licence compatibility, and unused dependencies against the `PIPE-026` budget.
+- [ ] `PIPE-034 RELEASE` Add reproducible-build proving the same inputs produce the same artifact, with the toolchain version pinned and recorded.
+- [ ] `PIPE-035` Add fault-injection covering a full disk, a timeout, a partition, and a failing dependency, each required to produce a reported failure rather than corruption.
+- [ ] `PIPE-036` Add crash-recovery killing the produced program at arbitrary points and requiring a safe idempotent restart with no torn state.
+- [ ] `PIPE-037 SECURITY` Add security-verification against the `PIPE-024` threat model: no declared secret in output, logs, or errors, and every trust boundary validating what crosses it.
+- [ ] `PIPE-038` Add observability requiring every failure to name what failed and with what input, exit codes to distinguish outcomes, and the program to be diagnosable without a debugger.
+
+## Fit With What Already Exists
+
+Plan references: §19 Review and Source Mapping; §22 Correctness and Assurance Gates; §23 Transactions, Migrations, and Recovery.
+
+Depends on: `PIPE-111`. Every claim in this section is about the boundary between changed and pre-existing code, which nothing currently draws.
+
+- [ ] `PIPE-039 BLOCKER` Add the regression stage proving the pre-existing suite still passes at the produced revision; the produced-file scoping that makes every other gate fair leaves this uncovered today.
+- [ ] `PIPE-039a` Require the changed lines to be covered by a test that runs them, which is a different claim from the suite passing and the one that catches a change nothing exercises.
+- [ ] `PIPE-040` Add api-surface requiring the exported surface to be minimal and, for a change to existing code, unbroken.
+- [ ] `PIPE-041 DATA` Add compatibility requiring the new version to read the previous version's data and interoperate with older peers, with every migration tested in both directions.
+
+## Audit and Delivery
+
+Plan references: §10 Guarantee Provenance; §22 Correctness and Assurance Gates; §33 Pipeline Refinement.
+
+Depends on: `PIPE-046` for the declared profile the skip audit challenges a skip against.
+
+- [ ] `PIPE-042` Add skip-audit challenging every skipped and not-implemented stage and reporting the ratio as a headline figure in the run summary, not only in the ledger table.
+- [ ] `PIPE-043` Add independent-review by a reviewer that did not write the code, working from the specification rather than the implementation, with no round cap and no setting that removes it.
+- [ ] `PIPE-044 UX` Show the skip ratio and the unverified caveat in the run's final message, so a person reading the timeline sees what was not done without opening the ledger.
+
+## Flow Renumbering and Profiles
+
+Plan references: §33 Pipeline Refinement; §23 Storage.
+
+Depends on: `PIPE-004`. Renumbering a flow whose stages can still claim what they did not check spreads the problem across more rows.
+
+- [ ] `PIPE-045 DATA` Renumber the flow to sixty-six stages and prove that recorded rows from the previous numbering still read correctly by name, including a migration test over rows written under the old numbers.
+- [ ] `PIPE-046` Add declared run profiles marking stages inapplicable before the run starts, so a library run declines crash-recovery in advance rather than skipping it at runtime, and make `PIPE-042` audit which of the two happened.
+- [ ] `PIPE-047 DOC` Record in `docs/plan.md` §33 which stages each shipped profile declines and why, so a profile cannot quietly become the way a stage stops being performed.
+
+## Registration and Reuse
+
+Plan references: §2 Compounding-Effort Thesis; §7 Atom Naming and Retrieval Identity; §23 Atom Storage; §31 Evidence-Driven Reuse and Learning.
+
+Depends on: `PIPE-111` for what counts as produced, and `PIPE-048` before every other ticket here, because recall against an empty registry finds nothing and proves nothing.
+
+- [ ] `PIPE-048 BLOCKER DATA` Add the atom-registration stage and write the registry row: documentation, contract hash, signature shape, evidence links, and the exact revision the atom was verified at. No run writes the registry today, so recall has nothing to search.
+- [ ] `PIPE-048a DATA` Record the documentation embedding for each registered atom through `RecordAtomDocumentationEmbedding`, bound to the exact documentation revision, contract hash, repository revision, and embedding configuration §7 requires.
+- [ ] `PIPE-049 DATA` Add molecule-documentation and molecule-registration on the same terms, recording what the composition guarantees and the atoms it composes as its parts, so a later run can reuse joins and not only leaves.
+- [ ] `PIPE-050 BLOCKER` Move recall ahead of the atoms stage and make it binding: every contract carries a `reuse` or `write` decision before anything is built, and a `reuse` decision names the registered atom, its evidence, and its verified revision.
+- [ ] `PIPE-051 BLOCKER` Implement the contract-hash key: an exact match on the normalised signature with its preconditions, postconditions, and effects, answered from the index with no model request, replacing the `strings.Contains(content, "func "+name+"(")` match that finds a renamed atom never and a same-named different atom always.
+- [ ] `PIPE-051a` Implement the signature-shape key: the parameter and result type vector with names erased, indexed, returning a bounded candidate set rather than a verdict.
+- [ ] `PIPE-051b` Implement the documentation-embedding key over the shape candidates only and never over the whole registry, so similarity proposes and the contract hash disposes, as §7 requires.
+- [ ] `PIPE-052` Admit a recalled atom only once it passes this run's synthesised cases from the case-synthesis stage, and record that re-verification as the atom's evidence in this run, so reuse cannot import the earlier run's blind spots.
+- [ ] `PIPE-053 BLOCKER` Thread the preflight `retrieval.PreWorkGateResult` into the agent loop's first-round context items; the gate already runs in `task_preflight.go` and the loop plans against a directory listing, `go.mod`, and `README.md` while its answer sits unread. First-round admission is for verified material only — facts, recipes, registered atoms, rules, and regression cases; advisory patterns enter through `MEM-018`'s gate-failure path instead, because a first attempt exposed to advice is no longer the clean arm §31's lesson-failure protocol needs.
+- [ ] `PIPE-054` Keep `recallKnownAtoms` as the reuse-regret stage at the end of the flow, never blocking, comparing every function the run wrote against the registry as it now stands and recording which of the three keys would have found the match.
+- [ ] `PIPE-055` Classify each regret finding as a registry gap or a recall miss, because a function that was never deposited and a function that was deposited and not found have different repairs, and report the run's regret count beside the skip ratio.
+- [ ] `PIPE-056 DATA` Record influence through the existing `retrieval.RecordInfluence` path when a recalled atom is accepted or rejected, so reuse decisions are auditable and an invalidated atom can be re-derived transitively as §31 requires.
+
+## Concurrent Execution
+
+Plan references: §33 Pipeline Refinement; §25 Speed; §26 Benchmark Timing.
+
+Depends on: `PIPE-057`, then `PIPE-058` and `PIPE-059`. `PIPE-064` is the property the whole section is written against and must exist before the first parallel stage ships.
+
+- [ ] `PIPE-057` Parse the produced source once per run and share the tree: `readProducedFunctions` is called twenty times and `producedGoFiles` thirteen more, each re-shelling to `git status` and re-parsing identical content.
+- [ ] `PIPE-058 BLOCKER` Declare `Requires` edges on every stage as data in `internal/pipeline`, with a test that the graph is acyclic, that every stage is reachable, and that no edge points forward in the flow.
+- [ ] `PIPE-058a BLOCKER` Execute the declared frontier concurrently while the ledger continues to record by stage number, so execution order and reporting order stop being the same thing.
+- [ ] `PIPE-059` Declare a resource class per check — pure AST, build-only, suite-read, exclusive-mutating — and schedule against it, since the worktree rather than the logic is what forces serialisation.
+- [ ] `PIPE-060` Answer atom-verification, molecule-verification, path-coverage, and non-functional from one instrumented suite run instead of four separate whole-suite invocations.
+- [ ] `PIPE-061` Run mutation scoring on isolated worktree copies in parallel; twelve serial whole-suite runs is the single largest cost in a run and the only check that cannot share the worktree.
+- [ ] `PIPE-062` Fan out per-unit work across items: per atom, per mutant, per fuzz target, and per platform target.
+- [ ] `PIPE-063` Cancel a failed gate's dependents and record them blocked, rather than computing verdicts that a first-write-wins row then discards.
+- [ ] `PIPE-064 TEST` Prove a stage's verdict does not depend on how many stages were in flight: run the same worktree serially and in parallel and require identical ledgers apart from timing.
+- [ ] `PIPE-065` Key stage results by input digest and reuse them across attempts within a run and across runs for recalled atoms, so an attempt that changed two files does not re-check the other eight. Cross-run reuse is a memory read: bind each cached verdict to the revision, toolchain, and dependency versions that produced it and invalidate it when they move, because a stage verdict carried into a later run on a stale binding is an unquarantinable claim about a program nobody checked.
+
+## Provider Backpressure
+
+Plan references: §21 Routing Safety; §25 Cost; §27 Initial Model Providers.
+
+Depends on: `PIPE-066`, the single admission point every other ticket here configures, and `PIPE-058`, which is what creates concurrent model requests in the first place.
+
+- [ ] `PIPE-066 BLOCKER` Route every model request through one admission point with a configured maximum concurrency, so fan-out cannot exceed what the provider tolerates and the ceiling is a setting rather than an accident of the graph shape.
+- [ ] `PIPE-067 BLOCKER` Treat `429` and provider overload responses as backpressure: exponential backoff with jitter, honouring `Retry-After` when the provider sends one, recorded as a wait rather than a stage failure.
+- [ ] `PIPE-068` Bound retries by attempt count and by total wall clock, then record the stage blocked with the provider's own reason, because "we could not ask" and "we asked and the answer was no" are different facts in an immutable ledger.
+- [ ] `PIPE-069` Narrow the concurrency ceiling for the remainder of the run under sustained rate limiting instead of retrying at full width into a limit.
+- [ ] `PIPE-070` Enforce budget and forecast at the admission point so concurrent stages cannot each believe they are inside the cap while collectively exceeding it.
+- [ ] `PIPE-071 TEST` Add a provider fake returning `429` with and without `Retry-After` and assert the backoff schedule, the ceiling reduction, the ledger wording, and that no stage records failed because of a rate limit.
+- [ ] `PIPE-072 UX` Show waiting-on-provider as its own state in the run timeline, distinct from working and from blocked, so a throttled run does not read as a stalled one.
+
+## Model Selection
+
+Built already, recorded here because `TODOS.md` is authoritative for what is implemented and the escalation vocabulary is now load-bearing for several tickets above.
+
+- [x] `PIPE-073` Make the ladder rungs a model and an effort level rather than a model alone, and order the default ladder so every effort of the cheap model precedes any rung of the dear one; raising effort bills more tokens at the rate in force, changing model raises the rate on every token.
+- [x] `PIPE-074` Trigger escalation on repetition — the same gate failing with the same normalised failure — rather than on attempt count, so a run failing something different each time is left on the cheapest rung it is converging on.
+- [x] `PIPE-075` Give each rung its own attempt allowance, bounded overall by the allowance times the number of grants; one shared budget charged the cheap model's failed attempts to the model it escalated to and left the last rung unreachable on the shipped defaults.
+- [x] `PIPE-076` Decompose once at the top of the ladder rather than asking the strongest rung again, and tell the run to stop trying to land the request in one piece.
+- [x] `PIPE-077` Refuse a descending ladder at validation: a run escalates because it stalled, so moving it somewhere cheaper at that moment guarantees it stalls again and nothing downstream would report the ladder was upside down.
+- [x] `PIPE-078` Stop the run on a rung named as requiring approval, and carry what was tried, what keeps failing, what it has cost, and which axis the extra cost is on; keep approval rungs off the default ladder so the gate is not on the ordinary case.
+- [x] `PIPE-079` Make planning a model request on a rung that does not climb, replacing the regular expression over the requirement that emitted one edit step per named file; a decomposition that misses a behaviour is paid for on every rung, on every attempt, and no effort further down recovers it.
+- [x] `PIPE-080` Carry the model's words on the turn: the text was collected, scanned for a completion keyword, and discarded, so a caller that asked the model a question rather than asking it to work could not read the answer.
+- [x] `PIPE-081` Price each rung separately; a ladder priced at the cheap model's rates reports the same cost whichever model ran, and the budget the product enforces stops being true the moment a run escalates.
+- [x] `PIPE-082 BLOCKER` Treat a refused turn as a failed attempt rather than a dead run, and tell the next attempt which rule it broke. Every loop error ended the run, which put a model slip in the same category as a database that will not open; rung 5 died on one with four attempts and three rungs unused.
+- [x] `PIPE-083` Stop the module root matching every request in acceptance-command selection: `strings.Contains` is true of the empty string against any text, so a root package read as named by every requirement and the one externally grounded stage never ran.
+- [ ] `PIPE-084 TEST` Record predicted rung, seeded rung, and finishing rung on every run, and report how often each rung was reached, so the ladder's own settings can be calibrated against what runs actually needed rather than against an argument in this document. Record alongside them the routing-key projection version of `MEM-022` and whether the run was seeded or exploring per `MEM-028`; without the first the rows cannot be grouped, and without the second the seeded population's cost is reported as everyone's.
+
+## Difficulty Rating
+
+Depends on `PIPE-079`: the rating is produced inside the specification request that already enumerates the units, so there is no rating stage until there is a planning request to carry it.
+
+- [ ] `PIPE-085` Add the difficulty-rating stage as stage 8, after contracts and inside the reviewed set, so a person can disagree with a tier before the money is spent rather than after.
+- [ ] `PIPE-086` Rate against a closed set of named tiers — direct, conditional, structural, algorithmic — each justified by a property of the contract; refuse a numeric score, which produces numbers that look measured, are noise through the middle of the range, and then make a binding cost decision.
+- [ ] `PIPE-087` Bias the rubric low: where two tiers both fit, take the lower. Under-rating is visible because the run stalls and climbs; over-rating is invisible and self-justifying, so the untended drift is upward.
+- [ ] `PIPE-088` Seed the ladder from the rating rather than replacing it, so a rating at the top rung short-circuits while a wrong rating still corrects; the correction path is the only thing that makes an over-rating recoverable.
+- [ ] `PIPE-089` Take the run's starting rung from the hardest unit and name the hard units in the decomposition, until `PIPE-018a` allows a rung per unit.
+- [ ] `PIPE-090 TEST` Record tier against outcome and answer the calibration question directly: of the units rated structural, how many did the cheapest rung handle unaided? A rubric nobody can calibrate drifts upward forever.
+- [ ] `PIPE-091` Choose the reviewing rung from measurement rather than from the rating: branch counts, loop nesting, path coverage, and above all which deliberate defects survived, since a surviving mutant is evidence the tests cannot see a defect in that region. The flow already computes all of it.
+- [ ] `PIPE-092 DOC` Record in `docs/plan.md` §33 which tier seeds which rung, so a rubric change and a cost change are the same edit and cannot drift apart.
+
+## Refinement Adversary
+
+Plan references: §21 Adversarial Agent; §9 Proof Obligations as the Unit of Assurance; §10 Guarantee Provenance; §12 Effect Discipline; §22 Correctness and Assurance Gates; §25 Metrics; §26 Benchmark Timing; §31 Evidence-Driven Reuse and Learning; §33 Pipeline Refinement.
+
+Depends on: `PIPE-001` through `PIPE-004`. A critic whose findings are recorded in a ledger that silently drops rows has recorded nothing.
+
+- [ ] `PIPE-093 BLOCKER` Assemble the critic's input: the contracts, data model, threat model, acceptance examples, and the diff, as one packet bound to the revision it describes.
+- [ ] `PIPE-093a BLOCKER` Make the critic a model request over that packet and parse its answer into typed findings, so it challenges requirement interpretation and unsupported guarantees as §21 defines it instead of reporting what the source looks like.
+- [ ] `PIPE-094` Keep the five static finders as evidence handed to the critic rather than as the critic, so §21's judgement and the mechanical checks stop being the same thing.
+- [ ] `PIPE-095` Select the critic's checks from task risk, changed obligation categories, effect types, dependency changes, and security classification as §21 requires, and read the `scope.riskLevel` the run already resolves and never uses.
+- [ ] `PIPE-096 BLOCKER` Raise every finding as a proof obligation with a stable identity in §9's sense, so a review can be discharged, regressed, or reopened rather than expiring with the attempt that produced it.
+- [ ] `PIPE-097` Attach guarantee provenance to each finding as §10 requires: evidence level, dependency binding, and lineage, so a later run can re-derive or invalidate it transitively.
+- [ ] `PIPE-098 BLOCKER` Record findings and their disposition in the pipeline ledger and the evidence bundle, so §22's assurance report reflects what the critic found and whether the next attempt fixed it; today the only consumers are one prompt string and one chat message.
+- [ ] `PIPE-099 BLOCKER` Route the review's send-back through `sendBack` so §21's progress monitor sees it; a run stuck on review findings currently neither escalates up the model ladder nor decomposes.
+- [ ] `PIPE-100` Mark the review round as spent only when findings actually sent work back, so the single round is not consumed by an attempt-one review that errored or found nothing and never sees the code that ships.
+- [ ] `PIPE-101` Establish reviewer independence as §31 defines lineage independence: the critic works from the specification and the diff rather than from the criteria the author derived, and its findings are recorded as an independent lineage. Independence includes retrieval: advisory material shown to this run's implementer is withheld from this run's critic, and where it cannot be, the finding records `influenced_by` and is excluded from confirming that pattern or its ancestors.
+- [ ] `PIPE-102` Remove `AdversarialReview` as a switch that deletes the reviewer; §22 forbids trading away a required reviewer for lower cost, so the setting may scale the critic's depth but not its existence.
+- [ ] `PIPE-103` Repair the swallowed-error finder against `PIPE-105`'s measurement: it examines only pure functions, resolves no standard-library call, and infers a swallow from the caller returning no error, so it reports correctly handled failures as defects. Retire it if the measured false-positive rate stays above the threshold `PIPE-105` records.
+- [ ] `PIPE-104` Repair the boundary finder against `PIPE-105`'s measurement by reading literal arguments from the test syntax tree: substring matching over concatenated source makes `"0"` match a file mode and `"Error"` match `t.Errorf`, so one finding is unreachable and the rest are near-random. Retire it if the measured rate stays above the threshold.
+- [ ] `PIPE-105 TEST` Measure the critic's false-positive rate before either finder is promoted, as §31's mechanical-rule governance requires, and record the measurement with the rule.
+- [ ] `PIPE-106` Rank findings by expected defect cost as §22 orders work, and bound how many reach the instruction, so the review does not compete with the code context under the loop's byte limits.
+- [ ] `PIPE-107` Share one mutation result between the critic and the ledger; the two independent `checkMutations` calls are roughly twenty-four whole-suite executions per run and §25's honest cost display cannot attribute them.
+- [ ] `PIPE-108` Attribute the critic's cost separately in the run's cost summary and in §26's benchmark timing, so the price of reviewing is visible next to the price of building.
+- [ ] `PIPE-109` Read the exit code in the runtime probe and distinguish a legible refusal from a silent one; §12's effect discipline is about failure being visible, and the probe currently examines only timeout, the literal `panic:`, and silence.
+- [ ] `PIPE-110` Stop reporting an empty output with a zero exit as a finding for programs whose correct behaviour is to emit nothing, so the probe does not fail work for doing what was asked.
+
+## Change Attribution
+
+Plan references: §33 Pipeline Refinement; §19 Review and Source Mapping; §22 Correctness and Assurance Gates; §27 Local Runtime and Repository Isolation.
+
+Depends on: nothing. This is the scoping every phase B through D gate already assumes it has.
+
+- [ ] `PIPE-111 BLOCKER` Derive the changed line ranges from the base revision the worktree was created at, replacing the changed-file list as the run's unit of attribution.
+- [ ] `PIPE-111a BLOCKER` Map those ranges to their enclosing declarations and expose the attributed set to every check, so a one-line fix inside a thirty-function file does not make the run answerable for the other twenty-nine.
+- [ ] `PIPE-112` Re-scope the completeness loop to attributed declarations only, so the refinement loop stops sending a run back to write tests and doc comments for functions it never touched.
+- [ ] `PIPE-113` Re-scope anti-patterns, complexity, and simplification to attributed declarations, and report a pre-existing finding in a touched file as context rather than as a gate failure.
+- [ ] `PIPE-114` Re-scope mutation to attributed lines, so the score measures whether this change's tests detect this change's defects.
+- [ ] `PIPE-115` Report coverage for the changed lines rather than the least-covered package in the module, which on any real repository describes code the run never touched.
+- [ ] `PIPE-116 TEST` Add a fixture repository with substantial pre-existing code and prove that a one-line change is judged on one declaration, since every gate in phases B through D inherits this scoping.
+
+## Task Classes and Acceptance
+
+Plan references: §27 Initial Product Scope; §0 Acceptance definitions; §24 Specification Review; §33 Pipeline Refinement.
+
+Depends on: `PIPE-117`, the spike whose answer decides the rest of the section and whether `PIPE-019` can ship as written.
+
+- [ ] `PIPE-117 BLOCKER SPIKE` Research how each of the six declared task classes states an executable acceptance example. The current form is arguments, stdin, and expected output, which only a command-line filter can satisfy; a refactor, a dependency change, a library feature, and behaviour-linked documentation can express none of them, and `PIPE-019` makes an example mandatory.
+- [ ] `PIPE-118` Add a second example form for work with no command-line surface: a named test that must pass, identified by package and test name, so a library change can be judged against something the requester wrote.
+- [ ] `PIPE-119` Define what a refactor and a dependency change are judged against, given that both are meant to preserve behaviour: the pre-change suite passing unchanged is the candidate, and it needs stating rather than assuming.
+- [ ] `PIPE-120` Restate the acceptance-oracle gate for repository work: an example must fail against the base revision rather than against an empty program, which is both checkable and the stronger claim.
+- [ ] `PIPE-121` Support quoted arguments in the example format; `args:` splits on spaces, so no argument containing one can be expressed.
+
+## Repository Reality
+
+Plan references: §27 Local Runtime and Repository Isolation; §27 Repository Indexing and Context Selection; §22 Correctness and Assurance Gates.
+
+Depends on: `PIPE-046`, the declared profile that lets a non-Go or non-standard repository be declined honestly rather than failed.
+
+- [ ] `PIPE-122 BLOCKER` Discover the project's own build and test commands instead of assuming `go build ./...` and `go test ./...`, and approve the discovered command in the permission policy, which today hardcodes exactly one invocation as the run's only approved command.
+- [ ] `PIPE-123` Support a repository whose module is not at the worktree root, and one whose suite needs build tags, rather than recording a gate failure for a repository that builds correctly.
+- [ ] `PIPE-124` Stop failing the atoms stage when a run produces no new function: a refactor, a configuration change, and a dependency bump each legitimately produce none, and the current detail claims every piece of work is entangled.
+- [ ] `PIPE-125 SPIKE` Decide what the flow records for a repository outside the Go-first scope. Recording failed for every stage misattributes a scope decision as a defect; not-implemented by declared profile is the honest answer and needs `PIPE-046` to carry it.
+- [ ] `PIPE-126` Adopt `internal/testselection` for the repeated whole-suite stages; repetition, non-functional, mutation, verification, and coverage each run the entire repository suite today, and the package exists and is wired only into the validation review workflow.
+
+## Mutation Correctness
+
+Plan references: §9 Proof Obligations as the Unit of Assurance; §31 Mechanical-Rule Governance; §33 Pipeline Refinement.
+
+Depends on: `PIPE-114`. A score computed over unattributed lines measures whether the wrong tests catch the wrong defects.
+
+- [ ] `PIPE-127 BLOCKER` Build every mutant before running the suite and discard the ones that do not compile: `" + "` becomes `" - "` inside string concatenation, the build fails, the suite fails, and the score counts it as caught, so the current score is inflated by mutants that never ran.
+- [ ] `PIPE-128 BLOCKER` Mutate the syntax tree rather than the file bytes, so a substitution cannot land inside a string literal or a comment and produce a survivor that is not a blind spot.
+- [ ] `PIPE-129` Sample mutants across the attributed lines rather than taking the first occurrence of each pattern in each file, so the score is not an artifact of file ordering.
+- [ ] `PIPE-130 TEST` Prove the score's meaning with a fixture whose tests are known to be blind and one whose tests are known to be thorough, and record the false-positive and false-negative rates as §31 requires of a mechanical rule.
+
+## Execution Containment
+
+Plan references: §27 Commands, Secrets, and Malicious Repository Content; §12 Effect Discipline; §10 Guarantee Provenance.
+
+Depends on: nothing. This is a boundary the rest of the product already enforces and these three stages do not.
+
+- [ ] `PIPE-131 SECURITY BLOCKER` Route acceptance runs, adversarial probes, and mutation suite runs through the mediated executor and its permission policy; all three shell out directly today, so repository code — a `TestMain`, an `init`, or any produced command — runs with the coordinator's own authority and no approval.
+- [ ] `PIPE-132 SECURITY` Bound what a probed or accepted program may reach: the probe builds and runs every main package in the repository against garbage arguments, and on a real repository those are programs the run did not write.
+- [ ] `PIPE-133 SECURITY TEST` Add an abuse case in which repository test code attempts to read a credential, reach the network, and write outside the worktree, and prove each attempt is refused and recorded.
+
+## Measurement Honesty
+
+Plan references: §25 Metrics; §10 Guarantee Provenance; §33 Pipeline Refinement.
+
+Depends on: `PIPE-039` for the stage `PIPE-136`'s baseline exists to serve, and `PIPE-111` for the scope `PIPE-115` measures.
+
+- [ ] `PIPE-134` Complete the capability map used by global-invariants: `io/fs`, `net/rpc`, `database/sql`, `os/user`, and `runtime/debug` are absent, `io/ioutil` is deprecated, and `os` conflates reading arguments with touching the filesystem.
+- [ ] `PIPE-135` State the complexity label's limits where it is recorded: it is read from loop nesting, so a recursive function and a call to a library sort are both labelled constant, and a label that is wrong in a named way is usable while an unqualified one is not.
+- [ ] `PIPE-136` Capture the base revision's suite result before the run starts, so the regression stage has something to compare against rather than asserting that nothing broke.
+
+## Contracts, Effects, and Atomicity
+
+Plan references: §14 Contracts and Invariants; §12 Effect Discipline; §9 Proof Obligations as the Unit of Assurance; §10 Guarantee Provenance; §7 Semantic Atom Categories.
+
+Depends on: `PIPE-111a` for what the run is answerable for, and `PIPE-004`, because each of these turns a stage that reports into a stage that constrains.
+
+These are the tickets where the product's own thesis is not yet implemented. Atomicity, declared contracts, and effect discipline are what the flow claims to derive its correctness from, and in each case below the check currently describes the code rather than holding it to something stated before it existed.
+
+- [ ] `PIPE-137 BLOCKER` Produce contracts from the specification rather than from the finished code: `describeContracts` reads signatures off what was written and records `derived_after: true`, so a contract cannot constrain the unit it describes. §14 requires the contract to exist first, and the atoms stage to check the implementation against it.
+- [ ] `PIPE-138` Enforce purity where a contract declares it: the atoms gate says an atom reads nothing outside its arguments, and `checkAtoms` only counts how many happen to be pure. A unit declared pure that reaches outside itself is a gate failure, and an impure unit records what it reaches for.
+- [ ] `PIPE-139` Resolve effects from imports and types rather than from a fixed list of package identifiers: `callsAnythingImpure` reads `time.Duration(n)` as an effect and cannot see a call through an injected interface, so the purity figure it produces is wrong in both directions.
+- [ ] `PIPE-140 BLOCKER` Compare declared effects against observed effects and fail the gate on an undeclared one. §12 makes the request-side effect the primary verification surface, and no stage currently checks that what a unit does matches what it said it would do.
+- [ ] `PIPE-141` Replace `testsNaming`'s identifier sweep with call-site resolution: a unit whose name coincides with a local variable is reported verified by a test that never calls it. This is the second site of the defect `PIPE-008` repairs and is not reached by that fix.
+- [ ] `PIPE-142 SPIKE` Decide whether the functional house style is the default or an option, and record the decision. `FunctionalStyleDirective` is documented as a style the tools do not enforce, while the flow's atomicity, purity, and effect-at-the-edge gates all presuppose it; the two cannot both stand.
+- [ ] `PIPE-143 BLOCKER` Raise every gate failure as a proof obligation with a stable identity rather than a detail string, so an obligation can be tracked across attempts and across runs and §22's rule about a required obligation disappearing has something to watch.
+- [ ] `PIPE-144` Record an evidence level on every satisfied stage in §10's vocabulary — fully evaluated, contract checked, model verified, runtime only — so §22's CI rule about evidence dropping below policy can read it, and a satisfied row stops meaning the same thing whatever established it.
+
+## Gate
+
+- [ ] `PIPE-G01 GATE` No stage records satisfied for a gate its check does not establish, proven by the binding test of `PIPE-004` over every stage in the flow.
+- [ ] `PIPE-G02 GATE` A compiling-but-failing run's ledger carries the real verdict for every stage the run actually performed, and no verdict computed by the run is discarded.
+- [ ] `PIPE-G03 GATE` A task started twice records two attempts, each with its own run identity and its own complete flow.
+- [ ] `PIPE-G04 GATE` A run whose request carries no executable acceptance example does not start, and the refusal names the missing example.
+- [ ] `PIPE-G05 GATE` Every stage in the refined flow is either performed, declined by a declared profile, or recorded not-implemented, and the skip audit reports the ratio with each skip's justification.
+- [ ] `PIPE-G06 GATE` The dogfood run over a repository with existing code passes the regression, api-surface, and compatibility stages, proving the flow can be used more than once on the same repository.
+- [ ] `PIPE-G07 GATE` Every function a run writes is registered with its documentation, and a later run's recall finds it by contract hash without a model request.
+- [ ] `PIPE-G08 GATE` A second run of the same requirement against a populated registry reuses rather than rebuilds, and its ledger shows each reused atom excused from the atom-writing stages with its case re-verification recorded in their place.
+- [ ] `PIPE-G09 GATE` The same worktree produces an identical ledger under serial and parallel execution, timing aside.
+- [ ] `PIPE-G10 GATE` A run against a provider returning sustained `429` responses completes with its waits recorded, no stage recorded failed for a rate limit, and the budget respected.
+- [ ] `PIPE-G11 GATE` Run wall clock is measured against a recorded baseline on the target-class machine, with the saving attributed per mechanism — parsing once, collapsed suite runs, parallel mutation, digest cache, and reuse — rather than claimed in aggregate.
+- [ ] `PIPE-G12 GATE` A run failing a different gate each attempt finishes on the rung it started on, and a run failing one gate identically reaches the rung its ladder allows; both are provable from the ledger without reading the source.
+- [ ] `PIPE-G13 GATE` No run reaches an approval rung without a recorded request naming what was tried, what failed, and which cost axis the step moves.
+- [ ] `PIPE-G14 GATE` A refused turn costs one attempt and never the run, proven by a fixture whose model writes the same file twice in a turn and whose run still delivers.
+- [ ] `PIPE-G15 GATE` Difficulty tiers are calibrated against outcomes rather than asserted: the report states, per tier, the share of units the cheapest rung handled unaided, and a tier whose share is near one is reported as over-rated.
+- [ ] `PIPE-G16 GATE` A program that satisfies every gate while doing the wrong thing is caught by the critic and not by a person, proving §21's challenge to requirement interpretation is being made.
+- [ ] `PIPE-G17 GATE` Every critic finding exists in the ledger and the evidence bundle as a proof obligation with its provenance and its disposition, and no finding is visible only in a chat message.
+- [ ] `PIPE-G18 GATE` The critic's false-positive rate and its share of run cost are both measured and recorded before either finder is promoted to a mechanical rule.
+- [ ] `PIPE-G19 GATE` A one-line change to a file holding many declarations is judged on the declarations it touched, proven on a fixture repository with substantial pre-existing code.
+- [ ] `PIPE-G20 GATE` Each of the six declared task classes can state an executable acceptance example and complete a run, or is explicitly recorded as unsupported with the reason.
+- [ ] `PIPE-G21 GATE` A repository whose build or test command is not the assumed one completes a run against its own commands rather than failing a gate for building correctly.
+- [ ] `PIPE-G22 GATE` The mutation score counts only mutants that compiled and ran, proven against a fixture whose tests are known to be blind and one whose tests are known to be thorough.
+- [ ] `PIPE-G23 GATE` No stage executes repository code outside the mediated executor, proven by an abuse case in which test code attempts a credential read, a network call, and a write outside the worktree.
+- [ ] `PIPE-G24 GATE` Every unit's contract exists before its implementation and the implementation is checked against it, proven by a run whose code satisfies its tests and fails its contract.
+- [ ] `PIPE-G25 GATE` A unit that takes an effect it did not declare fails its gate, and the ledger names the effect and the declaration it contradicts.
+- [ ] `PIPE-G26 GATE` Every satisfied stage records an evidence level, and a run whose evidence level drops between attempts is reported rather than passing on the strength of the earlier one.
+- [ ] `PIPE-G27 GATE` Every ticket in this milestone is atomic by the standard at the top of this file: one observable output and no unrecorded architecture decision, checked by review before the milestone closes.
+
+---
+
+# Memory and Learning Layer (2026-08-02)
+
+Goal: give the retrieval half of §31 something to retrieve, and bound what the product is allowed to conclude from its own runs.
+
+The read side is built and structurally sound. Retrieval gates refuse similarity as authority, maturity states cannot regain authority once quarantined, lineage refuses self-confirmation, and `RunPreWorkGate` already runs before planning. It queries a store nothing writes: `OpenEpisode`, `CloseEpisode`, `UpsertExtractedMemoryFact`, and every `Extract*FromEpisode` function have zero production callers, and `ForecastedTask.Retrieval` has zero consumers. The Pipeline Refinement milestone creates the atom registry, the proof-obligation findings, the discovered build commands, and the rung records an extractor would draw on, and names no extractor. This milestone is the write half, the admission rules that decide where what is written may re-enter, and the governance both require.
+
+Plan references: §31 Evidence-Driven Reuse and Learning; Extraction Triggers and the Candidacy Funnel; Injection Surfaces and Timing; Routing Evidence Keys; Mechanical-Rule Governance; Permanent Clean Room; §33 Model Selection, The Prior; §29 Phase 5.
+
+Depends on: `PIPE-001` through `PIPE-003` and `PIPE-111` before any extractor is enabled. §31 quarantine is terminal and a successor inherits no confidence, so a cohort minted from a ledger that drops rows, cannot count attempts, or holds a run answerable for every declaration in a file it touched once can only be retired, never corrected. Injection of already-verified material does not wait and is tracked at `PIPE-053`.
+
+Milestone output: an episode per run, deterministic facts extracted at close, a candidacy funnel that mints prose only when nothing stronger fits, context items that state their own evidence strength, a declared routing key, and a ladder prior that seeds rather than replaces and keeps a recorded exploration floor so it stays falsifiable.
+
+## Episode Lifecycle
+
+Plan references: §31 Chronological Episodes; Influence Lineage.
+
+Depends on: nothing. Every other ticket in this milestone writes into an episode, so an absent episode makes the rest unbuildable rather than merely unwired.
+
+- [ ] `MEM-001 BLOCKER` Open an episode when a run starts and close it when the run ends, carrying the task, the starting and ending revisions, and the run identity, so the append-only record §31 assumes exists actually exists; `OpenEpisode` and `CloseEpisode` have no production caller today.
+- [ ] `MEM-002 BLOCKER DATA` Record each attempt's gate, normalised failure, rung, and outcome as episode action events, so the transitions every extractor reads from are facts in the store rather than strings in a chat message.
+- [ ] `MEM-003 DATA` Bind the episode to the pipeline ledger's real attempt number from `PIPE-003`, so a task started twice produces two episodes and neither inherits the other's evidence.
+- [ ] `MEM-004 DATA` Carry the eligible set `RunPreWorkGate` surfaced into the run that consumes it: `ForecastedTask.Retrieval` has no consumer, and `RecordMemoryInfluence` sits on the preflight service while used, adapted, or rejected is only knowable in the agent run, so the decision has no path back today.
+- [ ] `MEM-004a DATA` Record the influence action and its justification for every carried item at episode close; without it eligibility never becomes influence, lineage stays unpopulated, and `ConfirmsMemoryArtifactIndependently` correctly refuses to trust anything the store holds.
+- [ ] `MEM-005` Record `advisory_exposure` on every episode as a write-once transition rather than a property asserted at open: an episode opens unexposed, becomes exposed the first time an advisory pattern enters, and can never be relabelled unexposed, so the permanent clean-room cohort §31 requires can be identified after the fact rather than asserted.
+
+## Deterministic Extraction at Close
+
+Plan references: §31 Learning Artifact Types, Workspace Facts; Extraction Triggers and the Candidacy Funnel.
+
+Depends on: `MEM-001` for the episode, `PIPE-111` for what counts as produced. These are the cheapest artifacts in §31 and the only tier that needs no judgment; the extraction functions are already written and merely uncalled.
+
+- [ ] `MEM-006 DATA` Extract the successful build and test commands from attributable executions at episode close through `ExtractAttributableBuildCommandsFromEpisode` and `ExtractAttributableTestCommandsFromEpisode`, so the commands `PIPE-122` discovers are learned once rather than rediscovered per run.
+- [ ] `MEM-007 DATA` Extract file-to-test mappings from observed successful validations, and record which validation established each mapping.
+- [ ] `MEM-008 DATA` Extract formatting and lint conventions from configuration and accepted work, bound to the revision that carried them.
+- [ ] `MEM-009 SECURITY` Extract repository instructions only through `ExtractApprovedRepositoryInstruction` and its durable approval identity, because repository text is untrusted input and an unapproved instruction extracted into project memory is a prompt-injection path into every later run.
+- [ ] `MEM-010 DATA` Record the base-revision suite result `PIPE-136` captures as a workspace fact bound to that revision, so the regression stage's oracle is established once per revision rather than recomputed per run. This is the one fact observed before the episode opened and extracted at its close, admissible because the rule forbids minting from work in progress rather than recording what was already true.
+- [ ] `MEM-011` Invalidate every extracted fact when its supporting evidence moves — revision, toolchain binding, or dependency version — rather than letting it age silently into a claim about a repository that has changed.
+- [ ] `MEM-011a BENCH` Budget extraction and report it as its own line in the run's cost summary: five extractors over an eight-attempt episode is unaccounted work in a milestone that accounts for everything else, and §25 requires the price of learning to be as visible as the price of building.
+
+## The Candidacy Funnel
+
+Plan references: §31 Extraction Triggers and the Candidacy Funnel; Mechanical-Rule Governance; Regression Oracle and Execution Policy.
+
+Depends on: `MEM-002` for the transitions, `PIPE-096` for findings that outlive their attempt. The ordering is the point: a product that mints prose when a check would have done has converted a checkable property into one that has to be believed.
+
+- [ ] `MEM-012 BLOCKER` Mint a candidate at the strongest tier that can express the observation — workspace fact, mechanical rule, regression case, routing evidence, advisory pattern — and refuse a weaker tier without a recorded reason the stronger one could not carry it.
+- [ ] `MEM-013 BLOCKER` Refuse candidacy from `agent_self_report`, from a run whose produced work was not attributed to changed declarations, and from unapproved repository text, so the sources §31 names as inadmissible cannot enter through an extractor rather than through retrieval.
+- [ ] `MEM-013a BLOCKER` Refuse a first-attempt success only for the tiers that require something to have been contested — advisory pattern, regression case, and routing evidence about where a run stalled — and admit it for the deterministic tier, since a command that ran and exited zero is an observation of what executed rather than a conclusion about what was hard. Refusing it outright would forbid `MEM-006` through `MEM-008` on the runs that go well, which are most of them.
+- [ ] `MEM-014` Promote a `PIPE-096` finding that survived its attempt into a regression case when it has a reproducible input, a stable oracle, a demonstrated failure, and an expected outcome, and store it as an observation when any of the four is absent.
+- [ ] `MEM-015` Route a candidate mechanical rule through §31's governance — `warn` by default, replay against accepted revisions, and a false-positive measurement — and share that path with `PIPE-105` and `PIPE-130` rather than building a second promotion mechanism beside it.
+- [ ] `MEM-016 TEST` Prove the funnel refuses to mint an advisory pattern for an observation a mechanical rule expresses, using a fixture whose failure is a swallowed error, which the anti-patterns stage already checks.
+
+## Injection Surfaces
+
+Plan references: §31 Injection Surfaces and Timing; Advisory Pattern Evaluation; Permanent Clean Room.
+
+Depends on: `PIPE-053` for the first-round path. `MEM-017` is the one ticket here that changes an existing surface rather than adding one, and every other ticket depends on it, because advice indistinguishable from a demonstrated failure is worse than no advice.
+
+- [ ] `MEM-017 BLOCKER` Classify every repository context item by evidence strength and label it by what it is, splitting the single `last-test-run-output` item that today carries compiler errors, completeness gaps, acceptance failures, and adversarial findings under one name that is accurate for none of them.
+- [ ] `MEM-018 BLOCKER` Admit advisory patterns only through the send-back for the gate they are indexed under, and only once that gate has already failed in this run, so the first attempt stays the clean arm §31's lesson-failure protocol compares against.
+- [ ] `MEM-019` Refuse advisory material in the specification request at any rung, because no gate downstream catches a wrong decomposition and the error is paid on every rung of every attempt.
+- [ ] `MEM-020` Index advisory patterns by the four gate names `pipeline.ModelBearing` already declares, and validate an unknown gate name at settings time exactly as `StageModels` does, so a pattern indexed against a stage that sends nothing back is a caught configuration error rather than a control that silently does nothing.
+- [ ] `MEM-021` Record the clean and exposed attempt as the two arms of §31's investigation, each stamped with its rung, and void the pair when the rung changed between them. Escalation triggers on the same gate failing repeatedly, which is exactly when an advisory is injected, so the two collide by construction; the run is not delayed to protect the measurement, and a void pair confirms nothing.
+- [ ] `MEM-021a TEST` Assert that a void pair is excluded from confirming a pattern, and that every pair records what it inherited: attempt N+1 carries N's edits and N's failure output, so the comparison isolates the advisory only against that shared inheritance.
+
+## Routing Evidence and the Ladder Prior
+
+Plan references: §31 Routing Evidence Keys; Versioned Task Fingerprints; §33 Model Selection, The Prior.
+
+Depends on: `MEM-022` for the key, then `PIPE-084` for the records. The key comes first because `fingerprint.ExactFingerprint` binds the base revision and so recurs for no second run: every routing row written before a coarser key exists is written against a value nothing will ever query.
+
+- [ ] `MEM-022 BLOCKER DATA` Declare a named, versioned routing-key projection over structured fields only — task class, difficulty tier, requested authority, required assurance, risk, and banded affected-path and affected-symbol counts — excluding the base revision and the affected identifiers, and stamp every routing record with the projection version that produced its key. The band edges are part of the projection: moving one without bumping the version silently merges two populations that were never comparable.
+- [ ] `MEM-023 DATA` Refuse to read routing records written under one projection version through another, because a key whose meaning changed is a different key wearing the same value.
+- [ ] `MEM-024` Seed the starting rung from the prior rather than replacing the ladder, leaving every rung above the seed intact, so a wrong prior still corrects by the path `PIPE-088` keeps for a wrong rating.
+- [ ] `MEM-025` Implement top-truncation before bottom-seeding: learning that a shape never benefits above a rung is self-correcting, because a wrong truncation stalls a run with nowhere left to climb, while a wrong upward seed succeeds and reports nothing.
+- [ ] `MEM-026 BLOCKER` Refuse to seed into a rung requiring approval: approval carries what was tried and what failed, a seeded run has failed nothing, and seeding there converts a person's decision about money into an automatic one justified by evidence that person never saw.
+- [ ] `MEM-027 BLOCKER` Refuse any prior that removes a check rather than a cost; where a stage genuinely does not apply, the declared profile of `PIPE-046` says so before the run starts and the skip audit records which of the two happened.
+- [ ] `MEM-028 DATA` Run a declared fraction of runs against the bottom of the ladder regardless of the prior, and record per run whether it was seeded or exploring, because a seeded run collects no evidence about the rung it skipped and an unexplored prior is unfalsifiable rather than calibrated.
+- [ ] `MEM-028a` Decay the exploration fraction toward a declared minimum as the prior's interval for a key tightens, and never to zero: a prior that keeps being right should cost steadily less to keep falsifiable, and one nothing contradicts is one nothing tests. Without a decay the floor is an unbounded permanent tax with no review point.
+- [ ] `MEM-029 UX` Report the exploration fraction and the seeded and exploring populations separately in the cost summary, so the seeded population's cost is not presented as everyone's.
+- [ ] `MEM-030` Refuse to let routing evidence satisfy any correctness gate, mirroring `retrievalgate`'s structural refusal of similarity as authority: routing evidence is admissible for spending decisions and inadmissible as evidence a program is right. This is the general rule `MEM-027` applies to the ladder specifically; implement it once, in the admission path both share.
+
+## Gate
+
+- [ ] `MEM-G01 GATE` Every run leaves a closed episode whose attempts, gates, normalised failures, and rungs are readable from the store without reading a chat message.
+- [ ] `MEM-G02 GATE` A second run in the same repository uses the build and test commands the first run established, and the ledger names the fact and the episode that supplied them.
+- [ ] `MEM-G03 GATE` An observation a mechanical rule can express never reaches the advisory tier, proven by a fixture whose failure the anti-patterns stage already detects.
+- [ ] `MEM-G04 GATE` No advisory pattern reaches a first attempt or a specification request, and every exposed attempt has a recorded clean attempt before it against the same worktree and rung.
+- [ ] `MEM-G05 GATE` Advisory material shown to a run's implementer is withheld from that run's critic.
+- [ ] `MEM-G10 GATE` Where a critic must see advisory material, its findings record `influenced_by` and are excluded from confirming that pattern or its ancestors.
+- [ ] `MEM-G11 GATE` Every recorded clean and exposed pair states both rungs, and a pair whose rung changed is void and confirms nothing.
+- [ ] `MEM-G06 GATE` Routing records are grouped and read by a declared projection version, and a run whose fingerprint has never recurred still matches a prior by shape.
+- [ ] `MEM-G07 GATE` No prior seeds into an approval rung and no prior removes a stage, proven by a fixture whose routing evidence recommends both.
+- [ ] `MEM-G08 GATE` The exploration floor is observable in the record: of the runs seeded above the cheapest rung, the report states how many the cheapest rung would have handled, drawn from exploring runs of the same key.
+- [ ] `MEM-G09 GATE` A quarantined artifact never regains authority, and its independently derived successor carries a new identity, no inherited confidence, and the original counterexample, proven end to end through the extraction path rather than only in the domain layer.

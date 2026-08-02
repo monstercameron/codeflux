@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/fingerprint"
@@ -30,6 +31,20 @@ type TaskLifecycleAdapter struct {
 	// model. Without it every client had to supply four values it would have
 	// been guessing, which is precisely what intake refuses.
 	environment *TaskEnvironmentObserver
+	// agent carries out the work a started task describes. It is nil when no
+	// provider key is configured, and then a task still starts and still gets a
+	// worktree — it simply has nobody to act in it, which is the honest state.
+	agent TaskAgent
+}
+
+// TaskAgent performs the work one started task asks for.
+type TaskAgent interface {
+	Run(ctx context.Context, taskID domain.TaskID, runID domain.RunID) error
+}
+
+// SetAgentExecution installs the agent a started task hands off to.
+func (adapter *TaskLifecycleAdapter) SetAgentExecution(agent TaskAgent) {
+	adapter.agent = agent
 }
 
 // SetEnvironmentObserver installs the observer that fills what a caller left
@@ -192,6 +207,20 @@ func (adapter *TaskLifecycleAdapter) StartPreparedTask(
 			"the run was recorded but its worker did not start: %w", err)
 	}
 
+	if adapter.agent != nil {
+		// The work runs in the background so starting a task returns at once,
+		// which is what the caller and the interface both expect. Its context
+		// is deliberately not the request's: a run must not be cut short
+		// because the browser call that started it returned.
+		agent, taskID, agentRun := adapter.agent, command.TaskID, runID
+		go func() {
+			runContext, cancel := context.WithTimeout(
+				context.Background(), agentRunTimeout)
+			defer cancel()
+			_ = agent.Run(runContext, taskID, agentRun)
+		}()
+	}
+
 	started, err := adapter.store.GetTask(ctx, command.TaskID)
 	if err != nil {
 		return transport.TaskControlView{}, err
@@ -228,3 +257,9 @@ func (adapter *TaskLifecycleAdapter) providerKeyForPolicy(
 	}
 	return key, nil
 }
+
+// agentRunTimeout bounds one run.
+//
+// It is generous because real work takes minutes, and bounded because a
+// goroutine with no deadline outlives the thing it was started for.
+const agentRunTimeout = 20 * time.Minute

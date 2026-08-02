@@ -526,3 +526,35 @@ func (value ExecutionPolicy) Validate() error {
 func valueError(field, reason string) error {
 	return &ValueError{Field: field, Reason: reason}
 }
+
+// AmbiguityPolicy decides what a run does when the request it was given can be
+// read more than one way.
+//
+// A request that is genuinely ambiguous has no right answer available to the
+// machine, and the two honest responses are to ask or to state an assumption
+// and proceed. Which one is right depends on the person and the moment — a
+// supervised session wants the question, an overnight queue wants progress —
+// so it is a declared posture rather than a decision buried in the planner.
+//
+// Guessing silently is not one of the options.
+type AmbiguityPolicy string
+
+const (
+	// AmbiguityAsk stops before any work and puts the question to the person.
+	// It is the default: unasked questions become wrong work, and wrong work
+	// costs more to review than a question costs to answer.
+	AmbiguityAsk AmbiguityPolicy = "ask"
+	// AmbiguityAssume proceeds on the narrowest defensible reading and records
+	// the assumption where the person will see it. It never hides that a choice
+	// was made on their behalf.
+	AmbiguityAssume AmbiguityPolicy = "assume"
+)
+
+func (value AmbiguityPolicy) IsValid() bool {
+	switch value {
+	case AmbiguityAsk, AmbiguityAssume:
+		return true
+	default:
+		return false
+	}
+}

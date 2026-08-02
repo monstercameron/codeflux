@@ -13,13 +13,18 @@ import (
 	"codeflux.dev/codeflux/internal/buildinfo"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
+	"codeflux.dev/codeflux/web/frontend/appearanceview"
+	"codeflux.dev/codeflux/web/frontend/atomcollection"
+	"codeflux.dev/codeflux/web/frontend/dataview"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/executionview"
+	"codeflux.dev/codeflux/web/frontend/filetree"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/preferences"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
+	"codeflux.dev/codeflux/web/frontend/settingsview"
 	"codeflux.dev/codeflux/web/frontend/shell"
 	frontendstate "codeflux.dev/codeflux/web/frontend/state"
 	"codeflux.dev/codeflux/web/frontend/taskcontrols"
@@ -37,6 +42,8 @@ func main() {
 		"/tasks",
 		"/graphs",
 		"/memory",
+		"/code",
+		"/atoms",
 		"/settings",
 		"/diagnostics",
 		"/first-run",
@@ -49,6 +56,28 @@ func main() {
 	history.Register("*", productPage, router.Options{Title: "CodeFlux"})
 	history.Mount("#app")
 	utils.WaitForever()
+}
+
+// navigateAndCommit performs a client navigation and then schedules one more
+// render.
+//
+// The router renders the new route surface once, and that first pass does not
+// reach the document when the surface being replaced owns a different shape:
+// the workspace mounted, rendered, and left the route frame empty until some
+// later state change happened to re-render it. Every navigation in this
+// application goes through here so nobody is left looking at a blank page.
+func navigateAndCommit(
+	navigate func(string),
+	commit func(),
+	path string,
+) {
+	if navigate == nil {
+		return
+	}
+	navigate(path)
+	if commit != nil {
+		ui.PostAsync(commit)
+	}
 }
 
 func productPage(router.Attrs) ui.Node {
@@ -64,8 +93,17 @@ func productApplication() ui.Node {
 	streamStatus := ui.UseState(sessionclient.Status{State: sessionclient.StateIdle})
 	reconnectVersion := ui.UseState(uint64(0))
 	reducedMotion := ui.UsePrefersReducedMotion()
+	// The console opens dark whatever the desktop prefers. Its own boot
+	// document is dark, a run is watched for long stretches, and the light
+	// treatment exists for daylight rather than as the default identity. The
+	// theme control still cycles all three and the choice persists.
 	preferredScheme := ui.UsePrefersColorScheme()
-	activeTheme, setTheme := ui.UseTheme(string(preferredScheme))
+	_ = preferredScheme
+	activeTheme, setTheme := ui.UseTheme(string(design.ThemeDark))
+	// The appearance choice is read from this machine and written back on
+	// every change. Theme, density, and motion had no durable home before:
+	// the theme control claimed the choice persisted and nothing stored it.
+	appearance := useAppearancePreferences(setTheme)
 	layoutState := ui.UseState(frontendstate.DefaultLayoutPreferences())
 	logSeverities := ui.UseState(map[executionview.Severity]bool{})
 	selectedGraphID := ui.UseState("")
@@ -76,6 +114,20 @@ func productApplication() ui.Node {
 	taskObservedAt := ui.UseRef(time.Now())
 	reconnectStartedAt := ui.UseRef(time.Time{})
 	preferencesReady := ui.UseState(false)
+	// The workspace's overflow menu is owned here rather than inside the route
+	// surface, so every route surface stays hook-free and moving between two of
+	// them cannot land on a hook-count mismatch.
+	taskActionsOpen := ui.UseState(false)
+	// A navigation renders the new route surface once, and that first pass is
+	// dropped: moving from any page to the thread workspace left the route
+	// frame empty in the document while the component had rendered normally,
+	// and any later state change filled it in. Rather than leave a person
+	// looking at a blank page until they touched something, the application
+	// schedules one more render immediately after the path changes.
+	routeCommitNonce := ui.UseState(uint64(0))
+	lastCommittedPath := ui.UseRef("")
+	lastStreamedThread := ui.UseRef("")
+	commitRoute := func() { routeCommitNonce.Set(routeCommitNonce.Get() + 1) }
 	resource := bootstrap.Get()
 	restoreContext := routes.RestorationContext{}
 	restoreKey := ""
@@ -93,13 +145,15 @@ func productApplication() ui.Node {
 		restoreKey,
 		restoreContext,
 	)
-	theme := design.Theme(activeTheme)
-	if theme != design.ThemeLight && theme != design.ThemeDark && theme != design.ThemeHighContrast {
-		theme = design.ThemeDark
-	}
+	// The stored choice is the only source of truth for the theme. The top
+	// bar's cycle control writes to it too, so the two controls cannot
+	// disagree about what is on screen.
+	theme := appearance.Theme
+	_ = activeTheme
+	motionReduced := appearance.ReducesMotion(reducedMotion)
 	tokens, tokenErr := design.TokensFor(design.Options{
-		Theme: theme, Density: design.DensityComfortable,
-		ReducedMotion: reducedMotion,
+		Theme: theme, Density: appearance.Density,
+		ReducedMotion: motionReduced,
 	})
 	if tokenErr != nil {
 		tokens, _ = design.TokensFor(design.Options{})
@@ -128,10 +182,14 @@ func productApplication() ui.Node {
 			}
 		} else if compatible(resource.Value) {
 			if selectedThread.Get().SessionID().IsZero() {
+				// Nothing is selected, which is not the same as nothing being
+				// reachable. Reporting a healthy coordinator as Disconnected
+				// sent people looking for a transport fault when all they had
+				// to do was open a thread.
 				session = frontendstate.SessionView{
 					Bootstrap:  frontendstate.BootstrapReady,
-					Connection: frontendstate.ConnectionDisconnected,
-					Message:    "Secure startup completed. Select a session to begin live updates.",
+					Connection: frontendstate.ConnectionIdle,
+					Message:    "Open a thread to follow its run.",
 				}
 			} else {
 				session = sessionViewForLifecycle(streamStatus.Get())
@@ -177,6 +235,15 @@ func productApplication() ui.Node {
 			store = selectedStore
 		}
 	}
+	ui.UseEffectOf(func() func() {
+		if lastCommittedPath.Get() == location.Path {
+			return nil
+		}
+		lastCommittedPath.Set(location.Path)
+		ui.PostAsync(func() { routeCommitNonce.Set(routeCommitNonce.Get() + 1) })
+		return nil
+	}, location.Path)
+	_ = routeCommitNonce.Get()
 	appRoute := routeFor(location.Path, location.Query)
 	taskDetailSelection := routes.TaskDetailSelection{}
 	if location.Path == "/tasks" {
@@ -185,6 +252,14 @@ func productApplication() ui.Node {
 		}
 	}
 	telemetryProps := useMountedFrontendTelemetry(appRoute.Name == routes.Settings)
+	settingsProps := useMountedSettings(appRoute.Name == routes.Settings, resource.Value, focusManager)
+	// The settings route's own regions draw from the answer above, but the
+	// appearance, data, and telemetry regions read the route's data state. It
+	// was seeded loading and nothing ever moved it, so those three drew a
+	// skeleton forever beside sections that had already answered.
+	store = store.ReduceRemote(frontendstate.SettingsChanged{
+		Settings: settingsViewForMountedSettings(settingsProps),
+	})
 	if location.Path == "/" &&
 		strings.TrimSpace(location.Query) == "" &&
 		resource.Ready &&
@@ -210,28 +285,68 @@ func productApplication() ui.Node {
 	// The route is part of the dependency because it is what a person typed or
 	// followed, and the rail's identity is part of it because the route can
 	// only be honoured once the rail has loaded the thread it names.
+	// The commit nonce is part of this dependency because the render pass a
+	// navigation produces can be dropped before it reaches the document, and an
+	// effect scheduled in that pass never runs while its dependency is already
+	// recorded as current. Including the nonce means the forced second pass
+	// carries a dependency the effect has genuinely not seen.
 	selectedRefreshDependency := selectedThread.Get().ID().String() + "|" +
 		strconv.FormatUint(selectedRefreshRevision, 10) + "|" +
 		appRoute.ThreadID.String() + "|" +
-		threadRailSource.State.Value.RepositoryID().String()
+		string(appRoute.Name) + "|" +
+		threadRailSource.State.Value.RepositoryID().String() + "|" +
+		strconv.FormatUint(routeCommitNonce.Get(), 10)
 	ui.UseEffectOf(func() func() {
 		selected := selectedThread.Get()
 		if threadRailSource.State.Value.RepositoryID().IsZero() {
 			return nil
 		}
-		if selected.ID().IsZero() {
-			// Nothing had ever adopted the thread the URL names. The rail
-			// restored it internally, so the interface drew the right
-			// conversation, but no session was opened against it and the whole
-			// app reported itself disconnected against sample content.
-			if appRoute.ThreadID.IsZero() {
-				return nil
-			}
+		// The route is what a person navigated to, so the route decides which
+		// thread is open. This used to adopt the route's thread only when
+		// nothing was selected yet, which made one specific path dead: boot on
+		// a route that names no thread — settings, diagnostics, the chooser —
+		// then click a thread. The click navigated and the rail's own selection
+		// was dropped on the way up, so the workspace drew a thread nobody had
+		// opened a session against and the whole console reported itself
+		// disconnected, with no way back but a reload.
+		// A thread that has just become the selected one needs its session
+		// opened. The render pass a navigation produces can be dropped before it
+		// reaches the document, and the mounted timeline's effect is recorded
+		// against a dependency it never actually ran for, so the stream would
+		// never start: the workspace drew the right thread and reported itself
+		// disconnected against it. Bumping the reconnect version when the
+		// selected thread changes gives that effect a dependency it has not
+		// seen, which is also exactly what a new subscription is.
+		if !selected.ID().IsZero() && lastStreamedThread.Get() != selected.ID().String() {
+			lastStreamedThread.Set(selected.ID().String())
+			ui.PostAsync(func() { reconnectVersion.Set(reconnectVersion.Get() + 1) })
+		}
+		if !appRoute.ThreadID.IsZero() && appRoute.ThreadID != selected.ID() {
 			if row, ok := mountedThreadRailRow(
 				threadRailSource.State.Value, appRoute.ThreadID,
 			); ok {
 				selectedThread.Set(row.Thread())
 			}
+			return nil
+		}
+		// The graph and memory surfaces are about the run that is open, but
+		// their routes do not name a thread, so a cold load of either selected
+		// nothing and they drew "Nothing mapped yet" over a graph that existed.
+		// They adopt the thread the coordinator itself reports as selected.
+		if selected.ID().IsZero() &&
+			(appRoute.Name == routes.Graphs || appRoute.Name == routes.Memory) {
+			if identity := resource.Value.SelectedThreadID; identity != nil {
+				if threadID, parseErr := domain.ParseThreadID(identity.GetValue()); parseErr == nil {
+					if row, ok := mountedThreadRailRow(
+						threadRailSource.State.Value, threadID,
+					); ok {
+						selectedThread.Set(row.Thread())
+					}
+				}
+			}
+			return nil
+		}
+		if selected.ID().IsZero() {
 			return nil
 		}
 		if row, ok := mountedThreadRailRow(threadRailSource.State.Value, selected.ID()); ok && row.Thread() != selected {
@@ -308,7 +423,7 @@ func productApplication() ui.Node {
 		timelineProps.ReviewFile = taskDetailSelection.ReviewFile
 		timelineProps.OnCloseReview = func() {
 			if path, err := routes.TaskSelectionPath(taskDetailSelection.Route); err == nil {
-				navigator.Navigate(path)
+				navigateAndCommit(navigator.Navigate, commitRoute, path)
 			}
 		}
 	}
@@ -326,7 +441,7 @@ func productApplication() ui.Node {
 			},
 			OpenEvent: func(eventID domain.EventID) {
 				if path, err := routes.TaskEventSelectionPath(taskDetailSelection.Route, eventID); err == nil {
-					navigator.Navigate(path)
+					navigateAndCommit(navigator.Navigate, commitRoute, path)
 					return
 				}
 				graphMessageStableKey.Set("event:" + eventID.String())
@@ -360,7 +475,7 @@ func productApplication() ui.Node {
 					return
 				}
 				if err == nil {
-					navigator.Navigate(path)
+					navigateAndCommit(navigator.Navigate, commitRoute, path)
 				}
 			}
 		}
@@ -423,6 +538,51 @@ func productApplication() ui.Node {
 		},
 	)
 	reloadGraph = graphSource.Reload
+	// Memory is read per project, not per task: what a project has learned
+	// outlives the run that learned it.
+	memorySource := useMountedMemory(selectedThread.Get().ProjectID(), consoleTranslator())
+	localData := useMountedLocalData(
+		primitives.Mode{
+			Theme: tokens.Theme, Density: tokens.Density,
+			HighContrast: tokens.Theme == design.ThemeHighContrast, ReducedMotion: tokens.ReducedMotion,
+		},
+		appRoute.Name == routes.Settings,
+	)
+	localDataPanel := ui.CreateElement(dataview.Component, localData)
+	// The code collection is read per repository at its current revision: what
+	// a repository contains is a fact about the tree, not about a task.
+	collectionProps := useMountedCodeCollection(
+		appRoute.Name == routes.Code, appRoute.RepositoryID,
+	)
+	// The atoms surface reads the same collection the code route reads, asked
+	// atom-first: every declaration that carries the directive, admitted or
+	// refused, across every package. It is mounted as a component rather than
+	// read here, so typing in its search box re-renders that surface instead
+	// of the whole console.
+	atomRepository := ""
+	if !appRoute.RepositoryID.IsZero() {
+		atomRepository = appRoute.RepositoryID.String()
+	} else if scope := selectedNavigationScope(resource.Value); !scope.RepositoryID.IsZero() {
+		atomRepository = scope.RepositoryID.String()
+	}
+	// The read lives here rather than inside the surface. Every other mounted
+	// surface in this console holds its resources in the root, and the one
+	// that did not never performed its first fetch at all: the atoms page sat
+	// on "Reading the collection" forever and only filled once a keystroke
+	// changed the query. The focus problem this was meant to solve was never
+	// the render scope; it was a search field that stopped being rendered.
+	atomsSource := useMountedAtoms(atomRepository, tokens)
+	// The code route is the repository's own tree. It reads only while that
+	// route is open, because listing every file and reading one is work no
+	// other page needs done.
+	fileTreeSource := useMountedFileTree(
+		appRoute.Name == routes.Code, atomRepository, tokens,
+	)
+	repositorySource := useMountedRepositoryPage(
+		resource.Value, repositoryChoices.Rows, repositoryChoices.State,
+		repositoryChoices.Error, repositoryChoices.Reload,
+		func(path string) { navigateAndCommit(navigator.Navigate, commitRoute, path) },
+	)
 	// The conversation and graph panes follow their own authoritative sources
 	// rather than the store's opening guess. Left at the opening guess they
 	// drew loading skeletons that nothing would ever resolve, which reads as a
@@ -457,7 +617,7 @@ func productApplication() ui.Node {
 		if path == "/graphs" {
 			emitGraphOpenedTelemetry(selectedThread.Get().TaskID())
 		}
-		navigator.Navigate(path)
+		navigateAndCommit(navigator.Navigate, commitRoute, path)
 	}
 	// The execution panels read the same durable events the timeline does, so
 	// what a person sees happening and what the log says cannot disagree.
@@ -484,12 +644,22 @@ func productApplication() ui.Node {
 		}
 	}
 	root := shell.RootProps{
+		TaskActionsOpen:   taskActionsOpen.Get(),
+		OnTaskActionsOpen: func() { taskActionsOpen.Set(true) },
+		OnTaskActionsDismiss: func() {
+			taskActionsOpen.Set(false)
+			// Focus goes back to the control that opened the menu. Left alone it
+			// landed on the document body, which puts a keyboard user at the top
+			// of the page after every dismissal.
+			ui.PostAsync(func() { focusManager.FocusByID("task-actions-trigger") })
+		},
 		Snapshot:     store.Snapshot(),
 		Execution:    execution,
 		Composer:     composerProps,
 		Timeline:     timelineProps,
 		TaskControls: authoritativeTaskControls,
 		Telemetry:    telemetryProps,
+		Settings:     settingsProps,
 		ThreadRail: ui.CreateElement(mountedThreadRail, mountedThreadRailProps{
 			Envelope: resource.Value, Snapshot: store.Snapshot(), Route: appRoute,
 			Mode: primitives.Mode{
@@ -502,7 +672,7 @@ func productApplication() ui.Node {
 					path, err = routes.TaskSelectionPath(route)
 				}
 				if err == nil {
-					navigator.Navigate(path)
+					navigateAndCommit(navigator.Navigate, commitRoute, path)
 				}
 			},
 			OnAuthoritativeSelection: func(thread threadrail.Thread) {
@@ -515,14 +685,57 @@ func productApplication() ui.Node {
 		}),
 		AuthoritativeGraph: graphSource.Authoritative,
 		GraphInspector:     graphSource.Inspector,
-		RepositoryChoices:  repositoryChoices.Choices,
-		SelectedScope:      selectedNavigationScope(resource.Value),
-		Route:              appRoute,
-		Tokens:             tokens,
-		Translator: frontendi18n.EnglishRegistry().Resolve(
-			string(frontendi18n.LocaleEnglishUnitedStates),
-		),
-		OnLayoutChange: layoutState.Set,
+		Appearance: ui.CreateElement(appearanceview.Component, appearanceview.Props{
+			Mode: primitives.Mode{
+				Theme: tokens.Theme, Density: tokens.Density,
+				HighContrast: tokens.Theme == design.ThemeHighContrast, ReducedMotion: tokens.ReducedMotion,
+			},
+			Theme: tokens.Theme, Density: tokens.Density,
+			Axis: appearanceview.Axis{
+				Measure: settingsview.RationaleMeasure,
+				Value:   settingsview.ValueColumnWidth,
+				Rail:    settingsview.ControlColumnWidth,
+			},
+			ReduceMotion:        motionReduced,
+			MotionFollowsSystem: appearance.Motion == preferences.MotionFollowSystem,
+			SystemReducesMotion: reducedMotion,
+			OnTheme: func(next design.Theme) {
+				setTheme(string(next))
+				record := appearance.Record()
+				record.Theme = string(next)
+				appearance.Set(record)
+			},
+			OnDensity: func(next design.Density) {
+				record := appearance.Record()
+				record.Density = string(next)
+				appearance.Set(record)
+			},
+			OnMotionFollow: func() {
+				record := appearance.Record()
+				record.Motion = preferences.MotionFollowSystem
+				appearance.Set(record)
+			},
+			OnMotionReduce: func(reduce bool) {
+				record := appearance.Record()
+				record.Motion = preferences.MotionFull
+				if reduce {
+					record.Motion = preferences.MotionReduce
+				}
+				appearance.Set(record)
+			},
+		}),
+		LocalData:         localDataPanel,
+		Memory:            memorySource,
+		Collection:        collectionProps,
+		Atoms:             ui.CreateElement(atomcollection.Component, *atomsSource),
+		FileTree:          ui.CreateElement(filetree.Component, *fileTreeSource),
+		Repositories:      repositorySource,
+		RepositoryChoices: repositoryChoices.Choices,
+		SelectedScope:     selectedNavigationScope(resource.Value),
+		Route:             appRoute,
+		Tokens:            tokens,
+		Translator:        consoleTranslator(),
+		OnLayoutChange:    layoutState.Set,
 		OnGraphSelect: func(id string) {
 			emitGraphNavigatedTelemetry(selectedThread.Get().TaskID())
 			selectedGraphID.Set(id)
@@ -533,7 +746,7 @@ func productApplication() ui.Node {
 				path, err = routes.TaskSelectionPath(route)
 			}
 			if err == nil {
-				navigator.Navigate(path)
+				navigateAndCommit(navigator.Navigate, commitRoute, path)
 			}
 		},
 		OnNavigatePath:       navigatePath,
@@ -542,14 +755,17 @@ func productApplication() ui.Node {
 		OnPauseRequested:     onPauseRequested,
 		OnStopRequested:      onStopRequested,
 		OnThemeChange: func() {
+			next := design.ThemeDark
 			switch theme {
 			case design.ThemeDark:
-				setTheme(string(design.ThemeLight))
+				next = design.ThemeLight
 			case design.ThemeLight:
-				setTheme(string(design.ThemeHighContrast))
-			default:
-				setTheme(string(design.ThemeDark))
+				next = design.ThemeHighContrast
 			}
+			setTheme(string(next))
+			record := appearance.Record()
+			record.Theme = string(next)
+			appearance.Set(record)
 		},
 	}
 	return ui.CreateElement(shell.SessionBootstrap, shell.SessionBootstrapProps{
@@ -639,7 +855,7 @@ func useLayoutPreferences(
 
 func isShellPreviewRoute(path string) bool {
 	switch path {
-	case "/tasks", "/graphs", "/memory", "/settings", "/diagnostics", "/first-run":
+	case "/tasks", "/graphs", "/memory", "/code", "/atoms", "/settings", "/diagnostics", "/first-run":
 		return true
 	default:
 		return false
@@ -712,6 +928,15 @@ func routeFor(path, query string) routes.Route {
 		// The local preview route deliberately omits a repository identifier so
 		// every frontend data state can be exercised before repository setup.
 		return routes.Route{Name: routes.Memory}
+	case "/code":
+		// The same preview convenience for the code collection. Without a
+		// repository the surface says it cannot be read rather than inventing
+		// one.
+		return routes.Route{Name: routes.Code}
+	case "/atoms":
+		// The atom collection takes the same unscoped entry: the surface reads
+		// the repository this session has open and says so when there is none.
+		return routes.Route{Name: routes.Atoms}
 	}
 	route, err := routes.Parse(path)
 	if err != nil {
@@ -807,4 +1032,11 @@ func selectedNavigationScope(envelope bootstrapEnvelope) shell.NavigationScope {
 		scope.ThreadID = domain.ThreadID{}
 	}
 	return scope
+}
+
+// consoleTranslator is the one message catalog every surface reads from, so a
+// kind named "reviewed command" on one screen is not named something else on
+// the next.
+func consoleTranslator() frontendi18n.Translator {
+	return frontendi18n.EnglishRegistry().Resolve(string(frontendi18n.LocaleEnglishUnitedStates))
 }

@@ -16,6 +16,12 @@ import (
 type MetricStripProps struct {
 	Measurements []Measurement
 	Mode         primitives.Mode
+	// Compact marks a panel drawn in the observation rail rather than
+	// across the workspace. The panels used to decide their own columns from
+	// the viewport, so in a three-hundred-pixel rail on a wide display they
+	// laid five measurements side by side and printed them on top of each
+	// other. Width is a fact about the container, not the window.
+	Compact bool
 }
 
 // MetricStrip renders the figures that decide whether to intervene.
@@ -42,21 +48,33 @@ func MetricStrip(props MetricStripProps) ui.Node {
 		cells = append(cells, metricCell(tokens, measurement))
 	}
 	return html.Section(html.Props{
-		Data: map[string]string{"component": "execution-metric-strip"},
-		Aria: map[string]string{"label": "Run measurements"},
-		Class: css.New(
-			u.Grid,
-			css.GridCols(css.Repeat(len(cells), css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
-			css.Gap(css.Px(tokens.Spacing.LG)),
-			css.Padding(css.Px(tokens.Rhythm.PanelInset)),
-			css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-			css.Border(
-				css.Px(tokens.Geometry.BorderWidth),
-				css.Hex(string(tokens.Colors.BorderSubtle)),
-			),
-		).String(),
+		Data:  map[string]string{"component": "execution-metric-strip"},
+		Aria:  map[string]string{"label": "Run measurements"},
+		Class: metricStripClass(tokens, props.Compact, len(cells)),
 	}, cells...)
+}
+
+// metricStripClass lays the figures out for the room they actually have.
+func metricStripClass(tokens design.Tokens, compact bool, cells int) string {
+	if compact {
+		return css.New(
+			u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)),
+			css.MinWidth(css.Zero),
+			css.Padding(css.Zero),
+		).String()
+	}
+	return css.New(
+		u.Grid,
+		css.GridCols(css.Repeat(cells, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
+		css.Gap(css.Px(tokens.Spacing.LG)),
+		css.Padding(css.Px(tokens.Rhythm.PanelInset)),
+		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+		css.Border(
+			css.Px(tokens.Geometry.BorderWidth),
+			css.Hex(string(tokens.Colors.BorderSubtle)),
+		),
+	).String()
 }
 
 func metricCell(tokens design.Tokens, measurement Measurement) ui.Node {
@@ -165,6 +183,12 @@ type TimelineProps struct {
 	// Now is supplied rather than read, so this component stays pure and a
 	// test can place a run at an exact moment.
 	Mode primitives.Mode
+	// Compact marks a panel drawn in the observation rail rather than
+	// across the workspace. The panels used to decide their own columns from
+	// the viewport, so in a three-hundred-pixel rail on a wide display they
+	// laid five measurements side by side and printed them on top of each
+	// other. Width is a fact about the container, not the window.
+	Compact bool
 }
 
 // ExecutionTimeline renders the ordered steps.
@@ -193,7 +217,7 @@ func ExecutionTimeline(props TimelineProps) ui.Node {
 			"total":     strconv.Itoa(progress.Total),
 		},
 		Aria:  map[string]string{"label": "Execution timeline"},
-		Class: executionPanelClass(tokens),
+		Class: executionPanelClassFor(tokens, props.Compact),
 	},
 		executionPanelHeader(tokens, "Execution timeline", progress.Label()),
 		progressBar(tokens, progress.Fraction(), progress.Label()),
@@ -303,6 +327,12 @@ type LogProps struct {
 	Mode       primitives.Mode
 	OnToggle   func(Severity)
 	OnClearAll func()
+	// Compact marks a panel drawn in the observation rail rather than
+	// across the workspace. The panels used to decide their own columns from
+	// the viewport, so in a three-hundred-pixel rail on a wide display they
+	// laid five measurements side by side and printed them on top of each
+	// other. Width is a fact about the container, not the window.
+	Compact bool
 }
 
 // StreamingLog renders emitted lines with severity filters.
@@ -360,7 +390,7 @@ func StreamingLog(props LogProps) ui.Node {
 			"hidden":    strconv.Itoa(hidden),
 		},
 		Aria:  map[string]string{"label": "Execution log"},
-		Class: executionPanelClass(tokens),
+		Class: executionPanelClassFor(tokens, props.Compact),
 	}, children...)
 }
 
@@ -540,6 +570,12 @@ func severityForeground(tokens design.Tokens, severity Severity) design.Color {
 type CurrentWorkProps struct {
 	Work Work
 	Mode primitives.Mode
+	// Compact marks a panel drawn in the observation rail rather than
+	// across the workspace. The panels used to decide their own columns from
+	// the viewport, so in a three-hundred-pixel rail on a wide display they
+	// laid five measurements side by side and printed them on top of each
+	// other. Width is a fact about the container, not the window.
+	Compact bool
 }
 
 // Work aliases CurrentWork so the props read naturally at the call site.
@@ -552,7 +588,7 @@ func CurrentlyExecuting(props CurrentWorkProps) ui.Node {
 		return html.Section(html.Props{
 			Data:  map[string]string{"component": "currently-executing", "present": "false"},
 			Aria:  map[string]string{"label": "Currently executing"},
-			Class: executionPanelClass(tokens),
+			Class: executionPanelClassFor(tokens, props.Compact),
 		},
 			executionPanelHeader(tokens, "Currently executing", "idle"),
 			html.P(html.Props{
@@ -572,7 +608,7 @@ func CurrentlyExecuting(props CurrentWorkProps) ui.Node {
 	return html.Section(html.Props{
 		Data:  map[string]string{"component": "currently-executing", "present": "true"},
 		Aria:  map[string]string{"label": "Currently executing"},
-		Class: executionPanelClass(tokens),
+		Class: executionPanelClassFor(tokens, props.Compact),
 	},
 		executionPanelHeader(tokens, "Currently executing", ""),
 		html.P(html.Props{
@@ -656,11 +692,26 @@ func progressBar(tokens design.Tokens, fraction float64, label string) ui.Node {
 }
 
 func executionPanelClass(tokens design.Tokens) string {
+	return executionPanelClassFor(tokens, false)
+}
+
+// executionPanelClassFor styles a run panel for the surface it sits on: a card
+// across the workspace, and a plain section inside the observation rail, where
+// another border would be the fourth one in from the edge of the display.
+func executionPanelClassFor(tokens design.Tokens, compact bool) string {
+	if compact {
+		return css.New(
+			u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)),
+			css.Padding(css.RawLength("14px 0")),
+			css.MinWidth(css.Zero),
+			css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		).String()
+	}
 	return css.New(
 		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)),
 		css.Padding(css.Px(tokens.Rhythm.PanelInset)),
 		css.MinWidth(css.Zero),
-		css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
+		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
 		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
 		css.Border(
 			css.Px(tokens.Geometry.BorderWidth),

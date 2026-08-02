@@ -47,7 +47,16 @@ func fetchSessionProjectionSnapshot(
 	if decoded.Session.SessionID != sessionID || decoded.Session.ThreadID != threadID {
 		return sessionprojection.SessionSnapshot{}, errSessionProjectionSnapshotMalformed
 	}
-	if !taskID.IsZero() && (decoded.Session.TaskID == nil || *decoded.Session.TaskID != taskID) {
+	// A snapshot that does not mention the task yet is behind, not malformed.
+	//
+	// The projection is built from the durable session sequence, and a task
+	// becomes visible to the rail the moment it is created — before the events
+	// that carry it into the session projection have been applied. Treating
+	// that gap as a broken answer failed the whole session the instant work
+	// started: the console reported itself disconnected and refused to send
+	// anything more, seconds after a person pressed Start work. A snapshot that
+	// names a *different* task is still a real mismatch and still refused.
+	if !taskID.IsZero() && decoded.Session.TaskID != nil && *decoded.Session.TaskID != taskID {
 		return sessionprojection.SessionSnapshot{}, errSessionProjectionSnapshotMalformed
 	}
 	return decoded, nil

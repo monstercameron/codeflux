@@ -663,3 +663,86 @@ func invalidateMemoryArtifactEmbeddingsForArtifact(
 	}
 	return int(affected), nil
 }
+
+// ListLatestMemoryArtifactRevisionsForProject returns the newest revision of
+// every live memory artifact in one project, newest first.
+//
+// It exists so the interface can show what the coordinator has learned about a
+// repository. Every predicate names the owning project: memory is the one store
+// where a leak across that boundary would teach one project's agent a fact it
+// was never entitled to, so the boundary is in the query rather than in the
+// caller. Logically deleted artifacts are excluded, because a deletion is the
+// product's way of saying a fact stopped being true.
+func (repositories *Repositories) ListLatestMemoryArtifactRevisionsForProject(
+	ctx context.Context,
+	projectID domain.ProjectID,
+	limit int,
+) ([]MemoryArtifactRevisionRecord, error) {
+	if projectID.IsZero() {
+		return nil, errors.New("project ID must not be empty")
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		memoryArtifactRevisionSelect+`
+ WHERE artifact_id IN (SELECT id FROM memory_artifacts WHERE project_id = ? AND deleted_at_unix_micros IS NULL)
+   AND revision_number = (
+     SELECT MAX(later.revision_number) FROM memory_artifact_revisions AS later
+      WHERE later.artifact_id = memory_artifact_revisions.artifact_id
+   )
+ ORDER BY created_at_unix_micros DESC, id DESC
+ LIMIT ?`,
+		projectID, limit,
+	)
+	if err != nil {
+		return nil, typedError(ErrUnreadable, "list memory artifact revisions", err)
+	}
+	defer rows.Close()
+	records := make([]MemoryArtifactRevisionRecord, 0, limit)
+	for rows.Next() {
+		record, scanErr := scanMemoryArtifactRevision(rows, "list memory artifact revisions")
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, typedError(ErrUnreadable, "list memory artifact revisions", err)
+	}
+	return records, nil
+}
+
+// GetMemoryArtifactProject reports which project owns one memory artifact.
+//
+// A detail read uses it to prove the artifact it is about to return belongs to
+// the project the caller named. Without that check an artifact identity alone
+// would be enough to read another project's memory, which is exactly the leak
+// the project boundary exists to prevent. A logically deleted artifact reports
+// found=false: its facts stopped being true.
+func (repositories *Repositories) GetMemoryArtifactProject(
+	ctx context.Context,
+	artifactID domain.MemoryArtifactID,
+) (domain.ProjectID, bool, error) {
+	if artifactID.IsZero() {
+		return domain.ProjectID{}, false, errors.New("memory artifact ID must not be empty")
+	}
+	var raw string
+	err := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT project_id FROM memory_artifacts WHERE id = ? AND deleted_at_unix_micros IS NULL`,
+		artifactID,
+	).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ProjectID{}, false, nil
+	}
+	if err != nil {
+		return domain.ProjectID{}, false, typedError(ErrUnreadable, "get memory artifact project", err)
+	}
+	projectID, err := domain.ParseProjectID(raw)
+	if err != nil {
+		return domain.ProjectID{}, false, typedError(ErrCorrupt, "get memory artifact project", err)
+	}
+	return projectID, true, nil
+}

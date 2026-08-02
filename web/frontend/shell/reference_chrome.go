@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -34,7 +35,7 @@ func applicationFrameClass(
 			}
 		}
 		if !inspectorCollapsed {
-			tracks = append(tracks, css.TrackLen(css.Px(316)))
+			tracks = append(tracks, css.TrackLen(css.Px(380)))
 		}
 	}
 	return css.New(
@@ -167,25 +168,69 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				}),
 			),
 		),
+		// The instrument strip. Every fact a person checks before intervening
+		// sits on one line, each under the smallest label that can name it,
+		// separated by hairlines rather than boxed into competing chips.
 		html.Div(html.Props{
 			Hidden: compact,
-			Aria:   map[string]string{"label": "Repository context"},
-			Class: desktopOnlyClass(
-				// The chips keep their natural size and the row gives way
-				// instead. Squeezing them truncated every label to two
-				// characters, which told the reader nothing about which
-				// repository or branch they were pointed at.
-				u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-				css.MinWidth(css.Zero), css.Overflow.Hidden,
-			),
+			Aria:   map[string]string{"label": "Workspace instruments"},
+			Class:  instrumentStripClass(),
 		},
-			contextControl("repository", repository, "/", props.Mode, props.OnNavigatePath),
-			contextControl("branch", branch, "/settings", props.Mode, props.OnNavigatePath),
-			contextControl("worktree", worktree, "/settings", props.Mode, props.OnNavigatePath),
-			html.Div(html.Props{Class: wideOnlyClass(), Hidden: !taskSelected},
-				contextControl("model", provider+" · "+model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
+			html.Div(html.Props{Class: instrumentGroupClass(tokens, true)},
+				instrumentEyebrow("Workspace", tokens),
+				html.Div(html.Props{
+					Class: css.New(
+						u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
+						css.MinWidth(css.Zero),
+					).String(),
+				},
+					contextControl("repository", repository, "/", props.Mode, props.OnNavigatePath),
+					html.Span(html.Props{
+						Aria: map[string]string{"hidden": "true"},
+						Class: css.New(
+							css.TextColor(css.Hex(string(tokens.Colors.TextDisabled))),
+							css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+						).String(),
+						Text: "/",
+					}),
+					contextControl("branch", branch, "/settings", props.Mode, props.OnNavigatePath),
+					contextControl("worktree", worktree, "/settings", props.Mode, props.OnNavigatePath),
+				),
 			),
-			costReadoutPlaceholder(),
+			html.Div(html.Props{
+				Class:  instrumentGroupClass(tokens, false),
+				Hidden: !taskSelected,
+			},
+				instrumentEyebrow("Model · "+provider, tokens),
+				contextControl("model", model+" · "+effort, "/settings", props.Mode, props.OnNavigatePath),
+			),
+			html.Div(html.Props{
+				Class:  wideOnlyClass(),
+				Hidden: !taskSelected,
+			},
+				html.Div(html.Props{Class: instrumentGroupClass(tokens, false)},
+					instrumentEyebrow("Spend against cap", tokens),
+					// The header carries the two figures that decide whether to
+					// intervene: what this has cost, and what the cap is. The
+					// forecast, token count, pricing snapshot and warning
+					// threshold remain the control's accessible name and open
+					// in settings, rather than being concatenated into an
+					// unreadable run of seven values.
+					costReadout(costReadoutProps{
+						Spent:     actual,
+						Remaining: budget,
+						Fraction:  props.View.SpentFraction,
+						Warned:    props.View.BudgetWarned,
+						Breakdown: "forecast " + forecast + ", usage " + tokensUsed +
+							", actual " + actual + ", pricing " + pricing +
+							", budget " + budget + ", remaining " + remaining +
+							", warning threshold " + warning,
+						Mode:       props.Mode,
+						OnNavigate: props.OnNavigatePath,
+						TargetPath: "/settings",
+					}),
+				),
+			),
 		),
 		html.Div(html.Props{
 			Aria: map[string]string{"label": "Session controls"},
@@ -193,40 +238,9 @@ func ApplicationBar(props ApplicationBarProps) ui.Node {
 				u.Flex, u.ItemsCenter, u.JustifyEnd, css.Gap(css.Px(tokens.Spacing.SM)),
 			).String(),
 		},
-			html.Div(html.Props{Class: wideOnlyClass(), Hidden: !taskSelected},
-				// The header carries the two figures that decide whether to
-				// intervene: what this has cost, and what is left of the cap.
-				// The forecast, token count, pricing snapshot and warning
-				// threshold used to be concatenated into the same control with
-				// slashes, which produced an unreadable run of seven values and
-				// meant neither number could be found at a glance. They are
-				// still reachable — the control opens the settings page, and the
-				// full breakdown is its accessible name.
-				costReadout(costReadoutProps{
-					Spent:     actual,
-					Remaining: remaining,
-					Breakdown: "forecast " + forecast + ", usage " + tokensUsed +
-						", actual " + actual + ", pricing " + pricing +
-						", budget " + budget + ", remaining " + remaining +
-						", warning threshold " + warning,
-					Mode:       props.Mode,
-					OnNavigate: props.OnNavigatePath,
-					TargetPath: "/settings",
-				}),
+			html.Div(html.Props{Hidden: compact, Class: desktopOnlyClass()},
+				liveLamp(connection, tokens),
 			),
-			html.Span(html.Props{
-				Hidden: compact,
-				Data:   map[string]string{"connection": connection},
-				Class: desktopOnlyClass(
-					u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
-					css.PaddingX(css.Px(tokens.Spacing.SM)),
-					css.MinHeight(css.Px(32)),
-					css.TextColor(css.Hex(string(tokens.Colors.Success))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-					css.FontWeight.Medium,
-				),
-				Text: "Local " + humanize(connection),
-			}),
 			manualReconnectControl(props, connection),
 			headerIconButtonWithID("global-search-trigger", primitives.IconSearch, "Search", props.Mode, props.OnSearchOpen),
 			headerIconButton(primitives.IconTheme, "Change color theme", props.Mode, props.OnThemeChange),
@@ -272,6 +286,20 @@ func manualReconnectControl(props ApplicationBarProps, connection string) ui.Nod
 	})
 }
 
+// applicationBarLayer is the stacking layer the top bar occupies.
+//
+// The bar used to declare no position and no z-index at all, which made it
+// unclickable in a way that reads as a paint bug and is not one. CSS paints
+// positioned elements above non-positioned content whatever the document order
+// says, and the application frame below the bar is position: relative. So the
+// frame, and everything positioned inside it — the compact sidebar and the
+// composer at 20, the graph overlays — painted over a bar that came first in
+// the markup, and took the clicks aimed at it.
+//
+// The number sits above every layer inside the frame and below the skip link's
+// 100, which must stay reachable from the very first Tab.
+const applicationBarLayer = 50
+
 func applicationBarClass(tracks []css.Track, tokens design.Tokens) string {
 	rules := []css.Rule{
 		u.Grid,
@@ -280,6 +308,11 @@ func applicationBarClass(tracks []css.Track, tokens design.Tokens) string {
 		css.Gap(css.Px(tokens.Spacing.LG)),
 		css.W(css.Full),
 		css.MinHeight(css.Px(64)),
+		// Relative rather than static so the z-index applies at all: a z-index
+		// on a static element is ignored, which is the shape this bug would
+		// take if the position were dropped later.
+		u.Relative,
+		css.ZIndex(applicationBarLayer),
 		css.PaddingX(css.Px(tokens.Spacing.XL)),
 		css.Bg(css.Hex(string(tokens.Colors.Shell))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
@@ -298,6 +331,22 @@ func applicationBarClass(tracks []css.Track, tokens design.Tokens) string {
 	return css.New(rules...).String()
 }
 
+// instrumentStripClass is the row of workspace facts in the middle of the bar.
+//
+// It deliberately clips nothing. Each instrument is a disclosure whose panel is
+// absolutely positioned below the bar, and a clipping ancestor trims an
+// absolutely positioned descendant away whatever z-index that descendant
+// declares — so the panel was being drawn and then cut off, and the button
+// inside it could not be reached. Overflow is instead handled where it belongs,
+// by each value ellipsizing itself, which is what contextValueClass was already
+// written to do and could not while its items refused to shrink.
+func instrumentStripClass() string {
+	return desktopOnlyClass(
+		u.Flex, u.ItemsCenter,
+		css.MinWidth(css.Zero),
+	)
+}
+
 func desktopOnlyClass(rules ...css.Rule) string {
 	rules = append(rules, css.Media(css.MaxW(1179), css.Display.None)...)
 	return css.New(rules...).String()
@@ -313,22 +362,194 @@ func brandMark(tokens design.Tokens) ui.Node {
 		Aria: map[string]string{"hidden": "true"},
 		Class: css.New(
 			u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-			css.W(css.Px(34)), css.H(css.Px(34)),
-			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+			css.W(css.Px(30)), css.H(css.Px(30)),
+			css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
 			css.Bg(css.Hex(string(tokens.Colors.Accent))),
-			css.Border(css.Px(1), css.Hex(string(tokens.Colors.AccentHover))),
 			css.TextColor(css.Hex(string(tokens.Colors.OnAccent))),
-			css.FontSize(css.Px(18)),
+			css.FontSize(css.Px(16)),
 			css.FontWeight.Bold,
-			css.Shadow(css.ShadowOf(
-				css.Zero, css.Px(8), css.Px(18), css.Px(-10),
-				css.RGBA(30, 110, 170, 0.6),
-			)),
 		).String(),
 		Text: "⌁",
 	})
 }
 
+// instrumentEyebrow is the tracked sans label that names a readout.
+//
+// The console's facts arrive as bare values — a branch name, a model name, a
+// spend — and a bare value cannot say what it is. The eyebrow above it does
+// that job in the smallest type the system allows, so the value below stays the
+// thing the eye lands on.
+func instrumentEyebrow(label string, tokens design.Tokens) ui.Node {
+	return markedEyebrow("", label, tokens)
+}
+
+// markedEyebrow is the tracked label with its own mark.
+//
+// Every named region in this console carries one, at one size, so the eye can
+// find a region by its shape before reading a word of it.
+func markedEyebrow(icon primitives.IconName, label string, tokens design.Tokens) ui.Node {
+	text := html.Span(html.Props{Text: label})
+	children := []ui.Node{text}
+	if icon != "" {
+		children = []ui.Node{
+			primitives.Icon(primitives.IconProps{Name: icon, Size: primitives.IconSizeSmall}),
+			text,
+		}
+	}
+	return html.Span(html.Props{
+		Aria: map[string]string{"hidden": "true"},
+		Class: css.New(
+			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(6)),
+			css.Font(css.FontStack(tokens.Fonts.UI)),
+			css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+			css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+			css.FontWeight.Semibold,
+			css.Tracking(css.Ems(0.09)),
+			css.TextTransform.Uppercase,
+			css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+			css.WhiteSpace.NoWrap,
+		).String(),
+	}, children...)
+}
+
+// instrumentGroupClass separates one readout from the next with a hairline
+// rather than a box. Boxing each group turned the strip into a row of competing
+// cards; a rule between them reads as one instrument with several dials.
+func instrumentGroupClass(tokens design.Tokens, first bool) string {
+	rules := []css.Rule{
+		u.Flex, u.FlexCol,
+		css.Gap(css.Px(2)),
+		css.MinWidth(css.Zero),
+		css.PaddingY(css.Px(tokens.Spacing.XS)),
+	}
+	if !first {
+		gap := strconv.Itoa(tokens.Spacing.LG) + "px"
+		rules = append(rules,
+			css.Padding(css.RawLength("4px 0 4px "+gap)),
+			css.Margin(css.RawLength("0 0 0 "+gap)),
+			css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		)
+	}
+	return css.New(rules...).String()
+}
+
+// liveLamp reports delivery state as a lamp with a word beside it.
+//
+// It is the one place the cool signal hue appears, so a live stream is
+// identifiable at the edge of vision, and the word carries the same state for
+// anyone who cannot use the colour.
+func liveLamp(connection string, tokens design.Tokens) ui.Node {
+	tone := tokens.Colors.Pending
+	label := humanize(connection)
+	switch state.ConnectionState(connection) {
+	case state.ConnectionLive:
+		tone, label = tokens.Colors.Active, "Live"
+	case state.ConnectionIdle:
+		tone, label = tokens.Colors.Pending, "Ready"
+	case state.ConnectionReplaying:
+		tone, label = tokens.Colors.Active, "Replaying"
+	case state.ConnectionConnecting, state.ConnectionDegraded:
+		tone = tokens.Colors.Warning
+	case state.ConnectionDisconnected, state.ConnectionUnauthorized,
+		state.ConnectionIncompatible:
+		tone = tokens.Colors.Failure
+	}
+	return html.Span(html.Props{
+		Data: map[string]string{"component": "live-lamp", "connection": connection},
+		Aria: map[string]string{"label": "Local session " + label},
+		Class: css.New(
+			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+			css.PaddingX(css.Px(tokens.Spacing.MD)),
+			css.MinHeight(css.Px(30)),
+			css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			css.WhiteSpace.NoWrap,
+		).String(),
+	},
+		html.Span(html.Props{
+			Aria: map[string]string{"hidden": "true"},
+			Class: css.New(
+				css.W(css.Px(7)), css.H(css.Px(7)),
+				css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+				css.Bg(css.Hex(string(tone))),
+				css.Shadow(css.ShadowOf(
+					css.Zero, css.Zero, css.Px(8), css.Zero, css.Hex(string(tone)),
+				)),
+			).String(),
+		}),
+		html.Span(html.Props{
+			Class: css.New(
+				css.Font(css.FontStack(tokens.Fonts.UI)),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.FontWeight.Semibold,
+				css.Tracking(css.Ems(0.08)),
+				css.TextTransform.Uppercase,
+				css.TextColor(css.Hex(string(tone))),
+			).String(),
+			Text: label,
+		}),
+	)
+}
+
+// contextValueClass styles one workspace fact as a readout that can be opened.
+//
+// The face carries the category: a repository is something a person named, so
+// it is set in the interface sans; a branch and a working-tree state are what
+// Git reports, so they are set in the monospace face the rest of the console
+// uses for measured values.
+func contextValueClass(kind string, tokens design.Tokens) string {
+	face := tokens.Fonts.Code
+	tone := tokens.Colors.TextSecondary
+	weight := css.FontWeight.Medium
+	if kind == "repository" {
+		face = tokens.Fonts.UI
+		tone = tokens.Colors.TextPrimary
+		weight = css.FontWeight.Semibold
+	}
+	rules := []css.Rule{
+		u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
+		css.MinHeight(css.Px(22)),
+		// Shrinkable, and allowed to shrink below its content: a flex item
+		// defaults to min-width auto, which is why the ellipsis declared below
+		// never engaged and the row had to be clipped by an ancestor instead.
+		css.MinWidth(css.Zero),
+		css.Margin(css.RawLength("0 0 0 -4px")),
+		css.PaddingX(css.Px(tokens.Spacing.XS)),
+		css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
+		css.TextColor(css.Hex(string(tone))),
+		css.Font(css.FontStack(face)),
+		css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+		weight,
+		css.WhiteSpace.NoWrap,
+		css.Overflow.Hidden,
+		css.TextOverflowEllipsis(),
+		css.Cursor.Pointer,
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	return css.New(rules...).String()
+}
+
+// contextControlProps configures one instrument in the bar.
+type contextControlProps struct {
+	Kind       string
+	Label      string
+	TargetPath string
+	Mode       primitives.Mode
+	OnNavigate func(string)
+}
+
+// contextControl builds one instrument as its own component instance.
+//
+// Each instrument owns its open state, so the four in the bar cannot share one
+// and open together.
 func contextControl(
 	kind string,
 	label string,
@@ -336,77 +557,137 @@ func contextControl(
 	mode primitives.Mode,
 	onNavigate func(string),
 ) ui.Node {
-	tokens := mode.Tokens()
-	return html.Details(html.Props{
-		Data:  map[string]string{"component": "context-option", "kind": kind},
-		Class: css.New(u.Relative).String(),
+	return ui.CreateElement(ContextControl, contextControlProps{
+		Kind: kind, Label: label, TargetPath: targetPath,
+		Mode: mode, OnNavigate: onNavigate,
+	})
+}
+
+// ContextControl is one workspace fact in the bar and the panel it opens.
+//
+// It was a bare <details>, which has no way to close itself: the panel stayed
+// open until the summary was clicked a second time, through navigation, through
+// clicking anywhere else, through Escape. The disclosure is now a button and a
+// primitives.Popover, which closes on Escape, on a click outside itself, and
+// returns focus to the trigger when it goes.
+//
+// Escape and outside-click are handled inside the overlay rather than by
+// handlers here on purpose. GWC's key handlers cannot read which key was
+// pressed, so an Escape rule written at this level could not exist; and closing
+// on the trigger's blur would fire the moment focus moved into the panel, which
+// would make the panel unreachable by keyboard — the same fault as closing on
+// the trigger's mouseleave while the pointer travels toward it.
+func ContextControl(props contextControlProps) ui.Node {
+	tokens := props.Mode.Tokens()
+	open := ui.UseState(false)
+	triggerID := "context-option-trigger-" + props.Kind
+	dismiss := func() { open.Set(false) }
+
+	triggerProps := html.PropsOf(html.OnClick(func() { open.Set(!open.Get()) }))
+	triggerProps.ID = triggerID
+	triggerProps.Type = "button"
+	triggerProps.Aria = map[string]string{
+		"label":    props.Kind + " " + props.Label,
+		"expanded": boolAttribute(open.Get()),
+		"haspopup": "true",
+	}
+	// The chip became a readout. A repository, a branch and a working tree are
+	// facts about where the agent is standing, so they are set as values under
+	// their own labels; the disclosure they open is still there, marked by a
+	// chevron that only appears on approach.
+	triggerProps.Class = contextValueClass(props.Kind, tokens)
+
+	return html.Div(html.Props{
+		Data: map[string]string{"component": "context-option", "kind": props.Kind},
+		// Relative anchors the panel below. MinWidth zero lets a long
+		// repository name shorten this control rather than push the row past
+		// the width of its grid track.
+		Class: css.New(u.Relative, css.MinWidth(css.Zero)).String(),
 	},
-		html.Summary(html.Props{
-			Aria: map[string]string{"label": label},
-			Class: css.New(
-				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-				// One fixed height and one line. These chips previously took
-				// whatever height their text wanted and wrapped mid-phrase, so
-				// the row read as four differently sized boxes.
-				css.H(css.Px(32)),
-				css.FlexShrink(css.Num(0)),
-				css.PaddingX(css.Px(tokens.Spacing.MD)),
-				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-				css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-				css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
-				css.WhiteSpace.NoWrap,
-				css.Cursor.Pointer,
-			).String(),
-		},
-			primitives.Icon(primitives.IconProps{Name: contextIcon(kind), Size: 14}),
-			html.Span(html.Props{Text: label}),
-			primitives.Icon(primitives.IconProps{Name: primitives.IconChevronDown, Size: 12}),
+		html.Button(triggerProps,
+			// The text truncates; the chevron does not. A disclosure whose
+			// marker is the first thing shortened stops reading as one.
+			html.Span(html.Props{
+				Text: props.Label,
+				Class: css.New(
+					css.MinWidth(css.Zero),
+					css.Overflow.Hidden,
+					css.WhiteSpace.NoWrap,
+					css.TextOverflowEllipsis(),
+				).String(),
+			}),
+			primitives.Icon(primitives.IconProps{Name: primitives.IconChevronDown, Size: 11}),
 		),
-		html.Div(html.Props{
-			Role: "group", Aria: map[string]string{"label": label + " options"},
+		contextControlPanelWhenOpen(props, open.Get(), triggerID, dismiss, tokens),
+	)
+}
+
+// contextControlPanelWhenOpen mounts the panel only while it is open.
+//
+// A closed overlay that still mounts is what emptied a whole route frame once
+// before, and nothing about a closed panel needs to exist in the document.
+func contextControlPanelWhenOpen(
+	props contextControlProps,
+	open bool,
+	triggerID string,
+	dismiss func(),
+	tokens design.Tokens,
+) ui.Node {
+	if !open {
+		return html.Span(html.Props{Aria: map[string]string{"hidden": "true"}})
+	}
+	navigate := func() {
+		dismiss()
+		if props.OnNavigate != nil {
+			props.OnNavigate(props.TargetPath)
+		}
+	}
+	return primitives.Popover(primitives.OverlayProps{
+		ID:              "context-option-panel-" + props.Kind,
+		Open:            true,
+		LabelledBy:      triggerID,
+		AnchorSelector:  "#" + triggerID,
+		AppRootSelector: `[data-component="app-shell"]`,
+		Mode:            props.Mode,
+		OnDismiss:       dismiss,
+		Content: html.Div(html.Props{
 			Data: map[string]string{"component": "context-option-panel"},
 			Class: css.New(
-				u.Absolute,
-				css.Top(css.RawLength("calc(100% + 4px)")), css.Left(css.Zero), css.ZIndex(40),
+				u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)),
 				css.MinWidth(css.Px(220)),
-				css.Padding(css.Px(tokens.Spacing.MD)),
-				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-				css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
-				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderStrong))),
-				css.Shadow(css.ShadowOf(
-					css.Zero, css.Px(8), css.Px(24), css.Zero, css.RGBA(0, 0, 0, 0.28),
-				)),
 			).String(),
 		},
-			html.Strong(html.Props{Text: label}),
+			html.Strong(html.Props{Text: props.Label}),
 			html.P(html.Props{
 				Class: css.New(
-					css.MarginY(css.Px(tokens.Spacing.SM)),
+					css.MarginY(css.Zero),
 					css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 				).String(),
-				Text: "Current " + kind + " selection",
+				Text: "Current " + props.Kind + " selection",
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: "Open " + map[bool]string{true: "repositories", false: "settings"}[targetPath == "/"],
-				Mode:  mode, Disabled: onNavigate == nil,
-				OnClick: func() {
-					if onNavigate != nil {
-						onNavigate(targetPath)
-					}
-				},
+				Label: "Open " + map[bool]string{
+					true: "repositories", false: "settings",
+				}[props.TargetPath == "/"],
+				Mode: props.Mode, Disabled: props.OnNavigate == nil,
+				OnClick: navigate,
 			}),
 		),
-	)
+	})
 }
 
 // costReadoutProps configures the header's money readout.
 type costReadoutProps struct {
-	Spent      string
-	Remaining  string
-	Breakdown  string
+	Spent     string
+	Remaining string
+	Breakdown string
+	// Fraction is how much of the cap has been spent, between 0 and 1. It is
+	// negative when either figure is unmeasured, which draws the track without
+	// a fill rather than drawing an empty bar that would read as "nothing
+	// spent yet".
+	Fraction   float64
+	Warned     bool
 	Mode       primitives.Mode
 	OnNavigate func(string)
 	TargetPath string
@@ -420,59 +701,120 @@ type costReadoutProps struct {
 // sans, because a label is chrome rather than a value.
 func costReadout(props costReadoutProps) ui.Node {
 	tokens := props.Mode.Tokens()
-	pair := func(label, value string, tone design.Color) ui.Node {
-		return html.Span(html.Props{
-			Class: css.New(
-				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
-			).String(),
-		},
-			html.Span(html.Props{
-				Class: css.New(
-					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-				).String(),
-				Text: label,
-			}),
-			html.Span(html.Props{
-				Class: css.New(
-					css.TextColor(css.Hex(string(tone))),
-					css.Font(css.FontStack(tokens.Fonts.Code)),
-					css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
-					css.FontWeight.Medium,
-				).String(),
-				Text: value,
-			}),
-		)
+	fill := tokens.Colors.Success
+	if props.Warned {
+		fill = tokens.Colors.Warning
 	}
+	if props.Fraction >= 1 {
+		fill = tokens.Colors.Failure
+	}
+	rules := []css.Rule{
+		u.Flex, u.FlexCol, css.Gap(css.Px(4)),
+		css.MinWidth(css.Px(150)),
+		css.Padding(css.RawLength("4px 8px")),
+		css.Margin(css.RawLength("0 0 0 -8px")),
+		css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
+		css.Bg(css.Transparent),
+		css.Border(css.Px(1), css.Transparent),
+		css.Cursor.Pointer,
+		css.TextAlign.Left,
+	}
+	rules = append(rules, css.Hover(css.Bg(css.Hex(string(tokens.Colors.Surface2))))...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
 	return html.Button(html.Props{
 		Type: "button",
-		Data: map[string]string{"component": "cost-readout"},
-		Aria: map[string]string{"label": "Cost and budget: " + props.Breakdown},
-		Class: css.New(
-			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.MD)),
-			css.MinHeight(css.Px(34)),
-			css.PaddingX(css.Px(tokens.Spacing.MD)),
-			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-			css.Border(css.Px(1), css.Transparent),
-			css.Cursor.Pointer,
-		).String(),
+		Data: map[string]string{
+			"component": "cost-readout",
+			"warned":    boolAttribute(props.Warned),
+		},
+		Aria:  map[string]string{"label": "Cost and budget: " + props.Breakdown},
+		Class: css.New(rules...).String(),
 		OnClick: ui.WrapHandler(func() {
 			if props.OnNavigate != nil {
 				props.OnNavigate(props.TargetPath)
 			}
 		}),
 	},
-		pair("spent", props.Spent, tokens.Colors.TextPrimary),
 		html.Span(html.Props{
+			Class: css.New(
+				u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS)),
+				css.Font(css.FontStack(tokens.Fonts.Code)),
+				css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+				css.FontWeight.Medium,
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				css.WhiteSpace.NoWrap,
+			).String(),
+		},
+			html.Span(html.Props{Text: props.Spent}),
+			html.Span(html.Props{
+				Class: css.New(
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.FontWeight.Normal,
+				).String(),
+				Text: "of " + props.Remaining,
+			}),
+		),
+		budgetMeter(props.Fraction, fill, tokens),
+	)
+}
+
+// budgetMeter draws spend against its cap.
+//
+// A cap is the one number in this console a person acts on without reading:
+// the question is not what the figure is, it is how much room is left. A bar
+// answers that in peripheral vision, where two currency values could not. An
+// unmeasured spend leaves the track empty rather than drawing a zero-length
+// fill, because a bar at zero claims a measurement.
+func budgetMeter(fraction float64, fill design.Color, tokens design.Tokens) ui.Node {
+	width := fraction
+	if width < 0 {
+		width = 0
+	}
+	if width > 1 {
+		width = 1
+	}
+	// The width is a percentage, and css.Percent takes a float. Rounding to an
+	// int first threw the precision away and then failed to compile anyway.
+	percent := math.Round(width*1000) / 10
+	children := []ui.Node{}
+	if fraction >= 0 {
+		children = append(children, html.Span(html.Props{
 			Aria: map[string]string{"hidden": "true"},
 			Class: css.New(
-				css.H(css.Px(16)),
-				css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+				css.Display.Block,
+				css.H(css.Full),
+				css.W(css.Percent(float64(percent))),
+				css.MinWidth(css.Px(2)),
+				css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+				css.Bg(css.Hex(string(fill))),
 			).String(),
-		}),
-		pair("left", props.Remaining, tokens.Colors.Accent),
-	)
+		}))
+	}
+	return html.Span(html.Props{
+		Data: map[string]string{
+			"component": "budget-meter",
+			"measured":  boolAttribute(fraction >= 0),
+		},
+		Aria: map[string]string{"hidden": "true"},
+		Class: css.New(
+			css.Display.Block,
+			css.W(css.Full),
+			css.H(css.Px(3)),
+			css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+			css.Overflow.Hidden,
+		).String(),
+	}, children...)
+}
+
+func boolAttribute(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
 }
 
 // headerIconButton renders a drawn control in the application bar or a rail.
@@ -487,7 +829,7 @@ func headerIconButton(
 	handler func(),
 ) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		Icon: icon, AccessibleLabel: accessible, Mode: mode,
+		Icon: icon, AccessibleLabel: accessible, Mode: mode, Quiet: true,
 		Disabled: handler == nil, OnClick: handler,
 	})
 }
@@ -500,7 +842,7 @@ func headerIconButtonWithID(
 	handler func(),
 ) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
-		ID: id, Icon: icon, AccessibleLabel: accessible, Mode: mode,
+		ID: id, Icon: icon, AccessibleLabel: accessible, Mode: mode, Quiet: true,
 		Disabled: handler == nil, OnClick: handler,
 	})
 }
@@ -530,23 +872,30 @@ func SearchDialog(props SearchDialogProps) ui.Node {
 		"label": "Search Codeflux",
 	}
 	searchProps.Data = map[string]string{"component": "global-search-input"}
-	searchProps.Class = css.New(
+	searchRules := []css.Rule{
 		css.W(css.Full), css.MinHeight(css.Px(44)),
 		css.PaddingX(css.Px(tokens.Spacing.MD)),
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderStrong))),
-	).String()
+		css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+	}
+	searchRules = append(searchRules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	searchProps.Class = css.New(searchRules...).String()
 	destinations := []struct {
-		glyph string
+		icon  primitives.IconName
 		label string
 		path  string
 	}{
-		{glyph: "▣", label: "Search tasks", path: "/tasks"},
-		{glyph: "⌘", label: "Search task graph", path: "/graphs"},
-		{glyph: "◫", label: "Search memory", path: "/memory"},
-		{glyph: "▤", label: "Search repositories", path: "/"},
+		{icon: primitives.IconTasks, label: "Search tasks", path: "/tasks"},
+		{icon: primitives.IconGraph, label: "Search task graph", path: "/graphs"},
+		{icon: primitives.IconMemory, label: "Search memory", path: "/memory"},
+		{icon: primitives.IconRepositories, label: "Search repositories", path: "/"},
 	}
 	query := strings.ToLower(strings.TrimSpace(props.Query))
 	results := make([]ui.Node, 0, len(destinations))
@@ -556,7 +905,8 @@ func SearchDialog(props SearchDialogProps) ui.Node {
 			continue
 		}
 		results = append(results, primitives.Button(primitives.ButtonProps{
-			Label:           destination.glyph + "  " + destination.label,
+			Label:           destination.label,
+			LeadingIcon:     destination.icon,
 			AccessibleLabel: destination.label,
 			Mode:            props.Mode, Disabled: props.OnNavigatePath == nil,
 			OnClick: func() {
@@ -575,33 +925,29 @@ func SearchDialog(props SearchDialogProps) ui.Node {
 			Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
 		}))
 	}
-	return primitives.Dialog(primitives.OverlayProps{
-		ID: "global-search-dialog", Open: props.Open,
-		LabelledBy: "global-search-title", DescribedBy: "global-search-description",
-		InitialFocusSelector: "#global-search-input", AppRootSelector: `[data-component="app-shell"]`,
-		Mode: props.Mode, OnDismiss: props.OnDismiss,
-		Content: html.Section(html.Props{
-			Data:  map[string]string{"component": "global-search"},
+	return primitives.Modal(primitives.ModalProps{
+		ID: "global-search-dialog", Title: "Search", Icon: primitives.IconSearch,
+		Description:          "Choose a scoped search destination. Your query stays on this machine.",
+		Open:                 props.Open,
+		Mode:                 props.Mode,
+		Width:                520,
+		InitialFocusSelector: "#global-search-input",
+		AppRootSelector:      `[data-component="app-shell"]`,
+		OnDismiss:            props.OnDismiss,
+		Body: html.Div(html.Props{
 			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD))).String(),
 		},
-			html.Div(html.Props{Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String()},
-				html.Div(html.Props{},
-					html.H2(html.Props{Class: design.HeadingClass(tokens, design.HeadingPanel), ID: "global-search-title", Text: "Search Codeflux"}),
-					html.P(html.Props{
-						ID: "global-search-description", Text: "Choose a scoped search destination. Your query stays local.",
-						Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
-					}),
-				),
-				primitives.Button(primitives.ButtonProps{
-					Label: "×", AccessibleLabel: "Close search", Mode: props.Mode,
-					Disabled: props.OnDismiss == nil, OnClick: props.OnDismiss,
-				}),
-			),
-			html.Label(html.Props{For: "global-search-input", Text: "Search"}),
+			html.Label(html.Props{
+				For: "global-search-input", Text: "Search",
+				Class: shellAssistiveClass(),
+			}),
 			html.Input(searchProps),
 			html.Div(html.Props{
 				Role: "group", Aria: map[string]string{"label": "Search destinations"},
-				Class: css.New(u.Grid, css.GridCols(css.Repeat(2, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))), css.Gap(css.Px(tokens.Spacing.SM))).String(),
+				Class: css.New(
+					u.Grid, css.GridCols(css.Repeat(2, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
+					css.Gap(css.Px(tokens.Spacing.SM)),
+				).String(),
 			}, results...),
 		),
 	})
@@ -703,13 +1049,24 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 		},
 		Class: productSidebarClass(layout, tokens),
 	},
+		// The rail's own controls sit under an eyebrow rather than above the
+		// navigation as three unexplained icons. Collapsing and resizing a rail
+		// is housekeeping; it should not be the first thing in the tab order or
+		// the first thing the eye meets.
+		// One affordance, and it says what it does. The rail used to open with a
+		// close cross and two resize arrows: three controls for housekeeping,
+		// ahead of the navigation they belong to, and the cross read as
+		// "dismiss this application" rather than "fold this rail away".
 		html.Div(html.Props{
-			Aria:  map[string]string{"label": "Thread rail layout controls"},
-			Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.XS))).String(),
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.SM)),
+				css.MinHeight(css.Px(26)),
+			).String(),
 		},
-			headerIconButtonWithID("product-sidebar-close", primitives.IconClose, "Collapse thread rail", props.Mode, props.OnCollapse),
-			headerIconButton(primitives.IconChevronLeft, "Narrow thread rail", props.Mode, props.OnNarrower),
-			headerIconButton(primitives.IconChevronRight, "Widen thread rail", props.Mode, props.OnWider),
+			markedEyebrow(primitives.IconMenu, "Navigate", tokens),
+			headerIconButtonWithID("product-sidebar-close", primitives.IconChevronLeft,
+				"Collapse thread rail", props.Mode, props.OnCollapse),
 		),
 		html.H2(html.Props{
 			ID: "product-sidebar-title", Text: navigationLabel,
@@ -717,49 +1074,49 @@ func ProductSidebar(props ProductSidebarProps) ui.Node {
 		}),
 		html.Div(html.Props{
 			Class: css.New(
-				css.MarginY(css.Px(tokens.Spacing.LG)),
+				u.Flex, u.FlexCol,
+				css.Margin(css.RawLength("8px 0 0")),
 				css.Padding(css.Zero),
 			).String(),
 		}, items...),
 		html.Div(html.Props{
 			Class: css.New(
+				u.Flex, u.FlexCol,
+				css.MinHeight(css.Zero),
+				css.Margin(css.RawLength(strconv.Itoa(tokens.Spacing.LG)+"px 0 0")),
+				css.Padding(css.RawLength(strconv.Itoa(tokens.Spacing.LG)+"px 0 0")),
 				css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-				css.PaddingY(css.Px(tokens.Spacing.LG)),
 				css.FlexGrow(css.Num(1)),
 			).String(),
 		},
 			threadRailNode,
 		),
+		// Where the data lives is a standing fact, not a card. It is set as one
+		// quiet line at the foot of the rail so it can be checked and ignored.
 		html.Div(html.Props{
 			Class: css.New(
-				css.Padding(css.Px(tokens.Spacing.MD)),
-				css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-				css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+				u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+				css.Margin(css.RawLength(strconv.Itoa(tokens.Spacing.MD)+"px 0 0")),
+				css.Padding(css.RawLength(strconv.Itoa(tokens.Spacing.MD)+"px 0 0")),
+				css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 			).String(),
 		},
-			html.Strong(html.Props{
+			html.Span(html.Props{
+				Aria: map[string]string{"hidden": "true"},
 				Class: css.New(
-					css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
-					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					css.W(css.Px(6)), css.H(css.Px(6)),
+					css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+					css.Bg(css.Hex(string(tokens.Colors.Success))),
 				).String(),
-				Text: "▣  Local data",
-			}),
-			html.P(html.Props{
-				Class: css.New(
-					css.MarginY(css.Px(tokens.Spacing.XS)),
-					css.TextColor(css.Hex(string(tokens.Colors.Success))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-				).String(),
-				Text: "Coordinator available",
 			}),
 			html.P(html.Props{
 				Class: css.New(
 					css.Margin(css.Zero),
 					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.Font(css.FontStack(tokens.Fonts.UI)),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 				).String(),
-				Text: "SQLite · encrypted at rest",
+				Text: "Local SQLite · encrypted at rest",
 			}),
 		),
 	)
@@ -822,6 +1179,10 @@ func routeSelected(route routes.Route, label, destination string) bool {
 		return route.Name == routes.ThreadWorkspace
 	case "Graphs":
 		return route.Name == routes.Graphs
+	case "Code":
+		return route.Name == routes.Code
+	case "Atoms":
+		return route.Name == routes.Atoms
 	case "Memory":
 		return route.Name == routes.Memory
 	case "Settings":
@@ -840,30 +1201,52 @@ func selectedAria(selected bool) string {
 func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 	rules := []css.Rule{
 		u.Flex, u.ItemsCenter,
-		css.Gap(css.Px(tokens.Spacing.MD)),
+		css.Gap(css.Px(tokens.Spacing.SM + 2)),
 		css.W(css.Full),
-		css.MinHeight(css.Px(42)),
+		css.MinHeight(css.Px(34)),
 		css.MarginY(css.Px(1)),
-		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.PaddingX(css.Px(tokens.Spacing.SM)),
 		css.TextAlign.Left,
 		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		css.Bg(css.Transparent),
 		css.Border(css.Zero, css.Transparent),
 		css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
 		css.TextDecoration.None,
-		css.FontSize(css.Px(tokens.Typography.Body.Size)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
 		css.FontWeight.Medium,
 		css.Cursor.Pointer,
 	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	rules = append(rules, css.Disabled(
+		css.TextColor(css.Hex(string(tokens.Colors.TextDisabled))),
+		css.Cursor.NotAllowed,
+	)...)
 	if selected {
 		rules = append(rules,
-			css.Bg(css.Hex(string(tokens.Colors.Selection))),
+			css.Bg(css.Hex(string(tokens.Colors.Surface2))),
 			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.FontWeight.Semibold,
-			// An inset shadow draws the accent edge without adding a border,
-			// so selecting a route does not shift its label sideways.
+			// An inset edge marks the current page without adding a border, so
+			// selecting a route does not shift its label sideways. The edge is
+			// the action key's own neutral, which keeps state colour free to
+			// mean machine state.
 			css.Shadow(css.ShadowInset(
-				css.Px(3), css.Zero, css.Zero, css.Zero,
+				css.Px(2), css.Zero, css.Zero, css.Zero,
 				css.Hex(string(tokens.Colors.Accent)),
 			)),
 		)
@@ -872,8 +1255,14 @@ func sidebarLinkClass(tokens design.Tokens, selected bool) string {
 }
 
 type AssuranceRailProps struct {
-	Snapshot   state.Snapshot
-	Mode       primitives.Mode
+	Snapshot state.Snapshot
+	Mode     primitives.Mode
+	// Graph and Execution are what the run is doing right now. They live in
+	// this rail rather than beside the transcript: a person reads the
+	// transcript and watches these, and the two jobs do not want the same
+	// column.
+	Graph      ui.Node
+	Execution  ui.Node
 	Collapsed  bool
 	OnCollapse func()
 }
@@ -900,25 +1289,29 @@ func AssuranceRail(props AssuranceRailProps) ui.Node {
 		},
 		Class: css.New(
 			u.Flex, u.FlexCol,
-			css.Gap(css.Px(tokens.Spacing.SM)),
 			css.H(css.Full),
-			css.Padding(css.Px(tokens.Spacing.SM)),
+			css.Padding(css.RawLength("16px 20px 20px")),
 			css.Bg(css.Hex(string(tokens.Colors.Shell))),
 			css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 			css.OverflowY.Auto,
 		).String(),
 	},
 		html.Div(html.Props{
-			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Padding(css.RawLength("0 0 12px")),
+			).String(),
 		},
-			// This heading set no colour and so inherited one, which against
-			// the rail's own surface rendered it very nearly invisible: the
-			// panel it names read as an unlabelled stack of cards. It is a
-			// Strong rather than a heading tag, which is why the heading
-			// contrast check did not catch it.
 			html.Strong(html.Props{
-				Class: design.HeadingClass(tokens, design.HeadingPanel),
-				Text:  "Task details",
+				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.FontWeight.Semibold,
+					css.Tracking(css.Ems(0.09)),
+					css.TextTransform.Uppercase,
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+				Text: "This run",
 			}),
 			headerIconButton(primitives.IconClose, "Collapse task details sidebar", props.Mode, props.OnCollapse),
 		),
@@ -928,23 +1321,260 @@ func AssuranceRail(props AssuranceRailProps) ui.Node {
 		// close with four artifacts reported as present without anything having
 		// looked. It was the development plan for this file, printed into the
 		// product, and it read as measurement.
-		inspectorCard("Repository", []detailRow{
-			{"Name", fallback(props.Snapshot.TopBar.Repository, "Not selected")},
-			{"Branch", fallback(props.Snapshot.TopBar.Branch, "Unknown")},
-			{"Working tree", fallback(props.Snapshot.TopBar.WorktreeStatus, "Unknown")},
-		}, tokens),
-		inspectorCard("Task", []detailRow{
-			{"State", humanize(fallback(props.Snapshot.TopBar.TaskState, "No task"))},
-			{"Model", fallback(props.Snapshot.TopBar.Model, "Unknown")},
-			{"Effort", fallback(props.Snapshot.TopBar.Effort, "Unknown")},
-		}, tokens),
-		inspectorCard("Measured", []detailRow{
-			{"Connection", humanize(string(props.Snapshot.Session.Connection))},
+		//
+		// It also repeated the header's own strip verbatim in three bordered
+		// cards. The rail now carries what the strip cannot: the state a run is
+		// in, the cap it is spending against, and where its work is happening.
+		runStateBlock(props.Snapshot, tokens),
+		inspectorSectionWithIcon(primitives.IconSpend, "Spend", []detailRow{
 			{"Spent", fallback(props.Snapshot.TopBar.ActualCost, "Unknown")},
-			{"Tokens", fallback(props.Snapshot.TopBar.ActualTokens, "Unknown")},
+			{"Cap", fallback(props.Snapshot.TopBar.HardBudget, "Not set")},
+			{"Left", fallback(props.Snapshot.TopBar.RemainingBudget, "Unknown")},
 			{"Forecast", fallback(props.Snapshot.TopBar.ForecastCost, "Unknown")},
-			{"Budget", fallback(props.Snapshot.TopBar.HardBudget, "Not set")},
-		}, tokens),
+			{"Tokens", fallback(props.Snapshot.TopBar.ActualTokens, "Unknown")},
+		}, spendMeterWhenMeasured(props.Snapshot.TopBar, tokens), tokens),
+		inspectorSectionWithIcon(primitives.IconTree, "Working tree", []detailRow{
+			{"Repository", fallback(props.Snapshot.TopBar.Repository, "Not selected")},
+			{"Branch", fallback(props.Snapshot.TopBar.Branch, "Unknown")},
+			{"State", fallback(props.Snapshot.TopBar.WorktreeStatus, "Unknown")},
+		}, nil, tokens),
+		railPanel("Project graph", props.Graph, 0, tokens),
+		railPanel("", props.Execution, 0, tokens),
+	)
+}
+
+// statusTone maps a task state to the lamp colour that reports it.
+//
+// One mapping serves the header pill, the rail and anything else that reports
+// the same state, so a run cannot be amber in one place and green in another.
+func statusTone(taskState string, tokens design.Tokens) design.Color {
+	lowered := strings.ToLower(strings.TrimSpace(taskState))
+	switch {
+	case lowered == "":
+		return tokens.Colors.Pending
+	case strings.Contains(lowered, "paused"), strings.Contains(lowered, "waiting"),
+		strings.Contains(lowered, "review"):
+		return tokens.Colors.Warning
+	case strings.Contains(lowered, "complete"), strings.Contains(lowered, "accepted"):
+		return tokens.Colors.Success
+	case strings.Contains(lowered, "fail"), strings.Contains(lowered, "blocked"),
+		strings.Contains(lowered, "error"):
+		return tokens.Colors.Failure
+	case strings.Contains(lowered, "no task"):
+		return tokens.Colors.Pending
+	default:
+		return tokens.Colors.Active
+	}
+}
+
+// spendMeterWhenMeasured draws the rail's meter only once both figures exist.
+// An empty track under a column of "Unknown" is a dial with no needle.
+func spendMeterWhenMeasured(topBar state.TopBarView, tokens design.Tokens) ui.Node {
+	if topBar.SpentFraction < 0 {
+		return nil
+	}
+	return budgetMeter(topBar.SpentFraction, budgetMeterTone(topBar, tokens), tokens)
+}
+
+// RailGraphSummary counts what the graph holds and offers the way into it.
+//
+// A canvas needs room to be read. Drawn into a three-hundred-and-eighty pixel
+// rail it laid its node labels on top of each other and ran its edges off the
+// panel, which taught a person nothing except that something was wrong with the
+// interface. The rail now reports the shape of the graph — how much of it there
+// is, and of what — and the graph itself has a page.
+func RailGraphSummary(
+	nodes []state.GraphNodeView,
+	authoritative *graphcanvas.AuthoritativeProps,
+	revision uint64,
+	tokens design.Tokens,
+	mode primitives.Mode,
+	onNavigate func(string),
+) ui.Node {
+	// The graph view carries a status per node rather than a kind, so the
+	// summary counts what a person is actually watching for: how much of the
+	// map has passed, how much is still running, and what is blocked.
+	// The authoritative graph is the one the coordinator is building. The
+	// store's node list is the local preview and stays empty during a real
+	// run, so a rail reading it reported "0 nodes" while the graph filled up.
+	mapped := len(nodes)
+	if authoritative != nil {
+		mapped = len(authoritative.Revision.Nodes())
+		if ordinal := authoritative.Revision.Metadata().Ordinal(); ordinal > revision {
+			revision = ordinal
+		}
+	}
+	counts := map[string]int{}
+	for _, node := range nodes {
+		status := strings.TrimSpace(node.Status)
+		if status == "" {
+			status = "pending"
+		}
+		counts[status]++
+	}
+	rows := make([]detailRow, 0, len(counts)+1)
+	total := strconv.Itoa(mapped) + " nodes"
+	if mapped == 1 {
+		total = "1 node"
+	}
+	rows = append(rows, detailRow{"Mapped", total})
+	for _, status := range []string{"running", "passed", "failed", "blocked", "pending"} {
+		if count, present := counts[status]; present {
+			rows = append(rows, detailRow{humanize(status), strconv.Itoa(count)})
+		}
+	}
+	rows = append(rows, detailRow{"Revision", strconv.FormatUint(revision, 10)})
+	body := make([]ui.Node, 0, len(rows)+1)
+	for _, row := range rows {
+		body = append(body, html.Div(html.Props{
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.MD)),
+				css.MinHeight(css.Px(24)),
+				css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+			).String(),
+		},
+			html.Span(html.Props{
+				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+				Text: row.label,
+			}),
+			html.Strong(html.Props{
+				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.Code)),
+					css.FontWeight.Medium,
+					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				).String(),
+				Text: row.value,
+			}),
+		))
+	}
+	body = append(body, html.Div(html.Props{
+		Class: css.New(css.Padding(css.RawLength("8px 0 0")), css.Margin(css.RawLength("0 0 0 -8px"))).String(),
+	}, primitives.Button(primitives.ButtonProps{
+		Label: "Open the graph", LeadingIcon: primitives.IconGraph,
+		AccessibleLabel: "Open the project graph", Quiet: true, Mode: mode,
+		Disabled:       onNavigate == nil,
+		DisabledReason: "The graph page is unavailable until the coordinator answers.",
+		OnClick: func() {
+			if onNavigate != nil {
+				onNavigate("/graphs")
+			}
+		},
+	})))
+	// The summary carries the graph's landmark in this layout. The shell
+	// promises a focus order that includes the graph region, and that promise
+	// has to point at whatever is actually drawing the graph here.
+	return html.Div(html.Props{
+		ID: "graph-region", TabIndex: -1,
+		Aria: map[string]string{"label": "Task graph"},
+		Data: map[string]string{
+			"component": "rail-graph-summary", "focus-region": "graph", "focus-order": "4",
+		},
+		Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(2)), css.MinWidth(css.Zero)).String(),
+	}, body...)
+}
+
+// railPanel gives a mounted surface its place in the observation rail.
+func railPanel(title string, content ui.Node, height int, tokens design.Tokens) ui.Node {
+	if content == nil {
+		return nil
+	}
+	children := make([]ui.Node, 0, 2)
+	if strings.TrimSpace(title) != "" {
+		children = append(children, html.H2(html.Props{
+			Class: css.New(
+				css.Margin(css.RawLength("0 0 8px")),
+				css.Font(css.FontStack(tokens.Fonts.UI)),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+				css.FontWeight.Semibold,
+				css.Tracking(css.Ems(0.09)),
+				css.TextTransform.Uppercase,
+				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+			).String(),
+			Text: title,
+		}))
+	}
+	body := []css.Rule{css.MinWidth(css.Zero), css.MinHeight(css.Zero)}
+	if height > 0 {
+		body = append(body, css.H(css.Px(height)))
+	}
+	children = append(children, html.Div(html.Props{
+		Class: css.New(body...).String(),
+	}, content))
+	return html.Section(html.Props{
+		Class: css.New(
+			u.Flex, u.FlexCol,
+			css.Padding(css.RawLength("16px 0")),
+			css.MinWidth(css.Zero),
+			css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		).String(),
+	}, children...)
+}
+
+// budgetMeterTone picks the meter's fill from the warning state the coordinator
+// reported rather than from the fraction, so a cap the server considers reached
+// is drawn as reached even if the two figures round otherwise.
+func budgetMeterTone(topBar state.TopBarView, tokens design.Tokens) design.Color {
+	if topBar.BudgetWarned {
+		return tokens.Colors.Warning
+	}
+	return tokens.Colors.Success
+}
+
+// runStateBlock is the rail's answer to the only question it exists for: what
+// is this run doing, and on what.
+func runStateBlock(snapshot state.Snapshot, tokens design.Tokens) ui.Node {
+	taskState := strings.TrimSpace(snapshot.TopBar.TaskState)
+	label := "No task yet"
+	tone := tokens.Colors.Pending
+	if taskState != "" {
+		label = humanize(taskState)
+		tone = design.Color(statusTone(taskState, tokens))
+	}
+	model := fallback(snapshot.TopBar.Model, "Unknown")
+	effort := fallback(snapshot.TopBar.Effort, "Unknown")
+	return html.Div(html.Props{
+		Data: map[string]string{"component": "run-state-block", "state": taskState},
+		Class: css.New(
+			u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)),
+			css.Padding(css.RawLength("0 0 16px")),
+			css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		).String(),
+	},
+		html.Div(html.Props{
+			Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
+		},
+			html.Span(html.Props{
+				Aria: map[string]string{"hidden": "true"},
+				Class: css.New(
+					css.W(css.Px(8)), css.H(css.Px(8)),
+					css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+					css.Bg(css.Hex(string(tone))),
+				).String(),
+			}),
+			html.Strong(html.Props{
+				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.Display)),
+					css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+					css.FontWeight.Normal,
+					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				).String(),
+				Text: label,
+			}),
+		),
+		html.Span(html.Props{
+			Class: css.New(
+				css.Font(css.FontStack(tokens.Fonts.Code)),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+			).String(),
+			Text: model + " · " + effort,
+		}),
 	)
 }
 
@@ -953,65 +1583,89 @@ type detailRow struct {
 	value string
 }
 
-func inspectorCard(title string, rows []detailRow, tokens design.Tokens) ui.Node {
-	nodes := make([]ui.Node, 0, len(rows))
+// inspectorSection lists measured facts under one eyebrow.
+//
+// It draws no card and no chevron. The chevron was decoration: nothing
+// collapsed, so the interface offered an affordance it did not have, and three
+// identical boxes made repository facts look as important as spend against a
+// cap. A rule and a label carry the grouping instead.
+func inspectorSection(title string, rows []detailRow, footer ui.Node, tokens design.Tokens) ui.Node {
+	return inspectorSectionWithIcon("", title, rows, footer, tokens)
+}
+
+// inspectorSectionWithIcon lists measured facts under one marked eyebrow.
+func inspectorSectionWithIcon(
+	icon primitives.IconName,
+	title string,
+	rows []detailRow,
+	footer ui.Node,
+	tokens design.Tokens,
+) ui.Node {
+	heading := []ui.Node{html.Span(html.Props{Text: title})}
+	if icon != "" {
+		heading = []ui.Node{
+			primitives.Icon(primitives.IconProps{Name: icon, Size: primitives.IconSizeSmall}),
+			html.Span(html.Props{Text: title}),
+		}
+	}
+	children := []ui.Node{
+		html.H2(html.Props{
+			Class: css.New(
+				css.Margin(css.RawLength("0 0 8px")),
+				css.Font(css.FontStack(tokens.Fonts.UI)),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+				css.FontWeight.Semibold,
+				css.Tracking(css.Ems(0.09)),
+				css.TextTransform.Uppercase,
+				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(6)),
+			).String(),
+		}, heading...),
+	}
 	for _, row := range rows {
-		nodes = append(nodes, html.Div(html.Props{
+		children = append(children, html.Div(html.Props{
 			Class: css.New(
 				u.Flex, u.ItemsCenter, u.JustifyBetween,
-				css.Gap(css.Px(tokens.Spacing.SM)),
-				css.MinHeight(css.Px(28)),
-				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.Gap(css.Px(tokens.Spacing.MD)),
+				css.MinHeight(css.Px(26)),
+				css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
 			).String(),
 		},
 			html.Span(html.Props{
-				Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextMuted)))).String(),
-				Text:  row.label,
+				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.WhiteSpace.NoWrap,
+				).String(),
+				Text: row.label,
 			}),
 			html.Strong(html.Props{
 				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.Code)),
 					css.FontWeight.Medium,
 					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					css.MinWidth(css.Zero),
+					css.Overflow.Hidden,
+					css.TextOverflowEllipsis(),
+					css.WhiteSpace.NoWrap,
 				).String(),
 				Text: row.value,
 			}),
 		))
 	}
+	if footer != nil {
+		children = append(children, html.Div(html.Props{
+			Class: css.New(css.Padding(css.RawLength("10px 0 2px"))).String(),
+		}, footer))
+	}
 	return html.Section(html.Props{
 		Class: css.New(
-			css.Padding(css.Px(tokens.Spacing.MD)),
-			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			u.Flex, u.FlexCol,
+			css.Padding(css.RawLength("16px 0")),
+			css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 		).String(),
-	},
-		// The heading and its collapse affordance sit on one row with the mark
-		// drawn rather than appended as a glyph. Concatenating "⌃" onto the
-		// title also put it into the accessible name, so a screen reader
-		// announced the section as "Identity and plan up-arrowhead".
-		html.Div(html.Props{
-			Class: css.New(
-				u.Flex, u.ItemsCenter, u.JustifyBetween,
-				css.Gap(css.Px(tokens.Spacing.SM)),
-				css.MarginY(css.Px(tokens.Spacing.SM)),
-			).String(),
-		},
-			html.H2(html.Props{
-				Class: design.HeadingClass(tokens, design.HeadingPanel),
-				Text:  title,
-			}),
-			html.Span(html.Props{
-				Aria: map[string]string{"hidden": "true"},
-				Class: css.New(
-					u.InlineFlex, css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-				).String(),
-			}, primitives.Icon(primitives.IconProps{
-				Name: primitives.IconChevronDown, Size: 14,
-			})),
-		),
-		html.Div(html.Props{}, nodes...),
-	)
+	}, children...)
 }
 
 func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
@@ -1029,16 +1683,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 	if noTask {
 		taskSummary = "Describe a change and Codeflux will plan it, run it, and show its work."
 	}
-	taskStateColor := tokens.Colors.Active
-	switch {
-	case strings.Contains(strings.ToLower(taskStateLabel), "paused"):
-		taskStateColor = tokens.Colors.Warning
-	case strings.Contains(strings.ToLower(taskStateLabel), "complete"):
-		taskStateColor = tokens.Colors.Success
-	case strings.Contains(strings.ToLower(taskStateLabel), "fail"),
-		strings.Contains(strings.ToLower(taskStateLabel), "blocked"):
-		taskStateColor = tokens.Colors.Failure
-	}
+	taskStateColor := statusTone(taskStateLabel, tokens)
 	moreExpanded := props.TaskActionsOpen
 	return html.Div(html.Props{
 		DataAttr: html.DataAttribute{Name: "component", Value: "task-workspace-header"},
@@ -1058,21 +1703,11 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 				css.PaddingX(css.Px(tokens.Spacing.SM)),
 			).String(),
 		},
+			// The mark that used to sit beside the title repeated the one in the
+			// application bar eight centimetres away and named nothing.
 			html.Div(html.Props{
 				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.LG))).String(),
 			},
-				html.Span(html.Props{
-					Aria: map[string]string{"hidden": "true"},
-					Class: css.New(
-						u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-						css.W(css.Px(40)), css.H(css.Px(40)),
-						css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-						css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-						css.TextColor(css.Hex(string(tokens.Colors.Accent))),
-						css.FontSize(css.Px(21)),
-					).String(),
-					Text: "⌁",
-				}),
 				html.Div(html.Props{
 					Class: css.New(
 						u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)),
@@ -1098,7 +1733,7 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 							).String(),
 							Text: taskTitle,
 						}),
-						statusPill(taskStateLabel, taskStateColor, tokens),
+						taskStatePill(noTask, taskStateLabel, taskStateColor, tokens),
 					),
 					html.P(html.Props{
 						Class: css.New(
@@ -1123,31 +1758,37 @@ func TaskWorkspaceHeader(props TaskWorkspaceHeaderProps) ui.Node {
 				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 			},
 				primitives.Button(primitives.ButtonProps{
-					Label: pauseLabel, AccessibleLabel: pauseAccessible, Mode: props.Mode,
+					Label: pauseLabel, LeadingIcon: taskPauseIcon(props.Snapshot.TopBar.TaskState),
+					AccessibleLabel: pauseAccessible, Mode: props.Mode,
 					Disabled: !props.Snapshot.TopBar.CanPause || props.OnPauseRequested == nil,
-					OnClick:  props.OnPauseRequested,
+					DisabledReason: runControlReason(noTask, props.Snapshot.TopBar.CanPause,
+						props.OnPauseRequested != nil, "pause"),
+					OnClick: props.OnPauseRequested,
 				}),
 				primitives.Button(primitives.ButtonProps{
-					Label: "Stop", AccessibleLabel: "Stop task", Mode: props.Mode,
+					Label: "Stop", LeadingIcon: primitives.IconStop,
+					AccessibleLabel: "Stop task", Mode: props.Mode,
 					Disabled: !props.Snapshot.TopBar.CanStop || props.OnStopRequested == nil,
-					OnClick:  props.OnStopRequested,
+					DisabledReason: runControlReason(noTask, props.Snapshot.TopBar.CanStop,
+						props.OnStopRequested != nil, "stop"),
+					OnClick: props.OnStopRequested,
 				}),
 				primitives.Button(primitives.ButtonProps{
-					Label: "Request review", AccessibleLabel: "Request review", Mode: props.Mode,
-					Disabled: props.OnReviewRequested == nil, OnClick: props.OnReviewRequested,
+					Label: "Request review", LeadingIcon: primitives.IconReview,
+					AccessibleLabel: "Request review", Mode: props.Mode,
+					Disabled: props.OnReviewRequested == nil,
+					DisabledReason: runControlReason(noTask, true,
+						props.OnReviewRequested != nil, "review"),
+					OnClick: props.OnReviewRequested,
 				}),
 				html.Div(html.Props{Class: css.New(u.Relative).String()},
 					primitives.Button(primitives.ButtonProps{
-						ID: "task-actions-trigger", Label: "•••", AccessibleLabel: "More task actions", Mode: props.Mode,
+						ID: "task-actions-trigger", Icon: primitives.IconMore,
+						AccessibleLabel: "More task actions", Mode: props.Mode,
 						Expanded: &moreExpanded, Controls: "task-actions-popover",
 						Disabled: props.OnTaskActionsOpen == nil, OnClick: props.OnTaskActionsOpen,
 					}),
-					ui.CreateElement(TaskActionsPopover, TaskActionsPopoverProps{
-						Open: props.TaskActionsOpen, Snapshot: props.Snapshot, Mode: props.Mode,
-						OnDismiss: props.OnTaskActionsDismiss, OnNavigatePath: props.OnNavigatePath,
-						OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
-						OnReviewRequested: props.OnReviewRequested,
-					}),
+					taskActionsPopoverWhenOpen(props),
 				),
 			),
 		),
@@ -1164,6 +1805,24 @@ type TaskActionsPopoverProps struct {
 	OnPauseRequested  func()
 	OnStopRequested   func()
 	OnReviewRequested func()
+}
+
+// taskActionsPopoverWhenOpen mounts the overflow menu only while it is open.
+//
+// A closed dialog still mounts an overlay, and mounting one inside a surface
+// that is itself replacing another route's surface left the entire route frame
+// empty in the document: a person who clicked a thread from any other page got
+// a blank workspace. Nothing about a closed menu needs to exist until it opens.
+func taskActionsPopoverWhenOpen(props TaskWorkspaceHeaderProps) ui.Node {
+	if !props.TaskActionsOpen {
+		return html.Span(html.Props{Aria: map[string]string{"hidden": "true"}})
+	}
+	return ui.CreateElement(TaskActionsPopover, TaskActionsPopoverProps{
+		Open: props.TaskActionsOpen, Snapshot: props.Snapshot, Mode: props.Mode,
+		OnDismiss: props.OnTaskActionsDismiss, OnNavigatePath: props.OnNavigatePath,
+		OnPauseRequested: props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+		OnReviewRequested: props.OnReviewRequested,
+	})
 }
 
 func TaskActionsPopover(props TaskActionsPopoverProps) ui.Node {
@@ -1191,64 +1850,93 @@ func TaskActionsPopover(props TaskActionsPopoverProps) ui.Node {
 			props.OnNavigatePath(path)
 		}
 	}
-	return primitives.Dialog(primitives.OverlayProps{
-		ID: "task-actions-popover", Open: props.Open,
-		LabelledBy: "task-actions-title", DescribedBy: "task-actions-description",
-		InitialFocusSelector: "#task-actions-open-graph", AppRootSelector: `[data-component="app-shell"]`,
-		Mode: props.Mode, OnDismiss: props.OnDismiss,
-		Content: html.Section(html.Props{
+	return primitives.Modal(primitives.ModalProps{
+		ID: "task-actions-popover", Title: "Task actions", Icon: primitives.IconMore,
+		Description:          "Inspect, review, pause, or stop the current task.",
+		Open:                 props.Open,
+		Mode:                 props.Mode,
+		Width:                420,
+		InitialFocusSelector: "#task-actions-open-graph",
+		AppRootSelector:      `[data-component="app-shell"]`,
+		OnDismiss:            props.OnDismiss,
+		Body: html.Div(html.Props{
 			Data:  map[string]string{"component": "task-actions"},
-			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)), css.MinWidth(css.Px(260))).String(),
+			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM))).String(),
 		},
-			html.H2(html.Props{
-				ID: "task-actions-title", Text: "Task actions",
-				Class: css.New(
-					css.Margin(css.Zero),
-					css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-					css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
-				).String(),
-			}),
-			html.P(html.Props{
-				ID: "task-actions-description", Text: "Inspect, review, pause, or stop the current task.",
-				Class: css.New(css.Margin(css.Zero), css.TextColor(css.Hex(string(tokens.Colors.TextSecondary)))).String(),
-			}),
 			primitives.Button(primitives.ButtonProps{
-				ID: "task-actions-open-graph", Label: "⌘  Open task graph", AccessibleLabel: "Open task graph", Mode: props.Mode,
+				ID: "task-actions-open-graph", Label: "Open task graph", LeadingIcon: primitives.IconGraph,
+				AccessibleLabel: "Open task graph", Mode: props.Mode,
 				Disabled: props.OnNavigatePath == nil, OnClick: navigate("/graphs"),
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: "Request review", AccessibleLabel: "Request review from task actions", Mode: props.Mode,
+				Label: "Request review", LeadingIcon: primitives.IconReview,
+				AccessibleLabel: "Request review from task actions", Mode: props.Mode,
 				Disabled: props.OnReviewRequested == nil, OnClick: invoke(props.OnReviewRequested),
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: pauseLabel, AccessibleLabel: pauseAccessible + " from task actions", Mode: props.Mode,
+				Label: pauseLabel, LeadingIcon: taskPauseIcon(props.Snapshot.TopBar.TaskState),
+				AccessibleLabel: pauseAccessible + " from task actions", Mode: props.Mode,
 				Disabled: !props.Snapshot.TopBar.CanPause || props.OnPauseRequested == nil,
-				OnClick:  invoke(props.OnPauseRequested),
+				DisabledReason: runControlReason(
+					strings.TrimSpace(props.Snapshot.TopBar.TaskState) == "",
+					props.Snapshot.TopBar.CanPause, props.OnPauseRequested != nil, "pause"),
+				OnClick: invoke(props.OnPauseRequested),
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: "■  Stop", AccessibleLabel: "Stop task from task actions", Mode: props.Mode,
+				Label: "Stop", LeadingIcon: primitives.IconStop,
+				AccessibleLabel: "Stop task from task actions", Mode: props.Mode,
 				Disabled: !props.Snapshot.TopBar.CanStop || props.OnStopRequested == nil,
-				OnClick:  invoke(props.OnStopRequested),
+				DisabledReason: runControlReason(
+					strings.TrimSpace(props.Snapshot.TopBar.TaskState) == "",
+					props.Snapshot.TopBar.CanStop, props.OnStopRequested != nil, "stop"),
+				OnClick: invoke(props.OnStopRequested),
 			}),
 			primitives.Button(primitives.ButtonProps{
-				Label: "⚙  Task settings", AccessibleLabel: "Open task settings", Mode: props.Mode,
+				Label: "Task settings", LeadingIcon: primitives.IconSettings,
+				AccessibleLabel: "Open task settings", Mode: props.Mode,
 				Disabled: props.OnNavigatePath == nil, OnClick: navigate("/settings"),
 			}),
 		),
 	})
 }
 
+// runControlReason says why a run control cannot be used.
+//
+// A control that is neither actionable nor explained is the worst state an
+// interface can be in: it looks like it works. These four sit at the top of the
+// workspace and are dark most of the time, because most of the time there is
+// nothing running to pause, stop, or send for review.
+func runControlReason(noTask, permitted, bound bool, action string) string {
+	switch {
+	case noTask:
+		return map[string]string{
+			"pause":  "Nothing is running to pause. Describe a change below to start a task.",
+			"stop":   "Nothing is running to stop. Describe a change below to start a task.",
+			"review": "There is no work to review yet. Describe a change below to start a task.",
+		}[action]
+	case !bound:
+		return "The local coordinator has not offered this control for the current run."
+	case !permitted:
+		return "The current task state does not allow this action."
+	default:
+		return ""
+	}
+}
+
 func taskPausePresentation(taskState string, compact bool) (string, string) {
 	if strings.Contains(strings.ToLower(strings.TrimSpace(taskState)), "paused") {
-		if compact {
-			return "▶", "Resume task"
-		}
-		return "▶  Resume", "Resume task"
+		return "Resume", "Resume task"
 	}
-	if compact {
-		return "Ⅱ", "Pause task"
+	return "Pause", "Pause task"
+}
+
+// taskPauseIcon draws the control's own mark, so a person reading the row at a
+// glance sees the shape of the action before the word.
+func taskPauseIcon(taskState string) primitives.IconName {
+	if strings.Contains(strings.ToLower(strings.TrimSpace(taskState)), "paused") {
+		return primitives.IconPlay
 	}
-	return "Ⅱ  Pause", "Pause task"
+	return primitives.IconPause
 }
 
 func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor design.Color, tokens design.Tokens) ui.Node {
@@ -1257,26 +1945,33 @@ func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor d
 	// most colourful row on the page saying nothing at all, and drawing the eye
 	// away from the one thing that was true. One sentence replaces it.
 	if strings.TrimSpace(topBar.TaskState) == "" {
+		// One short line rather than six labels against six copies of the word
+		// Unknown. The heading above carries the invitation, so this reports
+		// only the state, which is what a strip of measurements is for.
 		return html.Div(html.Props{
 			Data: map[string]string{"component": "task-metrics", "state": "no-task"},
 			Class: css.New(
-				css.PaddingY(css.Px(tokens.Spacing.MD)),
-				css.PaddingX(css.Px(tokens.Spacing.MD)),
+				css.Padding(css.RawLength("0 4px 4px")),
 				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				css.Font(css.FontStack(tokens.Fonts.UI)),
 				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.FontWeight.Semibold,
+				css.Tracking(css.Ems(0.09)),
+				css.TextTransform.Uppercase,
 			).String(),
 		}, html.P(html.Props{
 			Class: css.New(css.Margin(css.Zero)).String(),
-			Text:  "No task is running. Describe a change below to start one.",
+			Text:  "No task is running",
 		}))
 	}
+	// Three facts, not six. The forecast, the cap and what is left of it are
+	// one scroll away in the run rail and one glance away in the header meter;
+	// repeating all six here made the widest row on the page the least
+	// informative one.
 	metrics := []detailRow{
-		{"Task state", taskState},
-		{"Cost", fallback(topBar.ActualCost, "Unknown")},
+		{"State", taskState},
+		{"Spent", fallback(topBar.ActualCost, "Unknown")},
 		{"Tokens", fallback(topBar.ActualTokens, "Unknown")},
-		{"Forecast", fallback(topBar.ForecastCost, "Unknown")},
-		{"Budget", fallback(topBar.HardBudget, "Not set")},
-		{"Remaining", fallback(topBar.RemainingBudget, "Unknown")},
 	}
 	nodes := make([]ui.Node, 0, len(metrics))
 	for index, metric := range metrics {
@@ -1289,46 +1984,41 @@ func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor d
 		}
 		nodes = append(nodes, html.Div(html.Props{
 			Class: css.New(
-				u.Flex, u.ItemsCenter, u.JustifyBetween,
-				css.Gap(css.Px(tokens.Spacing.SM)),
-				css.PaddingY(css.Px(tokens.Spacing.XS)),
-				css.PaddingX(css.Px(tokens.Spacing.MD)),
+				u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+				css.MinWidth(css.Zero),
 			).String(),
 		},
 			html.P(html.Props{
 				Class: css.New(
 					css.Margin(css.Zero),
+					css.Font(css.FontStack(tokens.Fonts.UI)),
 					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.FontWeight.Semibold,
+					css.Tracking(css.Ems(0.09)),
+					css.TextTransform.Uppercase,
+					css.WhiteSpace.NoWrap,
 				).String(),
 				Text: metric.label,
 			}),
 			html.Strong(html.Props{
 				Class: css.New(
+					css.Font(css.FontStack(tokens.Fonts.Code)),
 					css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
-					css.LineHeightLen(css.Px(tokens.Typography.MetricValue.LineHeight)),
-					css.FontWeight.Semibold,
+					css.FontWeight.Medium,
 					css.TextColor(css.Hex(string(valueColor))),
+					css.WhiteSpace.NoWrap,
 				).String(),
 				Text: metric.value,
 			}),
 		))
 	}
 	rules := []css.Rule{
-		u.Grid,
-		css.GridCols(css.Repeat(6, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
-		u.ItemsCenter,
-		css.MinHeight(css.Px(44)),
-		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
-		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-		css.Shadow(css.ShadowOf(
-			css.Zero, css.Px(8), css.Px(30), css.Px(-26), css.RGBA(0, 0, 0, 0.5),
-		)),
+		u.Flex, u.ItemsCenter, css.FlexWrap.Wrap,
+		css.Gap(css.Px(tokens.Spacing.LG)),
+		css.MinHeight(css.Px(34)),
+		css.Padding(css.RawLength("0 4px")),
 	}
-	rules = append(rules, css.Media(
-		css.MaxW(799),
-		css.GridCols(css.Repeat(3, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
-	)...)
 	return html.Section(html.Props{
 		Aria: map[string]string{"label": "Task metrics"},
 		// The state distinguishes a strip reporting measurements from one
@@ -1340,17 +2030,35 @@ func taskMetricStrip(topBar state.TopBarView, taskState string, taskStateColor d
 	}, nodes...)
 }
 
+// taskStatePill reports the state of a running task and stays silent when
+// there is none: the heading already reads "No task yet", and a pill repeating
+// it beside the heading is the same sentence twice in two typefaces.
+func taskStatePill(noTask bool, label string, color design.Color, tokens design.Tokens) ui.Node {
+	if noTask {
+		// An empty span rather than a nil child. A nil in the middle of a
+		// children list reconciles cleanly on a fresh mount and drops the whole
+		// subtree when it replaces another route's surface, which is how
+		// clicking a thread from another page produced a blank page.
+		return html.Span(html.Props{Aria: map[string]string{"hidden": "true"}})
+	}
+	return statusPill(label, color, tokens)
+}
+
 func statusPill(label string, color design.Color, tokens design.Tokens) ui.Node {
 	return html.Span(html.Props{
 		Class: css.New(
-			u.InlineFlex, u.ItemsCenter,
-			css.MinHeight(css.Px(24)),
+			u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(6)),
+			css.MinHeight(css.Px(22)),
 			css.PaddingX(css.Px(tokens.Spacing.SM)),
 			css.Rounded(css.Px(tokens.Geometry.PillRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.Selection))),
+			css.Bg(css.Transparent),
+			css.Border(css.Px(1), css.Hex(string(color))),
 			css.TextColor(css.Hex(string(color))),
+			css.Font(css.FontStack(tokens.Fonts.UI)),
 			css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 			css.FontWeight.Semibold,
+			css.Tracking(css.Ems(0.06)),
+			css.TextTransform.Uppercase,
 		).String(),
 		Text: label,
 	})
@@ -1372,6 +2080,13 @@ func GraphPane(props GraphPaneProps) ui.Node {
 	content := asyncStateContent(props.State, "task graph nodes", len(props.Nodes), props.Mode)
 	if props.State == state.DataReady || props.State == state.DataPartialStale {
 		height := 510
+		if props.FullHeight {
+			// The graph's own page gives the canvas the room the page has. A
+			// six-hundred-pixel box on a nine-hundred-pixel page fitted four
+			// nodes at a third of their size, which is why every node in the
+			// diagram was an unreadable blank rectangle.
+			height = 760
+		}
 		if props.Viewport == state.ViewportWide {
 			height = 640
 		}
@@ -1383,6 +2098,7 @@ func GraphPane(props GraphPaneProps) ui.Node {
 			authoritative.ResponsiveMode = string(props.Viewport)
 			authoritative.VisualMode = props.Mode
 			authoritative.Height = height
+			authoritative.SuppressLegend = props.SuppressLegend
 			content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{Authoritative: &authoritative})
 		} else {
 			content = ui.CreateElement(graphcanvas.Renderer, graphcanvas.Props{
@@ -1416,13 +2132,10 @@ func GraphPane(props GraphPaneProps) ui.Node {
 		Class: css.New(
 			u.Flex, u.FlexCol,
 			css.MinWidth(css.Zero), css.H(css.Full),
-			css.Rounded(css.Px(tokens.Geometry.DialogRadius)),
-			css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
+			css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+			css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
 			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
 			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-			css.Shadow(css.ShadowOf(
-				css.Zero, css.Px(18), css.Px(44), css.Px(-28), css.RGBA(0, 0, 0, 0.72),
-			)),
 			css.Overflow.Hidden,
 		).String(),
 	},
@@ -1434,30 +2147,86 @@ func GraphPane(props GraphPaneProps) ui.Node {
 				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 			).String(),
 		},
-			html.Div(html.Props{
-				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
+			graphPanelTitle(props.Embedded, html.Div(html.Props{
+				Class: css.New(
+					u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+					css.FlexShrink(css.Num(0)),
+				).String(),
 			},
 				html.H2(html.Props{
 					Class: css.New(
-						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+						css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
 						css.Margin(css.Zero),
-						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
+						css.Font(css.FontStack(tokens.Fonts.UI)),
+						css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+						css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+						css.FontWeight.Semibold,
+						css.Tracking(css.Ems(0.09)),
+						css.TextTransform.Uppercase,
+						css.WhiteSpace.NoWrap,
 					).String(),
-					Text: "⌘  Project graph",
+					Text: "Project graph",
 				}),
-				statusPill("Live", tokens.Colors.Active, tokens),
-			),
-			html.Div(html.Props{
-				Class: css.New(
-					u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
-					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-				).String(),
-				Text: "▣ Work  ⬡ Tool  ◇ Plan  ● Proof  ◉ Memory",
-			}),
+			)),
+			// The legend names five node kinds. It gives way before the panel
+			// title does, because a truncated title tells a reader nothing while
+			// a truncated legend still names the kinds that fit. A surface that
+			// carries its own legend suppresses this one rather than printing
+			// the same five marks twice.
+			graphPanelTitle(props.SuppressLegend, graphLegend(tokens)),
 		),
 		content,
 	)
+}
+
+// graphPanelTitle drops the pane's own title when the rail above it has
+// already named the panel. The hidden attribute could not do this job: the row
+// is a flex container, and a display rule beats the attribute.
+// graphLegend names the node kinds with the same marks the graph draws.
+func graphLegend(tokens design.Tokens) ui.Node {
+	entries := []struct {
+		icon  primitives.IconName
+		label string
+		tone  design.Color
+	}{
+		{primitives.IconWork, "Work", tokens.Colors.Code},
+		{primitives.IconTool, "Tool", tokens.Colors.Execution},
+		{primitives.IconPlan, "Plan", tokens.Colors.Plan},
+		{primitives.IconProof, "Proof", tokens.Colors.Validation},
+		{primitives.IconMemory, "Memory", tokens.Colors.Memory},
+	}
+	nodes := make([]ui.Node, 0, len(entries))
+	for _, entry := range entries {
+		nodes = append(nodes, html.Span(html.Props{
+			Class: css.New(
+				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(4)),
+				css.TextColor(css.Hex(string(entry.tone))),
+			).String(),
+		},
+			primitives.Icon(primitives.IconProps{Name: entry.icon, Size: primitives.IconSizeSmall}),
+			html.Span(html.Props{
+				Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextMuted)))).String(),
+				Text:  entry.label,
+			}),
+		))
+	}
+	return html.Div(html.Props{
+		Data: map[string]string{"component": "graph-legend"},
+		Class: css.New(
+			u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.MD)),
+			css.MinWidth(css.Zero), css.Overflow.Hidden,
+			css.WhiteSpace.NoWrap, css.TextOverflowEllipsis(),
+			css.Font(css.FontStack(tokens.Fonts.UI)),
+			css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		).String(),
+	}, nodes...)
+}
+
+func graphPanelTitle(embedded bool, title ui.Node) ui.Node {
+	if embedded {
+		return nil
+	}
+	return title
 }
 
 func graphCanvasEdges(nodes []state.GraphNodeView) []graphcanvas.Edge {
@@ -1880,11 +2649,10 @@ func navigationDestinations(
 	}
 
 	// There is no Home. It pointed at the repository chooser, which is exactly
-	// where Repositories points, so two rail items lit up together on the page
-	// every session begins at — and a rail with two current pages tells a
-	// person nothing about where they are. Pointing it at the open conversation
-	// instead only moved the collision onto Tasks. Each remaining destination
-	// is somewhere the others are not.
+	// where Repositories points, so two rail items lit up together and a rail
+	// with two current pages tells a person nothing about where they are.
+	// Pointing it at the open conversation instead only moved the collision
+	// onto Tasks. Each remaining destination is somewhere the others are not.
 	destinations := []navigationDestination{}
 
 	tasks := navigationDestination{
@@ -1892,6 +2660,14 @@ func navigationDestinations(
 	}
 	memory := navigationDestination{
 		icon: primitives.IconMemory, label: "Memory", reason: needsRepository,
+	}
+	// The collection is a repository's own code, so it is reachable exactly
+	// when a repository is.
+	collection := navigationDestination{
+		icon: primitives.IconGraph, label: "Code", reason: needsRepository,
+	}
+	atoms := navigationDestination{
+		icon: primitives.IconTool, label: "Atoms", reason: needsRepository,
 	}
 	if !repository.IsZero() {
 		if !thread.IsZero() {
@@ -1908,6 +2684,14 @@ func navigationDestinations(
 			icon: primitives.IconMemory, label: "Memory",
 			path: pathOrEmpty(routes.Route{Name: routes.Memory, RepositoryID: repository}),
 		}
+		collection = navigationDestination{
+			icon: primitives.IconGraph, label: "Code",
+			path: pathOrEmpty(routes.Route{Name: routes.Code, RepositoryID: repository}),
+		}
+		atoms = navigationDestination{
+			icon: primitives.IconTool, label: "Atoms",
+			path: pathOrEmpty(routes.Route{Name: routes.Atoms, RepositoryID: repository}),
+		}
 	}
 
 	destinations = append(destinations,
@@ -1916,6 +2700,8 @@ func navigationDestinations(
 			icon: primitives.IconGraph, label: "Graphs",
 			path: pathOrEmpty(routes.Route{Name: routes.Graphs}),
 		},
+		collection,
+		atoms,
 		memory,
 		navigationDestination{
 			icon: primitives.IconRepositories, label: "Repositories",

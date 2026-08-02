@@ -11,6 +11,7 @@ import (
 	taskgraph "codeflux.dev/codeflux/internal/graph"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/readout"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
@@ -357,8 +358,8 @@ func costText(value CostAttribution) string {
 	if !value.Known {
 		return knownText("", value.UnknownReason)
 	}
-	return fmt.Sprintf("%s %d minor units — pricing snapshot %s",
-		value.Value.Currency, value.Value.MinorUnits, value.PricingSnapshot)
+	return fmt.Sprintf("%s — pricing snapshot %s",
+		readout.FormatExactMoneyForReading(value.Value), value.PricingSnapshot)
 }
 
 func messageStrings(values []domain.MessageID) []string {

@@ -20,10 +20,10 @@ func TestTaskControlPanelLabelsStatePhaseForecastAndActualsHonestly(t *testing.T
 		"Provider", "OpenAI", "Model", "gpt-5.6-sol", "Effort", "high",
 		"Estimated P50 1 s 250 ms · P90 2 s 500 ms",
 		"Estimated P50 1200 · P90 2400",
-		"Estimated P50 USD 40 minor units · P90 USD 90 minor units",
+		"Estimated P50 $0.40 · P90 $0.90",
 		"175 total · input 100 · cached input 25 · cache write 0 · output 30 · reasoning 20 exact provider-reported tokens",
-		"USD 25 minor units actual · pricing snapshot prices-2026-07-31",
-		"USD 375 minor units remaining of USD 400 minor units",
+		"$0.25 actual · pricing snapshot prices-2026-07-31",
+		"$3.75 remaining of $4.00",
 	} {
 		if !strings.Contains(markup, want) {
 			t.Errorf("observable task controls missing %q: %s", want, markup)
@@ -205,7 +205,7 @@ func TestBudgetWarningHardCapAndConfirmationAreExactAndNonSpamming(t *testing.T)
 	}
 	for _, want := range []string{
 		`data-component="hard-cap-decision"`, "in-flight provider request is settling",
-		"Old hard budget: USD 400 minor units", "New hard budget: USD 650 minor units",
+		"Old hard budget: $4.00", "New hard budget: $6.50",
 		"Confirm exact budget change", "Finishing with current work remains unavailable",
 	} {
 		if !strings.Contains(markup, want) {

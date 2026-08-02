@@ -131,11 +131,13 @@ func (service *WorkspaceService) InspectRepository(
 		return nil, status.Error(codes.Internal, "the repository could not be read")
 	}
 	summary := repositorySummary(repository)
+	warnings := repositoryWarnings(repository)
 	// A working-tree read can fail for ordinary reasons — the directory moved,
 	// Git is mid-operation — and none of them are a reason to refuse the whole
 	// inspection. The stored identity still answers the question of which
 	// repository this is; only the live fields go unanswered.
-	if live, liveErr := service.application.ReadRepositoryState(ctx, repository); liveErr == nil {
+	live, liveErr := service.application.ReadRepositoryState(ctx, repository)
+	if liveErr == nil {
 		summary.Git = &codefluxv1.GitStateView{
 			HeadRevision:     live.HeadRevision,
 			Branch:           live.Branch,
@@ -143,10 +145,20 @@ func (service *WorkspaceService) InspectRepository(
 			Dirty:            live.Dirty,
 			ChangedPathCount: live.ChangedPathCount,
 		}
+	} else {
+		// Saying so is the whole point. The stored summary that stands in for
+		// the live read carries dirty unset, which a caller would otherwise
+		// render as a clean tree — the one claim somebody starts an agent on
+		// the strength of.
+		warnings = append(warnings, &codefluxv1.RedactedText{
+			Value: "The working tree could not be read, so its branch and " +
+				"uncommitted changes are unknown rather than clean.",
+		})
 	}
 	return &codefluxv1.InspectRepositoryResponse{
-		Repository: summary,
-		Warnings:   repositoryWarnings(repository),
+		Repository:      summary,
+		Warnings:        warnings,
+		WorkingTreeRead: liveErr == nil,
 	}, nil
 }
 

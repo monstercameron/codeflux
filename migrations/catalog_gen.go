@@ -34,4 +34,6 @@ var Catalog = []Descriptor{
 	{Number: 27, Name: "000027_chronological_episodes.sql", SHA256: "081362acf1fe5da402922f5dfc16b33a768c455f0dd8a3bc053d7248d7358ccc"},
 	{Number: 28, Name: "000028_retrieval_channel_provenance.sql", SHA256: "fcdba34fefb56687f4af6614c41df16bff2ea349cb417c28e53794106416bde4"},
 	{Number: 29, Name: "000029_deterministic_retrieval_recall_reviews.sql", SHA256: "f885c5f69393b38a6fbd87f1f7da0e8341d01944213c040ac3cd42c353e8781a"},
+	{Number: 30, Name: "000030_pipeline_stage_ledger.sql", SHA256: "8a66515641e3b50e2ac65ae7d4c68add8c2bb077953969c1ebf366f7aac7a54f"},
+	{Number: 31, Name: "000031_pipeline_stage_documentation.sql", SHA256: "aeb82fc8256fff0ffb9670e70680b1db885298505adaddb44699c2fbb8bdf2de"},
 }

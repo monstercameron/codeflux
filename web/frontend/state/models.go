@@ -41,10 +41,15 @@ const (
 type ConnectionState string
 
 const (
-	ConnectionConnecting   ConnectionState = "connecting"
-	ConnectionLive         ConnectionState = "live"
-	ConnectionReplaying    ConnectionState = "replaying"
-	ConnectionDegraded     ConnectionState = "degraded"
+	ConnectionConnecting ConnectionState = "connecting"
+	ConnectionLive       ConnectionState = "live"
+	ConnectionReplaying  ConnectionState = "replaying"
+	ConnectionDegraded   ConnectionState = "degraded"
+	// ConnectionIdle is a reachable coordinator with nothing selected to
+	// follow. It exists because reporting that state as Disconnected sent
+	// people hunting a transport fault that was not there: the bridge was up,
+	// the database was ready, and no thread was open.
+	ConnectionIdle         ConnectionState = "idle"
 	ConnectionDisconnected ConnectionState = "disconnected"
 	ConnectionIncompatible ConnectionState = "incompatible"
 	ConnectionUnauthorized ConnectionState = "unauthorized"
@@ -128,7 +133,7 @@ func DefaultLayoutPreferences() LayoutPreferences {
 	return LayoutPreferences{
 		RailWidth:    240,
 		GraphWidth:   420,
-		SplitPercent: 52,
+		SplitPercent: 62,
 		Viewport:     ViewportWide,
 		ActivePane:   PaneConversation,
 	}

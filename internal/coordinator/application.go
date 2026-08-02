@@ -17,12 +17,14 @@ import (
 	"google.golang.org/grpc"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
+	agentloop "codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/buildinfo"
 	"codeflux.dev/codeflux/internal/credentials"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/frontendserver"
 	"codeflux.dev/codeflux/internal/gitwork"
+	"codeflux.dev/codeflux/internal/pipeline"
 	"codeflux.dev/codeflux/internal/retrieval"
 	"codeflux.dev/codeflux/internal/review"
 	"codeflux.dev/codeflux/internal/storage"
@@ -66,6 +68,37 @@ type ApplicationOptions struct {
 	// defaults to codeflux-worker beside the running executable, never a PATH
 	// lookup: that process receives the worktree and the coordinator endpoint.
 	WorkerExecutable string
+	// AgentModel is the model a started task's agent thinks with. When it is
+	// nil the coordinator looks for a key itself; when no key is found, tasks
+	// still start and reach a worktree but nothing acts in it, which is the
+	// honest state rather than a silent no-op.
+	AgentModel agentloop.FixedModel
+	// AgentModelFactory builds a model by name, which is what lets a run that
+	// has stopped making progress climb its ladder. When it is set the first
+	// rung is built from it, so AgentModel need not also be given.
+	//
+	// Supplying only AgentModel is still valid and means a run cannot escalate:
+	// there is one model and it stays on it. That is the right behaviour for a
+	// caller that has pinned a model on purpose, and the wrong behaviour to
+	// arrive at by accident, which is why the two are separate fields rather
+	// than one that sometimes escalates.
+	AgentModelFactory func(name string) (agentloop.FixedModel, error)
+	// Settings are the choices the delivery flow leaves open: how many attempts
+	// a run gets, which platforms it must build for, what house style it
+	// writes in. The zero value means the defaults, which are deliberately
+	// neutral: a preference the engine holds without being asked is a bias.
+	Settings pipeline.Settings
+	// AgentWorkingDirectory is where a .env holding a provider key is looked
+	// for. It defaults to the process working directory.
+	AgentWorkingDirectory string
+	// SimulateExecution scripts what an agent would do, for a coordinator that
+	// has no provider configured. The agent loop does not exist yet — the worker
+	// is a heartbeat and report channel with nothing feeding it — so without
+	// this a started task reaches Running and sits there with an empty
+	// timeline. Everything a simulated run produces is stamped SIMULATED,
+	// because it writes real files and real events and the only thing that
+	// makes it not real is that no provider was ever asked anything.
+	SimulateExecution bool
 }
 
 type OrphanedWorkerCandidate struct {
@@ -402,6 +435,21 @@ func StartApplication(
 		return nil, err
 	}
 	application.taskLifecycle.SetEnvironmentObserver(environment)
+	if agent, agentErr := buildAgentExecution(
+		options, repositories, application.events, checkpointing,
+		application.graphProjection,
+	); agentErr != nil {
+		return nil, agentErr
+	} else if agent != nil {
+		application.taskLifecycle.SetAgentExecution(agent)
+		// The settings surface hands a changed configuration to this engine, so
+		// a run started after the change does what the change said rather than
+		// what the process was started with.
+		flowSettings = flowSettingsFunc(func(settings pipeline.Settings) error {
+			_, err := agent.WithSettings(settings)
+			return err
+		})
+	}
 
 	if taskControls == nil {
 		return nil, errors.New(
@@ -497,6 +545,14 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	memoryQueries, err := NewMemoryQueryService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	memoryService, err := transport.NewMemoryService(memoryQueries)
+	if err != nil {
+		return nil, err
+	}
 	editorWorkspaces, err := NewEditorWorkspaceResolver(repositories)
 	if err != nil {
 		return nil, err
@@ -540,6 +596,7 @@ func StartApplication(
 	codefluxv1.RegisterSettingsServiceServer(application.taskServer, settingsService)
 	codefluxv1.RegisterGraphServiceServer(application.taskServer, graphService)
 	codefluxv1.RegisterReviewServiceServer(application.taskServer, reviewService)
+	codefluxv1.RegisterMemoryServiceServer(application.taskServer, memoryService)
 	// The workspace service was declared in the API and never registered, so
 	// every call to it returned Unimplemented: the repository picker, the
 	// workspace state, and the inspection surface were all unreachable against

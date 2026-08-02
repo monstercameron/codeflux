@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"strings"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"google.golang.org/grpc/codes"
@@ -101,6 +102,8 @@ func (service *CodeCollectionService) ListCodeSymbols(
 		Symbols:      views,
 		Page:         &codefluxv1.PageInfo{HasMore: page.Truncated},
 		TotalMatched: page.TotalMatched,
+		TotalAtoms:   page.TotalAtoms,
+		SearchQuery:  page.SearchQuery,
 	}, nil
 }
 
@@ -148,6 +151,20 @@ func (service *CodeCollectionService) InspectCodeSymbol(
 		Source:              codeCollectionText(detail.Source),
 		SourceStartLine:     detail.SourceStartLine,
 		SourceTruncated:     detail.SourceTruncated,
+		NamingChecked:       detail.NamingChecked,
+		NamingFinding:       codeCollectionText(detail.NamingFinding),
+		DocumentedFields:    detail.DocumentedFields,
+		MissingFields:       detail.MissingFields,
+		AccessQuery:         detail.AccessQuery,
+		IndexSchema:         detail.IndexSchema,
+		Structure: &codefluxv1.CodeSymbolStructureView{
+			Measured:   detail.Structure.Measured,
+			TimeBound:  detail.Structure.TimeBound,
+			SpaceClaim: detail.Structure.SpaceClaim,
+			LoopDepth:  detail.Structure.LoopDepth,
+			Branches:   detail.Structure.Branches,
+			Pure:       detail.Structure.Pure,
+		},
 	}, nil
 }
 
@@ -164,6 +181,8 @@ func codeSymbolToProto(symbol CodeSymbolRecord) *codefluxv1.CodeSymbolView {
 		Exported:              symbol.Exported,
 		Atom:                  symbol.Atom,
 		AtomProblem:           symbol.AtomProblem,
+		MatchedName:           symbol.MatchedName,
+		MatchedPromise:        codeCollectionText(symbol.MatchedPromise),
 	}
 }
 
@@ -231,3 +250,82 @@ func mapCodeCollectionError(err error, safe string) error {
 }
 
 var _ codefluxv1.CodeCollectionServiceServer = (*CodeCollectionService)(nil)
+
+// ListCodeFiles returns the collection as the files it is on disk.
+func (service *CodeCollectionService) ListCodeFiles(
+	ctx context.Context,
+	request *codefluxv1.ListCodeFilesRequest,
+) (*codefluxv1.ListCodeFilesResponse, error) {
+	repositoryID, err := RepositoryIDFromProto(request.GetRepositoryId())
+	if err != nil {
+		return nil, &RequestValidationError{
+			Field: "repository_id", Reason: "must be a repository identity",
+		}
+	}
+	page, err := service.application.ListCodeFiles(ctx, CodeCollectionQuery{
+		RepositoryID: repositoryID,
+		Search:       request.GetSearch(),
+		Limit:        int(request.GetPage().GetLimit()),
+	})
+	if err != nil {
+		return nil, mapCodeCollectionError(err, "the files could not be listed")
+	}
+	views := make([]*codefluxv1.CodeFileView, 0, len(page.Files))
+	for _, file := range page.Files {
+		views = append(views, codeFileToProto(file))
+	}
+	return &codefluxv1.ListCodeFilesResponse{
+		Revision:   codeCollectionRevisionToProto(page.Revision),
+		Files:      views,
+		Page:       &codefluxv1.PageInfo{HasMore: page.Truncated},
+		TotalFiles: page.TotalFiles,
+	}, nil
+}
+
+// ReadCodeFile returns one file's text and what it declares.
+func (service *CodeCollectionService) ReadCodeFile(
+	ctx context.Context,
+	request *codefluxv1.ReadCodeFileRequest,
+) (*codefluxv1.ReadCodeFileResponse, error) {
+	repositoryID, err := RepositoryIDFromProto(request.GetRepositoryId())
+	if err != nil {
+		return nil, &RequestValidationError{
+			Field: "repository_id", Reason: "must be a repository identity",
+		}
+	}
+	if strings.TrimSpace(request.GetWorkspaceRelativePath()) == "" {
+		return nil, &RequestValidationError{
+			Field: "workspace_relative_path", Reason: "must not be empty",
+		}
+	}
+	content, err := service.application.ReadCodeFile(ctx, CodeFileRead{
+		RepositoryID: repositoryID, Path: request.GetWorkspaceRelativePath(),
+	})
+	if err != nil {
+		return nil, mapCodeCollectionError(err, "the file could not be read")
+	}
+	declarations := make([]*codefluxv1.CodeSymbolView, 0, len(content.Declarations))
+	for _, symbol := range content.Declarations {
+		declarations = append(declarations, codeSymbolToProto(symbol))
+	}
+	return &codefluxv1.ReadCodeFileResponse{
+		Revision:     codeCollectionRevisionToProto(content.Revision),
+		File:         codeFileToProto(content.File),
+		Text:         codeCollectionText(content.Text),
+		LineCount:    content.Lines,
+		Truncated:    content.Truncated,
+		Declarations: declarations,
+	}, nil
+}
+
+// codeFileToProto converts one file record.
+func codeFileToProto(file CodeFileRecord) *codefluxv1.CodeFileView {
+	return &codefluxv1.CodeFileView{
+		WorkspaceRelativePath: file.Path,
+		Kind:                  file.Kind,
+		Generated:             file.Generated,
+		ImportPath:            file.ImportPath,
+		SymbolCount:           file.SymbolCount,
+		AtomCount:             file.AtomCount,
+	}
+}

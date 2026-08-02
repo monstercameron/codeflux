@@ -48,8 +48,18 @@ func ApplySessionSnapshot(
 	}
 	currentTaskID := projection.snapshot.Session.TaskID
 	incomingTaskID := snapshot.Session.TaskID
-	if currentTaskID != nil {
-		if incomingTaskID == nil || *currentTaskID != *incomingTaskID {
+	if currentTaskID != nil && incomingTaskID != nil && *currentTaskID != *incomingTaskID {
+		// A thread that has started another task is not a stale answer, and it
+		// is the ordinary case: every request after the first one in a thread
+		// produces a new task, and its events arrive against a projection still
+		// holding the previous one. Refusing every such snapshot outright meant
+		// the second request in a thread failed the whole session — the console
+		// reported itself disconnected and would not send anything more,
+		// seconds after a person pressed Start work.
+		//
+		// A snapshot that is behind the last applied event is still refused:
+		// that one really is stale, and adopting it would lose committed state.
+		if snapshot.Session.ThroughSequence < projection.diagnostics.LastAppliedSequence {
 			return requestSnapshotRepair(
 				next,
 				RepairTaskIdentityMismatch,
@@ -58,6 +68,24 @@ func ApplySessionSnapshot(
 				errors.New("snapshot task identity differs from active projection"),
 			)
 		}
+		next.snapshot = cloneSessionSnapshot(snapshot)
+		next.diagnostics.LastAppliedSequence = snapshot.Session.ThroughSequence
+		next.diagnostics.LastEventKind = ""
+		next.diagnostics.Repair = nil
+		next.connection = ConnectionProjection{State: ConnectionReplaying}
+		return next, nil
+	}
+	if currentTaskID != nil && incomingTaskID == nil {
+		// Erasing a task is different from moving to another one: no committed
+		// flow drops a task that exists, so a snapshot that omits it is refused
+		// and the trusted projection stands.
+		return requestSnapshotRepair(
+			next,
+			RepairTaskIdentityMismatch,
+			0,
+			"replace session snapshot task identity",
+			errors.New("snapshot omits the active task identity"),
+		)
 	}
 	if projection.snapshot.Task != nil && snapshot.Task == nil {
 		return requestSnapshotRepair(

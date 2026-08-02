@@ -22,6 +22,28 @@ type codeCollectionFake struct {
 	lastPackages CodeCollectionQuery
 	lastSymbols  CodeSymbolQuery
 	lastDetail   CodeSymbolInspection
+	files        CodeFilePage
+	filesErr     error
+	lastFiles    CodeCollectionQuery
+	content      CodeFileContent
+	contentErr   error
+	lastRead     CodeFileRead
+}
+
+func (fake *codeCollectionFake) ListCodeFiles(
+	_ context.Context,
+	query CodeCollectionQuery,
+) (CodeFilePage, error) {
+	fake.lastFiles = query
+	return fake.files, fake.filesErr
+}
+
+func (fake *codeCollectionFake) ReadCodeFile(
+	_ context.Context,
+	read CodeFileRead,
+) (CodeFileContent, error) {
+	fake.lastRead = read
+	return fake.content, fake.contentErr
 }
 
 func (fake *codeCollectionFake) ListCodePackages(

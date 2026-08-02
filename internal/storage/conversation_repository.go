@@ -396,3 +396,41 @@ func sameArtifactIDs(left, right []domain.ArtifactID) bool {
 	}
 	return true
 }
+
+// GetMessage reads one message by identity.
+//
+// It exists because a task records the message it was created from and nothing
+// could read it back: an agent asked to carry out a request had no way to see
+// what the request said.
+func (repositories *Repositories) GetMessage(
+	ctx context.Context,
+	messageID domain.MessageID,
+) (Message, error) {
+	if repositories == nil || repositories.database == nil {
+		return Message{}, errors.New("repositories are unavailable")
+	}
+	var (
+		message       Message
+		createdMicros int64
+	)
+	err := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT id, thread_id, sequence, role, body_redacted,
+		        idempotency_key, created_at_unix_micros
+		 FROM messages
+		 WHERE id = ?`,
+		messageID,
+	).Scan(
+		&message.ID, &message.ThreadID, &message.Sequence, &message.Role,
+		&message.BodyRedacted, &message.IdempotencyKey, &createdMicros,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Message{}, typedError(ErrNotFound, "read message",
+				errors.New("no message with that identity"))
+		}
+		return Message{}, classify("read message", err)
+	}
+	message.CreatedAt = time.UnixMicro(createdMicros).UTC()
+	return message, nil
+}

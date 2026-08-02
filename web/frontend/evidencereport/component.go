@@ -11,6 +11,7 @@ import (
 	reportevidence "codeflux.dev/codeflux/internal/evidence"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/readout"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
@@ -309,11 +310,11 @@ func uintRange(known bool, p50, p90 uint64, reason string) string {
 }
 
 func moneyRange(known bool, p50, p90 domain.Money, reason string) string {
-	return knownValue(known, "P50 "+moneyText(p50)+", P90 "+moneyText(p90), reason)
+	return knownValue(known, "P50 "+moneyText(p50)+" · P90 "+moneyText(p90), reason)
 }
 
 func moneyText(value domain.Money) string {
-	return fmt.Sprintf("%s %d minor units", value.Currency, value.MinorUnits)
+	return readout.FormatExactMoneyForReading(value)
 }
 
 func tokenUsageText(value domain.TokenUsage, reason string) string {

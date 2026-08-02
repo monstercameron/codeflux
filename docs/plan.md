@@ -7521,6 +7521,90 @@ The retrieval order is:
 6. deterministic compatibility validation before influence;
 7. routing and planning only from the validated candidate set.
 
+## Extraction Triggers and the Candidacy Funnel
+
+Retrieval states what a run may read. This states what a run may write, and when.
+
+Extraction runs at episode close and never during a run. A run that has not been accepted has established nothing, and a candidate minted from work still in progress records a belief rather than an outcome. What the rule forbids is minting from work in progress, not recording something that was already true when the episode opened: the base revision's suite result and the toolchain in force are observed before the run begins and extracted at close like everything else.
+
+A candidate is minted at the strongest tier that can express what was observed. A weaker tier is admissible only with a recorded reason the stronger one could not carry it:
+
+```text
+Workspace fact
+    A command, mapping, convention, or environment requirement observed in an
+    attributable successful execution. Deterministic, no judgment, and bound
+    to the revision that produced it.
+
+Mechanical rule
+    An observation a validator check, lint rule, compiler diagnostic, or
+    contract could express. Minting anything weaker when this tier fits is
+    what turns a checkable property into prose that has to be believed.
+
+Regression case
+    A failure with a reproducible input, a stable oracle, a demonstrated
+    failure, and an expected outcome. A failure missing any of the four is an
+    observation, not a case.
+
+Routing evidence
+    What a task of this shape cost, on which rung, and where it stalled.
+    Admissible for forecasting and seeding, never as evidence of correctness.
+
+Advisory pattern
+    Everything that survives the four tiers above. Scoped, experimental, and
+    subject to the Advisory Lesson Failure protocol from its first exposure.
+```
+
+The following never become candidates, at any tier:
+
+* `agent_self_report`, which carries `evidence_strength: none` and cannot be repaired by being restated;
+* a first-attempt success, for every tier that requires something to have been contested — advisory pattern, regression case, and routing evidence about where a run stalled — because nothing was contested and so no judgment was established. The deterministic tier is unaffected: a command that ran and exited zero is an observation of what executed, not a conclusion about what was hard, and forbidding it here would forbid learning anything from the runs that go well, which are most of them;
+* a run whose produced work was not attributed to the declarations it changed, because the observation would be about code the run never touched;
+* repository text no person approved, which is untrusted input reaching the product's own memory.
+
+Extraction quality is not iteratively improvable. Quarantine is terminal, and a successor artifact inherits no confidence, so a cohort minted from a ledger that dropped rows or misattributed produced work can only be retired — never corrected in place. Extraction therefore may not be enabled before ledger integrity and change attribution hold. This is a sequencing requirement, not a preference: the cost of extracting early is paid once and permanently, while the cost of extracting late is paid in runs that learned nothing and can be repeated.
+
+## Injection Surfaces and Timing
+
+The retrieval order states what may influence a run. This states where it may enter and when, because the same artifact is worth different amounts at different points and costs different amounts when wrong.
+
+Four surfaces, ordered by what a wrong entry costs:
+
+```text
+Specification request
+    Decides the decomposition. No gate downstream catches a wrong one, and
+    the error is paid on every rung of every attempt.
+
+Implementation context
+    Present on every attempt. Competes with the code for the loop's byte
+    budget.
+
+Gate send-back
+    Scoped to one gate that has already failed, on one attempt.
+
+Reviewer request
+    Scoped to judgment about work that already exists.
+```
+
+Verified material — workspace facts, execution recipes, registered atoms, mechanical rules, regression cases — may enter any surface from the first round. It is not on trial; it carries its own evidence and its own invalidation bindings.
+
+Advisory patterns may not enter the specification request at all, and may not enter the first attempt of a run. An advisory pattern enters only through the send-back for the gate it is indexed under, and only once that gate has already failed in that run.
+
+The reason is that the attempt loop is the closest thing to a controlled trial the Advisory Lesson Failure protocol can have for free. Attempt N is the clean arm and attempt N+1 the exposed arm, against the same starting revision and the same rung, at no cost beyond the attempt the run was going to spend anyway. Exposing the first attempt destroys the only clean arm the product gets for free and makes every later causal question a separately funded investigation.
+
+The two arms are not identical, and the difference is stated rather than assumed because causal conclusions are drawn from this pairing. Attempt N+1 inherits N's edits and N's failure output, so the pair isolates the advisory only against that shared inheritance. And a pair whose rung changed between the two attempts is not a comparison at all: escalation triggers on the same gate failing repeatedly, which is exactly when an advisory is injected, so the two mechanisms collide by construction. The run is not distorted to protect the measurement — escalation proceeds as it would have — and the pair is recorded as void and excluded from confirming anything.
+
+Advisory material shown to a run's implementer may not also be shown to that run's reviewer. A reviewer that saw the pattern produces findings within its lineage, which cannot independently confirm it; a reviewer that did not is an independent lineage in the sense the permanent clean room establishes at cohort level. Where a reviewer must see it, its findings record `influenced_by` and are excluded from confirming that pattern or its ancestors.
+
+## Routing Evidence Keys
+
+The exact fingerprint binds the base revision. It therefore identifies one run and recurs for no other, which is correct for reuse — where a match must be exact before it may discharge an obligation — and useless for routing, where the question is what work of this shape has cost before.
+
+Routing evidence carries its own key: a named, versioned projection of the fingerprint over structured fields only. The projection admits task class, difficulty tier, requested authority classes, required assurance, risk, and banded counts of affected paths and symbols. It excludes the base revision and the affected identifiers themselves, because a key that distinguishes two runs by which symbol they touched answers no question about either.
+
+The projection is declared and versioned exactly as a fingerprint schema is, and every routing record states the projection version that produced its key. Widening or narrowing the projection is a new version, and so is moving a band edge: a count that fell in one band and now falls in another is a different key, so a projection that changed its bands without changing its version would silently merge two populations that were never comparable. Records written under an earlier version are not silently re-read under a later one, because a key whose meaning changed is a different key wearing the same value.
+
+Routing evidence never establishes correctness. It is admissible for calibrated forecasting, for policy evaluation, and for seeding an execution ladder, and it is inadmissible as evidence that a program is right.
+
 ## Mechanical-Rule Governance
 
 Every candidate rule requires:
@@ -7680,3 +7764,444 @@ Kernel contradictions are system-wide assurance incidents.
 ```
 
 The immediate design priority is the code-first agent runtime, frozen adaptive-platform benchmark, and trustworthy correctness telemetry. Model routing and compounding memory are built only after that baseline works. The kernel atom list becomes load-bearing only if the graph experiment authorizes the deep Go verifier.
+
+---
+
+# 33. Pipeline Refinement
+
+The delivery flow a requirement passes through is declared in `internal/pipeline` and performed by the coordinator. The stage vocabulary in code remains authoritative. This section records what the flow as built gets wrong, what the flow as designed does not cover at all, and the refined flow those two findings imply.
+
+The flow's governing rule is unchanged and is the reason the rest of this section exists: "we did not check this" and "this passed" must never render the same way. Every defect below is a violation of that rule from the inside, where a stage records a pass for a gate it did not establish. That is worse than the absent record the ledger was built to replace, because a reader has no way to see it.
+
+## Recorded Defects in the Flow As Built
+
+| Defect | Location | Consequence |
+|---|---|---|
+| The unverified-run sweep pre-blocks stages the run then actually performs | `agent_execution.go` `!verified` sweep against the later adversarial, acceptance, and evidence calls | Storage is first-write-wins, so three real verdicts are computed and discarded on every failing run, including the evidence bundle a reader needs most |
+| Stages record `satisfied` for gates they only partly perform | atom-optimization, atom-complexity, platform-matrix, non-functional, composition-obligations, control-obligations | The gate text is stored beside the state, so the ledger asserts a rewrite that never happened, a measurement never taken, and a platform never exercised |
+| Test attribution accepts any identifier in any test file | `testedNames` | atom-example-tests, molecule-tests, and molecules are satisfiable by a coincidental local variable of the same name |
+| atom-fuzz skips whenever no fuzz target exists | `checkFuzzing` | The cheapest way to satisfy the stage is to write no fuzzing; no decoding boundary is ever enumerated |
+| Per-stage model overrides named sixteen stages that make no model request | `ModelBearing`, `stage_models` setting | There is one model entry point in a run; an override on a static-analysis stage would have rendered, validated, stored, and changed nothing. Now narrowed to the four gates that can send work back, which is the whole truth of what a per-stage pin can currently select |
+| `attempt` is pinned to `1` in the ledger, the start command, and the evidence reader | ledger, `StartPreparedTaskRun`, `assembleEvidence` | A task started a second time writes nothing and the interface shows the first run's ledger under the earlier run identity |
+| Atom and molecule classification ignores method and package-qualified calls | `describeBody` | A program composed through methods reads as entirely atomic, and every phase B and C gate rests on that split |
+| control-tests counts `if` and `case` nodes inside test files | `checkControlTests` | One `if err != nil` satisfies a gate about every declared failure path |
+| The structural sweep blocks a numeric range rather than a named set | `examineStructure` | Correct only while the flow's numbering happens to hold, and it pre-empts more accurate messages already written for stages in that range |
+| atom-optimization executes before atom-mutation is decided | `examineStructure` ordering | Contradicts the ordering the flow's own test exists to enforce; inert only while nothing is rewritten |
+| `started_at` always equals `finished_at` | stage record write | Two columns model duration and no duration is recordable |
+| The recorded flow length is stale in four comments | ledger, execution, delivery, ledger test | The record describes a flow shorter than the one it performs |
+| No test binds the stage vocabulary to the checks that perform it | `stages_test.go` | Ordering, gaplessness, and naming are guarded; gate-to-check agreement is not, which is what allows the second defect above |
+| Recall runs after the code is written | `recallKnownAtoms`, called at the end of the run against the functions the run just produced | The stage reports how much of the work was unnecessary once the work is finished; it is a regret report and never prevented a rebuild |
+| Recall matches by name substring | `strings.Contains(content, "func "+name+"(")` | Two functions doing the same thing under different names never match, and two sharing a name and differing in behaviour match falsely |
+| No run writes to the atom registry | `documentAtoms` produces stage evidence only; `RecordAtomDocumentationEmbedding` is never called from a run | Compounding effort is zero by construction: nothing is deposited, so there is nothing for a later run to recall |
+| The pre-work retrieval gate never reaches the agent | `retrieval.RunPreWorkGate` runs in `task_preflight.go`; the loop's context is `worktreeContextItems` | The model plans against a directory listing, `go.mod`, and `README.md` while the retrieval answer sits unread in the database |
+| Every structural check re-derives the same facts | `readProducedFunctions` is called twenty times and `producedGoFiles` thirteen more | Roughly thirty-three `git status` subprocesses and twenty full re-parses per run, all returning identical results |
+| The suite is run about twenty times per run, serially | twelve mutants, three repetitions, non-functional, atom and molecule verification, coverage, and the loop's own validation | The dominant cost of a run is repeated whole-suite execution that nothing shares, caches, or parallelises |
+| The refinement adversary makes no model request | `reviewAdversarially` is five static finders | §21 defines the critic as a challenger of requirement interpretation and unsupported guarantees; a token scan can raise neither, so the one challenge that catches a consistent set of wrong things is never made |
+| The adversary applies a universal checklist and reads no risk | all five finders run for every task; `scope.riskLevel` is resolved and never read | §21 selects checks from task risk, changed obligation categories, effect types, dependency changes, and security classification, and explicitly forbids the ever-growing universal list |
+| Adversary findings are not proof obligations and carry no provenance | `adversarialFinding` is free text with an identity nothing outlives the attempt | §9 makes the obligation the unit of assurance and §10 attaches guarantees to claims; a finding with no identity, evidence level, or lineage can be neither discharged, re-derived, nor invalidated |
+| Adversary findings never reach the ledger or the evidence bundle | the only consumers are one prompt string and one chat message | §22 requires assurance reports to influence the gate; the sharpest analysis a run performs leaves no record of what it found or whether the next attempt fixed it |
+| The adversary bypasses the progress monitor and is spent before the code is final | the review path sets `failure` directly rather than routing through `sendBack`; `reviewed` is set before the review runs | §21's escalation triggers on repeated failure of the same gate, so a run stuck on findings neither escalates nor decomposes, and the single round is consumed by attempt one even when it errors or finds nothing |
+| The adversary is not independent and can be switched off | same source, same derived criteria; `AdversarialReview` is a boolean | §31 makes lineage independence the condition for evidence to count, and §22 forbids trading away a required reviewer for lower cost |
+| Two adversary finders have no false-positive control | swallowed-error detection examines only pure functions and cannot see standard-library calls; boundary detection substring-matches, where `"0"` matches a file mode and `"Error"` matches `t.Errorf` | §31 requires measured false-positive control before a mechanical rule is promoted; a critic that cries wolf spends an attempt each time it does |
+| The adversary's cost is doubled and unattributed | `checkMutations` runs once for the critic and again for the ledger | §25's honest cost display and §26's benchmark timing both assume a run's expense is attributable; roughly twenty-four whole-suite executions occur with nothing recording that the critic paid for half of them |
+| The runtime probe never reads the exit code | `probeOneCommand` examines timeout, the literal `panic:`, and silence only | §12's effect discipline is about failure being visible; legible refusal is the property the probe exists to test and the one signal it does not read |
+| The flow is file-granular where it claims to be change-granular | `producedGoFiles` returns changed files and `readProducedFunctions` treats every declaration in them as produced | A one-line fix inside a thirty-function file makes the run answerable for all thirty, which is the exact outcome the Git scoping was introduced to prevent; completeness, anti-patterns, complexity, and mutation all inherit it |
+| Acceptance examples can only describe a command-line filter | `acceptanceExample` is arguments, stdin, and expected output | §27 declares six task classes, and a refactor, a dependency change, a library feature, and behaviour-linked documentation can express none of them; making an example mandatory would make four of the six unstartable |
+| Stages assume a greenfield single-module Go program | `checkAtoms` fails when no new function is produced; `go build ./...` and `go test ./...` are assumed; the permission policy approves exactly `go test ./...` | §27 supports scoped fixes, refactors, and dependency changes on repositories the user controls, and a repository whose suite needs build tags, a subdirectory module, or a Makefile cannot be validated at all |
+| Mutation scoring cannot tell a caught defect from a mutant that never compiled | raw text substitution over file bytes, no build between mutation and suite run | `" + "` becomes `" - "` inside string concatenation and fails to compile, which the suite reports as a failure and the score counts as caught; the same substitution inside a string literal or comment produces a survivor that is not a blind spot |
+| Unit verification attributes tests by identifier sweep | `testsNaming` maps every identifier inside a test function to that test | A unit whose name coincides with a local variable is reported verified by a test that never calls it; this is a second call site of the same defect as `testedNames` and is not fixed by repairing that one |
+| Repository code is executed outside the mediated-tool path | acceptance, the adversarial probe, and mutation each shell out with `exec.CommandContext` | §27's command mediation and inline approval govern every other action the agent takes; a `TestMain`, an `init`, or any produced command runs here with the coordinator's own authority and no approval |
+| Whole-repository suite execution is the flow's unit of measurement | repetition, non-functional, mutation, verification, and coverage each run `go test ./...` | On any repository larger than a fixture the flow is unusable, and `internal/testselection` already exists and is wired only into the validation review workflow |
+| Coverage reports the least-covered package in the whole module | `measureCoverage` takes the lowest | On a real repository the answer describes an untouched package, so the number is true and about something other than the change |
+
+## Structural Gaps in the Flow As Designed
+
+The specification is not grounded. Phase A derives contracts from the request and phases B through F verify against those derived contracts. The only external check is end-to-end-tests against acceptance examples, and the instructions gate permits zero examples provided the absence is explicit. Every stage can therefore be satisfied against a confident misreading of the request.
+
+The flow has no vocabulary for the following, each of which is a routine source of defects in delivered software:
+
+```text
+Data
+    the data model and its invariants
+    schema, persistence, and migration
+    backward compatibility with previously written data and older peers
+
+Concurrency and resources
+    concurrent execution, shared state, and ordering requirements
+    resource lifetime: handles, goroutines, connections, steady-state memory
+
+Failure
+    hostile environment rather than hostile input: full disks, timeouts,
+    partitions, failing dependencies
+    crash recovery and idempotent restart
+
+Security and supply chain
+    third-party dependency admission, pinning, vulnerabilities, licenses
+    trust boundaries, secrets, and what may never be emitted
+
+Operability
+    diagnosability: failures that name what failed and with what input
+    exported interface surface and its stability
+    reproducible builds
+
+Regression
+    the code that already existed, which the produced-file scoping never examines
+```
+
+Where the flow does have vocabulary it is applied at one depth only. Property tests, fuzzing, and mutation scoring stop at the atom, so composition and the program boundary receive none of them. `skipped` has no auditor, so a trivially shaped program excuses itself from most of phases B through D and delivers a clean ledger. The only reviewer is the author, working from criteria the author derived. Human contact is a single binary gate at the end, which is the most expensive place in the flow to discover a misread request.
+
+The compounding-effort thesis of §2 has no implementation at the point where it would compound. Atomicity is what makes produced work reusable, and the flow neither deposits what it produces nor withdraws before it builds. Both halves are missing, and each is useless without the other: recall against an empty registry finds nothing, and a registry nobody queries is storage cost with no return.
+
+## The Refined Flow
+
+Sixty-six stages in eight phases. Phases A and B decide what is being built, reuse what already exists, and build the smallest pieces that do not; C and D compose them, discharge the obligations composition creates, and answer for concurrency and failure; E assembles and exercises the program; F measures how much the checking was worth; G answers for the code that already existed; H audits the omissions, records what could have been reused, and hands the work over.
+
+Every function the flow produces is documented and registered. Documentation is the comment on the declaration; registration is the durable row a later run's recall can find. They are separate stages because they fail separately and a reader needs to know which one did.
+
+### Phase A: Specification, Grounded Externally
+
+| # | Stage | Gate |
+|---|---|---|
+| 1 | instructions | the request carries at least one executable acceptance example; the absence of one is not an accepted answer |
+| 2 | clarification | no material ambiguity is left unresolved: it was asked about or a bounded reading was stated |
+| 3 | acceptance-oracle | every example runs and fails against an empty program, so it is known to discriminate |
+| 4 | atomic-instructions | the request is split into single-purpose units, each citing the part of the request it comes from |
+| 5 | decomposition-coverage | every acceptance criterion is covered by at least one unit and no unit exists without a criterion |
+| 6 | data-model | the types, their invariants, and which states are made unrepresentable rather than merely unwanted |
+| 7 | contracts | each unit has a signature, types, preconditions, postconditions, declared effects, and error cases, written in the types of stage six |
+| 8 | difficulty-rating | every unit carries a difficulty tier drawn from a closed set, each tier justified by a property of the contract rather than by a felt sense of how hard the work looks |
+| 9 | resource-and-effect declaration | every resource the work acquires is named with the path on which it is released |
+| 10 | threat-model | trust boundaries, untrusted inputs, secrets, and the values that may never reach output, logs, or errors |
+| 11 | concurrency-model | what runs concurrently, what is shared, and which ordering and atomicity properties are required |
+| 12 | dependency-budget | the third-party code admitted, pinned, and justified against writing it instead |
+| 13 | recall | every contract is resolved against the registry and carries a binding decision, reuse or write, before anything is built; a reuse decision names the registered atom, its evidence, and the revision it was verified at |
+| 14 | specification-review | a person accepted the specification, including which contracts will be reused rather than written, before any code was written |
+
+Stage 3 applies the flow's own strongest device, that a test which passes against nothing is not a test, to the specification rather than to the unit. Stage 14 is the highest-leverage stage in the flow: it is the only place where a misread request costs one sentence instead of sixty stages. Stage 8 is deliberately inside the reviewed set, because a difficulty tier decides what every later stage is paid for and a person should be able to disagree with it before the money is spent rather than after.
+
+Stage 13 is the only stage that removes work rather than adding it, and it is the reason the longer flow is affordable. It is binding rather than advisory: a `reuse` decision excuses the atom from stages 16 through 26, because the run that wrote it already discharged them, and replaces all of them with one obligation carried into stage 19, that the recalled atom still passes this run's synthesised cases from stage 15. Reuse without re-verification imports the earlier run's blind spots; reuse with case re-verification costs one test run in place of eleven stages.
+
+### Phase B: Atoms
+
+| # | Stage | Gate |
+|---|---|---|
+| 15 | atom-case-synthesis | each atom has a ladder of inputs derived from its signature and every one is tried by a test asserting what that class of input demands |
+| 16 | atom-example-tests | tests written from the contract, before the atom, that fail against a stub |
+| 17 | atom-property-tests | at least one property over generated inputs for each postcondition |
+| 18 | atoms | each atom satisfies its contract and reads nothing outside its arguments |
+| 19 | atom-verification | every atom test passes, repeated with recorded seeds |
+| 20 | atom-fuzz | every decoding boundary is enumerated and fuzzed without panic or hang; a program with no boundary skips with that count as its evidence |
+| 21 | atom-mutation | the mutation score meets its threshold, so the tests are known to detect defects |
+| 22 | anti-patterns | the produced source contains no swallowed error, package-level mutable state, unchecked assertion, panic outside main, shadowed name, untyped parameter, flag argument, or body nested past following |
+| 23 | atom-optimization | the atom is rewritten to be simpler where it can be, and every test that passed before still passes with an unchanged result |
+| 24 | atom-complexity | the shipped atom carries a claimed time and space bound and a measured growth curve across input sizes, and the two agree |
+| 25 | atom-documentation | each verified atom carries a doc comment on its declaration stating its purpose, inputs, outputs, and the algorithm it uses |
+| 26 | atom-registration | every atom the run wrote is deposited in the registry with its documentation, contract hash, signature shape, documentation embedding, evidence links, and the exact revision it was verified at |
+
+This phase keeps its existing shape and ordering, which is the strongest part of the flow as designed. Stages 20 and 24 change from a claim to something a check can establish, and stage 26 is new: it is the deposit that makes stage 13 of every later run worth performing.
+
+Registration is not conditional on the atom being interesting. Every function the run wrote is registered, because the judgement about which work is worth reusing belongs to a later run's contract match and not to the run that happened to write it first.
+
+### Phase C: Molecules
+
+| # | Stage | Gate |
+|---|---|---|
+| 27 | composition-obligations | what each molecule must guarantee is stated, and each obligation names the atoms that discharge it |
+| 28 | molecule-tests | tests written from the obligations, before the molecule, that fail against a stub |
+| 29 | molecules | each molecule composes its atoms leaving no obligation unclosed |
+| 30 | molecule-property-tests | at least one property per obligation, stated over the composition rather than over its parts |
+| 31 | molecule-verification | every molecule test passes and every stated obligation is discharged |
+| 32 | molecule-mutation | the composition's tests are known to detect a composition defect, not only an atom defect |
+| 33 | molecule-documentation | each verified molecule carries a doc comment stating what it guarantees, which atoms discharge it, and how they are joined |
+| 34 | molecule-registration | every molecule the run wrote is deposited in the registry on the same terms as an atom, with the atoms it composes recorded as its parts |
+
+Molecules are registered for the same reason atoms are. A composition that discharged its obligations is reusable work, and a registry holding only leaf functions makes every later run rebuild the joins.
+
+### Phase D: Control, Concurrency, and Failure
+
+| # | Stage | Gate |
+|---|---|---|
+| 35 | control-obligations | ordering, termination, cancellation, and error propagation are stated for every path |
+| 36 | control-tests | every declared path has a test that provokes it, established by path rather than by counting decision nodes in test source |
+| 37 | control-flow | the orchestration terminates and leaves no path unreachable or undischarged |
+| 38 | path-coverage | branch coverage is measured against its threshold rather than assumed |
+| 39 | failure-path-injection | every declared failure path is forced to occur and behaves as its obligation says |
+| 40 | concurrency-verification | the race detector is clean and the ordering and atomicity claims of stage eleven hold under interleaving |
+| 41 | resource-lifetime | every resource declared at stage nine is released on every path, with no handle, goroutine, or memory growth under repetition |
+
+### Phase E: The Program
+
+| # | Stage | Gate |
+|---|---|---|
+| 42 | assembly | the pieces are wired into a module that compiles, checked before anything is run |
+| 43 | dependency-audit | every dependency is pinned, free of known vulnerabilities, licence-compatible, used, and within the budget of stage twelve |
+| 44 | program | a build artifact exists |
+| 45 | reproducible-build | the same inputs produce the same artifact, and the toolchain version is pinned and recorded |
+| 46 | integration-tests | components are exercised together, with nothing mocked |
+| 47 | end-to-end-tests | the built executable reproduces every acceptance example of stage one exactly |
+
+### Phase F: Verification Depth
+
+| # | Stage | Gate |
+|---|---|---|
+| 48 | global-invariants | properties that span the whole program hold across every run |
+| 49 | program-fuzz | the program's own external boundary, its arguments, standard input, files, and interfaces, is fuzzed without panic or hang |
+| 50 | adversarial-input | hostile input produces no violation |
+| 51 | fault-injection | a full disk, a timeout, a partition, and a failing dependency each produce a reported failure rather than corruption |
+| 52 | crash-recovery | the program killed at arbitrary points restarts safely and idempotently, leaving no torn state |
+| 53 | security-verification | verified against stage ten: no declared secret reaches output, logs, or errors, and every trust boundary validates what crosses it |
+| 54 | observability | every failure names what failed and with what input, exit codes distinguish outcomes, and the program is diagnosable without a debugger |
+| 55 | repetition | the suite is run repeatedly with recorded seeds and does not flake |
+| 56 | platform-matrix | the program builds, runs, and passes on every platform it claims to support |
+| 57 | non-functional | performance and resource use are within budget against a recorded baseline, and the run records the new baseline |
+
+### Phase G: Fit With What Already Exists
+
+| # | Stage | Gate |
+|---|---|---|
+| 58 | regression | the pre-existing suite still passes, the changed lines are covered, and nothing that worked before stopped working |
+| 59 | api-surface | the exported surface is minimal and, for a change to existing code, unbroken |
+| 60 | compatibility | the new version reads the previous version's data and interoperates with older peers, and every migration is tested in both directions |
+
+This phase does not exist in the flow as designed, and it is the phase that decides whether the product can be used more than once on the same repository. The produced-file scoping that makes every other gate fair also makes the flow blind to what it broke.
+
+### Phase H: Audit and Delivery
+
+| # | Stage | Gate |
+|---|---|---|
+| 61 | skip-audit | every skipped and not-implemented stage is challenged and justified, and the ratio is reported as a headline figure rather than left in a table |
+| 62 | reuse-regret | every function the run wrote is compared against the registry as it now stands, and each one that a better recall would have found is recorded with the key that would have found it |
+| 63 | independent-review | a reviewer that did not write the code, working from the specification rather than the implementation, with no round cap and no setting that removes it |
+| 64 | evidence-bundle | every claim links to the artifact and test supporting it, and what was not checked is stated |
+| 65 | human-acceptance | a person accepted the work, rejected it, or asked for a change |
+| 66 | deliver | the accepted change, its evidence, and its provenance are handed over |
+
+Stage 62 is the flow's existing recall check kept in place and given the job it is actually good at. As a gate before the work it was useless, because it ran after the work; as a measurement after the work it is the only instrument that says whether stage 13 is any good. It never blocks delivery. Its output is the refinement signal: a function it flags is either a registry gap, because the earlier atom was never deposited, or a recall miss, because it was deposited and the search did not find it, and those two failures have different repairs. A run whose regret is consistently zero has a recall stage that is working; a run whose regret is consistently high has one that is not, and the key that would have found the match names which of the three search keys to fix.
+
+Stage 62 replaces the refinement adversary rather than extending it. The static finders it uses today are evidence a critic should be handed, not the critic: they answer what the code looks like, and §21's critic exists to answer whether the code is the thing that was asked for. The finders therefore survive as inputs, the judgement moves to a reviewer with the specification in front of it, and every finding it raises becomes a proof obligation in §9's sense with the provenance §10 requires, so that a review can be discharged, re-derived, or invalidated like any other evidence rather than expiring with the attempt that produced it.
+
+The flow writes to memory at three stages and nowhere else: 26 and 34 deposit the atoms and molecules the run wrote, and 62 measures whether the deposit was findable. Everything else a run learns — which commands this repository actually builds and tests with, what the work cost and on which rung, which gate it stalled at and how many times — is about the run rather than about the program, and a stage gate is a claim about the program. Extraction of that material therefore happens at episode close, outside the stage flow, and the flow is not lengthened to hold it. A later reading that adds a sixty-seventh stage for learning has misplaced the boundary: by that point the run has nothing left to establish about the program, and a stage that cannot fail is not a gate.
+
+## Model Selection
+
+Every stage that asks a model something has to decide which model, at what reasoning effort. The flow answers that in four ways, ordered by how much each one knows: what earlier runs of this shape finished on, what the request says before anything is built, what the run has learned by failing, and what the finished code measurably is. The first knows nothing about this run and is the only one that compounds; the last knows the most and arrives too late to change what was built.
+
+### The Ladder
+
+A run climbs when it stops making progress. The trigger is repetition, not the attempt count: a run that has failed a different gate each time is converging and is left alone, while a run that has failed the same gate the same way is not going to succeed on the twelfth try, and the attempts between are spent establishing what was already established. Failures are compared after normalising the parts that change without the defect changing — temporary paths, durations, addresses, a line number that moved — because comparing raw text would find two runs of one defect different forever, the ladder would never be climbed, and nothing would report that the mechanism was inert.
+
+Effort is exhausted before model, because the two axes cost differently:
+
+```text
+Raising effort
+    Bills more tokens at the rate already in force. The second rung costs
+    more than the first without costing more per token.
+
+Changing model
+    Raises the rate on every token, not only on the extra thinking. This is
+    the axis worth deferring.
+```
+
+Intermediate effort levels are skipped on each model on purpose. Every rung costs a full stall to detect, so a rung only marginally different from the one below it is paid for in attempts and returns nothing.
+
+Each rung gets its own attempt allowance rather than sharing one budget across the run. Under a single budget, the attempts a run spent proving the cheap model could not do the work were charged to the model it escalated to: the strongest rung inherited the tail of a spent allowance and the last rung became unreachable entirely — a configured, documented rung no run could ever fire. The overall ceiling is the per-rung allowance times the number of grants, so a fresh allowance per rung is not an open cheque.
+
+At the top of the ladder the answer is not more model. A request the strongest rung has failed the same way repeatedly is usually not one unit of work that is hard, but several presented as one, where the run must hold all of them in mind at once and gets no feedback until every one is right. The response is to decompose and start again, once: repeating it would produce ever finer slices of a request that is not failing for being coarse.
+
+Some rungs are not reached without being asked. A rung named as requiring approval stops the run rather than being climbed, and the request carries what was tried, what keeps failing, what it has cost, and which kind of more-expensive the step is — more tokens at the current rate, or a higher rate on every token. Those are different decisions and a single "this costs more" tells a person neither. A question nobody has grounds to answer gets answered yes every time, and a rubber stamp is worse than no gate: it looks like oversight while the cost lands anyway with a record saying somebody approved it. An approval rung is therefore never on the default ladder, because a gate on the ordinary case is a gate that gets clicked through.
+
+### The Rating
+
+The ladder is reactive. It costs a full stall per rung to learn anything, so work that is obviously hard pays that price before it is allowed the model it needed from the start. Stage 8 rates each unit up front so a run can begin where the work is rather than where the cheapest rung is.
+
+The rating is a closed set of named tiers, not a numeric score. Nobody — model or person — reliably distinguishes a six from a seven, and a ten-point scale produces numbers that look measured and are noise through the middle of the range; that noise then makes a binding cost decision. Worse, self-rated difficulty tracks how elaborate a description sounds rather than how hard the work is. Named tiers tied to properties of the contract are arguable in a way a number is not: a person can dispute whether work is structural or algorithmic, and cannot meaningfully dispute that it is a seven.
+
+```text
+Direct
+    One transformation, no branching on the shape of the data.
+
+Conditional
+    Branches or accumulation over input, each case independent of the others.
+
+Structural
+    Parsing or building a shape that is not known until runtime.
+
+Algorithmic
+    Correctness rests on an invariant that is not local: search, ordering with
+    ties, concurrency, numeric stability.
+```
+
+The rating seeds the ladder; it does not replace it. A rating that lands on the top rung is a short circuit, so nothing is lost by seeding rather than replacing — and what is kept is the correction path, which matters because the error here is asymmetric. Under-rating is visible: the run stalls, climbs, and the ledger says so. Over-rating is invisible and self-justifying: rate everything Algorithmic, start at the top, everything succeeds, and nothing ever reports that the run overpaid. That asymmetry pushes steadily toward over-rating, which is the same failure as escalating on attempt count and just as hard to see. The rubric is therefore biased low: where two tiers both fit, the lower is taken, because climbing is cheap and recorded while a wrong high rating is silently expensive on every run thereafter.
+
+The rating is produced inside the specification request that already enumerates the units, not by a request of its own. A rating on a cheap model has the same reliability problem as the thing it gates; a rating on a strong one means paying for a strong request per unit in order to avoid paying for strong builds. The stage exists in the ledger because it is a decision that must be auditable and reviewable; its work is a few extra tokens in a request the flow already makes.
+
+A per-unit rating cannot select a per-unit build model while the implementation loop writes the whole program in one loop. Until units are built independently, the run's starting rung comes from the hardest unit, and the decomposition names which units are hard so attention lands there. That is a limitation of the loop rather than of the rating, and it is recorded here so the rating is not read as doing more than it does.
+
+Every rating is recorded beside what actually happened: the tier predicted, the rung it seeded, and the rung the run finished on. Without that pairing the rubric can never be calibrated, and a rubric nobody can calibrate drifts upward forever under the asymmetry above. The question it has to be able to answer is: of the units rated Structural, how many did the cheapest rung handle unaided?
+
+### The Prior
+
+The ladder learns inside a run and forgets at the end of it. The rating is derived fresh from each contract and carries nothing forward either. A project therefore pays the same stalls to discover the same thing indefinitely, and the third source of model selection — what runs of this shape have actually finished on — is the only one that compounds.
+
+A prior seeds the ladder and does not replace it, for the reason the rating does not, and the asymmetry is sharper here. A rating is derived from a contract, which the rating does not change. A prior is derived from outcomes, and outcomes are precisely what seeding changes: a run seeded above the cheapest rung produces no evidence about the rung it skipped, so the prior's own record stops containing anything capable of contradicting it.
+
+That makes direction the first design decision rather than a refinement of it:
+
+```text
+Truncating the top
+    Learning that a shape never benefits above a rung, and declining to climb
+    past it. Self-correcting: when the truncation is wrong the run stalls with
+    nowhere left to go, and the ledger says so in the same breath.
+
+Seeding above the bottom
+    Learning that a shape needs a stronger rung, and starting there.
+    Self-confirming: the run succeeds at the seeded rung, and nothing in the
+    record ever reports that the cheaper one would have done.
+```
+
+The first thing worth learning is therefore where the ladder stops being worth climbing, not where it should start — which is the opposite of where the intuition points, and cheaper besides, because the rungs a truncation removes are the dear ones.
+
+Two things a prior may never do. It may not seed into a rung that requires approval: approval carries what was tried and what failed, a seeded run has failed nothing yet, and a prior that seeds there converts a person's decision about money into an automatic one justified by evidence that person never saw. And it may not remove a check. A prior may change what a run spends and never what it knows; skipping a stage on the strength of an earlier run's verdict is a claim about this program supported by evidence about a different one. Where a stage genuinely does not apply, the declared profile says so before the run starts, and the skip audit records which of the two happened.
+
+Because a seeded run collects no evidence against its own seed, a declared fraction of runs ignores the prior and starts at the bottom of the ladder. Those runs pay exactly the stalls the prior exists to avoid, and they are the only arm the mechanism ever gets against itself: without them the prior is not a calibrated policy but an unfalsifiable one, retired only when somebody notices the bill. The fraction is a setting rather than a constant, and it is bounded rather than permanent: it decays toward a declared minimum as the prior's interval for a key tightens, so a prior that keeps being right costs steadily less to keep falsifiable. It never reaches zero, because a prior nothing contradicts is a prior nothing tests. A run records whether it was seeded or exploring, because a summary that cannot separate the two reports the seeded population's cost as though it were everyone's, and the exploration spend is reported on its own line so the tax stays visible enough to be reviewed rather than paid indefinitely because nobody is looking at it.
+
+What is recorded on every run is the tier predicted, the rung the prior seeded, the rung the run finished on, whether the run was seeded or exploring, and the projection version of the routing key. The question this has to answer is the one the seeding suppresses: of the runs seeded above the cheapest rung, how many would the cheapest rung have handled?
+
+A prior is routing evidence in §31's sense and carries §31's constraint with it. It is admissible for choosing what to spend and inadmissible as evidence that anything is correct.
+
+### The Reviewer
+
+The model that reviews is chosen from measurement, not from the rating. By review time the code exists and the flow has already computed what it is: branch counts, loop nesting, purity, signature shape, path coverage, and — most directly — which deliberate defects the tests failed to catch. A surviving mutant is evidence that the tests cannot see a defect in that region, which is exactly where a reviewer is worth paying for. That is strictly better information than a prediction made before anything was written, and the flow already holds it.
+
+The rating and the review rung answer different questions from different evidence, and collapsing them would be a mistake: the first is a forecast made in ignorance and used to avoid waste, the second is a measurement made in hindsight and used to spend where it counts.
+
+### What a Model Slip Costs
+
+A turn the loop refuses — a call attributed to a step that cannot accept it, a second write to one file in a turn — is a mistake the model made, not a failure of the machinery. It costs an attempt, and the next attempt is told which rule it broke, because a run handed only the refusal rewrites the identical turn and is refused identically. Ending the run instead puts a model slip in the same category as a database that will not open, and spends none of the attempts and none of the rungs that exist precisely to absorb it.
+
+## Reuse as the Speed Mechanism
+
+The fastest stage is the one that does not run. Reuse is therefore not a nicety attached to the flow; it is the only mechanism that makes a sixty-six stage flow cheaper over time rather than more expensive, and it is what atomicity was for.
+
+Three search keys, queried cheapest first, each narrowing the set the next one examines:
+
+```text
+Contract hash
+    The normalised signature with its declared preconditions, postconditions,
+    and effects. Exact, free, no model request. Answers "this exact obligation
+    has been discharged before" and, when it hits, ends the search.
+
+Signature shape
+    The parameter and result type vector with names erased. Cheap, indexed,
+    structural. Answers "something of this shape exists" and returns a small
+    candidate set rather than a verdict.
+
+Documentation embedding
+    The existing atomdoc and vectorsearch path, run over the candidate set from
+    the shape key and never over the whole registry. Answers "something that
+    does this exists under another name", which is the match no exact key can
+    make and the one a person would call reuse.
+```
+
+Vector similarity discovers candidates and does not establish validity, as §7 already requires. The first key establishes validity; the third only proposes.
+
+The registry is written by stages 26 and 34 and read by stage 13. Both halves are mandatory and neither is useful alone. What is deposited is the documentation, the contract hash, the shape vector, the documentation embedding, the evidence links, and the exact revision the atom was verified at, so a recall can state not only that a match exists but what was proven about it and when.
+
+Reuse is bounded by re-verification. A recalled atom is admitted only if it still passes this run's synthesised cases from stage 15, which are derived from this run's contract rather than the earlier one. That is what stops a registry from propagating an old blind spot into every program that reuses it, and it is why the saving is one test run rather than eleven stages rather than everything.
+
+## Concurrent Execution and Provider Backpressure
+
+The stage number orders the ledger. It does not order execution. A run's record has to read as one sequence, because the question a person asks of it is how far the work got; nothing about that requires the stages to have been performed one at a time.
+
+Execution is therefore a dependency graph. Each stage declares what it requires, the runner executes the frontier, and the ledger records by number regardless of the order the answers arrived in. What forces serialisation in practice is not the logic but the worktree, so every check declares the resource class it needs:
+
+```text
+Pure AST
+    Parses the produced source and decides from structure alone. The tree is
+    parsed once per run and shared; these run concurrently in process and
+    start no subprocess at all.
+
+Build-only
+    Needs a compiled module. One build cache, targets in parallel.
+
+Suite-read
+    Needs the suite to have run. Read-only on the worktree, so these share one
+    instrumented run rather than each starting their own.
+
+Exclusive-mutating
+    Rewrites the source in place. Mutation scoring is the only member, and it
+    gets its own throwaway copy of the worktree per mutant.
+```
+
+A stage that fails cancels its dependents, which are then recorded blocked rather than computed and discarded. That is both the fail-fast behaviour a person waiting on a run wants and the complete record the ledger wants, and the current serial code delivers neither.
+
+Concurrency changes when a stage runs and must never change what it decides. A verdict that depends on how many other stages were in flight is not a verdict, so every stage's inputs are the worktree content and the settings, and nothing else. That property is also what makes the results cacheable: a stage is a pure function of its input digest, so a later attempt over unchanged files reads the earlier verdict instead of recomputing it, and a recalled atom arrives with its checks already answered.
+
+Concurrency across model-bearing stages meets a limit the local machine does not impose. The provider is a shared, rate-limited, priced resource, and a flow that fans out will find its ceiling:
+
+```text
+One admission point
+    Every model request passes through a single limiter with a configured
+    maximum concurrency, so fan-out cannot exceed what the provider tolerates
+    and the ceiling is a setting rather than an accident of the graph shape.
+
+Rate-limit responses are backpressure, not failure
+    A 429 or a provider overload response retries with exponential backoff and
+    jitter, honouring Retry-After when the provider sends one. It is recorded
+    as a wait, not as a stage failure: a stage that failed because the account
+    was busy would put a false verdict in an immutable ledger.
+
+Bounded, then honest
+    Retries are bounded by attempt count and by total wall clock. When the
+    bound is reached the stage records blocked with the provider's own reason,
+    because "we could not ask" and "we asked and the answer was no" are
+    different facts.
+
+The limiter narrows under pressure
+    Sustained rate limiting reduces the concurrency ceiling for the rest of the
+    run rather than continuing to issue requests that will be refused. Retrying
+    at full width into a limit is how a run turns a slow provider into a spent
+    budget.
+
+Cost accounting is per request, not per stage
+    Budget and forecast are enforced at the admission point, so concurrent
+    stages cannot each believe they are inside the cap while collectively
+    exceeding it.
+```
+
+## Rules That Keep the Longer Flow Honest
+
+A flow twice as long is not twice as good. What makes it better is that every stage's gate is checkable and every omission is visible. Four rules carry that, and without them the refinement adds twenty-eight new ways to claim something untrue.
+
+```text
+Gate-to-check agreement
+    A stage may record satisfied only if its check establishes its full gate.
+    Anything less is skipped or not-implemented. A table test binds each stage
+    number to the check that performs it and to whether that check is permitted
+    to return satisfied at all.
+
+Declared profiles
+    A pure library does not need crash-recovery; a filter does not need
+    compatibility. The run declares its profile up front and marks stages
+    inapplicable before it starts. A skip declared in advance is a decision; a
+    skip discovered at runtime is an excuse, and stage 61 audits which it was.
+
+Artifacts before verification
+    The threat model, concurrency model, resource declaration, and dependency
+    budget are Phase A stages rather than notes beside their verification
+    stages. A model written after the fact is archaeology, and it will be
+    written to agree with whatever the code already does.
+
+Deposit and withdraw are one obligation
+    Registration is not optional and reuse is not advisory. A run that writes a
+    function nobody can find later has spent the work twice, and a run that
+    rebuilds a function the registry holds has spent it twice in the other
+    direction. Stage 62 measures which of the two happened and is the only
+    stage whose purpose is to improve a later run rather than to judge this one.
+```
+
+## Cost
+
+Phases F and G carry nearly all of the added wall-clock, which is the correct place for it: those are the stages that decide whether a near-perfect claim means anything. Stages 51, 52, and 56 are the expensive ones because each requires running the program rather than reading it. Stages 10, 14, 54, and 59 have no cheap automatic check and must produce a declared artifact that a later stage verifies against, rather than a state nobody can contest.
+
+Against that, three mechanisms take cost out, and they compound with each other rather than merely adding up. Reuse removes stages entirely, and its saving grows with the registry rather than with the machine. The dependency graph overlaps what remains, bounded by the worktree resource classes and, for model-bearing stages, by the provider's own limit. The digest-keyed cache removes the repeated work inside a run, where attempts re-check files they did not change, and across runs, where a recalled atom arrives with its verdicts already recorded. A first run on a new project is the most expensive run it will ever have, and that is the intended shape.

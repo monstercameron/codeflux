@@ -308,7 +308,7 @@ func packageList(props Props) ui.Node {
 				},
 			},
 			primitives.Button(primitives.ButtonProps{
-				Label: label, Mode: props.Mode,
+				Label: label, Mode: props.Mode, Quiet: true,
 				AccessibleLabel: "Open package " + record.ImportPath,
 				Disabled:        props.OnSelectPackage == nil,
 				OnClick: func() {
@@ -320,7 +320,10 @@ func packageList(props Props) ui.Node {
 		))
 	}
 	children := []ui.Node{
-		html.H3(html.Props{Text: "Packages"}),
+		html.H3(html.Props{
+			Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel),
+			Text:  "Packages",
+		}),
 		html.Ul(html.Props{Aria: map[string]string{"label": "Packages"}}, items...),
 	}
 	if props.Truncated {
@@ -342,7 +345,10 @@ func packageList(props Props) ui.Node {
 
 // symbolList renders the declarations of the selected package or search.
 func symbolList(props Props) ui.Node {
-	children := []ui.Node{html.H3(html.Props{Text: "Declarations"})}
+	children := []ui.Node{html.H3(html.Props{
+		Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel),
+		Text:  "Declarations",
+	})}
 	switch {
 	case props.SymbolsLoading:
 		children = append(children, html.P(html.Props{
@@ -394,7 +400,7 @@ func symbolItem(props Props, symbol SymbolRow) ui.Node {
 	}
 	children := []ui.Node{
 		primitives.Button(primitives.ButtonProps{
-			Label: label + " · " + detail, Mode: props.Mode,
+			Label: label + " · " + detail, Mode: props.Mode, Quiet: true,
 			AccessibleLabel: "Inspect " + label,
 			Disabled:        props.OnSelectSymbol == nil,
 			OnClick: func() {
@@ -432,7 +438,10 @@ func symbolItem(props Props, symbol SymbolRow) ui.Node {
 
 // detailPanel renders the selected declaration.
 func detailPanel(props Props) ui.Node {
-	children := []ui.Node{html.H3(html.Props{Text: "Declaration"})}
+	children := []ui.Node{html.H3(html.Props{
+		Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel),
+		Text:  "Declaration",
+	})}
 	switch {
 	case props.SelectedSymbol == "":
 		children = append(children, html.P(html.Props{
@@ -562,7 +571,10 @@ func referenceList(props Props, title string, references []Reference, component 
 			Aria: map[string]string{"label": title},
 			Data: map[string]string{"component": component},
 		},
-		html.H4(html.Props{Text: title}),
+		html.H4(html.Props{
+			Class: design.HeadingClass(props.Mode.Tokens(), design.HeadingPanel),
+			Text:  title,
+		}),
 		html.Ul(html.Props{}, items...),
 	)
 }
@@ -643,7 +655,10 @@ func signatureBlock(props Props, signature string) ui.Node {
 			Aria: map[string]string{"label": "Signature"},
 			Data: map[string]string{"component": "code-symbol-signature"},
 		},
-		html.H4(html.Props{Text: "Signature"}),
+		html.H4(html.Props{
+			Class: design.HeadingClass(tokens, design.HeadingPanel),
+			Text:  "Signature",
+		}),
 		html.Pre(
 			html.Props{
 				TabIndex: html.TabIndexZero,

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeflux.dev/codeflux/web/frontend/codecollection"
 	frontendcomposer "codeflux.dev/codeflux/web/frontend/composer"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/executionview"
@@ -13,6 +14,7 @@ import (
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
+	"codeflux.dev/codeflux/web/frontend/settingsview"
 	"codeflux.dev/codeflux/web/frontend/state"
 	"codeflux.dev/codeflux/web/frontend/taskcontrols"
 	"codeflux.dev/codeflux/web/frontend/telemetryview"
@@ -25,16 +27,36 @@ import (
 )
 
 type RootProps struct {
-	Snapshot             state.Snapshot
-	Composer             frontendcomposer.Props
-	Timeline             TimelineControlProps
-	TaskControls         *taskcontrols.Props
-	Telemetry            telemetryview.Props
-	ThreadRail           ui.Node
-	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
-	RepositoryChoices    *RepositoryChoiceSet
-	SelectedScope        NavigationScope
-	GraphInspector       ui.Node
+	Snapshot     state.Snapshot
+	Composer     frontendcomposer.Props
+	Timeline     TimelineControlProps
+	TaskControls *taskcontrols.Props
+	Telemetry    telemetryview.Props
+	// Appearance is the settings page's theme, density, and motion panel,
+	// supplied by the application that owns those choices.
+	Appearance ui.Node
+	// LocalData is the settings page's browser-storage panel.
+	LocalData          ui.Node
+	Settings           settingsview.Props
+	Collection         codecollection.Props
+	ThreadRail         ui.Node
+	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	RepositoryChoices  *RepositoryChoiceSet
+	SelectedScope      NavigationScope
+	GraphInspector     ui.Node
+	// Memory is the project-memory surface, supplied by the application
+	// because reading memory is a coordinator call the shell must not make.
+	Memory *MemoryWorkspaceProps
+	// Atoms is the atom collection surface. It is a mounted node rather than a
+	// prop tree because the surface owns its own search and selection: passing
+	// that state through here would make every keystroke re-render the shell.
+	Atoms ui.Node
+	// FileTree is the repository drawn as its own directory tree, with one
+	// file open. It is a mounted node for the same reason Atoms is.
+	FileTree ui.Node
+	// Repositories is the repositories surface, supplied for the same reason:
+	// listing repositories and reading a working tree are coordinator calls.
+	Repositories         *RepositoryWorkspaceProps
 	Route                routes.Route
 	Tokens               design.Tokens
 	Translator           frontendi18n.Translator
@@ -50,6 +72,11 @@ type RootProps struct {
 	OnStopRequested      func()
 	// Execution carries the live run surfaces down to the workspace.
 	Execution *ExecutionPanelProps
+	// TaskActionsOpen and its two callbacks are the workspace's overflow menu,
+	// owned by the application so no route surface has to hold a hook.
+	TaskActionsOpen      bool
+	OnTaskActionsOpen    func()
+	OnTaskActionsDismiss func()
 }
 
 // AppRoot keeps bootstrap failure states outside authenticated route shells.
@@ -86,13 +113,24 @@ func AppRoot(props RootProps) ui.Node {
 			Route: props.Route,
 			UI:    state.NewUIStore(props.Snapshot.Layout, nil),
 			Child: ui.CreateElement(AppShell, AppShellProps{
-				Snapshot: props.Snapshot, Route: props.Route, Tokens: props.Tokens,
+				TaskActionsOpen:      props.TaskActionsOpen,
+				OnTaskActionsOpen:    props.OnTaskActionsOpen,
+				OnTaskActionsDismiss: props.OnTaskActionsDismiss,
+				Snapshot:             props.Snapshot, Route: props.Route, Tokens: props.Tokens,
 				Composer: props.Composer, Timeline: props.Timeline,
 				TaskControls: props.TaskControls, ThreadRail: props.ThreadRail,
 				AuthoritativeGraph: props.AuthoritativeGraph, GraphInspector: props.GraphInspector,
+				Memory:            props.Memory,
+				Atoms:             props.Atoms,
+				FileTree:          props.FileTree,
+				Repositories:      props.Repositories,
+				Appearance:        props.Appearance,
+				LocalData:         props.LocalData,
 				RepositoryChoices: props.RepositoryChoices,
 				SelectedScope:     props.SelectedScope,
 				Telemetry:         props.Telemetry,
+				Settings:          props.Settings,
+				Collection:        props.Collection,
 				Translator:        props.Translator, Probe: props.Probe,
 				OnLayoutChange: props.OnLayoutChange, OnGraphSelect: props.OnGraphSelect,
 				OnThreadNavigate:     props.OnThreadNavigate,
@@ -111,16 +149,36 @@ func AppRoot(props RootProps) ui.Node {
 }
 
 type AppShellProps struct {
-	Snapshot             state.Snapshot
-	Composer             frontendcomposer.Props
-	Timeline             TimelineControlProps
-	TaskControls         *taskcontrols.Props
-	Telemetry            telemetryview.Props
-	ThreadRail           ui.Node
-	AuthoritativeGraph   *graphcanvas.AuthoritativeProps
-	RepositoryChoices    *RepositoryChoiceSet
-	SelectedScope        NavigationScope
-	GraphInspector       ui.Node
+	Snapshot     state.Snapshot
+	Composer     frontendcomposer.Props
+	Timeline     TimelineControlProps
+	TaskControls *taskcontrols.Props
+	Telemetry    telemetryview.Props
+	// Appearance is the settings page's theme, density, and motion panel,
+	// supplied by the application that owns those choices.
+	Appearance ui.Node
+	// LocalData is the settings page's browser-storage panel.
+	LocalData          ui.Node
+	Settings           settingsview.Props
+	Collection         codecollection.Props
+	ThreadRail         ui.Node
+	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	RepositoryChoices  *RepositoryChoiceSet
+	SelectedScope      NavigationScope
+	GraphInspector     ui.Node
+	// Memory is the project-memory surface, supplied by the application
+	// because reading memory is a coordinator call the shell must not make.
+	Memory *MemoryWorkspaceProps
+	// Atoms is the atom collection surface. It is a mounted node rather than a
+	// prop tree because the surface owns its own search and selection: passing
+	// that state through here would make every keystroke re-render the shell.
+	Atoms ui.Node
+	// FileTree is the repository drawn as its own directory tree, with one
+	// file open. It is a mounted node for the same reason Atoms is.
+	FileTree ui.Node
+	// Repositories is the repositories surface, supplied for the same reason:
+	// listing repositories and reading a working tree are coordinator calls.
+	Repositories         *RepositoryWorkspaceProps
 	Route                routes.Route
 	Tokens               design.Tokens
 	Translator           frontendi18n.Translator
@@ -135,6 +193,11 @@ type AppShellProps struct {
 	OnStopRequested      func()
 	// Execution carries the live run surfaces down to the workspace.
 	Execution *ExecutionPanelProps
+	// TaskActionsOpen and its two callbacks are the workspace's overflow menu,
+	// owned by the application so no route surface has to hold a hook.
+	TaskActionsOpen      bool
+	OnTaskActionsOpen    func()
+	OnTaskActionsDismiss func()
 }
 
 // AppShell composes independent render boundaries for chrome and route content.
@@ -184,6 +247,7 @@ func AppShell(props AppShellProps) ui.Node {
 		}
 	}
 	inspectorCollapsed := ui.UseState(false)
+	inspectorHidden := inspectorCollapsed.Get() || !routeIsAboutARun(props.Route.Name)
 	toggleInspector := func() { inspectorCollapsed.Update(toggleLocalVisibility) }
 	collapseInspector := func() {
 		inspectorCollapsed.Update(openLocalVisibility)
@@ -198,6 +262,22 @@ func AppShell(props AppShellProps) ui.Node {
 	closeSearch := func() {
 		searchOpen.Set(false)
 		searchQuery.Set("")
+	}
+	// The graph and the execution panels are built here so the observation rail
+	// can hold them. They are only built for the width that draws that rail;
+	// below it the workspace still owns them, and building both would mount the
+	// same authoritative surfaces twice.
+	var observationGraph ui.Node
+	var observationExecution ui.Node
+	if layout.Viewport == state.ViewportWide && props.Route.Name != routes.Graphs {
+		observationGraph = RailGraphSummary(
+			props.Snapshot.GraphNodes(), props.AuthoritativeGraph,
+			props.Snapshot.GraphRevision(),
+			props.Tokens, primitiveMode(props.Tokens), props.OnNavigatePath,
+		)
+		if props.Execution != nil {
+			observationExecution = compactExecutionPanels(*props.Execution, primitiveMode(props.Tokens))
+		}
 	}
 	pauseEnabled := props.Snapshot.TopBar.CanPause && props.OnPauseRequested != nil
 	stopEnabled := props.Snapshot.TopBar.CanStop && props.OnStopRequested != nil
@@ -256,7 +336,7 @@ func AppShell(props AppShellProps) ui.Node {
 					OnPauseRequested:     props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 				}),
 				html.Div(html.Props{Class: applicationFrameClass(
-					props.Snapshot.Layout, props.Tokens, inspectorCollapsed.Get(),
+					props.Snapshot.Layout, props.Tokens, inspectorHidden,
 				)},
 					ui.CreateElement(ProductSidebar, ProductSidebarProps{
 						Snapshot:         props.Snapshot,
@@ -276,30 +356,43 @@ func AppShell(props AppShellProps) ui.Node {
 						Class:    routeFrameClass(layout),
 					},
 						ui.CreateElement(AppRouter, RouteShellProps{
-							Snapshot:           props.Snapshot,
-							Composer:           props.Composer,
-							Timeline:           props.Timeline,
-							TaskControls:       props.TaskControls,
-							AuthoritativeGraph: props.AuthoritativeGraph,
-							RepositoryChoices:  props.RepositoryChoices,
-							SelectedScope:      props.SelectedScope,
-							GraphInspector:     props.GraphInspector,
-							Telemetry:          props.Telemetry,
-							Route:              props.Route,
-							Tokens:             props.Tokens,
-							Probe:              props.Probe,
-							OnLayoutChange:     props.OnLayoutChange,
-							OnGraphSelect:      props.OnGraphSelect,
-							OnNavigatePath:     props.OnNavigatePath,
-							OnPauseRequested:   props.OnPauseRequested,
-							OnStopRequested:    props.OnStopRequested,
-							Execution:          props.Execution,
+							TaskActionsOpen:      props.TaskActionsOpen,
+							OnTaskActionsOpen:    props.OnTaskActionsOpen,
+							OnTaskActionsDismiss: props.OnTaskActionsDismiss,
+							Snapshot:             props.Snapshot,
+							Composer:             props.Composer,
+							Timeline:             props.Timeline,
+							TaskControls:         props.TaskControls,
+							AuthoritativeGraph:   props.AuthoritativeGraph,
+							RepositoryChoices:    props.RepositoryChoices,
+							SelectedScope:        props.SelectedScope,
+							GraphInspector:       props.GraphInspector,
+							Memory:               props.Memory,
+							Atoms:                props.Atoms,
+							FileTree:             props.FileTree,
+							Repositories:         props.Repositories,
+							Appearance:           props.Appearance,
+							LocalData:            props.LocalData,
+							Telemetry:            props.Telemetry,
+							Settings:             props.Settings,
+							Collection:           props.Collection,
+							Route:                props.Route,
+							Tokens:               props.Tokens,
+							Probe:                props.Probe,
+							OnLayoutChange:       props.OnLayoutChange,
+							OnGraphSelect:        props.OnGraphSelect,
+							OnNavigatePath:       props.OnNavigatePath,
+							OnPauseRequested:     props.OnPauseRequested,
+							OnStopRequested:      props.OnStopRequested,
+							Execution:            props.Execution,
 						}),
 					),
 					ui.CreateElement(AssuranceRail, AssuranceRailProps{
 						Snapshot:   props.Snapshot,
 						Mode:       primitiveMode(props.Tokens),
-						Collapsed:  inspectorCollapsed.Get(),
+						Graph:      observationGraph,
+						Execution:  observationExecution,
+						Collapsed:  inspectorHidden,
 						OnCollapse: collapseInspector,
 					}),
 				),
@@ -604,27 +697,58 @@ type RouteShellProps struct {
 	RepositoryChoices  *RepositoryChoiceSet
 	SelectedScope      NavigationScope
 	GraphInspector     ui.Node
-	Telemetry          telemetryview.Props
-	Route              routes.Route
-	Tokens             design.Tokens
-	Probe              RenderProbe
-	OnLayoutChange     func(state.LayoutPreferences)
-	OnGraphSelect      func(string)
-	OnNavigatePath     func(string)
-	OnPauseRequested   func()
-	OnStopRequested    func()
+	// Memory is the project-memory surface, supplied by the application
+	// because reading memory is a coordinator call the shell must not make.
+	Memory *MemoryWorkspaceProps
+	// Atoms is the atom collection surface. It is a mounted node rather than a
+	// prop tree because the surface owns its own search and selection: passing
+	// that state through here would make every keystroke re-render the shell.
+	Atoms ui.Node
+	// FileTree is the repository drawn as its own directory tree, with one
+	// file open. It is a mounted node for the same reason Atoms is.
+	FileTree ui.Node
+	// Repositories is the repositories surface, supplied for the same reason:
+	// listing repositories and reading a working tree are coordinator calls.
+	Repositories *RepositoryWorkspaceProps
+	Telemetry    telemetryview.Props
+	// Appearance is the settings page's theme, density, and motion panel,
+	// supplied by the application that owns those choices.
+	Appearance ui.Node
+	// LocalData is the settings page's browser-storage panel.
+	LocalData        ui.Node
+	Settings         settingsview.Props
+	Collection       codecollection.Props
+	Route            routes.Route
+	Tokens           design.Tokens
+	Probe            RenderProbe
+	OnLayoutChange   func(state.LayoutPreferences)
+	OnGraphSelect    func(string)
+	OnNavigatePath   func(string)
+	OnPauseRequested func()
+	OnStopRequested  func()
 	// Execution is what the run is doing right now: the measurements that
 	// decide whether to intervene, the steps it has taken, the lines it is
 	// emitting, and what is in flight. It is optional because a task that has
 	// not started has none of it, and showing an empty execution panel would
 	// suggest a run that produced nothing rather than one that has not begun.
 	Execution *ExecutionPanelProps
+	// TaskActionsOpen and its two callbacks are the workspace's overflow menu,
+	// owned by the application so no route surface has to hold a hook.
+	TaskActionsOpen      bool
+	OnTaskActionsOpen    func()
+	OnTaskActionsDismiss func()
 }
 
 func RouteShell(props RouteShellProps) ui.Node {
 	mode := primitiveMode(props.Tokens)
 	switch props.Route.Name {
 	case routes.RepositoryChooser:
+		if props.Repositories != nil {
+			repositories := *props.Repositories
+			repositories.Tokens = props.Tokens
+			repositories.OnNavigatePath = props.OnNavigatePath
+			return ui.CreateElement(RepositoryWorkspaceShell, repositories)
+		}
 		chooser := RepositoryChooserProps{State: props.Snapshot.ThreadsState, Mode: mode}
 		if props.RepositoryChoices != nil {
 			chooser.State, chooser.Choices =
@@ -634,32 +758,56 @@ func RouteShell(props RouteShellProps) ui.Node {
 	case routes.ThreadWorkspace:
 		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
-			Composer:           props.Composer,
-			Timeline:           props.Timeline,
-			TaskControls:       props.TaskControls,
-			AuthoritativeGraph: props.AuthoritativeGraph,
-			GraphInspector:     props.GraphInspector,
-			OnLayoutChange:     props.OnLayoutChange,
-			OnGraphSelect:      props.OnGraphSelect,
-			OnNavigatePath:     props.OnNavigatePath,
-			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
+			TaskActionsOpen:      props.TaskActionsOpen,
+			OnTaskActionsOpen:    props.OnTaskActionsOpen,
+			OnTaskActionsDismiss: props.OnTaskActionsDismiss,
+			Composer:             props.Composer,
+			Timeline:             props.Timeline,
+			TaskControls:         props.TaskControls,
+			AuthoritativeGraph:   props.AuthoritativeGraph,
+			GraphInspector:       props.GraphInspector,
+			OnLayoutChange:       props.OnLayoutChange,
+			OnGraphSelect:        props.OnGraphSelect,
+			OnNavigatePath:       props.OnNavigatePath,
+			OnPauseRequested:     props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
 			Execution: props.Execution,
 		})
 	case routes.Graphs:
-		return ui.CreateElement(TaskWorkspaceShell, TaskWorkspaceProps{
+		return ui.CreateElement(GraphWorkspaceShell, GraphWorkspaceProps{
 			Snapshot: props.Snapshot, Tokens: props.Tokens, Probe: props.Probe,
-			Composer:           props.Composer,
-			Timeline:           props.Timeline,
-			TaskControls:       props.TaskControls,
 			AuthoritativeGraph: props.AuthoritativeGraph,
 			GraphInspector:     props.GraphInspector,
-			OnLayoutChange:     props.OnLayoutChange,
 			OnGraphSelect:      props.OnGraphSelect,
 			OnNavigatePath:     props.OnNavigatePath,
-			OnPauseRequested:   props.OnPauseRequested, OnStopRequested: props.OnStopRequested,
-			Execution: props.Execution,
+		})
+	case routes.Code:
+		// The code route is the repository as its own tree: a person new to it
+		// asks what is in here before they ask what a package offers, and the
+		// tree answers that in the shape the repository already has. The
+		// package and declaration listing remains available to any surface
+		// that wants it.
+		if props.FileTree != nil {
+			return props.FileTree
+		}
+		collection := props.Collection
+		collection.Mode = mode
+		return ui.CreateElement(CodeCollectionShell, CodeCollectionProps{
+			Title: "Code collection", Mode: mode, Collection: collection,
+		})
+	case routes.Atoms:
+		if props.Atoms != nil {
+			return props.Atoms
+		}
+		return ui.CreateElement(TopLevelState, TopLevelStateProps{
+			Kind: "empty", Title: "Atoms",
+			Body: "The atom collection is unavailable in this preview.",
 		})
 	case routes.Memory:
+		if props.Memory != nil {
+			memory := *props.Memory
+			memory.Tokens = props.Tokens
+			return ui.CreateElement(MemoryWorkspaceShell, memory)
+		}
 		return ui.CreateElement(MemoryShell, SimpleRouteProps{
 			Title: "Memory", State: props.Snapshot.Memory.State, Mode: mode,
 		})
@@ -667,6 +815,9 @@ func RouteShell(props RouteShellProps) ui.Node {
 		return ui.CreateElement(SettingsInteractiveShell, SettingsProps{
 			SimpleRouteProps: SimpleRouteProps{Title: "Settings", State: props.Snapshot.Settings.State, Mode: mode},
 			Telemetry:        props.Telemetry,
+			Configuration:    props.Settings,
+			Appearance:       props.Appearance,
+			LocalData:        props.LocalData,
 		})
 	case routes.Diagnostics:
 		return ui.CreateElement(DiagnosticsInteractiveShell, DiagnosticsProps{
@@ -685,6 +836,153 @@ func RouteShell(props RouteShellProps) ui.Node {
 			Kind: "not-found", Title: "Page not found", Body: "Choose a repository to continue.",
 		})
 	}
+}
+
+// GraphWorkspaceProps configures the graph as a surface of its own.
+type GraphWorkspaceProps struct {
+	Snapshot           state.Snapshot
+	AuthoritativeGraph *graphcanvas.AuthoritativeProps
+	GraphInspector     ui.Node
+	Tokens             design.Tokens
+	Probe              RenderProbe
+	OnGraphSelect      func(string)
+	OnNavigatePath     func(string)
+}
+
+// GraphWorkspaceShell is the graph read on its own terms.
+//
+// The graph used to be this route's name and the task workspace's body: asking
+// for the graph gave a person the transcript with a graph panel beside it, and
+// the panel was the same size it is when nobody asked for it. Structure,
+// execution and correctness are what this surface is for, so here the canvas
+// takes the width and the node inspector stands beside it, while the thread
+// workspace keeps the transcript as its subject.
+func GraphWorkspaceShell(props GraphWorkspaceProps) ui.Node {
+	mode := primitiveMode(props.Tokens)
+	layout := props.Snapshot.Layout.Normalize()
+	tokens := props.Tokens
+	// The page counts the graph it is actually drawing. Counting the local
+	// store instead reported "0 nodes" over a canvas holding a real revision.
+	nodeCount := len(props.Snapshot.GraphNodes())
+	summaryRevision := props.Snapshot.GraphRevision()
+	if props.AuthoritativeGraph != nil {
+		nodeCount = len(props.AuthoritativeGraph.Revision.Nodes())
+		if ordinal := props.AuthoritativeGraph.Revision.Metadata().Ordinal(); ordinal > 0 {
+			summaryRevision = ordinal
+		}
+	}
+	summary := strconv.Itoa(nodeCount) + " nodes"
+	if nodeCount == 1 {
+		summary = "1 node"
+	}
+	summary += " · revision " + strconv.FormatUint(summaryRevision, 10)
+	canvas := ui.CreateElement(GraphPane, GraphPaneProps{
+		State: props.Snapshot.GraphState, Nodes: props.Snapshot.GraphNodes(),
+		SelectedID: props.Snapshot.SelectedGraphID, Revision: props.Snapshot.GraphRevision(),
+		Collapsed: false, Viewport: layout.Viewport, Mode: mode, Probe: props.Probe,
+		Embedded: true, SuppressLegend: true, FullHeight: true, OnSelect: props.OnGraphSelect,
+		Authoritative: props.AuthoritativeGraph,
+	})
+	body := []ui.Node{html.Div(html.Props{
+		Class: css.New(
+			css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+			css.H(css.Full), css.Overflow.Hidden,
+		).String(),
+	}, canvas)}
+	if props.GraphInspector != nil {
+		body = append(body, html.Aside(html.Props{
+			Aria: map[string]string{"label": "Graph node inspector"},
+			Data: map[string]string{"component": "graph-workspace-inspector"},
+			Class: css.New(
+				css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+				css.H(css.Full), css.OverflowY.Auto,
+				css.Padding(css.RawLength("0 0 0 20px")),
+				css.BorderLeft(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			).String(),
+		},
+			html.H2(html.Props{
+				Class: css.New(
+					css.Margin(css.RawLength("0 0 10px")),
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+					css.FontWeight.Semibold,
+					css.Tracking(css.Ems(0.09)),
+					css.TextTransform.Uppercase,
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+				Text: "Selected node",
+			}),
+			props.GraphInspector,
+		))
+	}
+	columns := []css.Track{css.MinMax(css.TrackLen(css.Zero), css.Fr(1))}
+	if props.GraphInspector != nil && layout.Viewport == state.ViewportWide {
+		columns = append(columns, css.TrackLen(css.Px(360)))
+	}
+	return html.Main(html.Props{
+		ID: "main-content", TabIndex: -1,
+		Data: map[string]string{
+			"component": "graph-workspace-shell", "viewport": string(layout.Viewport),
+			"focus-region": "conversation", "focus-order": "2",
+		},
+		Class: css.New(
+			u.Grid,
+			css.GridRows(css.TrackAuto, css.MinMax(css.TrackLen(css.Zero), css.Fr(1))),
+			css.Gap(css.Px(tokens.Spacing.MD)),
+			css.W(css.Full), css.H(css.Full),
+			css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+			css.Padding(css.RawLength("12px 20px 20px")),
+			css.Bg(css.Hex(string(tokens.Colors.Canvas))),
+			css.Overflow.Hidden,
+		).String(),
+	},
+		html.Header(html.Props{
+			Aria:  map[string]string{"label": "Project graph"},
+			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.MD))).String(),
+		},
+			html.Div(html.Props{Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(2))).String()},
+				html.H1(html.Props{
+					Class: css.New(
+						css.Margin(css.Zero),
+						css.Font(css.FontStack(tokens.Fonts.Display)),
+						css.FontSize(css.Px(tokens.Typography.TaskTitle.Size)),
+						css.LineHeightLen(css.Px(tokens.Typography.TaskTitle.LineHeight)),
+						css.FontWeight.Normal,
+						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+					).String(),
+					Text: "Project graph",
+				}),
+				html.P(html.Props{
+					Class: css.New(
+						css.Margin(css.Zero),
+						css.Font(css.FontStack(tokens.Fonts.Code)),
+						css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+						css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					).String(),
+					Text: summary,
+				}),
+			),
+			html.Div(html.Props{
+				Class: css.New(
+					u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.WhiteSpace.NoWrap, css.Overflow.Hidden, css.TextOverflowEllipsis(),
+				).String(),
+				Text: "▣ Work · ⬡ Tool · ◇ Plan · ● Proof · ◉ Memory",
+			}),
+		),
+		html.Div(html.Props{
+			Class: css.New(
+				u.Grid, css.GridCols(columns...),
+				css.Gap(css.Px(tokens.Spacing.LG)),
+				css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+				css.H(css.Full), css.Overflow.Hidden,
+			).String(),
+		}, body...),
+	)
 }
 
 type TaskWorkspaceProps struct {
@@ -709,6 +1007,11 @@ type TaskWorkspaceProps struct {
 	// not started has none of it, and an empty execution panel would suggest a
 	// run that produced nothing rather than one that has not begun.
 	Execution *ExecutionPanelProps
+	// TaskActionsOpen and its two callbacks are the workspace's overflow menu,
+	// owned by the application so no route surface has to hold a hook.
+	TaskActionsOpen      bool
+	OnTaskActionsOpen    func()
+	OnTaskActionsDismiss func()
 }
 
 // ExecutionPanelProps binds the execution surfaces into the workspace.
@@ -723,10 +1026,17 @@ type ExecutionPanelProps struct {
 	OnClearSeverities func()
 }
 
+// TaskWorkspaceShell composes the run's reading column.
+//
+// It deliberately owns no hooks. Route surfaces are mounted at one position in
+// the tree, and GWC's hooks are positional: a surface that owned one state cell
+// while its neighbours owned none rendered nothing at all when a person moved
+// between them — a blank page after clicking a thread from settings, with no
+// error anywhere, recoverable only by reloading. Its one piece of interaction
+// state is owned by the caller and arrives as props.
 func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 	layout := props.Snapshot.Layout.Normalize()
 	mode := primitiveMode(props.Tokens)
-	taskActionsOpen := ui.UseState(false)
 	composerProps := composerPropsForConnection(props.Composer, props.Snapshot.Session.Connection)
 	rail := ui.CreateElement(ThreadRail, ThreadRailProps{
 		State: props.Snapshot.ThreadsState, Threads: props.Snapshot.Threads(),
@@ -741,9 +1051,9 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 			emitLayout(props.OnLayoutChange, layout)
 		},
 	})
-	conversation := html.Main(html.Props{
-		ID: "main-content", TabIndex: -1,
-		Data: map[string]string{"focus-region": "conversation", "focus-order": "2"},
+	conversation := html.Div(html.Props{
+		TabIndex: -1,
+		Data:     map[string]string{"focus-region": "conversation", "focus-order": "2"},
 		Class: css.New(
 			css.MinWidth(css.Zero), css.W(css.Full), css.H(css.Full), css.Overflow.Auto,
 		).String(),
@@ -761,6 +1071,11 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 		OnSelect:      props.OnGraphSelect,
 		Authoritative: props.AuthoritativeGraph, Inspector: props.GraphInspector,
 	})
+	// At full width the graph is no longer a second pane competing with the
+	// transcript for the middle of the screen. It moved to the observation rail
+	// with the rest of what the run is doing, and the transcript — the thing a
+	// person actually reads and answers — gets the room. Below full width the
+	// rail is not drawn, so the two surfaces still trade places through tabs.
 	split := primitives.ResizableSplit(primitives.ResizableSplitProps{
 		ID: "workspace-split", AccessibleLabel: "Resize conversation and task graph",
 		Orientation: primitives.SplitHorizontal,
@@ -780,12 +1095,12 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 		},
 		First: conversation, Second: graph,
 	})
-	if props.Execution != nil {
-		// The execution surfaces sit under the conversation, where a reader
-		// already looking at what the agent said finds what it is doing.
-		conversation = html.Main(html.Props{
-			ID: "main-content", TabIndex: -1,
-			Data: map[string]string{"focus-region": "conversation", "focus-order": "2"},
+	if props.Execution != nil && layout.Viewport != state.ViewportWide {
+		// Below full width there is no observation rail, so what the run is
+		// doing sits under the transcript instead of beside it.
+		conversation = html.Div(html.Props{
+			TabIndex: -1,
+			Data:     map[string]string{"focus-region": "conversation", "focus-order": "2"},
 			Class: css.New(
 				css.MinWidth(css.Zero), css.W(css.Full), css.H(css.Full), css.Overflow.Auto,
 			).String(),
@@ -802,26 +1117,41 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 	workspace := responsiveWorkspace(
 		layout, rail, conversation, graph, split, mode, props.OnLayoutChange,
 	)
+	if layout.Viewport == state.ViewportWide {
+		workspace = html.Div(html.Props{
+			Data:  map[string]string{"component": "reading-column"},
+			Class: readingColumnClass(props.Tokens),
+		},
+			// The rail's landmark stays in the tree at every width: the shell
+			// promises a focus order and it has to hold whether or not this
+			// width draws a split.
+			html.Div(html.Props{Hidden: true}, rail),
+			conversation,
+		)
+	}
 	headerChildren := []ui.Node{ui.CreateElement(TaskWorkspaceHeader, TaskWorkspaceHeaderProps{
 		Snapshot: props.Snapshot, Mode: mode,
-		TaskActionsOpen: taskActionsOpen.Get(),
-		OnTaskActionsOpen: func() {
-			taskActionsOpen.Set(true)
-		},
-		OnTaskActionsDismiss: func() {
-			taskActionsOpen.Set(false)
-		},
-		OnNavigatePath:    props.OnNavigatePath,
-		OnPauseRequested:  props.OnPauseRequested,
-		OnStopRequested:   props.OnStopRequested,
-		OnReviewRequested: props.Timeline.OnOpenReview,
+		TaskActionsOpen:      props.TaskActionsOpen,
+		OnTaskActionsOpen:    props.OnTaskActionsOpen,
+		OnTaskActionsDismiss: props.OnTaskActionsDismiss,
+		OnNavigatePath:       props.OnNavigatePath,
+		OnPauseRequested:     props.OnPauseRequested,
+		OnStopRequested:      props.OnStopRequested,
+		OnReviewRequested:    props.Timeline.OnOpenReview,
 	})}
 	if props.TaskControls != nil {
 		controlProps := *props.TaskControls
 		controlProps.Mode = mode
 		headerChildren = append(headerChildren, ui.CreateElement(taskcontrols.TaskControlDisclosure, controlProps))
 	}
-	return html.Div(html.Props{
+	// The surface is a main landmark, like every other route surface.
+	//
+	// It used to be a div while settings, memory and the graph were mains, and
+	// swapping a div in where a main had been at the same position left the
+	// route frame empty: the workspace rendered, and nothing arrived in the
+	// document. Clicking a thread from any other page produced a blank page.
+	return html.Main(html.Props{
+		ID: "main-content", TabIndex: -1,
 		Data: map[string]string{
 			"component":       "task-workspace-shell",
 			"viewport":        string(layout.Viewport),
@@ -846,9 +1176,12 @@ func TaskWorkspaceShell(props TaskWorkspaceProps) ui.Node {
 			css.Bg(css.Hex(string(props.Tokens.Colors.Canvas))),
 		).String(),
 	},
+		// The run's identity, its controls and its measurements sit at the head
+		// of the same column the transcript reads down. A header that spans a
+		// width the content does not is a header that belongs to nothing.
 		html.Div(html.Props{
 			Data:  map[string]string{"component": "task-observability-region"},
-			Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(props.Tokens.Spacing.SM))).String(),
+			Class: observabilityRegionClass(props.Tokens, layout.Viewport == state.ViewportWide),
 		}, headerChildren...),
 		workspace,
 	)
@@ -864,6 +1197,10 @@ func composerPropsForConnection(
 	composerProps.MutationDisabled = true
 	if composerProps.MutationDisabledReason == "" {
 		switch connection {
+		case state.ConnectionIdle:
+			composerProps.MutationDisabledReason = "Open a thread before sending a message"
+		case state.ConnectionConnecting:
+			composerProps.MutationDisabledReason = "Opening the live session; your draft is kept"
 		case state.ConnectionDisconnected:
 			composerProps.MutationDisabledReason = "Local Disconnected: reconnect to send this draft"
 		case state.ConnectionUnauthorized:
@@ -970,6 +1307,40 @@ func emitLayout(handler func(state.LayoutPreferences), layout state.LayoutPrefer
 	if handler != nil {
 		handler(layout.Normalize())
 	}
+}
+
+// observabilityRegionClass keeps the run header on the reading column's
+// measure at full width and lets it span everything below it.
+func observabilityRegionClass(tokens design.Tokens, wide bool) string {
+	rules := []css.Rule{
+		u.Flex, u.FlexCol,
+		css.Gap(css.Px(tokens.Spacing.SM)),
+		css.W(css.Full), css.MinWidth(css.Zero),
+	}
+	if wide {
+		rules = append(rules,
+			css.MaxWidth(css.Px(920)),
+			css.Margin(css.RawLength("0 auto")),
+		)
+	}
+	return css.New(rules...).String()
+}
+
+// readingColumnClass measures the transcript.
+//
+// Prose set the full width of a 1600-pixel display is prose nobody finishes a
+// line of. The column is capped near the width a serif stays readable at and
+// centred in whatever room is left, so the console reads like a document and
+// the machine's surfaces stay at the edges where they belong.
+func readingColumnClass(tokens design.Tokens) string {
+	return css.New(
+		u.Flex, u.FlexCol,
+		css.W(css.Full), css.H(css.Full),
+		css.MaxWidth(css.Px(920)),
+		css.Margin(css.RawLength("0 auto")),
+		css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+		css.Overflow.Hidden,
+	).String()
 }
 
 func workspaceGridClass(_ state.LayoutPreferences) string {
@@ -1207,6 +1578,10 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 	tokens := props.Mode.Tokens()
 	timelineProps := props.Timeline
 	timelineProps.Mode = props.Mode
+	// The count names what is on screen. It used to count the store's message
+	// list, which the authoritative timeline does not fill, so a transcript
+	// showing six entries reported "0 messages" directly above them.
+	entryCount := len(props.Messages)
 	content := asyncStateContent(props.State, "messages", len(props.Messages), props.Mode)
 	if props.State == state.DataReady || props.State == state.DataPartialStale {
 		cards := []timelinecard.Card(nil)
@@ -1222,12 +1597,18 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 			actions.OnSelectNode = props.OnGraphSelect
 		}
 		items := make([]ui.Node, 0, len(cards))
-		for _, card := range cards {
-			items = append(items, ui.CreateElement(timelineview.Renderer, timelineview.Props{
-				Card: card, Mode: props.Mode, Actions: actions,
-				Selected: selectedStableKey != "" && card.StableKey == selectedStableKey,
-			}))
+		for index, card := range cards {
+			items = append(items, transcriptSpineRow(
+				ui.CreateElement(timelineview.Renderer, timelineview.Props{
+					Card: card, Mode: props.Mode, Actions: actions,
+					Selected: selectedStableKey != "" && card.StableKey == selectedStableKey,
+				}),
+				card,
+				index == len(cards)-1 && cardStillArriving(card),
+				tokens,
+			))
 		}
+		entryCount = len(cards)
 		timelineChildren := make([]ui.Node, 0, 3)
 		if strings.TrimSpace(props.Timeline.SelectionNotice) != "" {
 			timelineChildren = append(timelineChildren, html.Div(html.Props{
@@ -1247,10 +1628,28 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 				Text: "Beginning of thread",
 			}))
 		}
+		// One continuous spine runs behind the whole stack. Drawing it per
+		// entry left a dashed line wherever two entries were spaced apart,
+		// which read as a broken sequence rather than a continuous one.
+		stack := make([]ui.Node, 0, len(items)+1)
+		if len(items) > 0 {
+			stack = append(stack, html.Span(html.Props{
+				Aria: map[string]string{"hidden": "true"},
+				Data: map[string]string{"component": "transcript-spine"},
+				Class: css.New(
+					u.Absolute,
+					css.Left(css.Px(5)), css.Top(css.Px(10)), css.Bottom(css.Px(10)),
+					css.W(css.Px(1)),
+					css.Bg(css.Hex(string(tokens.Colors.BorderStrong))),
+					css.OpacityNum(css.Num(0.6)),
+				).String(),
+			}))
+		}
+		stack = append(stack, items...)
 		timelineChildren = append(timelineChildren, html.Div(html.Props{
 			Data:  map[string]string{"component": "timeline-card-stack", "gap": "8px"},
 			Class: timelineCardStackClass(tokens),
-		}, items...))
+		}, stack...))
 		content = html.Div(html.Props{
 			Data: map[string]string{
 				"component":       "conversation-timeline",
@@ -1272,38 +1671,37 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 			"component": "conversation-pane", "state": string(props.State),
 			"revision": strconv.FormatUint(props.Revision, 10),
 		},
-		Class: panelClass(props.Mode),
+		Class: transcriptPanelClass(props.Mode),
 	},
 		html.Div(html.Props{
-			Class: css.New(u.Flex, u.ItemsCenter, u.JustifyBetween).String(),
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.MD)),
+				css.Padding(css.RawLength("2px 4px 12px")),
+				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			).String(),
 		},
-			html.Div(html.Props{
-				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
-			},
-				html.Span(html.Props{
-					Aria: map[string]string{"hidden": "true"},
-					Class: css.New(
-						css.TextColor(css.Hex(string(tokens.Colors.Success))),
-						css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-					).String(),
-					Text: "●",
-				}),
-				html.H2(html.Props{
-					Class: css.New(
-						css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-						css.Margin(css.Zero),
-						css.FontSize(css.Px(tokens.Typography.PanelHeading.Size)),
-						css.FontWeight.Semibold,
-					).String(),
-					Text: "Conversation",
-				}),
-			),
+			html.H2(html.Props{
+				Class: css.New(
+					css.Margin(css.Zero),
+					css.Font(css.FontStack(tokens.Fonts.UI)),
+					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+					css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+					css.FontWeight.Semibold,
+					css.Tracking(css.Ems(0.09)),
+					css.TextTransform.Uppercase,
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+				Text: "Transcript",
+			}),
 			html.Span(html.Props{
+				Data: map[string]string{"component": "transcript-count"},
 				Class: css.New(
 					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+					css.Font(css.FontStack(tokens.Fonts.Code)),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
 				).String(),
-				Text: fmt.Sprintf("%d messages", len(props.Messages)),
+				Text: transcriptCountLabel(entryCount),
 			}),
 		),
 		html.Div(html.Props{
@@ -1315,23 +1713,129 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 			ui.CreateElement(TimelineControls, timelineProps),
 			content,
 		),
+		// The composer is docked to the record rather than floated above it in
+		// its own raised card. A panel inside a panel inside a panel was the
+		// shape the whole console had, and it left nothing looking foreground.
 		html.Div(html.Props{
 			Data: map[string]string{"focus-region": "composer", "focus-order": "3"},
 			Class: css.New(
-				css.Padding(css.Px(tokens.Spacing.SM)),
-				css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
-				css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
-				css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
-				css.Shadow(css.ShadowOf(
-					css.Zero, css.Px(14), css.Px(34), css.Px(-22), css.RGBA(0, 0, 0, 0.68),
-				)),
+				css.Padding(css.RawLength("12px 0 0")),
+				css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
 			).String(),
 		}, ui.CreateElement(frontendcomposer.Composer, composerPropsForConversation(props))),
 	)
 }
 
+// transcriptCountLabel names how many durable entries are on screen.
+func transcriptCountLabel(count int) string {
+	if count == 1 {
+		return "1 entry"
+	}
+	return fmt.Sprintf("%d entries", count)
+}
+
+// cardStillArriving reports whether a card is the head of a stream that has not
+// finished, which is the only condition under which the spine pulses.
+func cardStillArriving(card timelinecard.Card) bool {
+	return card.Message != nil && card.Message.Status == timelinecard.MessageProvisional
+}
+
+// transcriptSpineRow hangs one entry off the sequence spine.
+//
+// The spine is the signature of this console and it encodes what the product
+// is: a durable, ordered event sequence that can be replayed. Each entry gets a
+// node on a continuous line, coloured by what kind of thing it is, so the shape
+// of a run — planning, then tools, then validation, then a decision — is
+// readable before a single card is. The head of an unfinished stream is the one
+// element in the interface allowed to move.
+func transcriptSpineRow(card ui.Node, model timelinecard.Card, head bool, tokens design.Tokens) ui.Node {
+	tone := transcriptSpineTone(model, tokens)
+	nodeRules := []css.Rule{
+		css.W(css.Px(9)), css.H(css.Px(9)),
+		css.MarginY(css.Px(6)),
+		css.Rounded(css.Px(tokens.Geometry.PillRadius)),
+		css.Bg(css.Hex(string(tone))),
+		css.Border(css.Px(2), css.Hex(string(tokens.Colors.Surface1))),
+		css.FlexShrink(css.Num(0)),
+		css.ZIndex(1),
+	}
+	if head {
+		nodeRules = append(nodeRules,
+			css.Shadow(css.ShadowOf(
+				css.Zero, css.Zero, css.Px(10), css.Zero, css.Hex(string(tone)),
+			)),
+		)
+		if !tokens.ReducedMotion {
+			nodeRules = append(nodeRules,
+				css.Keyframes("codeflux-spine-head",
+					css.At("0%", css.OpacityNum(css.Num(1))),
+					css.At("50%", css.OpacityNum(css.Num(0.35))),
+					css.At("100%", css.OpacityNum(css.Num(1))),
+				),
+				css.Animation(css.Ms(1800), css.EaseInOut),
+			)
+		}
+	}
+	return html.Div(html.Props{
+		Data: map[string]string{
+			"component": "transcript-entry",
+			"kind":      string(model.Kind),
+			"head":      boolAttribute(head),
+		},
+		Class: css.New(
+			u.Flex, css.Gap(css.Px(tokens.Spacing.MD)),
+			css.MinWidth(css.Zero),
+		).String(),
+	},
+		html.Div(html.Props{
+			Aria: map[string]string{"hidden": "true"},
+			Class: css.New(
+				u.Flex, u.FlexCol, u.ItemsCenter,
+				css.W(css.Px(11)),
+				css.FlexShrink(css.Num(0)),
+			).String(),
+		},
+			html.Span(html.Props{Class: css.New(nodeRules...).String()}),
+		),
+		html.Div(html.Props{
+			Class: css.New(css.MinWidth(css.Zero), css.FlexGrow(css.Num(1))).String(),
+		}, card),
+	)
+}
+
+// transcriptSpineTone colours a spine node by what the entry is.
+//
+// It reuses the kind accents the graph legend already uses, so the same content
+// category is the same colour wherever a person meets it.
+func transcriptSpineTone(card timelinecard.Card, tokens design.Tokens) design.Color {
+	switch card.Kind {
+	case timelinecard.KindMessage:
+		if card.Message != nil && card.Message.Role == "user" {
+			return tokens.Colors.Accent
+		}
+		return tokens.Colors.TextMuted
+	case timelinecard.KindPlan, timelinecard.KindPlanRevision, timelinecard.KindRequirement:
+		return tokens.Colors.Plan
+	case timelinecard.KindTool, timelinecard.KindContext:
+		return tokens.Colors.Execution
+	case timelinecard.KindValidation, timelinecard.KindDiff:
+		return tokens.Colors.Validation
+	case timelinecard.KindApproval, timelinecard.KindCompletion:
+		return tokens.Colors.Success
+	case timelinecard.KindError, timelinecard.KindRecovery:
+		return tokens.Colors.Failure
+	case timelinecard.KindForecast, timelinecard.KindCostBudget, timelinecard.KindUsage:
+		return tokens.Colors.Forecast
+	case timelinecard.KindCheckpoint, timelinecard.KindGraphChange:
+		return tokens.Colors.Memory
+	default:
+		return tokens.Colors.Pending
+	}
+}
+
 func timelineCardStackClass(tokens design.Tokens) string {
 	return css.New(
+		u.Relative,
 		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)), css.MinWidth(css.Zero),
 	).String()
 }
@@ -1360,6 +1864,14 @@ type GraphPaneProps struct {
 	OnSelect      func(string)
 	Authoritative *graphcanvas.AuthoritativeProps
 	Inspector     ui.Node
+	// Embedded marks a graph drawn inside a surface that already names it, so
+	// it drops its own title. SuppressLegend does the same for the legend,
+	// which the dedicated graph workspace carries in its header.
+	Embedded       bool
+	SuppressLegend bool
+	// FullHeight asks for the canvas the graph's own page can afford, rather
+	// than the boxed height a companion panel gets.
+	FullHeight bool
 }
 
 var _ = legacyGraphPane
@@ -1444,6 +1956,24 @@ func legacyGraphPane(props GraphPaneProps) ui.Node {
 	)
 }
 
+// transcriptPanelClass draws the record itself rather than a card holding it.
+//
+// The transcript is the page: it has the reading column to itself, so a border,
+// a corner and a drop shadow around it only announce that some other, more
+// important surface must be outside. Nothing is outside.
+func transcriptPanelClass(mode primitives.Mode) string {
+	tokens := mode.Tokens()
+	return css.New(
+		u.Flex, u.FlexCol,
+		css.Gap(css.Px(tokens.Spacing.MD)),
+		css.Bg(css.Transparent),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		css.Padding(css.RawLength("0 8px")),
+		css.H(css.Full),
+		css.MinWidth(css.Zero), css.MaxWidth(css.Full), css.Overflow.Hidden,
+	).String()
+}
+
 func panelClass(mode primitives.Mode) string {
 	tokens := mode.Tokens()
 	return css.New(
@@ -1471,8 +2001,9 @@ func asyncStateContent(kind state.DataState, subject string, count int, mode pri
 			AccessibleLabel: "Loading " + subject, Lines: 4, Mode: mode,
 		})
 	case state.DataReadyEmpty:
+		title, body := emptyInvitation(subject)
 		return primitives.EmptyState(primitives.EmptyStateProps{
-			Title: "No " + subject, Body: "There is nothing to show yet.", Mode: mode,
+			Title: title, Body: body, Mode: mode,
 		})
 	case state.DataReady:
 		return html.P(html.Props{Text: fmt.Sprintf("%d %s", count, subject)})
@@ -1498,6 +2029,44 @@ func asyncStateContent(kind state.DataState, subject string, count int, mode pri
 		return html.Div(html.Props{Role: "status", Text: subject + " are offline; reconnecting"})
 	default:
 		return html.Div(html.Props{Role: "alert", Text: "Unknown " + subject + " state"})
+	}
+}
+
+// emptyInvitation says what will fill a surface rather than restating that it
+// is empty. "No task graph nodes. There is nothing to show yet." named the
+// absence twice and told nobody what would end it.
+func emptyInvitation(subject string) (string, string) {
+	switch subject {
+	case "task graph nodes":
+		return "Nothing mapped yet",
+			"The graph draws itself as the run plans, edits, and checks its work."
+	case "messages":
+		return "Nothing here yet",
+			"Describe a change below and the transcript records every step of it."
+	case "memory":
+		return "No memory yet",
+			"What the agent learns about this repository is kept here."
+	case "repositories":
+		return "No repository open",
+			"Open a local repository to give the agent somewhere to work."
+	default:
+		return "No " + subject + " yet", "This fills in as the run produces " + subject + "."
+	}
+}
+
+// routeIsAboutARun reports whether the observation rail belongs on a route.
+//
+// The rail reports the current run: its spend, its working tree, its timeline.
+// On the graph, memory, repositories, settings, and diagnostics pages it took
+// three hundred and eighty pixels from the subject to report "No task yet" and
+// four unknowns, and the graph fitted itself into what was left at a third of
+// its size. Only the routes whose subject is a run keep it.
+func routeIsAboutARun(name routes.Name) bool {
+	switch name {
+	case routes.ThreadWorkspace:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1675,25 +2244,85 @@ func SettingsShell(props SimpleRouteProps) ui.Node {
 type SettingsProps struct {
 	SimpleRouteProps
 	Telemetry telemetryview.Props
+	// Appearance is the theme, density, and motion control panel. It is
+	// supplied by the application because those choices live in application
+	// state, not in the shell that renders them.
+	Appearance ui.Node
+	// LocalData is the browser-storage panel, supplied for the same reason:
+	// only the application can reach this browser's stored interface state.
+	LocalData ui.Node
+	// Configuration is the server-backed settings surface, supplied by the
+	// application because reading the policy, the providers, and the models is
+	// a coordinator call the shell must not make.
+	Configuration settingsview.Props
 }
 
+// SettingsInteractiveShell is the settings specification sheet.
+//
+// It was seven panels in a two-column grid, five thousand pixels tall, whose
+// right column stood empty for two thousand of them because grid rows yoke
+// their heights. Settings are the one surface where somebody compares many
+// values at once, and panels prevent exactly that by breaking the vertical
+// axis the values would be compared along. The sheet is one column of rows on
+// a shared value axis instead, and it owns the route frame so the commit bar
+// can stay with the reader rather than sitting below everything.
 func SettingsInteractiveShell(props SettingsProps) ui.Node {
+	tokens := props.Mode.Tokens()
 	telemetry := props.Telemetry
 	telemetry.Mode = props.Mode
-	return routeMain("settings-shell", props.Title, props.Mode,
-		routeRegion(props.Mode, "providers", "Providers",
-			routeStateContent(props.SimpleRouteProps, "providers", html.P(html.Props{Text: "Provider connections and capabilities."}))),
-		routeRegion(props.Mode, "models", "Models",
-			routeStateContent(props.SimpleRouteProps, "models", html.P(html.Props{Text: "Model and effort defaults."}))),
-		routeRegion(props.Mode, "policy", "Policy",
-			routeStateContent(props.SimpleRouteProps, "policy", html.P(html.Props{Text: "Approval, budget, and execution policy."}))),
-		routeRegion(props.Mode, "appearance", "Appearance",
-			routeStateContent(props.SimpleRouteProps, "appearance preferences", html.P(html.Props{Text: "Theme, density, and motion preferences."}))),
-		routeRegion(props.Mode, "data", "Data",
-			routeStateContent(props.SimpleRouteProps, "data controls", html.P(html.Props{Text: "Backup, retention, and local data controls."}))),
-		routeRegion(props.Mode, "telemetry", "Local telemetry",
-			routeStateContent(props.SimpleRouteProps, "local telemetry", ui.CreateElement(telemetryview.Component, telemetry))),
+	configuration := props.Configuration
+	configuration.Mode = props.Mode
+	configuration.Appearance = settingsAppearance(props)
+	configuration.LocalData = settingsLocalData(props)
+	configuration.Telemetry = ui.CreateElement(telemetryview.Component, telemetry)
+	return html.Main(html.Props{
+		ID: "main-content", TabIndex: -1,
+		Data: map[string]string{
+			"component": "settings-shell", "focus-region": "conversation",
+			"focus-order": "2", "state": string(props.State),
+		},
+		Class: css.New(
+			u.Grid,
+			css.GridRows(css.MinMax(css.TrackLen(css.Zero), css.Fr(1)), css.TrackAuto),
+			css.W(css.Full), css.H(css.Full),
+			css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+			css.Bg(css.Hex(string(tokens.Colors.Canvas))),
+			css.Overflow.Hidden,
+		).String(),
+	},
+		html.Div(html.Props{
+			Data: map[string]string{"scroll-owner": "route"},
+			Class: css.New(
+				css.W(css.Full), css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+				css.OverflowY.Auto, css.OverflowX.Hidden,
+				css.PaddingX(css.Px(tokens.Spacing.XXL)),
+				css.PaddingY(css.Px(tokens.Spacing.XL)),
+			).String(),
+		}, settingsview.Sheet(configuration)),
+		settingsview.CommitBar(configuration),
 	)
+}
+
+// settingsAppearance draws the appearance controls when the application
+// supplied them, and says plainly that they are unavailable when it did not.
+// The section used to describe controls that were never there.
+func settingsAppearance(props SettingsProps) ui.Node {
+	if props.Appearance != nil {
+		return props.Appearance
+	}
+	return routeStateContent(props.SimpleRouteProps, "appearance preferences",
+		html.P(html.Props{Text: "Appearance controls are unavailable in this preview."}))
+}
+
+// settingsLocalData draws the browser-storage controls when the application
+// supplied them. The section previously named three capabilities -- backup,
+// retention, and local data controls -- and offered none of them.
+func settingsLocalData(props SettingsProps) ui.Node {
+	if props.LocalData != nil {
+		return props.LocalData
+	}
+	return routeStateContent(props.SimpleRouteProps, "data controls",
+		html.P(html.Props{Text: "Local data controls are unavailable in this preview."}))
 }
 
 func DiagnosticsShell(props SimpleRouteProps) ui.Node {
@@ -1706,7 +2335,7 @@ type DiagnosticsProps struct {
 }
 
 func DiagnosticsInteractiveShell(props DiagnosticsProps) ui.Node {
-	return routeMain("diagnostics-shell", props.Title, props.Mode,
+	return routeScrollOwner("diagnostics-scroll-owner", routeMain("diagnostics-shell", props.Title, props.Mode,
 		routeRegion(props.Mode, "health", "Health",
 			routeStateContent(props.SimpleRouteProps, "health", html.P(html.Props{Text: "Coordinator and database health."}))),
 		routeRegion(props.Mode, "durable-session-sequence", "Durable session sequence",
@@ -1726,7 +2355,7 @@ func DiagnosticsInteractiveShell(props DiagnosticsProps) ui.Node {
 				html.P(html.Props{Text: "A Thread contains conversation. A Task is durable work. An Attempt is one execution. A Plan revision changes the approach. An Approval authorizes a gated action. A Checkpoint is restorable state. Recovery resumes safely."}),
 			),
 		),
-	)
+	))
 }
 
 // DiagnosticsSequenceView renders the content-free mounted session cursor used
@@ -1835,14 +2464,24 @@ func firstRunLayout(props FirstRunProps) ui.Node {
 			stateProps, firstRunSubject(card.Title), renderFirstRunCard(props, card),
 		))
 	}
-	content := routeMain("first-run-shell", props.Title, props.Mode, regions...)
-	// The application frame deliberately clips route content so task routes can
-	// own their pane scrolling. Static first-run content instead needs one
-	// explicit route-level scroll owner; without it, the cards extend beneath
-	// that clipped frame and pointer/touch users cannot reach the final steps.
+	return routeScrollOwner(
+		"first-run-scroll-owner",
+		routeMain("first-run-shell", props.Title, props.Mode, regions...),
+	)
+}
+
+// routeScrollOwner gives one static route its own vertical scroll.
+//
+// The application frame clips route content so task routes can own their pane
+// scrolling. A route built from stacked regions is taller than that frame, and
+// without an owner of its own everything past the fold is simply unreachable:
+// the settings page measured 4114 pixels inside a 936-pixel frame with no
+// scrollbar anywhere, which hid policy, appearance, data, and telemetry
+// entirely. The wheel is moved explicitly because the frame swallows it.
+func routeScrollOwner(component string, content ui.Node) ui.Node {
 	scrollOwnerProps := html.PropsOf(html.OnWheel(handleFirstRunWheel))
 	scrollOwnerProps.Data = map[string]string{
-		"component":    "first-run-scroll-owner",
+		"component":    component,
 		"scroll-owner": "route",
 	}
 	scrollOwnerProps.Class = css.New(
@@ -1851,17 +2490,18 @@ func firstRunLayout(props FirstRunProps) ui.Node {
 		css.OverflowX.Hidden, css.OverflowY.Auto,
 		css.OverscrollBehaviorY.Contain,
 	).String()
-	return html.Div(scrollOwnerProps,
-		content,
-	)
+	return html.Div(scrollOwnerProps, content)
 }
 
 func routeMain(component, title string, mode primitives.Mode, regions ...ui.Node) ui.Node {
 	tokens := mode.Tokens()
+	// The gap between regions is the density token rather than a fixed step.
+	// Density had been computed on every render and read by nothing: choosing
+	// compact changed no pixel on any page.
 	gridRules := []css.Rule{
 		u.Grid,
 		css.GridCols(css.MinMax(css.TrackLen(css.Zero), css.Fr(1))),
-		css.Gap(css.Px(tokens.Spacing.LG)),
+		css.Gap(css.Px(tokens.Rhythm.PanelGap)),
 	}
 	gridRules = append(gridRules, css.Media(
 		css.MinW(900),
@@ -1945,7 +2585,9 @@ func routeRegion(mode primitives.Mode, name, title string, children ...ui.Node) 
 		Class: css.New(
 			u.Flex, u.FlexCol,
 			css.Gap(css.Px(tokens.Spacing.SM)),
-			css.Padding(css.Px(tokens.Spacing.XL)),
+			// The inset is the density token: this is the one measurement a
+			// reading-density preference is supposed to change.
+			css.Padding(css.Px(tokens.Rhythm.PanelInset)),
 			css.MinHeight(css.Px(210)),
 			css.Rounded(css.Px(tokens.Geometry.DialogRadius)), css.MinWidth(css.Zero),
 			css.Bg(css.Hex(string(tokens.Colors.SurfaceRaised))),
@@ -2054,6 +2696,10 @@ func announcementCandidate(snapshot state.Snapshot) state.Announcement {
 		return state.Announcement{
 			Kind: state.AnnouncementRecovery, Message: "Live updates are reconnecting",
 		}
+	case state.ConnectionIdle:
+		return state.Announcement{
+			Kind: state.AnnouncementConnection, Message: "Ready. Open a thread to follow its run",
+		}
 	case state.ConnectionDisconnected:
 		return state.Announcement{
 			Kind: state.AnnouncementConnection, Message: "CodeFlux is disconnected",
@@ -2093,6 +2739,39 @@ func humanize(value string) string {
 // timeline and the live log sit side by side: one answers "how far has this
 // got", the other "what is it saying", and reading either without the other
 // gives a misleading picture.
+// compactExecutionPanels is what the observation rail shows while a run is
+// going: what it is doing now, the steps behind that, and the log — in that
+// order, in one column, because the rail is three hundred and eighty pixels
+// wide and every one of these panels used to lay itself out from the width of
+// the window instead.
+func compactExecutionPanels(props ExecutionPanelProps, mode primitives.Mode) ui.Node {
+	tokens := mode.Tokens()
+	return html.Div(html.Props{
+		Data: map[string]string{"component": "execution-panels", "layout": "rail"},
+		Class: css.New(
+			u.Flex, u.FlexCol, css.MinWidth(css.Zero),
+		).String(),
+	},
+		executionview.CurrentlyExecuting(executionview.CurrentWorkProps{
+			Work: props.Current, Mode: mode, Compact: true,
+		}),
+		executionview.ExecutionTimeline(executionview.TimelineProps{
+			Steps: props.Steps, Mode: mode, Compact: true,
+		}),
+		executionview.StreamingLog(executionview.LogProps{
+			Lines: props.Lines, Filter: props.Filter, Streaming: props.Streaming,
+			Mode: mode, OnToggle: props.OnToggleSeverity, OnClearAll: props.OnClearSeverities,
+			Compact: true,
+		}),
+		html.Div(html.Props{Class: css.New(css.Padding(css.RawLength("14px 0 0")),
+			css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle)))).String()},
+			executionview.MetricStrip(executionview.MetricStripProps{
+				Measurements: props.Measurements, Mode: mode, Compact: true,
+			}),
+		),
+	)
+}
+
 func executionPanels(props ExecutionPanelProps, mode primitives.Mode) ui.Node {
 	tokens := mode.Tokens()
 	columns := []css.Rule{
@@ -2138,5 +2817,57 @@ func executionPanels(props ExecutionPanelProps, mode primitives.Mode) ui.Node {
 				}),
 			),
 		),
+	)
+}
+
+// CodeCollectionProps configures the repository's code directory.
+type CodeCollectionProps struct {
+	Title      string
+	Mode       primitives.Mode
+	Collection codecollection.Props
+}
+
+// CodeCollectionShell is the repository's own collection on its own surface.
+//
+// The repository map was built and never read by anything in the product. This
+// is where a person sees what their code actually contains — its packages, its
+// declarations, and the documentation each one carries — and which of those
+// declarations are admitted atoms.
+//
+// It owns the full route frame rather than the centred reading column every
+// other simple route uses, because it is a browsing surface: three panes that
+// scroll independently, not a page somebody reads top to bottom.
+func CodeCollectionShell(props CodeCollectionProps) ui.Node {
+	title := props.Title
+	if title == "" {
+		title = "Code collection"
+	}
+	tokens := props.Mode.Tokens()
+	return html.Main(html.Props{
+		ID: "main-content", TabIndex: -1,
+		Data: map[string]string{
+			"component": "code-collection-shell", "focus-region": "conversation",
+			"focus-order": "2",
+		},
+		Class: css.New(
+			u.Grid,
+			css.GridRows(css.TrackAuto, css.MinMax(css.TrackLen(css.Zero), css.Fr(1))),
+			css.Gap(css.Px(tokens.Spacing.MD)),
+			css.W(css.Full), css.H(css.Full),
+			css.MinWidth(css.Zero), css.MinHeight(css.Zero),
+			css.Padding(css.RawLength("12px 20px 20px")),
+			css.Bg(css.Hex(string(tokens.Colors.Canvas))),
+			css.Overflow.Hidden,
+		).String(),
+	},
+		html.H1(html.Props{
+			Text: title,
+			Class: css.New(
+				css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+			).String(),
+		}),
+		ui.CreateElement(codecollection.Component, props.Collection),
 	)
 }

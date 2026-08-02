@@ -103,8 +103,25 @@ func TestInstrumentWorkspacePaletteUsesMineralSurfacesAndCoolSignals(t *testing.
 		relativeLuminance(darkSurface1) < relativeLuminance(darkSurface2)) {
 		t.Fatalf("dark mineral surface ladder is not deliberate: %#v", dark.Colors)
 	}
-	if darkAccent.Blue <= darkAccent.Red || darkAccent.Green <= darkAccent.Red {
-		t.Fatalf("signal accent is not in the cool cyan/cobalt family: %s", dark.Colors.Accent)
+	// The action key is a warm neutral, not a hue. Colour in this console
+	// means machine state, so the control a person presses must not compete
+	// with a lamp that reports one.
+	if !(darkAccent.Red > darkAccent.Green && darkAccent.Green > darkAccent.Blue) {
+		t.Fatalf("dark action key is not a warm neutral: %s", dark.Colors.Accent)
+	}
+	if ratio, err := ContrastRatio(dark.Colors.Accent, dark.Colors.Canvas); err != nil ||
+		ratio < 7 {
+		t.Fatalf("dark action key does not read as a key against the canvas: %v %v", ratio, err)
+	}
+	// Live delivery owns the cool signal, and owns it alone.
+	darkActive, _ := ParseColor(string(dark.Colors.Active))
+	if darkActive.Blue <= darkActive.Red || darkActive.Green <= darkActive.Red {
+		t.Fatalf("live signal is not in the cool cyan/cobalt family: %s", dark.Colors.Active)
+	}
+	for name, color := range tokenColorMap(dark.Colors) {
+		if color == dark.Colors.Active && name != "active" && name != "focus-ring" {
+			t.Fatalf("dark %s reuses the live signal hue", name)
+		}
 	}
 	if dark.Colors.Accent == dark.Colors.Success || dark.Colors.Plan == dark.Colors.Blocked {
 		t.Fatal("action and semantic state colors collapsed into one meaning")
@@ -138,11 +155,15 @@ func TestInstrumentWorkspaceTypeMotionAndGeometryRemainPrecise(t *testing.T) {
 	if !tokens.Typography.MetricValue.Tabular || tokens.Typography.Code.Tabular {
 		t.Fatalf("readout/code numeric roles = %#v", tokens.Typography)
 	}
+	if !strings.Contains(tokens.Fonts.Reading, "Sitka Text") ||
+		!strings.Contains(tokens.Fonts.Display, "Sitka Heading") {
+		t.Fatalf("reading and display roles lost the optically sized serif: %#v", tokens.Fonts)
+	}
 	if tokens.Geometry != (GeometryTokens{
 		BorderWidth: 1, BorderStrongWidth: 2,
-		RadiusSmall: 3, ControlRadius: 4, PanelRadius: 6, DialogRadius: 8,
+		RadiusSmall: 2, ControlRadius: 5, PanelRadius: 8, DialogRadius: 12,
 		PillRadius: 999, FocusRingWidth: 3, FocusRingOffset: 2,
-		Shadow: "0 10px 30px -10px rgba(3,12,20,0.34)",
+		Shadow: "0 24px 60px -24px rgba(2,6,14,0.60)",
 	}) {
 		t.Fatalf("instrument geometry drifted: %#v", tokens.Geometry)
 	}

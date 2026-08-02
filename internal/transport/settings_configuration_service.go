@@ -36,6 +36,11 @@ type SettingsConfigurationApplication interface {
 	ReadFlowSettings(context.Context) (FlowSettingsRecord, error)
 	// WriteFlowSettings records new values and applies them to the engine.
 	WriteFlowSettings(context.Context, WriteFlowSettings) (FlowSettingsRecord, error)
+	// SpendSummaryApplication reports what recorded work cost. It is embedded
+	// rather than made a separate service dependency because the settings
+	// surface is where a person already goes to see the budget the spend runs
+	// against.
+	SpendSummaryApplication
 }
 
 // PolicyRecord is the execution policy in force.

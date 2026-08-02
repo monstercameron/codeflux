@@ -51,11 +51,21 @@ func useMountedRepositoryChoices(envelope bootstrapEnvelope) mountedWorkspaceSou
 		if err != nil {
 			return mountedWorkspaceAnswer{}, err
 		}
-		choices, err := projectRepositoryChoices(listed, selectedThreadRoutes(envelope))
+		threads := selectedThreadRoutes(envelope)
+		choices, err := projectRepositoryChoices(listed, threads)
 		if err != nil {
 			return mountedWorkspaceAnswer{}, err
 		}
-		answer := mountedWorkspaceAnswer{Choices: choices}
+		// The repositories page reads the same answer rather than asking the
+		// same question again: one listing, two surfaces built from it.
+		answer := mountedWorkspaceAnswer{
+			Choices: choices,
+			Rows: projectRepositoryRows(
+				listed, threads,
+				accessibleRepositoryIdentities(envelope),
+				currentRepositoryIdentity(envelope),
+			),
+		}
 		// The inspection is a second call because it reads the working tree,
 		// which the listing deliberately does not: a picker over twenty
 		// repositories must not run twenty git status calls to draw itself.
@@ -73,7 +83,7 @@ func useMountedRepositoryChoices(envelope bootstrapEnvelope) mountedWorkspaceSou
 		return answer, nil
 	}, dependency)
 
-	source := mountedWorkspaceSource{}
+	source := mountedWorkspaceSource{Reload: resource.Reload}
 	set := shell.RepositoryChoiceSet{}
 	current := resource.Get()
 	switch {
@@ -81,14 +91,19 @@ func useMountedRepositoryChoices(envelope bootstrapEnvelope) mountedWorkspaceSou
 		// An empty list is a state to act on, not one to retry, so it is not
 		// reported as a failure.
 		set.State = state.DataReadyEmpty
+		source.State = shell.SurfaceReady
 	case current.Error != nil:
 		set.State = state.DataRecoverableError
+		source.State, source.Error = shell.SurfaceFailed, current.Error.Error()
 	case current.Loading || !current.Ready:
 		set.State = state.DataLoading
+		source.State = shell.SurfaceLoading
 	case len(current.Value.Choices) == 0:
 		set.State = state.DataReadyEmpty
+		source.State = shell.SurfaceReady
 	default:
 		set.State, set.Choices = state.DataReady, current.Value.Choices
+		source.State, source.Rows = shell.SurfaceReady, current.Value.Rows
 		source.Summary = current.Value.Summary
 	}
 	source.Choices = &set
@@ -98,12 +113,20 @@ func useMountedRepositoryChoices(envelope bootstrapEnvelope) mountedWorkspaceSou
 // mountedWorkspaceAnswer is one coordinator answer about the workspace.
 type mountedWorkspaceAnswer struct {
 	Choices []shell.RepositoryChoice
+	Rows    []shell.RepositoryRow
 	Summary workspaceSummary
 }
 
 // mountedWorkspaceSource is what the root reads from that answer.
 type mountedWorkspaceSource struct {
 	Choices *shell.RepositoryChoiceSet
+	Rows    []shell.RepositoryRow
+	// State and Error are the listing's own outcome, carried so the
+	// repositories page can distinguish an empty coordinator from an
+	// unreachable one instead of inferring it from an empty slice.
+	State   shell.SurfaceLoadState
+	Error   string
+	Reload  func()
 	Summary workspaceSummary
 }
 

@@ -185,9 +185,22 @@ func NewHandler(options Options) (http.Handler, error) {
 		grpctunnel.WithOriginCheck(sameOrigin),
 		grpctunnel.WithAuthorize(authorizeCookie(options.SessionToken)),
 		grpctunnel.WithReadLimitBytes(4<<20),
-		grpctunnel.WithMaxActiveConnections(32),
-		grpctunnel.WithMaxConnectionsPerClient(4),
-		grpctunnel.WithMaxUpgradesPerClientPerMinute(60),
+		// The caps are sized to what one browser legitimately opens. The client
+		// dials this bridge from sixteen places — the thread rail, the
+		// timeline, the graph, task controls, review, telemetry, and more —
+		// each holding its own connection, and every route change reconnects
+		// several of them. A per-client cap of four refused most of that with
+		// HTTP 429, which the interface could only report as "Disconnected":
+		// the coordinator was running an agent and the page could not be told.
+		//
+		// They remain real bounds rather than being removed. The client is one
+		// browser on loopback holding an authenticated cookie, so the cap is
+		// there to stop a runaway page exhausting the server, not to stop an
+		// attacker who would already have the cookie. The lasting fix is for
+		// the client to multiplex these onto one connection.
+		grpctunnel.WithMaxActiveConnections(96),
+		grpctunnel.WithMaxConnectionsPerClient(48),
+		grpctunnel.WithMaxUpgradesPerClientPerMinute(600),
 		grpctunnel.WithSessionMaxLifetime(30*time.Minute),
 	)
 	mux.Handle("GET "+bridgePath, withBridgeRequestIdentity(bridge))

@@ -72,6 +72,16 @@ func authorizedThreadRailScope(
 	if repositoryID, ok := authorized[snapshot.Workspace.RepositoryID]; ok {
 		return threadRailScope{repositoryID: repositoryID, workspaceID: workspaceID}, nil
 	}
+	// The repository this session was started against is an authorized answer,
+	// and it is the right one on every page that carries no repository in its
+	// route. Without this the rail fell back to "exactly one repository
+	// exists", so recording a second one emptied the thread list on /tasks,
+	// /memory, and /repositories while a workspace was plainly open.
+	if selected := envelope.SelectedRepositoryID; selected != nil {
+		if repositoryID, ok := authorized[selected.GetValue()]; ok {
+			return threadRailScope{repositoryID: repositoryID, workspaceID: workspaceID}, nil
+		}
+	}
 	if len(authorized) == 1 {
 		for _, repositoryID := range authorized {
 			return threadRailScope{repositoryID: repositoryID, workspaceID: workspaceID}, nil

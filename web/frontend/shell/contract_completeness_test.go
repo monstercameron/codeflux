@@ -154,7 +154,7 @@ func hasExplicitDataStatePresentation(markup string, dataState state.DataState) 
 	markers := map[state.DataState][]string{
 		state.DataNotRequested:     {"Not requested"},
 		state.DataLoading:          {`aria-busy="true"`, "Loading"},
-		state.DataReadyEmpty:       {`data-state="empty"`, "There is nothing to show yet."},
+		state.DataReadyEmpty:       {`data-state="empty"`},
 		state.DataReady:            {"0 recent workspaces"},
 		state.DataPartialStale:     {"updates are delayed"},
 		state.DataRecoverableError: {`data-state="error"`, "Retry"},

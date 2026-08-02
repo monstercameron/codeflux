@@ -15,7 +15,7 @@ import (
 	"github.com/monstercameron/GoWebComponents/v5/ui"
 )
 
-const mountedThreadRowHeight = 72
+const mountedThreadRowHeight = 56
 
 // ThreadRailProps binds immutable rail state to user intent callbacks. Rename
 // and archive callbacks express intent only; authoritative reducer responses
@@ -51,6 +51,15 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 	if height == 0 {
 		height = 560
 	}
+	// A virtualized list still has to be told how tall it is, but a rail with
+	// one thread in it should not draw a five-row window of empty box under
+	// that thread. The window closes to what there is, and opens as threads
+	// arrive.
+	if rows := float64(len(props.State.Rows())); rows > 0 {
+		if fitted := rows*mountedThreadRowHeight + 12; fitted < height {
+			height = fitted
+		}
+	}
 	contract, err := NewVirtualListContract(props.State, height)
 	if err != nil {
 		return threadRailContractError(err.Error())
@@ -66,6 +75,7 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 			// and read as the most important thing on the page.
 			html.H2(html.Props{
 				Class: css.New(
+					u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(6)),
 					css.Margin(css.Zero),
 					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
 					css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
@@ -74,11 +84,19 @@ func ThreadRail(props ThreadRailProps) ui.Node {
 					css.TextTransform.Uppercase,
 					css.Tracking(css.Ems(0.09)),
 				).String(),
-				Text: map[bool]string{true: "Recent tasks", false: "Threads"}[props.Embedded],
-			}),
+			},
+				primitives.Icon(primitives.IconProps{
+					Name: primitives.IconThread, Size: primitives.IconSizeSmall,
+				}),
+				// Both lists hold threads. Calling the embedded one "Recent tasks"
+				// named it after the wrong noun: a Task is the durable work inside
+				// a thread, and the rail selects threads.
+				html.Span(html.Props{Text: "Threads"}),
+			),
 			ui.CreateElement(threadRailButton, primitives.ButtonProps{
-				ID: "thread-rail-new", Label: "New thread", AccessibleLabel: "Create new thread",
-				Primary: true, Busy: props.NewThreadBusy, Disabled: props.OnNewThread == nil,
+				ID: "thread-rail-new", Label: "New", LeadingIcon: primitives.IconPlus,
+				AccessibleLabel: "Create new thread",
+				Quiet:           true, Busy: props.NewThreadBusy, Disabled: props.OnNewThread == nil,
 				Mode: props.Mode, OnClick: props.OnNewThread,
 			}),
 		),
@@ -208,30 +226,42 @@ func threadRailRow(props threadRailRowProps) ui.Node {
 	if view.Archived {
 		indicators = append(indicators, html.Span(html.Props{Data: map[string]string{"field": "archived"}, Text: "Archived"}))
 	}
+	// A thread is a line in a list, not a card. Boxing each one put a border
+	// around every conversation in the rail and made a list of three look like
+	// three panels; the selected one is marked by an edge and a surface instead.
 	rowRules := []css.Rule{
-		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.XS)),
-		css.Padding(css.Px(tokens.Spacing.SM)), css.MinHeight(css.Px(mountedThreadRowHeight)),
+		u.Flex, u.FlexCol, css.Gap(css.Px(2)),
+		css.Padding(css.RawLength("8px 10px")),
+		css.MinHeight(css.Px(mountedThreadRowHeight - 4)),
 		css.MinWidth(css.Zero), css.W(css.Full), css.Overflow.Hidden,
-		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
+		css.Bg(css.Transparent),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Transparent),
 	}
-	if props.Selected {
-		rowRules = append(rowRules,
-			css.Bg(css.Hex(string(tokens.Colors.Selection))),
-			css.TextColor(css.Hex(string(tokens.Colors.OnSelection))),
-			css.Border(css.Px(tokens.Geometry.BorderStrongWidth), css.Hex(string(tokens.Colors.OnSelection))),
-		)
-	} else if props.Active {
-		rowRules = append(rowRules, css.Border(
-			css.Px(tokens.Geometry.BorderStrongWidth), css.Hex(string(tokens.Colors.BorderStrong)),
+	if tokens.Motion.Control > 0 {
+		rowRules = append(rowRules, css.Transition(
+			css.TransitionProps(css.PropColors),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
 		))
 	}
-	titleColor := tokens.Colors.TextPrimary
+	rowRules = append(rowRules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+	)...)
+	if props.Selected {
+		rowRules = append(rowRules,
+			css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+			css.Shadow(css.ShadowInset(
+				css.Px(2), css.Zero, css.Zero, css.Zero, css.Hex(string(tokens.Colors.Accent)),
+			)),
+		)
+	} else if props.Active {
+		rowRules = append(rowRules, css.Bg(css.Hex(string(tokens.Colors.Surface1))))
+	}
+	titleColor := tokens.Colors.TextSecondary
 	metadataColor := tokens.Colors.TextMuted
 	if props.Selected {
-		titleColor = tokens.Colors.OnSelection
-		metadataColor = tokens.Colors.OnSelection
+		titleColor = tokens.Colors.TextPrimary
 	}
 	return html.Div(html.Props{
 		Data: map[string]string{
@@ -243,17 +273,31 @@ func threadRailRow(props threadRailRowProps) ui.Node {
 		Class: css.New(rowRules...).String(),
 	},
 		html.Div(html.Props{Class: css.New(
-			u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.XS)), css.MinWidth(css.Zero),
+			u.Flex, u.ItemsCenter, u.JustifyBetween, css.Gap(css.Px(tokens.Spacing.SM)), css.MinWidth(css.Zero),
 		).String()},
-			html.Strong(html.Props{
-				Title: view.Title,
+			html.Span(html.Props{
 				Class: css.New(
-					css.MinWidth(css.Zero), css.Overflow.Hidden, css.WhiteSpace.NoWrap,
-					css.TextOverflowEllipsis(), css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
-					css.TextColor(css.Hex(string(titleColor))),
+					u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM)),
+					css.MinWidth(css.Zero),
+					css.TextColor(css.Hex(string(threadRowMarkTone(view, props.Selected, tokens)))),
 				).String(),
-				Text: view.Title,
-			}),
+			},
+				primitives.Icon(primitives.IconProps{
+					Name: threadRowMark(view), Size: primitives.IconSizeSmall,
+				}),
+				html.Strong(html.Props{
+					Title: view.Title,
+					Class: css.New(
+						css.MinWidth(css.Zero), css.Overflow.Hidden, css.WhiteSpace.NoWrap,
+						css.TextOverflowEllipsis(),
+						css.Font(css.FontStack(tokens.Fonts.UI)),
+						css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+						css.FontWeight.Medium,
+						css.TextColor(css.Hex(string(titleColor))),
+					).String(),
+					Text: view.Title,
+				}),
+			),
 			html.Div(html.Props{Class: css.New(u.Flex, css.Gap(css.Px(tokens.Spacing.XS))).String()}, indicators...),
 		),
 		html.Div(html.Props{
@@ -266,6 +310,33 @@ func threadRailRow(props threadRailRowProps) ui.Node {
 			).String(),
 		}, metadata...),
 	)
+}
+
+// threadRowMark names a thread by what it is doing.
+func threadRowMark(view RowView) primitives.IconName {
+	switch {
+	case view.Archived:
+		return primitives.IconArchive
+	case view.Attention != AttentionNone:
+		return primitives.IconReview
+	default:
+		return primitives.IconThread
+	}
+}
+
+// threadRowMarkTone colours that mark, and only that mark, so a rail of ten
+// threads shows where attention is needed without ten coloured labels.
+func threadRowMarkTone(view RowView, selected bool, tokens design.Tokens) design.Color {
+	switch {
+	case view.Attention != AttentionNone:
+		return tokens.Colors.Warning
+	case view.Archived:
+		return tokens.Colors.TextDisabled
+	case selected:
+		return tokens.Colors.Accent
+	default:
+		return tokens.Colors.TextMuted
+	}
 }
 
 func selectedThreadActions(props ThreadRailProps, row Row) ui.Node {
@@ -395,13 +466,18 @@ func threadFilterControls(props ThreadRailProps) ui.Node {
 			},
 		}))
 	}
+	tokens := props.Mode.Tokens()
 	return html.Div(html.Props{
 		Role: "group", Aria: map[string]string{"label": "Thread filters"},
 		Data: map[string]string{"component": "thread-filters"},
 		Class: css.New(
 			u.Grid,
 			css.GridCols(css.Repeat(3, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
-			css.Gap(css.Px(props.Mode.Tokens().Spacing.XS)),
+			css.Gap(css.Px(2)),
+			css.Padding(css.Px(2)),
+			css.Bg(css.Hex(string(tokens.Colors.Surface1))),
+			css.Border(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
 		).String(),
 	}, children...)
 }

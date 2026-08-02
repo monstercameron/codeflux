@@ -206,6 +206,8 @@ func restorationContext(
 		Authenticated:          true,
 		Compatible:             compatible,
 		FirstRunComplete:       envelope.RouteAccess.FirstRunComplete,
+		OpenRepositoryID:       identityOrZeroRepository(envelope.SelectedRepositoryID),
+		OpenThreadID:           identityOrZeroThread(envelope.SelectedThreadID),
 		CoordinatorAvailable:   true,
 		AccessibleRepositories: make(map[string]bool, len(envelope.RouteAccess.AccessibleRepositories)),
 		AccessibleThreads:      make(map[string]bool, len(envelope.RouteAccess.AccessibleThreads)),
@@ -244,4 +246,28 @@ func addThreadAccess(target map[string]bool, identity *codefluxv1.StableIdentity
 	}
 	target[parsed.String()] = true
 	return nil
+}
+
+// identityOrZeroRepository reads a repository identity, or nothing.
+func identityOrZeroRepository(identity *codefluxv1.StableIdentity) domain.RepositoryID {
+	if identity == nil {
+		return domain.RepositoryID{}
+	}
+	value, err := domain.ParseRepositoryID(identity.GetValue())
+	if err != nil {
+		return domain.RepositoryID{}
+	}
+	return value
+}
+
+// identityOrZeroThread reads a thread identity, or nothing.
+func identityOrZeroThread(identity *codefluxv1.StableIdentity) domain.ThreadID {
+	if identity == nil {
+		return domain.ThreadID{}
+	}
+	value, err := domain.ParseThreadID(identity.GetValue())
+	if err != nil {
+		return domain.ThreadID{}
+	}
+	return value
 }

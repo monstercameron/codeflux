@@ -32,7 +32,7 @@ func TestAppRootMountsAuthoritativeTaskControlsOnlyWhenProvided(t *testing.T) {
 		`data-component="task-control-panel"`,
 		`data-task-state="running"`, `data-phase="editing"`,
 		`data-ui-connection="disconnected"`, `data-sequence-certain="false"`,
-		"The timeline remains readable", "gpt-5.6-sol", "USD 300 minor units remaining",
+		"The timeline remains readable", "gpt-5.6-sol", "$3.00 remaining",
 		`aria-label="Pause task"`, `aria-label="Stop task"`,
 	} {
 		if !strings.Contains(with, want) {

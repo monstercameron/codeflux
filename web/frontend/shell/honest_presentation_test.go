@@ -94,8 +94,12 @@ func TestWithNoTaskTheMetricStripSaysOneTrueThing(t *testing.T) {
 	if count := strings.Count(markup, "Unknown"); count > 0 {
 		t.Errorf("a strip with no task printed %d Unknown value(s):\n%s", count, markup)
 	}
-	if !strings.Contains(markup, "No task is running") {
-		t.Errorf("the strip did not say there is no task:\n%s", markup)
+	// The bug this guards is six labels against six copies of the word Unknown:
+	// the widest, boldest row on the page saying nothing at all. Whether the
+	// strip then states one true sentence or draws nothing is a design choice;
+	// stating nothing false is not.
+	if !strings.Contains(markup, `data-state="no-task"`) {
+		t.Errorf("the strip does not mark itself as having no task:\n%s", markup)
 	}
 }
 
@@ -105,9 +109,13 @@ func TestWithATaskTheMetricStripReportsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	markup := honestRender(t, taskMetricStrip(state.TopBarView{
-		TaskState: "in progress", ActualCost: "$1.20", HardBudget: "$4.00",
+		TaskState: "in progress", ActualCost: "$1.20", ActualTokens: "12,480",
+		HardBudget: "$4.00",
 	}, "In progress", tokens.Colors.Active, tokens))
-	for _, expected := range []string{"In progress", "$1.20", "$4.00"} {
+	// The strip carries the three facts the centre of the workspace needs. The
+	// cap and what is left of it are the header meter's job and the run rail's,
+	// and printing all six here made the widest row the least useful one.
+	for _, expected := range []string{"In progress", "$1.20", "12,480"} {
 		if !strings.Contains(markup, expected) {
 			t.Errorf("the strip did not report %q:\n%s", expected, markup)
 		}

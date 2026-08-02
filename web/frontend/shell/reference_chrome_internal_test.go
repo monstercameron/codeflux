@@ -111,15 +111,17 @@ func TestApplicationBarLabelsPausedTaskControlAsResumeAndShowsAuthoritativeFacts
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Provider names the model readout; the model and effort are its value.
+	// The remaining facts stay reachable as the cost control's accessible name.
 	for _, want := range []string{
-		"openai · gpt-5.6-sol · high", "150 tokens", "price-17",
+		"Model · openai", "gpt-5.6-sol · high", "150 tokens", "price-17",
 		"USD 82 minor units", "below threshold",
 	} {
 		if !strings.Contains(markup, want) {
 			t.Errorf("authoritative application bar missing %q: %s", want, markup)
 		}
 	}
-	if label, accessible := taskPausePresentation("paused", false); label != "▶  Resume" || accessible != "Resume task" {
+	if label, accessible := taskPausePresentation("paused", false); label != "Resume" || accessible != "Resume task" {
 		t.Fatalf("paused task presentation = %q/%q", label, accessible)
 	}
 }

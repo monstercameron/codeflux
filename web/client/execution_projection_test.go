@@ -192,13 +192,21 @@ func TestEveryProjectedLogLineIsPresentable(t *testing.T) {
 			t.Errorf("projected line %q is unpresentable: %v", line.ID, err)
 		}
 	}
-	// The label is the event's own kind rather than invented prose: nothing
-	// here should put words in the coordinator's mouth.
+	// The label names the event kind in the words the rest of the console uses.
+	// It is a translation of a closed registry rather than invented prose: an
+	// unknown kind still falls back to the kind itself, which the next test
+	// covers.
 	if strings.Contains(lines[0].Text, "_") {
 		t.Errorf("the label was not made readable: %q", lines[0].Text)
 	}
-	if !strings.Contains(lines[0].Text, "task") {
-		t.Errorf("the label lost the event kind: %q", lines[0].Text)
+	if !strings.EqualFold(lines[0].Text, "Task state changed") {
+		t.Errorf("the label does not name the event: %q", lines[0].Text)
+	}
+	unknown := executionLines(timeline.State{Events: []events.SessionEvent{
+		fixtureEvent(21, events.Kind("some-future-kind"), 1),
+	}})
+	if len(unknown) != 1 || !strings.Contains(unknown[0].Text, "some-future-kind") {
+		t.Errorf("an unknown kind was not reported as itself: %+v", unknown)
 	}
 }
 

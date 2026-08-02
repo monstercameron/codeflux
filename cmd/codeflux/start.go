@@ -26,6 +26,7 @@ type startArguments struct {
 	repository     string
 	openBrowser    bool
 	nonInteractive bool
+	simulate       bool
 }
 
 // parseStartArguments reads the flags, refusing anything it does not know
@@ -39,6 +40,8 @@ func parseStartArguments(args []string) (startArguments, error) {
 	}
 	remaining, nonInteractive := hasFlag(remaining, "--non-interactive")
 	arguments.nonInteractive = nonInteractive
+	remaining, simulate := hasFlag(remaining, "--simulate")
+	arguments.simulate = simulate
 
 	for index := 0; index < len(remaining); index++ {
 		switch remaining[index] {
@@ -164,6 +167,7 @@ func runStart(
 		ListenAddress:     arguments.address,
 		TaskListenAddress: "127.0.0.1:0",
 		FrontendAssets:    resolved,
+		SimulateExecution: arguments.simulate,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "codeflux start: %v\n", err)
@@ -199,6 +203,13 @@ func runStart(
 	// typed.
 	fmt.Fprintf(stdout, "codeflux is running at %s\n", url)
 	fmt.Fprintf(stdout, "serving the interface from %s\n", origin)
+	if arguments.simulate {
+		// Said plainly and every time. A scripted run writes real files and
+		// real events, so somebody who forgot the flag would otherwise read one
+		// as the work of an agent that never ran.
+		fmt.Fprintln(stdout,
+			"execution is SIMULATED: no provider is contacted and every run is scripted")
+	}
 	fmt.Fprintln(stdout, "the session secret is held by this process and sent to the browser as a cookie; it is not printed")
 
 	if arguments.openBrowser {

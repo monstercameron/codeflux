@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 	// The kind of change is the one thing about a task nothing can observe, so
 	// it is held here and sent with the request rather than defaulted anywhere.
 	taskClass := ui.UseState("")
+	startNotice := ui.UseState("")
 	usd, currencyErr := domain.ParseCurrencyCode("USD")
 	providerID, providerErr := domain.ParseProviderID("prv_" + previewComposerUUID)
 	modelOptions, modelOptionsErr := previewModelOptions(providerID)
@@ -81,10 +83,27 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 		return nil
 	}, settlementDependency)
 	complete := func(command composerSendCommand) {
+		startNotice.Set("")
 		ui.SafeGo("send mounted composer message", func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			// Three seconds covered the message and nothing else. Sending is one
+			// RPC; starting the work behind it is three more, each of which the
+			// coordinator answers only after it has created, forecast and
+			// preflighted a task. The deadline used to expire mid-chain, so a
+			// request was recorded and the work silently never began.
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			messageID, sendErr := sendComposerCommand(ctx, command)
 			cancel()
+			// A start failure leaves the message standing, so it settles as an
+			// accepted send and reports what happened to the work separately.
+			var startFailure taskStartError
+			if errors.As(sendErr, &startFailure) {
+				notice := "Recorded. " + startFailure.Unwrap().Error()
+				if errors.Is(sendErr, errNoDeclaredTaskClass) {
+					notice = "Recorded. Choose a kind of change beside the message field to start work on it."
+				}
+				ui.PostAsync(func() { startNotice.Set(notice) })
+				sendErr = nil
+			}
 			next, mode, err := settleComposerCommand(modelState.Get(), command, messageID, sendErr)
 			if err == nil {
 				if committed := latestEvent.Get(); sendErr == nil && committed.ThreadID == command.ThreadID {
@@ -102,6 +121,7 @@ func livePreviewComposer(thread threadrail.Thread, latest events.SessionEvent, _
 		})
 	}
 	props := composer.Props{
+		Notice:         startNotice.Get(),
 		View:           composer.View(modelState.Get(), threadID, ""),
 		BudgetCurrency: usd,
 		TransportMode:  transportMode.Get(),

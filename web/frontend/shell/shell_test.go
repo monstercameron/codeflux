@@ -82,7 +82,10 @@ func TestAppShellRendersIndependentLandmarksAndBoundaries(t *testing.T) {
 		`data-component="application-bar"`,
 		`data-component="thread-rail"`,
 		`data-component="conversation-pane"`,
-		`data-component="graph-pane"`,
+		// At full width the workspace shows the graph as a summary in the
+		// observation rail; the canvas itself is the graph route's surface,
+		// which the next assertion holds to.
+		`data-component="rail-graph-summary"`,
 		`aria-label="Threads"`,
 		`aria-label="Conversation"`,
 		`aria-label="Task graph"`,
@@ -93,9 +96,30 @@ func TestAppShellRendersIndependentLandmarksAndBoundaries(t *testing.T) {
 			t.Errorf("markup missing %q:\n%s", want, markup)
 		}
 	}
-	for _, boundary := range []string{"application-bar", "thread-rail", "conversation-pane", "graph-pane"} {
+	// Each chrome boundary renders exactly once in the workspace. The graph
+	// pane is not among them any more: at full width the workspace shows the
+	// graph as a rail summary and the canvas belongs to the graph route, which
+	// the assertions below hold to.
+	for _, boundary := range []string{"application-bar", "thread-rail", "conversation-pane"} {
 		if len(probe[boundary]) != 1 {
 			t.Errorf("render probe count for %s = %d", boundary, len(probe[boundary]))
+		}
+	}
+	if len(probe["graph-pane"]) != 0 {
+		t.Errorf("the workspace drew the graph canvas %d time(s)", len(probe["graph-pane"]))
+	}
+	graphs := render(t, ui.CreateElement(shell.AppRoot, shell.RootProps{
+		Snapshot: readySnapshot(),
+		Route:    routes.Route{Name: routes.Graphs},
+		Tokens:   tokens(t),
+		Probe:    probe,
+	}))
+	for _, want := range []string{
+		`data-component="graph-workspace-shell"`,
+		`data-component="graph-pane"`,
+	} {
+		if !strings.Contains(graphs, want) {
+			t.Errorf("graph surface missing %q", want)
 		}
 	}
 }

@@ -178,7 +178,7 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 		}
 	}
 	rail := ui.CreateElement(threadrail.ThreadRail, threadrail.ThreadRailProps{
-		State: current, Mode: props.Mode, Embedded: true, Height: 270,
+		State: current, Mode: props.Mode, Embedded: true, Height: 360,
 		NewThreadBusy: createBusy.Get(), RenameBusy: renameBusy.Get(), ArchiveBusy: archiveBusy.Get(),
 		OnNewThread: func() {
 			if createBusy.Get() {
@@ -287,7 +287,11 @@ func mountedThreadRail(props mountedThreadRailProps) ui.Node {
 	})
 
 	children := []ui.Node{
-		threadRailTransportNotice("authoritative-bridge", message, props.Mode),
+		// Silence is the healthy state. A permanent banner saying threads are
+		// synchronized occupied the top of the rail with a fact that is true
+		// almost always and interesting almost never; it now speaks only when
+		// something is loading, retained, or refused.
+		threadRailTransportNotice("authoritative-bridge", noticeWhenNotable(message), props.Mode),
 		rail,
 	}
 	if !renameTarget.Get().IsZero() {
@@ -395,7 +399,21 @@ func isThreadRailServiceUnavailable(err error) bool {
 		status.Code(err) == codes.Unimplemented || status.Code(err) == codes.Unavailable
 }
 
+// noticeWhenNotable drops the two messages that only confirm the ordinary.
+func noticeWhenNotable(message string) string {
+	switch strings.TrimSpace(message) {
+	case "Threads are synchronized with the local coordinator.",
+		"Thread changes are synchronized with the local coordinator.":
+		return ""
+	default:
+		return message
+	}
+}
+
 func threadRailTransportNotice(mode, message string, primitiveMode primitives.Mode) ui.Node {
+	if strings.TrimSpace(message) == "" {
+		return nil
+	}
 	tokens := primitiveMode.Tokens()
 	return html.P(html.Props{
 		Role: "status", Text: message,

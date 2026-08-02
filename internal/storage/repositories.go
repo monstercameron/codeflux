@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -803,3 +804,28 @@ var (
 	_ ContextManifestOperations  = (*Repositories)(nil)
 	_ WorktreeBindingOperations  = (*Repositories)(nil)
 )
+
+// CountRowsForTest reports how many rows one table holds.
+//
+// It exists so a test can assert on what was actually persisted rather than on
+// what a service said it persisted. The table name is checked against the
+// schema rather than interpolated blindly, because a name reaching a query
+// unchecked is an injection whether or not the caller is a test.
+func (repositories *Repositories) CountRowsForTest(table string) (int, error) {
+	if repositories == nil || repositories.database == nil {
+		return 0, errors.New("repositories are unavailable")
+	}
+	var known string
+	if err := repositories.database.sql.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", table,
+	).Scan(&known); err != nil {
+		return 0, fmt.Errorf("no such table: %s", table)
+	}
+	var count int
+	if err := repositories.database.sql.QueryRow(
+		"SELECT COUNT(*) FROM " + known,
+	).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

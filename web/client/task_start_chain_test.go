@@ -159,7 +159,10 @@ func TestNoKindMeansNoTaskAndNoFailure(t *testing.T) {
 	if len(client.calls) != 0 {
 		t.Errorf("an undeclared kind still called %v", client.calls)
 	}
-	if !strings.Contains(err.Error(), "Options") {
+	// The kind of change moved out of the options modal and next to the
+	// message field, because it is the one field that decides whether pressing
+	// the button starts work. The refusal points at where it now lives.
+	if !strings.Contains(err.Error(), "beside the message field") {
 		t.Errorf("the refusal does not say where to fix it: %v", err)
 	}
 }

@@ -31,7 +31,7 @@ func TestReportCardRendersReadableExactClaimLevelEvidence(t *testing.T) {
 		"External provider runtime behavior was not executed.", props.Report.Claims[0].EvidenceIDs[0].String(),
 		props.Report.Claims[0].GraphNodeIDs[0].String(), props.Report.GraphRevisionID.String(),
 		"Approvals and authority used", "explicit user approval", "Model, provider, tool, and policy versions",
-		"Forecast and actual attribution", "P50 2m0s, P90 5m0s", "USD 8 minor units",
+		"Forecast and actual attribution", "P50 2m0s, P90 5m0s", "$0.08",
 		"Assumptions and limitations", "No deployment was performed.",
 	}
 	for _, want := range wants {
@@ -71,7 +71,7 @@ func TestReportCardShowsUnknownMetricsWithoutInventingZero(t *testing.T) {
 		`data-report-field="forecast-tokens">P50 0`,
 		`data-report-field="actual-tokens">0 total`,
 		`data-report-field="forecast-cost">P50  0`,
-		`data-report-field="actual-cost"> 0 minor units`,
+		`data-report-field="actual-cost">$0.00`,
 	} {
 		if strings.Contains(markup, forbidden) {
 			t.Fatalf("unknown metric was invented as zero via %q\n%s", forbidden, markup)

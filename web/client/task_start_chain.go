@@ -28,7 +28,22 @@ type taskStartClient interface {
 // project-memory retrieval and routing, so an invented one would silently
 // change which prior work the task is compared against.
 var errNoDeclaredTaskClass = errors.New(
-	"choose a kind of change in Options to start a task")
+	"choose a kind of change beside the message field to start work")
+
+// taskStartError marks a request that was recorded but did not start.
+//
+// The two failures are not the same and must not be reported as one: a send
+// that failed means the words are gone and should be retried, while a start
+// that failed means the request is durable and only the work did not begin.
+// Reporting the second as the first told people their message had not been
+// accepted when it had.
+type taskStartError struct{ cause error }
+
+func (failure taskStartError) Error() string {
+	return "the request was recorded but work did not start: " + failure.cause.Error()
+}
+
+func (failure taskStartError) Unwrap() error { return failure.cause }
 
 // startRequestedTask turns a recorded request into a running task.
 //

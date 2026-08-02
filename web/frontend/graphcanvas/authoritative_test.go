@@ -60,7 +60,11 @@ func TestAuthoritativeRendererEmitsCompleteAccessibleVisualContract(t *testing.T
 		`data-selected="true"`,
 		`data-component="graph-selection-ring"`,
 		`width="240"`, `height="88"`,
-		`x="18"`, `y="34"`, `font-size="15"`,
+		// The label is drawn in a foreignObject: the renderer only creates a
+		// fixed set of tags in the SVG namespace and "text" is not one of them,
+		// so an SVG <text> was built as an HTML element and never painted.
+		`<foreignObject`, `data-component="graph-node-label"`,
+		`font-size:15px`, `color:#e9eef7`,
 		`tabIndex="0"`,
 	} {
 		if !strings.Contains(markup, fragment) {

@@ -170,13 +170,21 @@ func initializeCoordinatorGitRepository(t *testing.T, path string) {
 		}
 	}
 	run("init", "--initial-branch=main")
-	if err := os.WriteFile(
-		filepath.Join(path, "main.go"),
-		[]byte("package main\n\nfunc main() {}\n"), 0o600,
-	); err != nil {
-		t.Fatal(err)
+	// The repository is a real Go module, because the product's whole job is to
+	// write Go into it and then run the module's own tests. Without go.mod
+	// nothing an agent writes can compile and no validation command can run, so
+	// a fixture missing it quietly tests a repository no user would ever have.
+	for name, content := range map[string]string{
+		"go.mod":  "module codeflux.test/workspace\n\ngo 1.26.0\n",
+		"main.go": "package main\n\nfunc main() {}\n",
+	} {
+		if err := os.WriteFile(
+			filepath.Join(path, name), []byte(content), 0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+		run("add", name)
 	}
-	run("add", "main.go")
 	run("-c", "user.name=Codeflux Test", "-c", "user.email=codeflux@example.invalid",
 		"commit", "-m", "base")
 }

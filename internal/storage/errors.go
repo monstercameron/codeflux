@@ -43,8 +43,18 @@ type Error struct {
 	Cause     error
 }
 
+// Error names the operation, its classification, and what the store actually
+// said.
+//
+// The cause used to be kept but never printed, so every constraint failure
+// read as "database constraint" and the one fact that identifies which rule was
+// broken — the rule's own name — was carried all the way up and discarded at
+// the point somebody would read it.
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s: %v", e.Operation, e.Kind)
+	if e.Cause == nil {
+		return fmt.Sprintf("%s: %v", e.Operation, e.Kind)
+	}
+	return fmt.Sprintf("%s: %v: %v", e.Operation, e.Kind, e.Cause)
 }
 
 func (e *Error) Unwrap() error {

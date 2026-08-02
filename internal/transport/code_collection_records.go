@@ -22,6 +22,52 @@ type CodeCollectionApplication interface {
 	// documentation, its atom fields when it is an admitted atom, and what
 	// calls it.
 	InspectCodeSymbol(context.Context, CodeSymbolInspection) (CodeSymbolDetail, error)
+	// ListCodeFiles returns every file the map recorded, so a client can draw
+	// the collection as the tree it is on disk.
+	ListCodeFiles(context.Context, CodeCollectionQuery) (CodeFilePage, error)
+	// ReadCodeFile returns one file's text and what it declares.
+	ReadCodeFile(context.Context, CodeFileRead) (CodeFileContent, error)
+}
+
+// CodeFileRecord is one file in the collection.
+type CodeFileRecord struct {
+	Path string
+	// Kind is what the mapper recorded -- "source", "test" -- and Generated
+	// marks a file nobody wrote by hand.
+	Kind        string
+	Generated   bool
+	ImportPath  string
+	SymbolCount uint32
+	AtomCount   uint32
+}
+
+// CodeFilePage is one bounded page of files.
+type CodeFilePage struct {
+	Revision   CodeCollectionRevision
+	Files      []CodeFileRecord
+	Truncated  bool
+	TotalFiles uint32
+}
+
+// CodeFileRead names one file to read.
+type CodeFileRead struct {
+	RepositoryID domain.RepositoryID
+	// Path is workspace-relative and must be one the map recorded. Resolving an
+	// arbitrary path would turn a directory listing into a way to read anything
+	// the coordinator can reach.
+	Path string
+}
+
+// CodeFileContent is one file as it is on disk, bounded.
+type CodeFileContent struct {
+	Revision CodeCollectionRevision
+	File     CodeFileRecord
+	Text     string
+	Lines    uint32
+	// Truncated reports that the file continues past what was returned, so a
+	// reader is told rather than left to assume they saw all of it.
+	Truncated    bool
+	Declarations []CodeSymbolRecord
 }
 
 // CodeCollectionQuery names the repository whose collection is being read.
@@ -118,6 +164,11 @@ type CodeSymbolRecord struct {
 	// Summary is the declaration's first documentation sentence, or empty when
 	// it has none. It is never generated.
 	Summary string
+	// MatchedName and MatchedPromise say why a search returned this row: the
+	// term is in the declaration's own name, or it is in the documented text
+	// quoted here. They are empty outside a search.
+	MatchedName    bool
+	MatchedPromise string
 }
 
 // CodeSymbolPage is one bounded page of declarations.
@@ -127,6 +178,12 @@ type CodeSymbolPage struct {
 	Truncated bool
 	// TotalMatched is how many declarations matched before the bound.
 	TotalMatched uint32
+	// TotalAtoms is the whole collection's atom count, whatever this query
+	// matched, so a filtered answer can still say what it is a part of.
+	TotalAtoms uint32
+	// SearchQuery is the SQL this search performed. It is empty when nothing
+	// was searched.
+	SearchQuery string
 }
 
 // CodeSymbolReference is one place a declaration is named.
@@ -141,6 +198,22 @@ type CodeAtomField struct {
 	Label string
 	Text  string
 	Items []string
+}
+
+// CodeSymbolStructure is what the pipeline's own atom stages measure about a
+// declaration: how deeply it loops, how much it branches, and whether it
+// reaches outside its arguments.
+//
+// Measured separates "not an atom, so nothing was measured" from "measured,
+// and the answer is zero". A declaration with no loops is O(1); one that was
+// never looked at is unknown, and those are not the same claim.
+type CodeSymbolStructure struct {
+	Measured   bool
+	TimeBound  string
+	SpaceClaim string
+	LoopDepth  uint32
+	Branches   uint32
+	Pure       bool
 }
 
 // CodeSymbolDetail is one declaration read closely.
@@ -167,7 +240,23 @@ type CodeSymbolDetail struct {
 	// Tests are declarations in test files that reference this one. They are
 	// separated from Callers because "what exercises this" and "what depends
 	// on this" are different questions, and only one of them is evidence.
-	Tests         []CodeSymbolReference
+	Tests []CodeSymbolReference
+	// NamingChecked reports that the atom-naming grammar was run against this
+	// name, and NamingFinding states the violation when there is one. A name is
+	// the part of an atom's contract a caller cannot avoid reading.
+	NamingChecked bool
+	NamingFinding string
+	// Structure is the pipeline's own structural measurement of this
+	// declaration.
+	Structure CodeSymbolStructure
+	// DocumentedFields and MissingFields split the schema's canonical field
+	// list by whether this atom declares them.
+	DocumentedFields []string
+	MissingFields    []string
+	// AccessQuery reads this atom back out of the coordinator's atom index, and
+	// IndexSchema is the table it runs against.
+	AccessQuery   string
+	IndexSchema   string
 	Implements    []string
 	ImplementedBy []string
 }
@@ -182,3 +271,12 @@ var ErrCodeSymbolNotFound = errors.New("code symbol not found")
 // which for a large collection means a page that takes longer to render the
 // more code there is.
 const MaximumCodePage = 500
+
+// MaximumCodeFilePage bounds one page of files.
+//
+// It is far larger than a page of packages because a file row is a path and
+// five numbers, and because a tree missing most of a repository is not that
+// repository. A thousand-file project is ordinary; truncating it at a
+// package-sized page would show an arbitrary slice of the alphabet and call it
+// the directory structure.
+const MaximumCodeFilePage = 5000

@@ -109,7 +109,32 @@ func TestFetchSessionProjectionSnapshotBindsResponseToMountedIdentity(t *testing
 		t.Fatalf("snapshot = %#v, request = %#v", got, client.request)
 	}
 
-	snapshot.ThreadId = snapshotIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD, "thr_01890f3c-4a00-7abc-8def-1123456789ab")
+	// A projection that has not caught up with a brand new task is behind, not
+	// broken: the task exists, the events that carry it into the session
+	// sequence have not been applied yet, and refusing the whole snapshot for
+	// that reason disconnected the console the instant work started.
+	behind := &codefluxv1.SessionProjectionSnapshot{
+		SessionId:       snapshot.GetSessionId(),
+		ThreadId:        snapshot.GetThreadId(),
+		ThroughSequence: snapshot.GetThroughSequence(),
+		ObservedAt:      snapshot.GetObservedAt(),
+	}
+	client.response = &codefluxv1.GetSessionSnapshotResponse{Snapshot: behind}
+	if _, err = fetchSessionProjectionSnapshot(context.Background(), client, sessionID, threadID, taskID); err != nil {
+		t.Fatalf("a snapshot that lags the new task was refused: %v", err)
+	}
+
+	// A snapshot naming a different task is a real mismatch.
+	other := completeSessionProjectionSnapshot(t)
+	other.TaskId = snapshotIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_TASK, "tsk_01890f3c-4a00-7abc-8def-2123456789ab")
+	client.response = &codefluxv1.GetSessionSnapshotResponse{Snapshot: other}
+	if _, err = fetchSessionProjectionSnapshot(context.Background(), client, sessionID, threadID, taskID); !errors.Is(err, errSessionProjectionSnapshotMalformed) {
+		t.Fatalf("task mismatch error = %v", err)
+	}
+
+	mismatched := completeSessionProjectionSnapshot(t)
+	mismatched.ThreadId = snapshotIdentity(codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_THREAD, "thr_01890f3c-4a00-7abc-8def-1123456789ab")
+	client.response = &codefluxv1.GetSessionSnapshotResponse{Snapshot: mismatched}
 	if _, err = fetchSessionProjectionSnapshot(context.Background(), client, sessionID, threadID, taskID); !errors.Is(err, errSessionProjectionSnapshotMalformed) {
 		t.Fatalf("identity mismatch error = %v", err)
 	}

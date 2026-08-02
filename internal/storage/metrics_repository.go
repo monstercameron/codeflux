@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
+
+	"codeflux.dev/codeflux/internal/domain"
 )
 
 // MetricsWindow bounds every scorecard query to an explicit closed interval.
@@ -297,18 +300,57 @@ func (repositories *Repositories) milestoneDuration(
 // Token and cost totals carry an explicit unknown count. A provider that never
 // reported usage must not be averaged in as zero, which would understate spend
 // exactly when it matters.
+//
+// The figures come from provider_attempt_accounting, which the provider
+// execution service writes for every physical attempt. Each attempt may carry
+// several accounting rows as its evidence improves from an estimate to a
+// reconciled provider report, so only the highest sequence per attempt counts;
+// adding every row would report up to four times the tokens that were bought.
 type CostMetrics struct {
 	Window            MetricsWindow
 	InputTokens       Count
+	CachedInputTokens Count
+	CacheWriteTokens  Count
 	OutputTokens      Count
 	ReasoningTokens   Count
-	CostMinorUnits    Count
+	// CostMinorUnits is KnownCost truncated to whole minor units, retained for
+	// the scorecard's run-against-baseline comparison. One provider call
+	// routinely costs a fraction of a minor unit, so this value alone
+	// understates spend and rounds a small window to zero; KnownCost is the
+	// exact figure and the one to report to a person.
+	CostMinorUnits Count
+	// KnownCost is the exact subtotal, in minor units of Currency, of the
+	// attempts that carried a price. Attempts with no known price are excluded
+	// here and counted in CostUnknownCount, so the pair reads as "at least this
+	// much, plus this many calls nobody could price" rather than as a total.
+	KnownCost ExactMinorCost
+	// Currency is set only when every priced attempt in the window agrees on
+	// one. Minor units of different currencies do not add up, so a mixed window
+	// reports no currency and no known cost.
 	Currency          string
 	UsageUnknownCount Count
 	CostUnknownCount  Count
 	ProviderAttempts  Count
 	RepairAttempts    Count
 }
+
+// settledProviderAttempts keeps one accounting row per physical attempt: the
+// highest sequence, which carries the strongest evidence that attempt reached.
+// The rows are append-only and an attempt commonly holds an estimate followed
+// by a provider report, so an aggregate over all of them counts the same
+// tokens more than once.
+const settledProviderAttempts = `
+	WITH settled AS (
+		SELECT
+			usage_known, input_tokens, cached_input_tokens,
+			cache_write_tokens, output_tokens, reasoning_tokens,
+			cost_known, cost_minor_numerator, cost_minor_denominator,
+			currency, created_at_unix_micros,
+			ROW_NUMBER() OVER (
+				PARTITION BY attempt_id ORDER BY sequence DESC
+			) AS recency
+		FROM provider_attempt_accounting
+	)`
 
 // CostMetrics runs the M22-094 queries.
 func (repositories *Repositories) CostMetrics(
@@ -321,39 +363,52 @@ func (repositories *Repositories) CostMetrics(
 	from, to := window.bounds()
 	result := CostMetrics{Window: window}
 
-	const usageQuery = `
+	const usageQuery = settledProviderAttempts + `
 		SELECT
 			COALESCE(sum(CASE WHEN usage_known = 1 THEN input_tokens ELSE 0 END), 0),
+			COALESCE(sum(CASE WHEN usage_known = 1 THEN cached_input_tokens ELSE 0 END), 0),
+			COALESCE(sum(CASE WHEN usage_known = 1 THEN cache_write_tokens ELSE 0 END), 0),
 			COALESCE(sum(CASE WHEN usage_known = 1 THEN output_tokens ELSE 0 END), 0),
 			COALESCE(sum(CASE WHEN usage_known = 1 THEN reasoning_tokens ELSE 0 END), 0),
-			COALESCE(sum(CASE WHEN cost_known = 1 THEN cost_minor ELSE 0 END), 0),
 			COALESCE(sum(CASE WHEN usage_known = 0 THEN 1 ELSE 0 END), 0),
 			COALESCE(sum(CASE WHEN cost_known = 0 THEN 1 ELSE 0 END), 0),
 			count(*)
-		FROM usage_records
-		WHERE created_at_unix_micros BETWEEN ? AND ?`
+		FROM settled
+		WHERE recency = 1 AND created_at_unix_micros BETWEEN ? AND ?`
 	row := repositories.database.sql.QueryRowContext(ctx, usageQuery, from, to)
-	var input, output, reasoning, cost, usageUnknown, costUnknown, attempts int64
+	var input, cachedInput, cacheWrite, output, reasoning int64
+	var usageUnknown, costUnknown, attempts int64
 	if err := row.Scan(
-		&input, &output, &reasoning, &cost, &usageUnknown, &costUnknown, &attempts,
+		&input, &cachedInput, &cacheWrite, &output, &reasoning,
+		&usageUnknown, &costUnknown, &attempts,
 	); err != nil {
-		return CostMetrics{}, classify("aggregate usage records", err)
+		return CostMetrics{}, classify("aggregate provider attempt usage", err)
 	}
 	result.InputTokens = knownCount(input)
+	result.CachedInputTokens = knownCount(cachedInput)
+	result.CacheWriteTokens = knownCount(cacheWrite)
 	result.OutputTokens = knownCount(output)
 	result.ReasoningTokens = knownCount(reasoning)
-	result.CostMinorUnits = knownCount(cost)
 	result.UsageUnknownCount = knownCount(usageUnknown)
 	result.CostUnknownCount = knownCount(costUnknown)
 	result.ProviderAttempts = knownCount(attempts)
 
-	// A single currency is only reported when the window contains exactly one,
-	// because summing minor units across currencies would be meaningless.
-	currency, err := repositories.singleCurrency(ctx, from, to)
+	// A window whose priced attempts disagree on currency has no total to
+	// report, and CostMinorUnits stays unknown rather than carrying a sum of
+	// unlike units.
+	cost, known, err := repositories.settledCostSubtotal(ctx, from, to)
 	if err != nil {
 		return CostMetrics{}, err
 	}
-	result.Currency = currency
+	if known {
+		result.KnownCost = cost
+		result.Currency = string(cost.Currency)
+		if cost.Denominator > 0 {
+			result.CostMinorUnits = knownCount(cost.Numerator / cost.Denominator)
+		} else {
+			result.CostMinorUnits = knownCount(0)
+		}
+	}
 
 	repairs, err := repositories.scalar(ctx,
 		`SELECT count(*) FROM repair_attempts WHERE created_at_unix_micros BETWEEN ? AND ?`,
@@ -365,33 +420,73 @@ func (repositories *Repositories) CostMetrics(
 	return result, nil
 }
 
-func (repositories *Repositories) singleCurrency(
+// settledCostSubtotal adds the exact cost of every priced attempt in the
+// window.
+//
+// Grouping on currency and denominator lets SQLite add the numerators as
+// integers, so the number of rational additions is the number of distinct
+// prices in the window rather than the number of calls. The result reports
+// unknown when two currencies appear, because their minor units are not the
+// same unit and adding them produces a figure that means nothing.
+func (repositories *Repositories) settledCostSubtotal(
 	ctx context.Context,
 	from, to int64,
-) (string, error) {
-	rows, err := repositories.database.sql.QueryContext(ctx,
-		`SELECT DISTINCT currency FROM usage_records
-		 WHERE currency IS NOT NULL AND created_at_unix_micros BETWEEN ? AND ?`,
-		from, to)
+) (ExactMinorCost, bool, error) {
+	const query = settledProviderAttempts + `
+		SELECT currency, cost_minor_denominator, sum(cost_minor_numerator)
+		FROM settled
+		WHERE recency = 1
+		  AND cost_known = 1
+		  AND created_at_unix_micros BETWEEN ? AND ?
+		GROUP BY currency, cost_minor_denominator`
+	rows, err := repositories.database.sql.QueryContext(ctx, query, from, to)
 	if err != nil {
-		return "", classify("read usage currencies", err)
+		return ExactMinorCost{}, false, classify("read settled costs", err)
 	}
 	defer func() { _ = rows.Close() }()
-	currencies := make([]string, 0, 2)
+
+	total := new(big.Rat)
+	currency := ""
 	for rows.Next() {
-		var currency string
-		if err := rows.Scan(&currency); err != nil {
-			return "", classify("scan usage currency", err)
+		var rowCurrency string
+		var denominator, numerator int64
+		if err := rows.Scan(&rowCurrency, &denominator, &numerator); err != nil {
+			return ExactMinorCost{}, false, classify("scan settled cost", err)
 		}
-		currencies = append(currencies, currency)
+		if denominator <= 0 {
+			return ExactMinorCost{}, false, fmt.Errorf(
+				"settled cost has denominator %d", denominator)
+		}
+		switch {
+		case currency == "":
+			currency = rowCurrency
+		case currency != rowCurrency:
+			return ExactMinorCost{}, false, nil
+		}
+		total.Add(total, new(big.Rat).SetFrac(
+			big.NewInt(numerator), big.NewInt(denominator)))
 	}
 	if err := rows.Err(); err != nil {
-		return "", classify("iterate usage currencies", err)
+		return ExactMinorCost{}, false, classify("iterate settled costs", err)
 	}
-	if len(currencies) == 1 {
-		return currencies[0], nil
+	if currency == "" {
+		// No priced attempt in the window. Nothing was bought, so the subtotal
+		// is an exact zero rather than an unknown, and the caller's currency
+		// stays empty.
+		return ExactMinorCost{}, true, nil
 	}
-	return "", nil
+	if !total.Num().IsInt64() || !total.Denom().IsInt64() {
+		return ExactMinorCost{}, false, nil
+	}
+	exact, err := normalizeExactCost(ExactMinorCost{
+		Numerator:   total.Num().Int64(),
+		Denominator: total.Denom().Int64(),
+		Currency:    domain.CurrencyCode(currency),
+	})
+	if err != nil {
+		return ExactMinorCost{}, false, fmt.Errorf("settled cost: %w", err)
+	}
+	return exact, true, nil
 }
 
 // ForecastAccuracyMetrics is M22-095: forecast error and interval coverage.

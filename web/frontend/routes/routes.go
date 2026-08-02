@@ -21,6 +21,8 @@ const (
 	ThreadWorkspace   Name = "thread-workspace"
 	Graphs            Name = "graphs"
 	Memory            Name = "memory"
+	Code              Name = "code"
+	Atoms             Name = "atoms"
 	Settings          Name = "settings"
 	Diagnostics       Name = "diagnostics"
 	FirstRun          Name = "first-run"
@@ -43,10 +45,18 @@ type Spec struct {
 // Map returns the complete stable route map.
 func Map() []Spec {
 	return []Spec{
-		{Name: RepositoryChooser, Pattern: "/"},
+		{Name: RepositoryChooser, Pattern: "/repositories"},
 		{Name: ThreadWorkspace, Pattern: "/workspace/{repository_id}/thread/{thread_id}"},
 		{Name: Graphs, Pattern: "/graphs"},
 		{Name: Memory, Pattern: "/workspace/{repository_id}/memory"},
+		// Code is the repository's own collection: its packages, its
+		// declarations, and the documentation each one carries about itself.
+		{Name: Code, Pattern: "/workspace/{repository_id}/code"},
+		// Atoms is the collection read atom-first: every declaration admitted
+		// as an atom across every package, with the documentation it carries.
+		// The code route answers "what is in this package"; this one answers
+		// "what can be called, and what does it promise".
+		{Name: Atoms, Pattern: "/workspace/{repository_id}/atoms"},
 		{Name: Settings, Pattern: "/settings"},
 		{Name: Diagnostics, Pattern: "/diagnostics"},
 		{Name: FirstRun, Pattern: "/first-run"},
@@ -82,7 +92,11 @@ func Parse(raw string) (Route, error) {
 	}
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	switch {
-	case path == "/":
+	case path == "/", path == "/repositories":
+		// The front door and the chooser are the same view. Which one a person
+		// actually lands on is decided by Restore, because "/" should put
+		// somebody into the work they already have open rather than asking them
+		// to pick a repository they picked days ago.
 		return Route{Name: RepositoryChooser}, nil
 	case path == "/settings":
 		return Route{Name: Settings}, nil
@@ -98,6 +112,18 @@ func Parse(raw string) (Route, error) {
 			return Route{}, parseErr
 		}
 		return Route{Name: Memory, RepositoryID: repositoryID}, nil
+	case len(parts) == 3 && parts[0] == "workspace" && parts[2] == "code":
+		repositoryID, parseErr := parseRepositoryID(parts[1])
+		if parseErr != nil {
+			return Route{}, parseErr
+		}
+		return Route{Name: Code, RepositoryID: repositoryID}, nil
+	case len(parts) == 3 && parts[0] == "workspace" && parts[2] == "atoms":
+		repositoryID, parseErr := parseRepositoryID(parts[1])
+		if parseErr != nil {
+			return Route{}, parseErr
+		}
+		return Route{Name: Atoms, RepositoryID: repositoryID}, nil
 	case len(parts) == 4 && parts[0] == "workspace" && parts[2] == "thread":
 		repositoryID, parseErr := parseRepositoryID(parts[1])
 		if parseErr != nil {
@@ -139,6 +165,16 @@ func Path(route Route) (string, error) {
 			return "", fmt.Errorf("%w: memory requires repository id", ErrInvalidRoute)
 		}
 		return "/workspace/" + route.RepositoryID.String() + "/memory", nil
+	case Code:
+		if route.RepositoryID.IsZero() {
+			return "", fmt.Errorf("%w: code requires repository id", ErrInvalidRoute)
+		}
+		return "/workspace/" + route.RepositoryID.String() + "/code", nil
+	case Atoms:
+		if route.RepositoryID.IsZero() {
+			return "", fmt.Errorf("%w: atoms requires repository id", ErrInvalidRoute)
+		}
+		return "/workspace/" + route.RepositoryID.String() + "/atoms", nil
 	case ThreadWorkspace:
 		if route.RepositoryID.IsZero() || route.ThreadID.IsZero() {
 			return "", fmt.Errorf("%w: workspace requires repository and thread ids", ErrInvalidRoute)
@@ -274,10 +310,15 @@ func ValidateWorkspaceRelativePath(raw string) (string, error) {
 
 // RestorationContext contains only server-confirmed access information.
 type RestorationContext struct {
-	Authenticated          bool
-	Compatible             bool
-	FirstRunComplete       bool
-	CoordinatorAvailable   bool
+	Authenticated        bool
+	Compatible           bool
+	FirstRunComplete     bool
+	CoordinatorAvailable bool
+	// OpenRepositoryID and OpenThreadID are the conversation the coordinator
+	// says is open. They are what lets the front door land in the work instead
+	// of on a chooser.
+	OpenRepositoryID       domain.RepositoryID
+	OpenThreadID           domain.ThreadID
 	AccessibleRepositories map[string]bool
 	AccessibleThreads      map[string]bool
 	ArchivedThreads        map[string]bool
@@ -302,6 +343,20 @@ type Restoration struct {
 	Reason RestoreReason
 }
 
+// isFrontDoor reports whether a path is the bare entry point.
+//
+// Only "/" redirects. Somebody who asks for "/repositories" is asking for the
+// chooser and gets it, so the rail item that goes there is not a control that
+// bounces you somewhere else.
+func isFrontDoor(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	path := strings.TrimSuffix(parsed.EscapedPath(), "/")
+	return path == ""
+}
+
 // Restore accepts a stored path only after current server authorization and
 // compatibility are established. A stored path never grants access.
 func Restore(raw string, context RestorationContext) Restoration {
@@ -318,11 +373,26 @@ func Restore(raw string, context RestorationContext) Restoration {
 		return Restoration{Route: Route{Name: FirstRun}, Reason: RestoreFirstRun}
 	}
 	route, err := Parse(raw)
+	if err == nil && route.Name == RepositoryChooser && isFrontDoor(raw) &&
+		!context.OpenRepositoryID.IsZero() && !context.OpenThreadID.IsZero() {
+		// The front door opens onto the work, not onto a chooser. Landing on a
+		// repository picker that reads "Disconnected" — because no conversation
+		// is selected, so no session is streaming — made a working product look
+		// dead, with the open thread hidden behind one faint row.
+		return Restoration{
+			Route: Route{
+				Name:         ThreadWorkspace,
+				RepositoryID: context.OpenRepositoryID,
+				ThreadID:     context.OpenThreadID,
+			},
+			Reason: RestoreAccepted,
+		}
+	}
 	if err != nil {
 		return Restoration{Route: Route{Name: RepositoryChooser}, Reason: RestoreMalformed}
 	}
 	switch route.Name {
-	case Memory, ThreadWorkspace:
+	case Memory, Code, Atoms, ThreadWorkspace:
 		if !context.AccessibleRepositories[route.RepositoryID.String()] {
 			return Restoration{Route: Route{Name: RepositoryChooser}, Reason: RestoreRepositoryUnavailable}
 		}
@@ -347,6 +417,27 @@ func Restore(raw string, context RestorationContext) Restoration {
 // which are not routes, and refused /graphs, which is — so the navigation rail
 // sent a person to a server 404.
 func IsApplicationPath(path string) bool {
+	if isUnscopedEntryPath(path) {
+		return true
+	}
 	route, err := Parse(path)
 	return err == nil && route.Name != NotFound
+}
+
+// isUnscopedEntryPath reports the paths the browser application routes without
+// a repository in them.
+//
+// The client offers "/tasks" and "/memory" as entry points and resolves each to
+// a scoped route once a repository is open, but the canonical forms carry the
+// repository, so Parse refuses the bare ones. The server answered a person who
+// reloaded or deep-linked either of them with a plain-text 404 from its own
+// router — the interface never loaded at all. Serving the document lets the
+// application do what it already knows how to do with them.
+func isUnscopedEntryPath(path string) bool {
+	switch strings.TrimSuffix(path, "/") {
+	case "/tasks", "/memory", "/atoms", "/code":
+		return true
+	default:
+		return false
+	}
 }

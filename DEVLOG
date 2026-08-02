@@ -24,6 +24,50 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-018
+Date: 2026-08-02
+Status: CHECKPOINT committed with lint and tests failing, by explicit direction
+Change-ID: CL-20260802-009
+Request-or-TODO: User: "commit all code and push to remote", then "just commit
+  everything for now", then "stop wasting time runnig tests the code isnt worth
+  testing rn, just fuckig commit and push codeflux"
+Goal: Get every uncommitted change into history and onto the remote
+Assumptions: The user wants the snapshot preserved and pushed now, and accepts
+  that the gates are red. This was raised explicitly before committing and
+  reaffirmed twice, so it is a decision rather than an oversight
+Decisions: Split into three commits rather than one, so the metadata and the
+  design references -- both self-contained and gate-clean -- are separately
+  reviewable and revertible, and only this third commit carries the failing
+  state. Two mechanical repairs were made to WIP code owned by other lanes,
+  after asking and being told to keep both: gofmt across 20 files under web/,
+  and design.HeadingPanel applied to five unclassed headings in
+  web/frontend/codecollection/component.go. The heading role is a judgement made
+  on another lane's behalf and may be wrong -- HeadingRailLabel is arguably
+  right for the two that head lists -- so it is named here for that lane to
+  correct. The 35 unused declarations were NOT deleted: they are work in
+  progress, and removing them would destroy a lane's half-finished code to make
+  a linter quiet
+Files-or-schemas: 79 modified tracked files and the remaining untracked ones --
+  internal/coordinator agent stages, internal/storage repositories,
+  internal/transport services, internal/openaimodel, internal/executor,
+  internal/frontendtest, web/client, web/frontend, TODOS.md, docs/plan.md.
+  Migrations 000030 and 000031 added
+Validation: gofmt clean. go build ./... exits 0. staticcheck: 44 findings.
+  test-fast: exit 1. Committed regardless, by direction
+Failures-or-discarded-approaches: Three gates were cleared in sequence before it
+  became clear the rest could not be: gofmt flagged 222 files, of which 202 were
+  under .artifacts/ and irrelevant, leaving 20 real ones; a CRLF false positive
+  was ruled out first by checking for CR bytes, since gofmt -l has misreported
+  on CRLF here before. The heading-contrast check then failed on five headings.
+  staticcheck's 44 findings could not be cleared without deleting other lanes'
+  work, which is where the attempt stopped
+Known-limitations: This revision does not pass the repository's own gates and
+  must not be treated as a base for anything. The failing test package is
+  unidentified. The pipeline stage ledger's two migrations are now immutable
+Next-safe-step: Re-run codeflux-dev test-fast with full output retained,
+  identify the failing package, and open a task for the 35 unused declarations
+  so each is either wired up or removed by the lane that wrote it
+
 Dev-Log: DL-20260802-017
 Date: 2026-08-02
 Status: Design references tracked

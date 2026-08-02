@@ -193,13 +193,51 @@ func eventIdentity(event events.SessionEvent) string {
 }
 
 // eventLabel renders what an event says, in the reader's terms.
+// eventPhrase names each durable event kind in the words a person uses.
+//
+// This is a translation, not an invention: the kinds are a closed registry, and
+// every phrase here says exactly what its kind means. The raw kind remains the
+// fallback for anything a newer coordinator sends that this client has never
+// heard of, so an unknown event is still reported rather than hidden.
+var eventPhrase = map[events.Kind]string{
+	events.KindMessageDelta:              "Writing a message",
+	events.KindMessageFinal:              "Wrote a message",
+	events.KindThreadCreated:             "Opened the thread",
+	events.KindThreadRenamed:             "Renamed the thread",
+	events.KindThreadArchived:            "Archived the thread",
+	events.KindPlanCreated:               "Proposed a plan",
+	events.KindPlanChanged:               "Revised the plan",
+	events.KindToolStarted:               "Started a tool",
+	events.KindToolProgress:              "Tool is working",
+	events.KindToolCompleted:             "Tool finished",
+	events.KindApprovalRequested:         "Asked for approval",
+	events.KindApprovalResolved:          "Approval answered",
+	events.KindTaskStateChanged:          "Task state changed",
+	events.KindForecastUpdated:           "Updated the forecast",
+	events.KindUsageUpdated:              "Reported token usage",
+	events.KindCostUpdated:               "Reported cost",
+	events.KindBudgetUpdated:             "Updated the budget",
+	events.KindValidationUpdated:         "Ran a check",
+	events.KindGraphSnapshot:             "Rebuilt the graph",
+	events.KindGraphPatch:                "Updated the graph",
+	events.KindCheckpointCreated:         "Recorded a checkpoint",
+	events.KindRecoveryRequired:          "Recovery required",
+	events.KindError:                     "Reported an error",
+	events.KindChangeAcceptanceUpdated:   "Change acceptance updated",
+	events.KindTaskProjectionInvalidated: "Projection invalidated",
+}
+
 func eventLabel(event events.SessionEvent) string {
 	kind := strings.TrimSpace(string(event.Kind))
 	if kind == "" {
 		return "unnamed event"
 	}
-	// The kind is the honest label. Inventing prose here would put words in
-	// the coordinator's mouth that no durable record contains.
+	// A run is watched by a person, and "tool-started" is the name of a wire
+	// constant rather than of anything that happened. The phrase says the same
+	// thing in the words the rest of the console is written in.
+	if phrase, named := eventPhrase[event.Kind]; named {
+		return phrase
+	}
 	return strings.ReplaceAll(kind, "_", " ")
 }
 

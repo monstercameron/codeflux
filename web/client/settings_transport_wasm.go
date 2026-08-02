@@ -9,7 +9,20 @@ import (
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/web/frontend/settingsview"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// recentSpendWindow is the period the settings page reports spend for.
+//
+// A month is long enough that a figure is not empty for anyone who used the
+// product this week, and short enough that it answers "what has this been
+// costing me" rather than "what has it ever cost". The label is returned with
+// the bounds so the page states the period it is showing; a spend figure with
+// no period attached is read as covering now, whatever it covers.
+func recentSpendWindow() (time.Time, time.Time, string) {
+	until := time.Now().UTC()
+	return until.AddDate(0, 0, -30), until, "the last 30 days"
+}
 
 // readMountedSettings asks the coordinator for the policy and the recorded
 // providers in one exchange.
@@ -36,9 +49,30 @@ func readMountedSettings(
 	if err != nil {
 		return settingsAnswer{}, err
 	}
+	flow, err := client.GetFlowSettings(ctx, &codefluxv1.GetFlowSettingsRequest{
+		WorkspaceId: workspace,
+	})
+	if err != nil {
+		return settingsAnswer{}, err
+	}
 	answer := settingsAnswer{
-		Policy:    projectSettingsPolicy(policy),
-		Providers: projectSettingsProviders(models),
+		Policy:           projectSettingsPolicy(policy),
+		Providers:        projectSettingsProviders(models),
+		Flow:             projectFlowSettings(flow),
+		FlowUnrenderable: flow.GetUnrenderable(),
+		FlowRevision:     flow.GetRevision(),
+	}
+	// Spend is supplementary: the page is still worth drawing without it. A
+	// failed read therefore leaves the panel unknown, which renders as "no
+	// figure" rather than failing the whole surface or, worse, showing a zero.
+	since, until, windowLabel := recentSpendWindow()
+	spend, spendErr := client.GetSpendSummary(ctx, &codefluxv1.GetSpendSummaryRequest{
+		WorkspaceId: workspace,
+		Since:       timestamppb.New(since),
+		Until:       timestamppb.New(until),
+	})
+	if spendErr == nil {
+		answer.Spend = projectSpendSummary(spend, windowLabel)
 	}
 	if timeout, present := settingsRequestTimeout(models); present {
 		answer.Policy.RequestTimeout = time.Duration(timeout)

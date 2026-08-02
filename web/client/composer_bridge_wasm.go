@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
 	"codeflux.dev/codeflux/internal/domain"
@@ -40,8 +39,8 @@ func sendComposerCommand(
 	// a reason that has nothing to do with what they wrote.
 	if _, startErr := startRequestedTask(
 		ctx, codefluxv1.NewTaskServiceClient(connection), command, messageID,
-	); startErr != nil && !errors.Is(startErr, errNoDeclaredTaskClass) {
-		return messageID, startErr
+	); startErr != nil {
+		return messageID, taskStartError{cause: startErr}
 	}
 	return messageID, nil
 }

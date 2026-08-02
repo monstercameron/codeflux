@@ -665,3 +665,41 @@ func validEventForKind(
 	}
 	return event
 }
+
+// TestASecondTaskInAThreadReplacesTheProjectionInsteadOfFailingIt covers the
+// ordinary case that used to disconnect the console: a person sends a second
+// request in a thread, the coordinator creates another task, and its snapshot
+// names a task the projection has never seen.
+func TestASecondTaskInAThreadReplacesTheProjectionInsteadOfFailingIt(t *testing.T) {
+	ids := newProjectionTestIDs(t)
+	projection, err := ApplySessionSnapshot(New(), snapshotFor(ids, 3, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondTask, err := domain.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := snapshotFor(ids, 6, 6)
+	next.Session.TaskID = &secondTask
+	adopted, err := ApplySessionSnapshot(projection, next)
+	if err != nil {
+		t.Fatalf("a second task was refused: %v", err)
+	}
+	if adopted.Snapshot().Session.TaskID == nil || *adopted.Snapshot().Session.TaskID != secondTask {
+		t.Fatalf("the projection kept the previous task: %+v", adopted.Snapshot().Session)
+	}
+	if adopted.Diagnostics().Repair != nil || adopted.LastAppliedSequence() != 6 {
+		t.Fatalf("adoption left repair state: %+v", adopted.Diagnostics())
+	}
+
+	// A snapshot naming another task while sitting behind the applied cursor is
+	// still stale, and still refused.
+	stale := snapshotFor(ids, 2, 2)
+	stale.Session.TaskID = &secondTask
+	refused, err := ApplySessionSnapshot(adopted, stale)
+	if !errors.Is(err, ErrSnapshotRepairRequired) || refused.LastAppliedSequence() != 6 {
+		t.Fatalf("a stale second-task snapshot was adopted: %v", err)
+	}
+}

@@ -213,10 +213,27 @@ func TestTheServerServesExactlyWhatTheClientRoutes(t *testing.T) {
 		})
 	}
 
+	// The client's router registers "/tasks" and "/memory" as entry points and
+	// resolves each into a scoped route once a repository is open, so both are
+	// served: refusing them answered a reload or a deep link with a plain-text
+	// 404 and the interface never loaded at all.
+	for _, path := range []string{"/tasks", "/memory"} {
+		t.Run("serves entry path "+path, func(t *testing.T) {
+			response, err := server.Client().Get(server.URL + path)
+			if err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+			defer response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				t.Fatalf("GET %s = %d; the client routes this entry path", path, response.StatusCode)
+			}
+		})
+	}
+
 	// A path the client cannot route must not receive the document either:
 	// serving it produces a page that mounts and then renders not-found,
 	// which is a worse answer than the honest one.
-	for _, path := range []string{"/tasks", "/memory", "/workspace", "/nope"} {
+	for _, path := range []string{"/workspace", "/nope"} {
 		t.Run("refuses "+path, func(t *testing.T) {
 			response, err := server.Client().Get(server.URL + path)
 			if err != nil {

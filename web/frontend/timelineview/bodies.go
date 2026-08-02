@@ -8,6 +8,7 @@ import (
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/readout"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
@@ -125,10 +126,9 @@ func renderMessage(message timelinecard.Message, props Props) ui.Node {
 		}
 	}
 	if props.Actions.OnCopy != nil {
-		children = append(children, primitives.Button(primitives.ButtonProps{
-			Label: "Copy message", Mode: props.Mode,
-			OnClick: func() { props.Actions.OnCopy(message.Body) },
-		}))
+		// The copy action is drawn by the card header. Kept here it added a
+		// forty-four pixel row under every message in the transcript.
+		_ = message.Body
 	}
 	role := messagePresentationRole(message.Role)
 	return html.Div(html.Props{
@@ -684,7 +684,7 @@ func moneyText(value domain.Money) string {
 	if value.Validate() != nil {
 		return "Unknown"
 	}
-	return fmt.Sprintf("%d %s minor units", value.MinorUnits, value.Currency)
+	return readout.FormatExactMoneyForReading(value)
 }
 
 func moneyOrUnknown(value domain.Money) string { return moneyText(value) }
@@ -737,21 +737,29 @@ func messageBodyClass(mode primitives.Mode, role string) string {
 		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)),
 		css.MinWidth(css.Zero), css.MaxWidth(css.Percent(100)),
 	}
-	if role == "user" {
-		rules = append(rules,
-			css.Padding(css.Px(tokens.Spacing.MD)),
-			css.Bg(css.Hex(string(tokens.Colors.Surface3))),
-			css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
-			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-		)
-	}
+	// A message used to be drawn in a bordered box inside the bordered card
+	// that already announced it, one box inside another saying the same thing.
+	// What separates a person's words from the agent's is now the entry itself
+	// and the spine node beside it.
+	_ = role
 	return css.New(rules...).String()
 }
 
+// definitionListClass lays a card's facts out as label and value.
+//
+// The label column took its minimum content width, so "Affected action" broke
+// across two lines beside a one-word value. It now reserves a readable measure
+// and gives the rest to the value.
 func definitionListClass(mode primitives.Mode) string {
 	return css.New(
-		u.Grid, css.GridCols(css.TrackMinContent, css.MinMax(css.TrackLen(css.Zero), css.Fr(1))),
-		css.ColumnGap(css.Px(mode.Tokens().Spacing.SM)), css.RowGap(css.Px(mode.Tokens().Spacing.XS)), css.Margin(css.Zero),
+		u.Grid,
+		css.GridCols(
+			css.MinMax(css.TrackLen(css.Px(116)), css.TrackLen(css.Auto)),
+			css.MinMax(css.TrackLen(css.Zero), css.Fr(1)),
+		),
+		css.ColumnGap(css.Px(mode.Tokens().Spacing.MD)),
+		css.RowGap(css.Px(mode.Tokens().Spacing.XS)),
+		css.Margin(css.Zero),
 	).String()
 }
 
@@ -804,13 +812,28 @@ func secondaryDetailsBodyClass(mode primitives.Mode) string {
 
 func disclosureSummaryClass(mode primitives.Mode) string {
 	tokens := mode.Tokens()
-	return css.New(
-		u.Flex, u.ItemsCenter,
+	// A disclosure inside an entry is an aside, not a heading. It keeps the
+	// full pointer target and takes the smallest label the system has, so an
+	// entry reads as one thing with a way in rather than as two stacked rows.
+	rules := []css.Rule{
+		u.InlineFlex, u.ItemsCenter,
+		css.Gap(css.Px(tokens.Spacing.XS)),
 		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
-		css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
-		css.LineHeightLen(css.Px(tokens.Typography.CompactBody.LineHeight)),
-		css.FontWeight.Semibold, css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
-	).String()
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		css.LineHeightLen(css.Px(tokens.Typography.Metadata.LineHeight)),
+		css.FontWeight.Semibold,
+		css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+		css.Cursor.Pointer,
+	}
+	rules = append(rules, css.Hover(
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	return css.New(rules...).String()
 }
 
 func forecastMetricGridClass(mode primitives.Mode) string {

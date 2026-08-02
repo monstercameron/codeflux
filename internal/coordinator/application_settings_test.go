@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,6 +131,77 @@ func TestTheSettingsSurfacesAnswerOverTheGeneratedClient(t *testing.T) {
 		t.Fatalf("test unknown provider = %v, want NotFound", err)
 	}
 
+	// A recorded provider becomes one row naming it. No model is catalogued
+	// for it, because nothing in this product writes the model catalogue yet,
+	// so the row reports a provider that cannot be used rather than being
+	// omitted and leaving nothing to configure.
+	registered, err := application.repos.EnsureProviderRegistration(
+		t.Context(),
+		storage.EnsureProviderRegistration{
+			DisplayName: "OpenAI", ProviderType: "openai",
+			AdapterName: "openai-responses", AdapterVersion: "1",
+			ProviderVersion: "responses-v1", EndpointRedacted: "https://api.openai.com/v1",
+			CapabilitiesJSON: `{"streaming":true}`,
+			ModelIdentifier:  "gpt-5.6-sol", ModelVersion: "2026-05",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, err = client.GetModels(ctx, &codefluxv1.GetModelsRequest{WorkspaceId: workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	views := models.GetModels()
+	if len(views) != 1 {
+		t.Fatalf("want one provider row, got %d: %+v", len(views), views)
+	}
+	if views[0].GetModelId() != "" || views[0].GetDisplayName().GetValue() != "OpenAI" {
+		t.Fatalf("provider row lost a field: %+v", views[0])
+	}
+	if views[0].GetProviderId().GetValue() != registered.ProviderID.String() {
+		t.Fatalf("provider row names %q, want %q",
+			views[0].GetProviderId().GetValue(), registered.ProviderID.String())
+	}
+	// No credential is bound, so the provider is not available. Reporting it as
+	// available would tell somebody a run could start.
+	if views[0].GetAvailable() {
+		t.Fatal("a provider with no bound credential must not be reported as available")
+	}
+
+	registeredIdentity, err := transport.ProviderIDToProto(registered.ProviderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked, err := client.TestProvider(ctx, &codefluxv1.TestProviderRequest{
+		ProviderId: registeredIdentity,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked.GetReachable() {
+		t.Fatal("a provider with no bound credential must not check as resolved")
+	}
+	// Every summary this check produces says a provider request was not made,
+	// whatever the outcome. A local credential lookup reported as a connection
+	// test would tell somebody their endpoint, network, and key all work when
+	// only the last of the three was looked at.
+	if !strings.Contains(checked.GetSummary().GetValue(), "No provider request was made") {
+		t.Fatalf("summary omits what was not done: %q", checked.GetSummary().GetValue())
+	}
+
+	// The request contract names the model a credential is configured for, and
+	// nothing in this product writes the model catalogue yet, so this is
+	// refused rather than recorded against a model nobody has evidence for.
+	if _, err := client.ConfigureProvider(ctx, &codefluxv1.ConfigureProviderRequest{
+		Control:             &codefluxv1.MutationControl{IdempotencyKey: "settings-configure-2"},
+		WorkspaceId:         workspace,
+		ProviderId:          registeredIdentity,
+		CredentialReference: "os://codeflux/openai",
+		ModelId:             "gpt-5.6-sol",
+	}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("configure against an uncatalogued model = %v, want InvalidArgument", err)
+	}
 }
 
 // TestAStoredUserSettingsLayerBeatsTheCompiledDefault exercises the fixed

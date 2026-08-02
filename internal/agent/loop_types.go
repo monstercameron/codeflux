@@ -140,9 +140,19 @@ type ModelTurn struct {
 	ModelRequestID domain.ModelRequestID
 	Model          providers.ModelIdentity
 	ToolCalls      []ModelToolCall
-	Completion     CompletionSignal
-	Usage          providers.Usage
-	Cost           providers.ExactAmount
+	// MessageRedacted is what the model said in words this turn.
+	//
+	// The loop itself acts on tool calls and the completion signal, not on
+	// prose, and it is right to: a run driven by what a model claims rather
+	// than by what it did is not supervised. But the text was being collected,
+	// scanned for a completion keyword, and then discarded, so a caller that
+	// asked the model a question — rather than asking it to work — had no way
+	// to read the answer. Carrying it costs nothing and makes a direct
+	// question answerable through the same port.
+	MessageRedacted string
+	Completion      CompletionSignal
+	Usage           providers.Usage
+	Cost            providers.ExactAmount
 }
 
 // FixedModel is the already-budgeted fixed-provider turn boundary. Provider

@@ -79,8 +79,13 @@ func sessionViewForLifecycle(status sessionclient.Status) frontendstate.SessionV
 			view.Message = "Live session updates are unavailable."
 		}
 	default:
-		view.Connection = frontendstate.ConnectionDisconnected
-		view.Message = "No live session is connected."
+		// A selected thread whose stream has not reported yet is opening, not
+		// disconnected. Reporting the idle moment as a fault made every page
+		// load flash "Local Disconnected" and dead-lock the composer with
+		// "reconnect to send this draft" for the two seconds before the first
+		// status arrived.
+		view.Connection = frontendstate.ConnectionConnecting
+		view.Message = "Opening the live session."
 	}
 	return view
 }

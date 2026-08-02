@@ -8,6 +8,7 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/readout"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
@@ -62,15 +63,25 @@ type Props struct {
 	// and a guess would land inside the fingerprint that gates project-memory
 	// retrieval and routing. Everything else a task needs — the base revision,
 	// the toolchain, the validation profile — the coordinator reads for itself.
-	TaskClass                 string
-	OnTaskClassChange         func(string)
-	OnTextChange              func(string)
-	OnSubmitRequested         func()
-	OnRetryRequested          func(IdempotencyKey)
-	OnPolicyChange            func(domain.PolicyPreset, bool)
-	OnBudgetMinorUnitsChange  func(string)
-	OnModelChange             func(ModelOverride, bool)
-	OnEffortChange            func(domain.ReasoningEffort, bool)
+	TaskClass                string
+	OnTaskClassChange        func(string)
+	OnTextChange             func(string)
+	OnSubmitRequested        func()
+	OnRetryRequested         func(IdempotencyKey)
+	OnPolicyChange           func(domain.PolicyPreset, bool)
+	OnBudgetMinorUnitsChange func(string)
+	OnModelChange            func(ModelOverride, bool)
+	OnEffortChange           func(domain.ReasoningEffort, bool)
+	// Notice reports what happened to the work a message asked for, which is a
+	// different fact from whether the message was delivered. It is a status,
+	// not an error: the request is durable either way.
+	Notice                    string
+	OptionsOpen               bool
+	OnOptionsOpen             func()
+	OnOptionsDismiss          func()
+	TaskControlsOpen          bool
+	OnTaskControlsOpen        func()
+	OnTaskControlsDismiss     func()
 	OnOpenAttachmentPicker    func()
 	AttachmentPickerOpen      bool
 	AttachmentOptions         []RepositoryAttachment
@@ -90,6 +101,23 @@ func Composer(props Props) ui.Node {
 	mutationDisabled := props.Disabled || props.MutationDisabled
 	composing := ui.UseRef(false)
 	focus := ui.UseFocusManager()
+	// The two option surfaces are owned here. They are interaction state of one
+	// control — nothing durable, nothing the coordinator needs to know — so
+	// they do not travel up through the application and back down again.
+	optionsOpen := ui.UseState(false)
+	taskControlsOpen := ui.UseState(false)
+	props.OptionsOpen = optionsOpen.Get()
+	props.OnOptionsOpen = func() { optionsOpen.Set(true) }
+	props.OnOptionsDismiss = func() {
+		optionsOpen.Set(false)
+		ui.PostAsync(func() { focus.FocusByID("composer-options") })
+	}
+	props.TaskControlsOpen = taskControlsOpen.Get()
+	props.OnTaskControlsOpen = func() { taskControlsOpen.Set(true) }
+	props.OnTaskControlsDismiss = func() {
+		taskControlsOpen.Set(false)
+		ui.PostAsync(func() { focus.FocusByID("composer-task-controls-trigger") })
+	}
 	requestedSubmit := props.OnSubmitRequested
 	stableSubmit := ui.UseEvent(func() {
 		if requestedSubmit != nil {
@@ -181,6 +209,7 @@ func Composer(props Props) ui.Node {
 					Role: "group", Aria: map[string]string{"label": "Message options"},
 					Class: composerCommandTrayClass(props.Mode.Tokens()),
 				},
+					composerTaskClassControl(props, busy || mutationDisabled),
 					composerAttachments(props, busy || mutationDisabled),
 					composerOverrideControls(props, busy || mutationDisabled),
 					composerTaskControls(props, busy, mutationDisabled),
@@ -195,6 +224,22 @@ func Composer(props Props) ui.Node {
 		children = append(children, html.P(html.Props{
 			ID: "composer-mutation-disabled-reason", Role: "status",
 			Text: props.MutationDisabledReason, Class: composerMutationStatusClass(props.Mode.Tokens()),
+		}))
+	}
+	if strings.TrimSpace(props.Notice) != "" {
+		children = append(children, html.P(html.Props{
+			ID: "composer-start-notice", Role: "status", Text: props.Notice,
+			Data: map[string]string{"component": "composer-start-notice"},
+			Class: css.New(
+				css.Margin(css.RawLength("6px 0 0")),
+				css.Padding(css.RawLength("8px 10px")),
+				css.Rounded(css.Px(props.Mode.Tokens().Geometry.ControlRadius)),
+				css.Bg(css.Hex(string(props.Mode.Tokens().Colors.Surface1))),
+				css.BorderLeft(css.Px(2), css.Hex(string(props.Mode.Tokens().Colors.Warning))),
+				css.Font(css.FontStack(props.Mode.Tokens().Fonts.UI)),
+				css.FontSize(css.Px(props.Mode.Tokens().Typography.Metadata.Size)),
+				css.TextColor(css.Hex(string(props.Mode.Tokens().Colors.TextSecondary))),
+			).String(),
 		}))
 	}
 	children = append(children, html.P(html.Props{
@@ -305,6 +350,44 @@ func attachmentGlyph(kind AttachmentKind) string {
 	return "▤"
 }
 
+// composerTaskClassControl is the one field that decides whether pressing the
+// button starts work.
+//
+// It used to live inside the options modal with the optional overrides, so a
+// person could write a request, send it, and watch nothing happen: the message
+// was recorded, the task was never created, and no surface said why. It now
+// sits beside the field it qualifies.
+func composerTaskClassControl(props Props, disabled bool) ui.Node {
+	tokens := props.Mode.Tokens()
+	classProps := html.PropsOf(html.OnChange(func(event ui.ChangeEvent) {
+		if props.OnTaskClassChange != nil {
+			props.OnTaskClassChange(event.GetValue())
+		}
+	}))
+	classProps.ID = "composer-task-class"
+	classProps.Value = props.TaskClass
+	classProps.Disabled = disabled || props.OnTaskClassChange == nil
+	classProps.Aria = map[string]string{"label": "What kind of change this is"}
+	classProps.Class = css.New(
+		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
+		css.H(css.Px(32)),
+		css.PaddingX(css.Px(tokens.Spacing.SM)),
+		css.Bg(css.Transparent),
+		css.TextColor(css.Hex(string(
+			map[bool]design.Color{true: tokens.Colors.TextPrimary, false: tokens.Colors.TextMuted}[strings.TrimSpace(props.TaskClass) != ""],
+		))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		css.FontWeight.Semibold,
+	).String()
+	return html.Div(html.Props{
+		Data:  map[string]string{"component": "composer-task-class"},
+		Class: css.New(u.Flex, u.ItemsCenter).String(),
+	}, html.Select(classProps, composerTaskClassOptions()...))
+}
+
 func composerOverrideControls(props Props, disabled bool) ui.Node {
 	policy, hasPolicy := props.View.Draft.PolicyOverride()
 	policyValue := ""
@@ -341,11 +424,16 @@ func composerOverrideControls(props Props, disabled bool) ui.Node {
 		budgetValue = strconv.FormatInt(budget.MinorUnits, 10)
 		budgetCurrency = budget.Currency
 	}
-	budgetLabel := "Hard budget (exact minor units)"
+	// The field keeps taking exact minor units, because the cap is enforced
+	// against that integer and a decimal here would reintroduce the rounding
+	// the domain type exists to prevent. What changes is that it now says so in
+	// words somebody can act on instead of naming the storage unit.
+	budgetLabel := "Hard budget"
 	budgetAriaLabel := "Hard budget in exact currency minor units"
+	budgetHint := readout.FormatMinorUnitHint("")
 	if currency, err := domain.ParseCurrencyCode(string(budgetCurrency)); err == nil {
-		budgetLabel = "Hard budget (" + string(currency) + " minor units)"
 		budgetAriaLabel = "Hard budget in exact " + string(currency) + " minor units"
+		budgetHint = readout.FormatMinorUnitHint(currency)
 	}
 	budgetProps := html.PropsOf(html.OnInput(func(event ui.InputEvent) {
 		if props.OnBudgetMinorUnitsChange != nil {
@@ -405,63 +493,126 @@ func composerOverrideControls(props Props, disabled bool) ui.Node {
 	effortProps.Aria = map[string]string{"label": "Optional reasoning effort override"}
 	effortProps.Class = composerInputClass(props.Mode.Tokens(), false)
 
-	return html.Details(html.Props{
-		Data:  map[string]string{"component": "composer-advanced-options"},
-		Class: composerDetailsClass(props.Mode.Tokens()),
+	// The overrides open in a modal rather than unfolding inside the composer.
+	// Five selects and a currency field expanding under the message field
+	// pushed the transcript up the screen every time somebody looked at them,
+	// and put a form where a person was trying to write a sentence.
+	fields := html.Div(html.Props{
+		Role: "group", Aria: map[string]string{"label": "Composer policy and budget overrides"},
+		Class: composerOverrideGridClass(props.Mode.Tokens()),
 	},
-		html.Summary(html.Props{
-			Aria:  map[string]string{"label": "Show policy, budget, model, and effort options"},
-			Class: composerSummaryClass(props.Mode.Tokens()), Text: "Options",
+		composerLabeledControl(props.Mode.Tokens(), "composer-policy-note", "Kind of change",
+			html.P(html.Props{
+				Class: css.New(
+					css.Margin(css.Zero),
+					css.Font(css.FontStack(props.Mode.Tokens().Fonts.UI)),
+					css.FontSize(css.Px(props.Mode.Tokens().Typography.Metadata.Size)),
+					css.TextColor(css.Hex(string(props.Mode.Tokens().Colors.TextMuted))),
+				).String(),
+				Text: "Chosen beside the message field, because a request cannot start work without it.",
+			})),
+		composerLabeledControl(props.Mode.Tokens(), "composer-policy", "Policy", html.Select(policyProps,
+			html.Option(html.Props{Value: "", Text: "Use default policy"}),
+			html.Option(html.Props{Value: string(domain.PolicyPresetCorrectness), Text: "Correctness"}),
+			html.Option(html.Props{Value: string(domain.PolicyPresetBalanced), Text: "Balanced"}),
+			html.Option(html.Props{Value: string(domain.PolicyPresetFast), Text: "Fast"}),
+			html.Option(html.Props{Value: string(domain.PolicyPresetEconomical), Text: "Economical"}),
+		)),
+		composerLabeledControlWithHint(props.Mode.Tokens(), "composer-hard-budget", budgetLabel,
+			budgetHint, html.Input(budgetProps)),
+		composerLabeledControl(props.Mode.Tokens(), "composer-model", "Model override",
+			html.Select(modelProps, composerModelOptions(props.ModelOptions)...)),
+		composerLabeledControl(props.Mode.Tokens(), "composer-effort", "Reasoning effort override", html.Select(effortProps,
+			html.Option(html.Props{Value: "", Text: "Use default effort"}),
+			html.Option(html.Props{Value: string(domain.ReasoningEffortMinimal), Text: "Minimal"}),
+			html.Option(html.Props{Value: string(domain.ReasoningEffortStandard), Text: "Standard"}),
+			html.Option(html.Props{Value: string(domain.ReasoningEffortExtended), Text: "Extended"}),
+			html.Option(html.Props{Value: string(domain.ReasoningEffortMaximum), Text: "Maximum"}),
+		)),
+	)
+	return html.Div(html.Props{
+		Data:  map[string]string{"component": "composer-advanced-options"},
+		Class: css.New(u.Flex).String(),
+	},
+		primitives.Button(primitives.ButtonProps{
+			ID: "composer-options", Label: "Options", LeadingIcon: primitives.IconOptions,
+			AccessibleLabel: "Show policy, budget, model, and effort options",
+			Quiet:           true, Disabled: props.OnOptionsOpen == nil, Mode: props.Mode,
+			OnClick: props.OnOptionsOpen,
 		}),
-		html.Div(html.Props{
-			Role: "group", Aria: map[string]string{"label": "Composer policy and budget overrides"},
-			Class: composerOverrideGridClass(props.Mode.Tokens()),
-		},
-			composerLabeledControl(props.Mode.Tokens(), "composer-task-class", "Kind of change",
-				html.Select(classProps, composerTaskClassOptions()...)),
-			composerLabeledControl(props.Mode.Tokens(), "composer-policy", "Policy", html.Select(policyProps,
-				html.Option(html.Props{Value: "", Text: "Use default policy"}),
-				html.Option(html.Props{Value: string(domain.PolicyPresetCorrectness), Text: "Correctness"}),
-				html.Option(html.Props{Value: string(domain.PolicyPresetBalanced), Text: "Balanced"}),
-				html.Option(html.Props{Value: string(domain.PolicyPresetFast), Text: "Fast"}),
-				html.Option(html.Props{Value: string(domain.PolicyPresetEconomical), Text: "Economical"}),
-			)),
-			composerLabeledControl(props.Mode.Tokens(), "composer-hard-budget", budgetLabel, html.Input(budgetProps)),
-			composerLabeledControl(props.Mode.Tokens(), "composer-model", "Model override",
-				html.Select(modelProps, composerModelOptions(props.ModelOptions)...)),
-			composerLabeledControl(props.Mode.Tokens(), "composer-effort", "Reasoning effort override", html.Select(effortProps,
-				html.Option(html.Props{Value: "", Text: "Use default effort"}),
-				html.Option(html.Props{Value: string(domain.ReasoningEffortMinimal), Text: "Minimal"}),
-				html.Option(html.Props{Value: string(domain.ReasoningEffortStandard), Text: "Standard"}),
-				html.Option(html.Props{Value: string(domain.ReasoningEffortExtended), Text: "Extended"}),
-				html.Option(html.Props{Value: string(domain.ReasoningEffortMaximum), Text: "Maximum"}),
-			)),
-		),
+		primitives.Modal(primitives.ModalProps{
+			ID: "composer-options-modal", Title: "Message options", Icon: primitives.IconOptions,
+			Description: "These apply to the next message only. Anything left on its default follows the workspace policy.",
+			Open:        props.OptionsOpen, Mode: props.Mode, Width: 620,
+			AppRootSelector: `[data-component="app-shell"]`,
+			Body:            fields,
+			DismissLabel:    "Done",
+			OnDismiss:       props.OnOptionsDismiss,
+		}),
 	)
 }
 
 func composerTaskControls(props Props, busy, disabled bool) ui.Node {
-	return html.Details(html.Props{
+	return html.Div(html.Props{
 		Data:  map[string]string{"component": "composer-task-controls"},
-		Class: composerDetailsClass(props.Mode.Tokens()),
+		Class: css.New(u.Flex).String(),
 	},
-		html.Summary(html.Props{
-			Aria:  map[string]string{"label": "Show task controls"},
-			Class: composerSummaryClass(props.Mode.Tokens()),
-			Text:  "Task controls",
+		primitives.Button(primitives.ButtonProps{
+			ID: "composer-task-controls-trigger", Label: "Task controls",
+			LeadingIcon: primitives.IconTool, AccessibleLabel: "Show task controls",
+			Quiet: true, Disabled: props.OnTaskControlsOpen == nil, Mode: props.Mode,
+			OnClick: props.OnTaskControlsOpen,
 		}),
-		html.Div(html.Props{
-			Role:  "group",
-			Aria:  map[string]string{"label": "Task controls"},
-			Class: composerTaskMenuClass(props.Mode.Tokens()),
-		}, composerTaskActions(props, busy, disabled)),
+		primitives.Modal(primitives.ModalProps{
+			ID: "composer-task-controls-modal", Title: "Task controls", Icon: primitives.IconTool,
+			Description: "Actions the coordinator currently allows for this task. Anything unavailable says why.",
+			Open:        props.TaskControlsOpen, Mode: props.Mode, Width: 520,
+			AppRootSelector: `[data-component="app-shell"]`,
+			Body: html.Div(html.Props{
+				Role:  "group",
+				Aria:  map[string]string{"label": "Task controls"},
+				Class: composerTaskMenuClass(props.Mode.Tokens()),
+			}, composerTaskActions(props, busy, disabled)),
+			OnDismiss: props.OnTaskControlsDismiss,
+		}),
 	)
 }
 
 func composerLabeledControl(tokens design.Tokens, id, label string, control ui.Node) ui.Node {
-	return html.Div(html.Props{Class: composerStackClass(tokens)},
-		html.Label(html.Props{For: id, Text: label}), control,
-	)
+	return composerLabeledControlWithHint(tokens, id, label, "", control)
+}
+
+// composerLabeledControlWithHint names a field and, where the field takes a
+// unit a person would otherwise have to guess, says what that unit is.
+func composerLabeledControlWithHint(
+	tokens design.Tokens,
+	id, label, hint string,
+	control ui.Node,
+) ui.Node {
+	children := []ui.Node{
+		html.Label(html.Props{
+			For: id, Text: label,
+			Class: css.New(
+				css.Font(css.FontStack(tokens.Fonts.UI)),
+				css.FontSize(css.Px(tokens.Typography.ControlLabel.Size)),
+				css.FontWeight.Medium,
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+			).String(),
+		}),
+		control,
+	}
+	if strings.TrimSpace(hint) != "" {
+		children = append(children, html.P(html.Props{
+			ID: id + "-hint", Text: hint,
+			Class: css.New(
+				css.Margin(css.Zero),
+				css.Font(css.FontStack(tokens.Fonts.Code)),
+				css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+			).String(),
+		}))
+	}
+	return html.Div(html.Props{Class: composerStackClass(tokens)}, children...)
 }
 
 // TaskClassChoices are the kinds of change a person can declare, in the order
@@ -505,8 +656,10 @@ func composerModelOptions(options []ModelOption) []ui.Node {
 func composerAttachments(props Props, disabled bool) ui.Node {
 	return primitives.Button(primitives.ButtonProps{
 		ID: "composer-attach", Label: "Attach", AccessibleLabel: "Attach file or symbol",
+		Quiet:    true,
 		Disabled: disabled || props.OnOpenAttachmentPicker == nil, Mode: props.Mode,
-		OnClick: props.OnOpenAttachmentPicker,
+		DisabledReason: attachDisabledReason(props, disabled),
+		OnClick:        props.OnOpenAttachmentPicker,
 	})
 }
 
@@ -544,11 +697,48 @@ func composerAttachmentChips(props Props, disabled bool) ui.Node {
 	}, chips...)
 }
 
+// attachDisabledReason explains a picker that cannot be opened.
+func attachDisabledReason(props Props, disabled bool) string {
+	switch {
+	case props.OnOpenAttachmentPicker == nil:
+		return "Attachments need an open repository the coordinator has authorized."
+	case disabled:
+		return "Attachments cannot change while a message is being sent."
+	default:
+		return ""
+	}
+}
+
+// sendDisabledReason explains a send that cannot be made.
+func sendDisabledReason(props Props) string {
+	switch {
+	case props.MutationDisabled && strings.TrimSpace(props.MutationDisabledReason) != "":
+		return props.MutationDisabledReason
+	case props.Disabled && strings.TrimSpace(props.DisabledReason) != "":
+		return props.DisabledReason
+	case props.OnSubmitRequested == nil:
+		return "The local coordinator is not accepting messages for this thread."
+	case !props.View.CanSubmit:
+		return "Write a message first. Enter sends it; Shift+Enter starts a new line."
+	default:
+		return ""
+	}
+}
+
 func composerSendControls(props Props, busy bool) ui.Node {
+	label := "Send"
+	leading := primitives.IconSend
+	if strings.TrimSpace(props.TaskClass) != "" {
+		// A declared kind of change is what turns a recorded request into work,
+		// so the control stops saying "Send" and says what will actually happen.
+		label = "Start work"
+		leading = primitives.IconPlay
+	}
 	controls := []ui.Node{primitives.Button(primitives.ButtonProps{
-		ID: "composer-submit", Label: "Send", Primary: true,
-		Disabled: !props.View.CanSubmit || props.Disabled || props.MutationDisabled || props.OnSubmitRequested == nil,
-		Busy:     busy, Mode: props.Mode,
+		ID: "composer-submit", Label: label, LeadingIcon: leading, Primary: true,
+		Disabled:       !props.View.CanSubmit || props.Disabled || props.MutationDisabled || props.OnSubmitRequested == nil,
+		DisabledReason: sendDisabledReason(props),
+		Busy:           busy, Mode: props.Mode,
 		DescribedBy: func() string {
 			if props.MutationDisabled && strings.TrimSpace(props.MutationDisabledReason) != "" {
 				return "composer-mutation-disabled-reason"
@@ -597,7 +787,7 @@ func composerTaskActions(props Props, busy, disabled bool) ui.Node {
 		}
 		reasonID := "composer-task-action-" + string(action) + "-reason"
 		children := []ui.Node{primitives.Button(primitives.ButtonProps{
-			ID: "composer-task-action-" + string(action), Label: taskActionLabel(action),
+			ID: "composer-task-action-" + string(action), Label: taskActionLabel(action), Quiet: true,
 			Value:       string(action),
 			Disabled:    disabled || reason != "" || props.OnTaskAction == nil || (busy && action != ActionStop),
 			DescribedBy: map[bool]string{true: reasonID}[reason != ""],
@@ -633,14 +823,14 @@ func composerSurfaceClass(tokens design.Tokens) string {
 }
 
 func composerInputClass(tokens design.Tokens, multiline bool) string {
+	// The multiline field draws no chrome of its own. It sits inside the
+	// composer well, which owns the border, the corner and the focus ring, so
+	// what a person types into reads as one control rather than a box inside a
+	// box beside a row of loose buttons.
 	rules := []css.Rule{
 		css.MinWidth(css.Zero),
-		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
-		css.PaddingX(css.Px(tokens.Spacing.LG)),
-		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+		css.Bg(css.Transparent),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
-		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
 		css.Font(css.FontStack(tokens.Fonts.UI)),
 		css.FontSize(css.Px(tokens.Typography.Body.Size)),
 		css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
@@ -648,22 +838,57 @@ func composerInputClass(tokens design.Tokens, multiline bool) string {
 	if multiline {
 		rules = append(rules,
 			css.FlexGrow(css.Num(1)), css.MinWidth(css.Px(240)),
-			css.MinHeight(css.Px(72)), css.PaddingY(css.Px(tokens.Spacing.MD)),
+			css.MinHeight(css.Px(64)),
+			css.Padding(css.RawLength("10px 12px 4px")),
+			css.Border(css.Zero, css.Transparent),
+			css.Outline(css.Zero, css.Transparent),
 		)
 	} else {
-		rules = append(rules, css.W(css.Full))
+		rules = append(rules,
+			css.W(css.Full),
+			css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
+			css.PaddingX(css.Px(tokens.Spacing.MD)),
+			css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+			css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+			css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		)
+		rules = append(rules, css.FocusVisible(
+			css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+			css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+		)...)
 	}
-	rules = append(rules, css.FocusVisible(
-		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
-		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
-	)...)
 	return css.New(rules...).String()
 }
 
+// composerBarClass draws the well that holds the field and its controls.
+//
+// Focus is shown on the well rather than on the field inside it, so the whole
+// composer lights up when it is ready to take what you type.
 func composerBarClass(tokens design.Tokens) string {
-	return css.New(
-		u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM)), css.MinWidth(css.Zero),
-	).String()
+	focusWithin := css.DefineVariant("&:focus-within")
+	rules := []css.Rule{
+		u.Flex, u.FlexCol,
+		css.Gap(css.Px(tokens.Spacing.SM)),
+		css.MinWidth(css.Zero),
+		css.Padding(css.RawLength("4px 6px 6px")),
+		css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
+		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors, css.PropShadow),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, focusWithin(
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+		css.Shadow(css.ShadowOf(
+			css.Zero, css.Zero, css.Zero, css.Px(3), css.Hex(string(tokens.Colors.Selection)),
+		)),
+	)...)
+	return css.New(rules...).String()
 }
 
 func composerCommandTrayClass(tokens design.Tokens) string {
@@ -708,16 +933,35 @@ func composerDetailsClass(tokens design.Tokens) string {
 	return css.New(css.MinWidth(css.Zero), css.Position.Relative).String()
 }
 
+// composerSummaryClass styles the composer's own disclosures.
+//
+// They open options beside the field they belong to, so they are drawn as part
+// of the well rather than as two more outlined buttons competing with the one
+// control that commits the message.
 func composerSummaryClass(tokens design.Tokens) string {
-	return css.New(
+	rules := []css.Rule{
 		u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
+		css.Gap(css.Px(tokens.Spacing.XS)),
 		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
-		css.PaddingX(css.Px(tokens.Spacing.MD)),
+		css.PaddingX(css.Px(tokens.Spacing.SM)),
+		css.Bg(css.Transparent),
+		css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Transparent),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		css.FontWeight.Semibold,
+		css.Cursor.Pointer,
+	}
+	rules = append(rules, css.Hover(
 		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
 		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
-		css.Rounded(css.Px(tokens.Geometry.ControlRadius)), css.Cursor.Pointer,
-	).String()
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
+	)...)
+	return css.New(rules...).String()
 }
 
 func composerAssistiveClass() string {
@@ -738,11 +982,8 @@ func composerOverrideGridClass(tokens design.Tokens) string {
 	return css.New(
 		u.Grid,
 		css.GridCols(css.Repeat(2, css.MinMax(css.TrackLen(css.Zero), css.Fr(1)))),
-		css.Gap(css.Px(tokens.Spacing.SM)), css.MinWidth(css.Px(360)),
-		css.MarginY(css.Px(tokens.Spacing.SM)), css.Padding(css.Px(tokens.Spacing.SM)),
-		css.Bg(css.Hex(string(tokens.Colors.Surface1))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderSubtle))),
-		css.Rounded(css.Px(tokens.Geometry.PanelRadius)),
+		css.Gap(css.Px(tokens.Spacing.MD)), css.MinWidth(css.Zero),
+		css.Margin(css.Zero), css.Padding(css.Zero),
 	).String()
 }
 

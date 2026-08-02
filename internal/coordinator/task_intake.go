@@ -220,7 +220,20 @@ func applyIntakeDefaults(request TaskIntakeRequest) TaskIntakeRequest {
 		// Routine is the floor, not a claim the work is safe: risk is
 		// re-classified from the real diff at review time (§22), and the
 		// router may only strengthen a floor, never weaken it.
+		//
+		// The floor is read from the requirement by the product's own
+		// deterministic analysis, which is the same function the store applies
+		// to the stored message when a run records what it is doing. Defaulting
+		// to routine regardless of the text made the two disagree for any
+		// request the analysis reads as heavier — one naming four files, say —
+		// and the store then refused the requirement, the plan, and with them
+		// every record the run would have left behind.
 		request.RiskLevel = domain.RiskLevelRoutine
+		if analysis, err := storage.AnalyzeTaskRequirement(
+			strings.TrimSpace(request.Requirement),
+		); err == nil {
+			request.RiskLevel = analysis.RiskLevel
+		}
 	}
 	if request.RequiredAssurance == "" {
 		request.RequiredAssurance = domain.AssuranceLevelRuntimeOnly

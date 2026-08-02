@@ -29,7 +29,7 @@ func TestContextInspectorRendersCompleteBoundedNodeExplanation(t *testing.T) {
 		"Graph projection tests", "Passed", "All selected projection tests passed.",
 		"1m30s attributable elapsed time",
 		"175 total — input 100, cached input 25, cache write 5, output 30, reasoning 15",
-		"exact provider-reported tokens", "USD 25 minor units — pricing snapshot prices-2026-07-31",
+		"exact provider-reported tokens", "$0.25 — pricing snapshot prices-2026-07-31",
 		props.RelatedMessages[0].String(), props.Node.Sources().EventIDs()[0].String(),
 		"Plan revision 3 · step validate-graph", "internal/graph/projector.go:42:1–78:2",
 		`type="button"`, `aria-label="Explain in chat for Validate task graph projection"`,

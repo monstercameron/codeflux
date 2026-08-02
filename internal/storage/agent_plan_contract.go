@@ -86,8 +86,13 @@ type RequirementAnalysis struct {
 const requirementClassifierVersion = "deterministic-requirement-v1"
 
 var (
+	// A path is only a file when its last segment carries a known extension.
+	// Requiring one everywhere is what keeps a module path out: "example.com/demo"
+	// has slashes and a dot but names no file, and taking it for one put a file
+	// in the plan's expected set that no step could ever cover, which refused
+	// the whole plan.
 	requirementPathPattern = regexp.MustCompile(
-		`(?i)(?:^|[\s"'()])([a-z0-9_.-]+(?:/[a-z0-9_.-]+)+|[a-z0-9_.-]+\.(?:go|md|sql|proto|json|yaml|yml|toml|mod|sum))`,
+		`(?i)(?:^|[\s"'()])((?:[a-z0-9_.-]+/)*[a-z0-9_-]+\.(?:go|md|sql|proto|json|yaml|yml|toml|mod|sum))`,
 	)
 	requirementCodePattern = regexp.MustCompile("`([^`\\r\\n]{1,256})`")
 )
@@ -332,8 +337,14 @@ func BuildAgentPlan(
 			draft.ExpectedFiles...,
 		)),
 		Steps: steps,
+		// The copy starts from an empty slice rather than a nil one so that a
+		// requirement naming no command encodes as [] here exactly as it does in
+		// the analysis. Both sides state the same fact, and the store compares
+		// them as JSON: nil encodes as null, null does not equal [] in SQL, and
+		// every plan for a requirement naming no explicit command was refused.
 		ExplicitValidationCommands: append(
-			[]string(nil), analysis.ExplicitCommands...,
+			make([]string, 0, len(analysis.ExplicitCommands)),
+			analysis.ExplicitCommands...,
 		),
 		ValidationCommands: normalizedStrings(append(
 			explicitValidationCommands,
@@ -661,7 +672,13 @@ func classifyRequirementRisk(
 
 func classifyRequirementAmbiguities(lower string) []RequirementAmbiguity {
 	switch {
-	case containsAny(lower, "either ", "which one", "which approach", "or whichever"):
+	// The phrases name a choice of approach, not any use of the word either.
+	// Matching bare "either " caught "holding either a value or an error" — a
+	// description of a type, not a fork in the road — and stopped the run to
+	// ask which alternative was meant. A question asked about something
+	// unambiguous is worse than none: it teaches people to dismiss them.
+	case containsAny(lower, "either in ", "either using ", "either by ",
+		"either as ", "which one", "which approach", "or whichever"):
 		return []RequirementAmbiguity{{
 			Topic:    "material scope choice",
 			Material: true,
@@ -695,7 +712,41 @@ func extractRequirementFiles(body string) []string {
 			)
 		}
 	}
-	return normalizedPaths(values)
+	return collapseRestatedPaths(normalizedPaths(values))
+}
+
+// collapseRestatedPaths drops a bare filename that another named path already
+// covers.
+//
+// A request names its deliverables once and then talks about them: "create
+// cmd/bank/main.go and cmd/bank/account.go, where account.go holds the type
+// and main.go reads input". The second mention of each is the same file, not a
+// third and fourth one. Counting them separately produced a plan step per
+// mention — steps scoped to files at the repository root that the work would
+// never touch — and pushed the request over the file count that classifies it
+// as heavier work, so a plain two-file program demanded a plan approval it had
+// no reason to need.
+//
+// Only bare names collapse, and only into a path that ends with them. Two real
+// files that genuinely share a basename, in different directories, are both
+// named with their directories and both survive.
+func collapseRestatedPaths(paths []string) []string {
+	covered := make(map[string]bool, len(paths))
+	for _, candidate := range paths {
+		index := strings.LastIndex(candidate, "/")
+		if index < 0 {
+			continue
+		}
+		covered[candidate[index+1:]] = true
+	}
+	kept := make([]string, 0, len(paths))
+	for _, candidate := range paths {
+		if !strings.Contains(candidate, "/") && covered[candidate] {
+			continue
+		}
+		kept = append(kept, candidate)
+	}
+	return kept
 }
 
 func extractRequirementSymbols(body string) []string {
@@ -956,4 +1007,15 @@ func normalizedPlanStrings(values []string, maximum, maxLength int) bool {
 		}
 	}
 	return true
+}
+
+// ValidationProfileForRisk reports the validation profile a risk level
+// requires.
+//
+// The pairing is a rule of the contract rather than a choice a caller makes:
+// an analysis whose profile does not match its risk is refused. It is exported
+// so a caller that must adopt a risk decided elsewhere can keep the two in step
+// instead of guessing the mapping.
+func ValidationProfileForRisk(risk domain.RiskLevel) ValidationProfileName {
+	return validationProfileForRisk(risk)
 }

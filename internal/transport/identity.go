@@ -272,3 +272,33 @@ func BudgetIDToProto(value domain.BudgetID) (*codefluxv1.StableIdentity, error) 
 func BudgetIDFromProto(value *codefluxv1.StableIdentity) (domain.BudgetID, error) {
 	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_BUDGET, domain.ParseBudgetID)
 }
+
+// MemoryArtifactIDToProto converts a memory-artifact identity to its protobuf envelope.
+func MemoryArtifactIDToProto(value domain.MemoryArtifactID) (*codefluxv1.StableIdentity, error) {
+	return identityToProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT)
+}
+
+// MemoryArtifactIDFromProto validates and converts a protobuf memory-artifact identity.
+func MemoryArtifactIDFromProto(value *codefluxv1.StableIdentity) (domain.MemoryArtifactID, error) {
+	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT, domain.ParseMemoryArtifactID)
+}
+
+// MemoryArtifactRevisionIDToProto converts a memory-artifact revision identity to its protobuf envelope.
+func MemoryArtifactRevisionIDToProto(value domain.MemoryArtifactRevisionID) (*codefluxv1.StableIdentity, error) {
+	return identityToProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION)
+}
+
+// MemoryArtifactRevisionIDFromProto validates and converts a protobuf memory-artifact revision identity.
+func MemoryArtifactRevisionIDFromProto(value *codefluxv1.StableIdentity) (domain.MemoryArtifactRevisionID, error) {
+	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION, domain.ParseMemoryArtifactRevisionID)
+}
+
+// EpisodeIDToProto converts an episode identity to its protobuf envelope.
+func EpisodeIDToProto(value domain.EpisodeID) (*codefluxv1.StableIdentity, error) {
+	return identityToProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_EPISODE)
+}
+
+// EpisodeIDFromProto validates and converts a protobuf episode identity.
+func EpisodeIDFromProto(value *codefluxv1.StableIdentity) (domain.EpisodeID, error) {
+	return identityFromProto(value, codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_EPISODE, domain.ParseEpisodeID)
+}

@@ -68,10 +68,14 @@ func TestComposerRendersMultilineOverridesAttachmentsAndReachableStop(t *testing
 		"Enter sends. Shift+Enter inserts a newline.",
 		`data-component="composer-advanced-options"`,
 		`aria-label="Show policy, budget, model, and effort options"`,
-		`>Options</summary>`,
+		// The overrides open in a modal now, so the trigger is a control and the
+		// fields live behind it rather than unfolding inside the composer.
+		`id="composer-options"`,
+		`data-modal="composer-options-modal"`,
 		`aria-label="Cost speed correctness policy"`,
 		`aria-label="Hard budget in exact USD minor units"`,
-		`Hard budget (USD minor units)`,
+		`Hard budget`,
+		`Whole cents. 5000 is $50.00.`,
 		`value="2500"`,
 		`aria-label="Optional model override"`,
 		`aria-label="Optional reasoning effort override"`,

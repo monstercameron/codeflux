@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"codeflux.dev/codeflux/internal/atomdoc"
+	"codeflux.dev/codeflux/internal/atomname"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/gitwork"
 	"codeflux.dev/codeflux/internal/storage"
@@ -67,6 +68,15 @@ type collectedRepository struct {
 	implements  map[string][]string
 	implemented map[string][]string
 	totalAtoms  uint32
+	// searchable is every admitted atom with the text a search reads, and
+	// search is the index built over it. The index is built once per map
+	// rather than per query.
+	searchable []atomSearchDocument
+	search     *atomSearchIndex
+	// files is every file the map recorded, in path order, and fileByPath is
+	// the lookup a read is allowed to resolve against.
+	files      []transport.CodeFileRecord
+	fileByPath map[string]transport.CodeFileRecord
 }
 
 // newCodeCollectionApplication composes the mapper with the repository store.
@@ -130,7 +140,23 @@ func (application *codeCollectionApplication) ListCodeSymbols(
 	}
 	limit := boundedCodeLimit(query.Limit)
 	search := strings.ToLower(strings.TrimSpace(query.Search))
-	page := transport.CodeSymbolPage{Revision: collected.revisionView()}
+	page := transport.CodeSymbolPage{
+		Revision: collected.revisionView(), TotalAtoms: collected.totalAtoms,
+	}
+	// An atom search reads the documented promises, not just the declaration
+	// name: "which one says it is not safe to retry" is the question people
+	// actually arrive with, and no name answers it. Ordinary symbol listing
+	// keeps the name match it has always had.
+	if query.AtomsOnly && search != "" {
+		matched, ranked, searchErr := collected.searchAtoms(query, search, limit)
+		if searchErr == nil && len(ranked) > 0 {
+			page.Symbols = ranked
+			page.TotalMatched = matched
+			page.Truncated = uint32(len(ranked)) < matched
+			page.SearchQuery = AtomSearchSQL(search, limit)
+			return page, nil
+		}
+	}
 	for _, symbol := range collected.symbols {
 		if query.ImportPath != "" && symbol.ImportPath != query.ImportPath {
 			continue
@@ -201,6 +227,16 @@ func (application *codeCollectionApplication) InspectCodeSymbol(
 	detail.Source = read.source
 	detail.SourceStartLine = read.sourceStartLine
 	detail.SourceTruncated = read.sourceTruncated
+	detail.NamingChecked, detail.NamingFinding = checkAtomNaming(symbol)
+	detail.Structure = read.structure
+	if symbol.Atom {
+		detail.DocumentedFields, detail.MissingFields = splitSchemaFields(read.fields)
+		// The query is offered only for an atom, because only an atom is in the
+		// index. Showing a read for a row that is not there would be a
+		// statement that returns nothing and looks like a fault.
+		detail.AccessQuery = AtomSelectSQL(symbol.Key)
+		detail.IndexSchema = AtomSchemaSQL()
+	}
 	return detail, nil
 }
 
@@ -236,9 +272,19 @@ func (application *codeCollectionApplication) collect(
 	if _, replacing := application.collected[key]; !replacing {
 		application.order = append(application.order, key)
 		for len(application.order) > maximumCollectedRepositories {
-			delete(application.collected, application.order[0])
+			evicted := application.order[0]
+			// The evicted map owns an open in-memory database. Dropping the
+			// reference without closing it would leak one connection per
+			// repository somebody browsed.
+			if stale, ok := application.collected[evicted]; ok {
+				stale.search.Close()
+			}
+			delete(application.collected, evicted)
 			application.order = application.order[1:]
 		}
+	}
+	if superseded, ok := application.collected[key]; ok && superseded != built {
+		superseded.search.Close()
 	}
 	application.collected[key] = built
 	return built, nil
@@ -289,12 +335,58 @@ func (application *codeCollectionApplication) build(
 		callees:     map[string][]transport.CodeSymbolReference{},
 		implements:  map[string][]string{},
 		implemented: map[string][]string{},
+		fileByPath:  map[string]transport.CodeFileRecord{},
 	}
 	for _, warning := range mapped.Warnings {
 		collected.warnings = append(collected.warnings, warning.Stage+": "+warning.Message)
 	}
 	indexCollectedSymbols(collected, mapped, atomsByPath(root, mapped))
+	// A failed index is not a failed map. Search then falls back to matching
+	// names, which is what it did before the index existed; refusing the whole
+	// collection because its search index would not build would take away the
+	// listing to protect the search.
+	if index, indexErr := newAtomSearchIndex(collected.searchable); indexErr == nil {
+		collected.search = index
+	}
 	return collected, nil
+}
+
+// searchAtoms answers one atom search from the full-text index, in rank order.
+//
+// The package filter is applied after ranking rather than inside the query: it
+// is a coarse narrowing a person applies with a control, and pushing it into
+// the match expression would let a package name in the query silently act as a
+// filter.
+func (collected *collectedRepository) searchAtoms(
+	query transport.CodeSymbolQuery,
+	search string,
+	limit int,
+) (matched uint32, ranked []transport.CodeSymbolRecord, err error) {
+	hits, err := collected.search.Search(search, transport.MaximumCodePage)
+	if err != nil {
+		return 0, nil, err
+	}
+	for _, hit := range hits {
+		symbol, present := collected.byKey[hit.Key]
+		if !present {
+			continue
+		}
+		if query.ImportPath != "" && symbol.ImportPath != query.ImportPath {
+			continue
+		}
+		if query.ExportedOnly && !symbol.Exported {
+			continue
+		}
+		// The reason travels with the row: a result list that cannot say why
+		// an atom is in it is one a person has to take on faith.
+		symbol.MatchedName = hit.MatchedName
+		symbol.MatchedPromise = hit.Promise
+		matched++
+		if len(ranked) < limit {
+			ranked = append(ranked, symbol)
+		}
+	}
+	return matched, ranked, nil
 }
 
 // revisionView states which revision an answer describes.
@@ -334,6 +426,7 @@ type declarationRead struct {
 	source          string
 	sourceStartLine uint32
 	sourceTruncated bool
+	structure       transport.CodeSymbolStructure
 }
 
 // maximumDeclarationLines bounds the source one declaration returns.
@@ -363,6 +456,7 @@ func readDeclaration(
 				continue
 			}
 			read := describeDeclaration(fileSet, typed.Doc, functionSignature(fileSet, typed))
+			read.structure = measureDeclaration(typed)
 			return withDeclarationSource(read, absolute, fileSet, typed.Doc, typed), nil
 		case *ast.GenDecl:
 			for _, specification := range typed.Specs {
@@ -487,8 +581,8 @@ func atomDirectivePresent(group *ast.CommentGroup) bool {
 // Only files that contain the directive are parsed. Parsing every Go file in a
 // repository to answer a directory listing would make opening the page cost as
 // much as a build.
-func atomsByPath(root string, mapped workspace.RepositoryMap) map[string]map[string]string {
-	admitted := map[string]map[string]string{}
+func atomsByPath(root string, mapped workspace.RepositoryMap) map[string]map[string]atomAdmission {
+	admitted := map[string]map[string]atomAdmission{}
 	for _, file := range mapped.Files {
 		// Generated source is skipped: an atom directive in a file nobody wrote
 		// by hand is not a declaration somebody documented.
@@ -515,24 +609,54 @@ func atomsByPath(root string, mapped workspace.RepositoryMap) map[string]map[str
 			continue
 		}
 		for _, candidate := range candidates {
-			problem := ""
-			if _, err := atomdoc.ParseAtomDocumentationComment(candidate); err != nil {
-				problem = "the atom documentation comment does not parse"
+			entry := atomAdmission{}
+			// The comment is parsed here anyway to decide admission, so the
+			// documented text it yields is captured rather than discarded: it
+			// is what the search index is built from, and parsing every atom
+			// comment a second time to read it back would double the cost of
+			// opening the page.
+			parsedComment, err := atomdoc.ParseAtomDocumentationComment(candidate)
+			if err != nil {
+				entry.Problem = "the atom documentation comment does not parse"
+			} else {
+				entry.Documentation = atomDocumentationText(parsedComment)
 			}
 			if admitted[file.Path] == nil {
-				admitted[file.Path] = map[string]string{}
+				admitted[file.Path] = map[string]atomAdmission{}
 			}
-			admitted[file.Path][candidate.Identifier] = problem
+			admitted[file.Path][candidate.Identifier] = entry
 		}
 	}
 	return admitted
+}
+
+// atomAdmission is what parsing one atom's comment established: whether it was
+// admitted, and the text a search can look through.
+type atomAdmission struct {
+	Problem       string
+	Documentation string
+}
+
+// atomDocumentationText flattens an atom's documented promises into the text a
+// search index reads. Labels are kept, because "retry" is a word people search
+// for and it is a label before it is prose.
+func atomDocumentationText(parsed atomdoc.ParsedComment) string {
+	var builder strings.Builder
+	builder.WriteString(parsed.OpeningSentence)
+	for _, field := range parsed.Fields {
+		builder.WriteString("\n")
+		builder.WriteString(field.Label)
+		builder.WriteString(": ")
+		builder.WriteString(strings.Join(field.BodyLines, " "))
+	}
+	return strings.TrimSpace(builder.String())
 }
 
 // indexCollectedSymbols builds the listing and the call index over one map.
 func indexCollectedSymbols(
 	collected *collectedRepository,
 	mapped workspace.RepositoryMap,
-	admitted map[string]map[string]string,
+	admitted map[string]map[string]atomAdmission,
 ) {
 	packageByPath := map[string]string{}
 	fileCounts := map[string]uint32{}
@@ -551,7 +675,8 @@ func indexCollectedSymbols(
 	atomCounts := map[string]uint32{}
 	for _, symbol := range mapped.Symbols {
 		importPath := packageByPath[symbol.Path]
-		problem, isAtom := admitted[symbol.Path][symbol.Name]
+		admission, isAtom := admitted[symbol.Path][symbol.Name]
+		problem := admission.Problem
 		record := transport.CodeSymbolRecord{
 			Key:         codeSymbolKey(symbol.Path, symbol.Receiver, symbol.Name),
 			Name:        symbol.Name,
@@ -570,6 +695,11 @@ func indexCollectedSymbols(
 		if record.Atom {
 			atomCounts[importPath]++
 			collected.totalAtoms++
+			collected.searchable = append(collected.searchable, atomSearchDocument{
+				Key: record.Key, Name: record.Name, Receiver: record.Receiver,
+				ImportPath: record.ImportPath, Path: record.Path,
+				Documentation: admission.Documentation,
+			})
 		}
 	}
 	for _, pkg := range mapped.Packages {
@@ -584,6 +714,33 @@ func indexCollectedSymbols(
 			AtomCount:   atomCounts[pkg.ImportPath],
 		})
 	}
+	// The file list is built from the map's own files rather than from the
+	// packages, because a repository holds files no package claims -- a
+	// generated file, a testdata fixture, a file that would not compile -- and
+	// a tree drawn only from packages would quietly leave them out.
+	perFileSymbols := map[string]uint32{}
+	perFileAtoms := map[string]uint32{}
+	for _, symbol := range collected.symbols {
+		perFileSymbols[symbol.Path]++
+		if symbol.Atom {
+			perFileAtoms[symbol.Path]++
+		}
+	}
+	for _, file := range mapped.Files {
+		record := transport.CodeFileRecord{
+			Path:        file.Path,
+			Kind:        file.Kind,
+			Generated:   file.Generated,
+			ImportPath:  packageByPath[file.Path],
+			SymbolCount: perFileSymbols[file.Path],
+			AtomCount:   perFileAtoms[file.Path],
+		}
+		collected.files = append(collected.files, record)
+		collected.fileByPath[record.Path] = record
+	}
+	sort.SliceStable(collected.files, func(first, second int) bool {
+		return collected.files[first].Path < collected.files[second].Path
+	})
 	sort.SliceStable(collected.packages, func(first, second int) bool {
 		return collected.packages[first].ImportPath < collected.packages[second].ImportPath
 	})
@@ -643,8 +800,7 @@ func appendBoundedReference(
 // The text is sliced out of the file rather than reprinted from the syntax
 // tree: a reprint is the compiler's formatting of the code, not the code, and
 // a reader comparing a promise against its implementation needs what is
-// actually there. The comment above the declaration is included, because the
-// promise and the code that keeps it are one thing to read.
+// actually there.
 func withDeclarationSource(
 	read declarationRead,
 	absolute string,
@@ -656,10 +812,12 @@ func withDeclarationSource(
 	if err != nil {
 		return read
 	}
+	// The slice starts at the declaration, not at its comment. The comment is
+	// returned separately as the notes the author wrote, and repeating forty
+	// lines of it above the code would push the body off the screen on the one
+	// surface that exists to show the body.
+	_ = doc
 	start := node.Pos()
-	if doc != nil && doc.Pos().IsValid() && doc.Pos() < start {
-		start = doc.Pos()
-	}
 	startPosition := fileSet.Position(start)
 	endPosition := fileSet.Position(node.End())
 	if !startPosition.IsValid() || !endPosition.IsValid() ||
@@ -676,6 +834,86 @@ func withDeclarationSource(
 	read.source = strings.Join(lines, "\n")
 	read.sourceStartLine = uint32(startPosition.Line)
 	return read
+}
+
+// splitSchemaFields reports which of the schema's canonical fields an atom
+// declares and which it leaves out.
+//
+// The schema declares nineteen fields, and an atom that documents twelve of
+// them is a different thing from one that documents all nineteen. Only the
+// list of the missing seven says which promises were never made — which is the
+// question an author has when their atom looks documented and still fails a
+// stage.
+func splitSchemaFields(declared []transport.CodeAtomField) (documented, missing []string) {
+	written := make(map[string]bool, len(declared))
+	for _, field := range declared {
+		written[strings.ToLower(strings.TrimSpace(field.Label))] = true
+	}
+	for _, label := range atomdoc.CanonicalFieldLabels() {
+		if written[strings.ToLower(label)] {
+			documented = append(documented, label)
+			continue
+		}
+		missing = append(missing, label)
+	}
+	return documented, missing
+}
+
+// measureDeclaration reports the structural facts the pipeline itself measures
+// about a function.
+//
+// It calls the same analysis the run's own atom stages call — the deepest loop
+// nesting that StageAtomComplexity turns into a time bound, the decision points
+// that StageAtomCaseSynthesis turns into a count of cases to cover, and the
+// purity test StageAtoms applies. Measuring it twice with two different
+// definitions would let the page and the pipeline disagree about the same
+// declaration, so this reads the pipeline's answer rather than its own.
+func measureDeclaration(declaration *ast.FuncDecl) transport.CodeSymbolStructure {
+	if declaration == nil || declaration.Body == nil {
+		return transport.CodeSymbolStructure{}
+	}
+	_, branches, loopDepth := describeBody(declaration, map[string]bool{})
+	return transport.CodeSymbolStructure{
+		Measured:  true,
+		TimeBound: complexityLabel(loopDepth),
+		// The space claim is the one the pipeline records: nothing here
+		// allocates beyond what it was handed, and a measured growth is what a
+		// later run would have to disagree with.
+		SpaceClaim: "bounded by the input it is given",
+		LoopDepth:  uint32(loopDepth),
+		Branches:   uint32(branches),
+		Pure:       !callsAnythingImpure(declaration),
+	}
+}
+
+// checkAtomNaming runs the product's own atom-naming grammar against an
+// admitted atom's name.
+//
+// The grammar is already defined and enforced nowhere a person can see: it
+// asks that an executable atom begin with a recognized action verb, that an
+// initialism be an established abbreviation, that a name not carry a provider
+// name or a guarantee claim. A name is the part of a contract a caller cannot
+// avoid reading, so what the product thinks of it belongs beside the contract.
+// Only admitted atoms are checked: an ordinary declaration never claimed to
+// follow this grammar.
+func checkAtomNaming(symbol transport.CodeSymbolRecord) (checked bool, finding string) {
+	if !symbol.Atom {
+		return false, ""
+	}
+	name, err := atomname.NewCanonicalName(symbol.Name)
+	if err != nil {
+		return true, err.Error()
+	}
+	kind := atomname.NameSubjectKindExecutableAtom
+	if symbol.Kind != "function" && symbol.Kind != "method" {
+		kind = atomname.NameSubjectKindNonExecutableAtom
+	}
+	if err := atomname.ValidateNamingGrammar(
+		name, kind, atomname.DefaultNamingLexicon(), nil,
+	); err != nil {
+		return true, err.Error()
+	}
+	return true, ""
 }
 
 // partitionTestReferences splits references declared in test files from the

@@ -286,30 +286,37 @@ func TokensFor(options Options) (Tokens, error) {
 		Theme: theme, Density: density, ReducedMotion: options.ReducedMotion,
 		Colors: colors,
 		Fonts: FontTokens{
-			// Humanist serifs, not Didones. On a dark ground a high-contrast
-			// display serif loses its hairlines; Iowan, Palatino and Georgia
-			// keep an even stroke weight and stay readable at 14px.
-			Display: `"Iowan Old Style","Palatino Linotype",Palatino,` +
-				`"Book Antiqua",Georgia,"Noto Serif",serif`,
-			Reading: `"Iowan Old Style","Palatino Linotype",Palatino,` +
-				`"Book Antiqua",Georgia,"Noto Serif",serif`,
+			// Sitka is a humanist screen serif that ships with Windows. It was
+			// drawn for reading at interface sizes, so it holds an even stroke
+			// on a dark ground where a high-contrast display serif would lose
+			// its hairlines, and it is optically sized: the Heading cut carries
+			// titles, the Text cut carries prose.
+			Display: `"Sitka Heading","Sitka Display",Constantia,` +
+				`"Iowan Old Style",Georgia,"Noto Serif",serif`,
+			Reading: `"Sitka Text",Sitka,Constantia,` +
+				`"Iowan Old Style",Georgia,"Noto Serif",serif`,
 			UI:   `"Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,-apple-system,sans-serif`,
-			Code: `"Cascadia Mono","SFMono-Regular",ui-monospace,Consolas,monospace`,
+			Code: `"Cascadia Mono","Cascadia Code","SFMono-Regular",ui-monospace,Consolas,monospace`,
 		},
 		Typography: TypographyTokens{
 			// Serif roles are set lighter and looser than their sans
 			// equivalents would be. A serif at weight 600 on a dark ground
 			// reads as shouting; the size carries the hierarchy instead.
-			WorkspaceTitle: TypeStyle{Size: 30, LineHeight: 40, Weight: 400},
-			TaskTitle:      TypeStyle{Size: 24, LineHeight: 34, Weight: 400},
-			SectionTitle:   TypeStyle{Size: 19, LineHeight: 28, Weight: 400},
-			PanelHeading:   TypeStyle{Size: 15, LineHeight: 22, Weight: 600},
-			Body:           TypeStyle{Size: 15, LineHeight: 24, Weight: 400},
-			CompactBody:    TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
-			Metadata:       TypeStyle{Size: 12, LineHeight: 18, Weight: 500},
-			ControlLabel:   TypeStyle{Size: 13, LineHeight: 18, Weight: 600},
+			WorkspaceTitle: TypeStyle{Size: 34, LineHeight: 42, Weight: 400},
+			TaskTitle:      TypeStyle{Size: 26, LineHeight: 34, Weight: 400},
+			SectionTitle:   TypeStyle{Size: 19, LineHeight: 26, Weight: 400},
+			// A panel heading names the panel; it must not outrank the prose
+			// inside it. It shares the body size and separates itself by
+			// weight, which is also what keeps the hierarchy validator honest.
+			PanelHeading: TypeStyle{Size: 15, LineHeight: 20, Weight: 700},
+			Body:         TypeStyle{Size: 15, LineHeight: 25, Weight: 400},
+			CompactBody:  TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
+			// Metadata is the small tracked sans eyebrow used for field labels
+			// and section markers. It is the one role set below body size.
+			Metadata:     TypeStyle{Size: 11, LineHeight: 16, Weight: 600},
+			ControlLabel: TypeStyle{Size: 13, LineHeight: 18, Weight: 600},
 			MetricValue: TypeStyle{
-				Size: 20, LineHeight: 26, Weight: 500, Tabular: true,
+				Size: 22, LineHeight: 28, Weight: 500, Tabular: true,
 			},
 			Code: TypeStyle{Size: 13, LineHeight: 20, Weight: 400},
 		},
@@ -319,16 +326,21 @@ func TokensFor(options Options) (Tokens, error) {
 		Spacing: SpacingTokens{XS: 4, SM: 8, MD: 16, LG: 24, XL: 40, XXL: 64},
 		Geometry: GeometryTokens{
 			BorderWidth: 1, BorderStrongWidth: 2,
-			RadiusSmall: 3, ControlRadius: 4, PanelRadius: 6,
-			DialogRadius: 8, PillRadius: 999,
+			// Boundaries are hairlines and the corners are tight. A console is
+			// an instrument: a generous radius reads as soft where this needs
+			// to read as machined, and at small sizes it eats the corner of
+			// every dense row. Radius grows with the surface, never past the
+			// point where a rectangle stops looking like one.
+			RadiusSmall: 2, ControlRadius: 5, PanelRadius: 8,
+			DialogRadius: 12, PillRadius: 999,
 			FocusRingWidth: 3, FocusRingOffset: 2,
-			Shadow: "0 10px 30px -10px rgba(3,12,20,0.34)",
+			Shadow: "0 24px 60px -24px rgba(2,6,14,0.60)",
 		},
 		Elevation: ElevationTokens{
 			Flat:     Elevation{},
-			Resting:  Elevation{OffsetY: 1, Blur: 2, Opacity: 0.08},
-			Floating: Elevation{OffsetY: 10, Blur: 28, Spread: -8, Opacity: 0.24},
-			Modal:    Elevation{OffsetY: 22, Blur: 56, Spread: -16, Opacity: 0.38},
+			Resting:  Elevation{OffsetY: 1, Blur: 3, Opacity: 0.10},
+			Floating: Elevation{OffsetY: 16, Blur: 40, Spread: -12, Opacity: 0.34},
+			Modal:    Elevation{OffsetY: 30, Blur: 78, Spread: -22, Opacity: 0.50},
 		},
 		Motion: motion,
 		Interaction: InteractionTokens{
@@ -400,63 +412,78 @@ func (tokens Tokens) Validate() error {
 	return nil
 }
 
+// darkColors is the instrument treatment: a cold graphite console where color
+// is reserved for state.
+//
+// Two rules hold the palette together. Interactive surfaces are neutral — the
+// primary action is a warm paper key, not a colored one — so that saturated
+// color anywhere in the console means a machine state and nothing else. And
+// live delivery owns cyan alone: it is the only place that hue appears, so a
+// running stream is identifiable at the edge of vision.
 func darkColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#0a0f0d", Shell: "#0d1614",
-		Surface1: "#111e1a", Surface2: "#16241f", Surface3: "#1c2c26",
-		SurfaceRaised: "#223530", SurfaceInset: "#070c0a",
-		BorderSubtle: "#253530", BorderStrong: "#6a8a7c",
-		TextPrimary: "#eaf3ee", TextSecondary: "#aec4ba", TextMuted: "#86988e",
-		TextDisabled: "#5e7268",
-		Accent:       "#29c46a", AccentHover: "#4fda88", AccentPressed: "#1c9a52",
-		OnAccent: "#05170d", Link: "#6fd1ff",
-		Selection: "#163a28", OnSelection: "#dffbea",
-		Success: "#34d399", OnSuccess: "#052015",
-		Warning: "#e3b341", OnWarning: "#1d1400",
-		Failure: "#f0667a", OnFailure: "#240509",
-		Active: "#4fa8ff", OnActive: "#041526",
-		Blocked: "#f0708a", OnBlocked: "#240509",
-		Invalidated: "#c79aa8", OnInvalidated: "#1d0f14",
-		Pending: "#93a79c", OnPending: "#0a1310",
-		Plan: "#a78bfa", OnPlan: "#170b2e",
-		Evidence: "#e3a83e", OnEvidence: "#1d1200",
-		FocusRing: "#66e3a0",
-		Code:      "#2fe0a0", OnCode: "#04160f",
-		Test: "#4c9efa", OnTest: "#041526",
-		Memory: "#93a0b0", OnMemory: "#0b1218",
-		Forecast: "#d7cb4a", OnForecast: "#201c02",
-		Execution: "#23b563", OnExecution: "#04160d",
-		Validation: "#2bc8cb", OnValidation: "#02191a",
+		Canvas: "#090c11", Shell: "#0e121a",
+		Surface1: "#141a24", Surface2: "#1a2130", Surface3: "#222b3a",
+		SurfaceRaised: "#1b2331", SurfaceInset: "#05070b",
+		BorderSubtle: "#263043", BorderStrong: "#7c8ca6",
+		TextPrimary: "#e9eef7", TextSecondary: "#aab7ca", TextMuted: "#8a97ab",
+		TextDisabled: "#5f6b7d",
+		// The paper key: the one action surface, borrowed from the record
+		// column so the thing you press belongs to the same material as the
+		// thing you are reading.
+		Accent: "#e8e3d6", AccentHover: "#f5f1e6", AccentPressed: "#cfc9bb",
+		OnAccent: "#10141c", Link: "#7cc4ff",
+		Selection: "#142334", OnSelection: "#dce9fa",
+		Success: "#46d39a", OnSuccess: "#04150e",
+		Warning: "#f5a524", OnWarning: "#1a1200",
+		Failure: "#ff6f7d", OnFailure: "#23060b",
+		Active: "#47d6e6", OnActive: "#04191d",
+		Blocked: "#ff8a9b", OnBlocked: "#23060b",
+		Invalidated: "#c9a6b4", OnInvalidated: "#1b1014",
+		Pending: "#94a3b8", OnPending: "#0b1119",
+		Plan: "#a79bf7", OnPlan: "#15102e",
+		Evidence: "#e3b04b", OnEvidence: "#1b1200",
+		FocusRing: "#58e0f0",
+		Code:      "#7fd8a8", OnCode: "#04170e",
+		Test: "#7fb6ff", OnTest: "#041526",
+		Memory: "#a9b6c8", OnMemory: "#0b1119",
+		Forecast: "#d9ce6a", OnForecast: "#1c1a02",
+		Execution: "#58d6c4", OnExecution: "#031a17",
+		Validation: "#63c9e8", OnValidation: "#02181f",
 	}
 }
 
+// lightColors is the same instrument in daylight: the shell cools to pale
+// graphite, the action key inverts to ink, and every state hue is darkened to
+// carry text at AA on a light ground.
 func lightColors() ColorTokens {
 	return ColorTokens{
-		Canvas: "#f4f7f5", Shell: "#eef3ef",
-		Surface1: "#ffffff", Surface2: "#f6f9f7", Surface3: "#eaf0ec",
-		SurfaceRaised: "#ffffff", SurfaceInset: "#e3ebe6",
-		BorderSubtle: "#d3e0d8", BorderStrong: "#5c7568",
-		TextPrimary: "#10201a", TextSecondary: "#33453d", TextMuted: "#4c5f56",
-		TextDisabled: "#71847a",
-		Accent:       "#178246", AccentHover: "#146c3a", AccentPressed: "#0f5730",
-		OnAccent: "#ffffff", Link: "#0b6fae",
-		Selection: "#d6f3e2", OnSelection: "#0d3822",
-		Success: "#167a41", OnSuccess: "#ffffff",
-		Warning: "#8a5c00", OnWarning: "#ffffff",
-		Failure: "#b23347", OnFailure: "#ffffff",
-		Active: "#1c66c2", OnActive: "#ffffff",
-		Blocked: "#a23a55", OnBlocked: "#ffffff",
-		Invalidated: "#7a4f5c", OnInvalidated: "#ffffff",
-		Pending: "#44584f", OnPending: "#ffffff",
-		Plan: "#6748c7", OnPlan: "#ffffff",
+		Canvas: "#edf0f5", Shell: "#e4e9f0",
+		Surface1: "#fbfcfe", Surface2: "#f2f5f9", Surface3: "#e7ecf3",
+		SurfaceRaised: "#ffffff", SurfaceInset: "#dfe5ee",
+		BorderSubtle: "#ccd5e1", BorderStrong: "#5a6879",
+		TextPrimary: "#10151d", TextSecondary: "#38424f", TextMuted: "#4e5a69",
+		TextDisabled: "#78838f",
+		// The ink key: the daylight inverse of the paper key.
+		Accent: "#16202c", AccentHover: "#22303f", AccentPressed: "#0c121a",
+		OnAccent: "#f7f4ec", Link: "#0a63b0",
+		Selection: "#dce8f7", OnSelection: "#0b2438",
+		Success: "#10774b", OnSuccess: "#ffffff",
+		Warning: "#8a5a00", OnWarning: "#ffffff",
+		Failure: "#b3253c", OnFailure: "#ffffff",
+		Active: "#0f6e86", OnActive: "#ffffff",
+		Blocked: "#a3304a", OnBlocked: "#ffffff",
+		Invalidated: "#7a5060", OnInvalidated: "#ffffff",
+		Pending: "#4a5866", OnPending: "#ffffff",
+		Plan: "#5b44c0", OnPlan: "#ffffff",
 		Evidence: "#8a6110", OnEvidence: "#ffffff",
-		FocusRing: "#14824a",
+		FocusRing: "#0c6e86",
 		Code:      "#0e6f42", OnCode: "#ffffff",
-		Test: "#1a63c9", OnTest: "#ffffff",
+		Test: "#1a5fc0", OnTest: "#ffffff",
 		Memory: "#4c5e6b", OnMemory: "#ffffff",
-		Forecast: "#7a6c00", OnForecast: "#ffffff",
-		Execution: "#106b3f", OnExecution: "#ffffff",
-		Validation: "#0f7f83", OnValidation: "#ffffff",
+		Forecast: "#6f6300", OnForecast: "#ffffff",
+		Execution: "#0d6f66", OnExecution: "#ffffff",
+		Validation: "#0f6e86", OnValidation: "#ffffff",
 	}
 }
 

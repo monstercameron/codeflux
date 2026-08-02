@@ -525,6 +525,12 @@ func validateStableIdentity(identity *codefluxv1.StableIdentity, path string) er
 		_, err = domain.ParseProviderID(identity.GetValue())
 	case codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_BUDGET:
 		_, err = domain.ParseBudgetID(identity.GetValue())
+	case codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT:
+		_, err = domain.ParseMemoryArtifactID(identity.GetValue())
+	case codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION:
+		_, err = domain.ParseMemoryArtifactRevisionID(identity.GetValue())
+	case codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_EPISODE:
+		_, err = domain.ParseEpisodeID(identity.GetValue())
 	default:
 		err = domain.ErrInvalidID
 	}

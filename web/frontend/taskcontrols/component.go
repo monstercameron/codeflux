@@ -10,6 +10,7 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/primitives"
+	"codeflux.dev/codeflux/web/frontend/readout"
 	"github.com/monstercameron/GoWebComponents/v5/css"
 	"github.com/monstercameron/GoWebComponents/v5/css/u"
 	"github.com/monstercameron/GoWebComponents/v5/html"
@@ -555,7 +556,7 @@ func hardBudgetText(value BudgetView) string {
 }
 
 func moneyText(value domain.Money) string {
-	return string(value.Currency) + " " + strconv.FormatInt(value.MinorUnits, 10) + " minor units"
+	return readout.FormatExactMoneyForReading(value)
 }
 
 func tokenUsageText(value domain.TokenUsage) string {

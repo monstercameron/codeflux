@@ -32,6 +32,12 @@ type AuthoritativeProps struct {
 	ResponsiveMode      string
 	VisualMode          primitives.Mode
 	Height              int
+	// SuppressLegend drops the canvas's own vocabulary key when the surface
+	// around it already carries one. Drawn twice on the graph's own page, the
+	// legend took three hundred pixels of the panel and left the diagram a
+	// two-hundred-and-forty pixel strip, which fitted every node to a third of
+	// its size and made each one an unreadable blank rectangle.
+	SuppressLegend      bool
 	OnSelectNode        func(domain.NodeID)
 	OnHighlightMessages func(domain.NodeID)
 	OnModeChange        func(graph.Mode)
@@ -288,7 +294,7 @@ func authoritativeSVG(props AuthoritativeProps) ui.Node {
 			modeTabs,
 		),
 		authoritativeModePanels(modeValue, graphViewport),
-		authoritativeLegend(props.VisualMode, props.ResponsiveMode),
+		canvasLegend(props),
 		selectedNodeAnnouncement(props.Revision, selected.Get()),
 	)
 }
@@ -475,14 +481,41 @@ func authoritativeNodeContents(node graph.Node, bounds graphlayout.Rect, mode pr
 	}
 	return append(result,
 		shape,
-		html.Tag("text", html.Props{Raw: map[string]any{
-			"x": "18", "y": "34", "fill": string(tokens.Colors.TextPrimary),
-			"font-size": "15", "font-weight": "600", "font-family": tokens.Fonts.UI,
-		}}, html.Text(display)),
-		html.Tag("text", html.Props{Data: map[string]string{"component": "graph-node-status"}, Raw: map[string]any{
-			"x": "18", "y": strconv.FormatInt(bounds.Height-18, 10), "fill": string(tokens.Colors.TextSecondary),
-			"font-size": "12", "font-weight": "600", "font-family": tokens.Fonts.UI,
-		}}, html.Text(graphStatusIcon(node.Status())+" "+graphStatusLabel(node.Status()))),
+		// The label is drawn in a foreignObject rather than an SVG <text>.
+		//
+		// The renderer creates SVG tags through createElementNS from a fixed tag
+		// set, and "text" is not in it: every node label was created in the HTML
+		// namespace inside the SVG, carried its attributes, and never painted.
+		// The whole diagram drew as correctly placed, correctly linked, entirely
+		// blank rectangles. A foreignObject is in that set, and what it holds is
+		// ordinary HTML the renderer already knows how to build.
+		html.Tag("foreignObject", html.Props{
+			Raw: map[string]any{
+				"x": "0", "y": "0",
+				"width":  strconv.FormatInt(bounds.Width, 10),
+				"height": strconv.FormatInt(bounds.Height, 10),
+			},
+		},
+			html.Div(html.Props{
+				Data: map[string]string{"component": "graph-node-label"},
+				Raw: map[string]any{"style": "width:100%;height:100%;box-sizing:border-box;" +
+					"padding:16px 18px;display:flex;flex-direction:column;justify-content:space-between;" +
+					"overflow:hidden;pointer-events:none;font-family:" + tokens.Fonts.UI},
+			},
+				html.Div(html.Props{
+					Raw: map[string]any{"style": "color:" + string(tokens.Colors.TextPrimary) +
+						";font-size:15px;font-weight:600;line-height:20px;" +
+						"overflow:hidden;text-overflow:ellipsis;white-space:nowrap"},
+					Text: display,
+				}),
+				html.Div(html.Props{
+					Data: map[string]string{"component": "graph-node-status"},
+					Raw: map[string]any{"style": "color:" + string(tokens.Colors.TextSecondary) +
+						";font-size:12px;font-weight:600;line-height:16px;white-space:nowrap"},
+					Text: graphStatusIcon(node.Status()) + " " + graphStatusLabel(node.Status()),
+				}),
+			),
+		),
 	)
 }
 
@@ -748,6 +781,14 @@ func edgeVisual(class graph.EdgeClass, tokens design.Tokens) (stroke, dash strin
 		dash = "none"
 	}
 	return stroke, dash, width
+}
+
+// canvasLegend draws the vocabulary key unless the surface already has one.
+func canvasLegend(props AuthoritativeProps) ui.Node {
+	if props.SuppressLegend {
+		return nil
+	}
+	return authoritativeLegend(props.VisualMode, props.ResponsiveMode)
 }
 
 func authoritativeContainerClass(tokens design.Tokens, height int) string {

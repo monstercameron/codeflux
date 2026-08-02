@@ -22,8 +22,14 @@ type TopBarView struct {
 	HardBudget      string
 	RemainingBudget string
 	BudgetWarning   string
-	CanPause        bool
-	CanStop         bool
+	// SpentFraction is how much of the hard cap has been spent, between 0 and
+	// 1, or a negative value when either figure is unmeasured. The header draws
+	// it as a meter, and a meter must not invent a zero for a measurement
+	// nobody took.
+	SpentFraction float64
+	BudgetWarned  bool
+	CanPause      bool
+	CanStop       bool
 }
 
 type ReviewView struct {

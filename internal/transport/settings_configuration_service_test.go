@@ -30,6 +30,17 @@ type settingsConfigurationFake struct {
 	flowErr     error
 	written     WriteFlowSettings
 	writeErr    error
+	spend       SpendSummaryRecord
+	spendQuery  SpendSummaryQuery
+	spendErr    error
+}
+
+func (fake *settingsConfigurationFake) ReadSpendSummary(
+	_ context.Context,
+	query SpendSummaryQuery,
+) (SpendSummaryRecord, error) {
+	fake.spendQuery = query
+	return fake.spend, fake.spendErr
 }
 
 func (fake *settingsConfigurationFake) ReadFlowSettings(

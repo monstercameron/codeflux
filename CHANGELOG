@@ -30,6 +30,43 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-009
+Date: 2026-08-02
+Type: CHECKPOINT. Every uncommitted working-tree change is committed as the
+  lanes left it, with the repository's own gates failing
+Request-or-TODO: User: "commit all code and push to remote"; then, when the
+  failing gates were raised, "just commit everything for now"; then "stop
+  wasting time runnig tests the code isnt worth testing rn, just fuckig commit
+  and push codeflux"
+Outcome: This is a clearly labelled checkpoint commit, taken under the explicit
+  user authorization AGENTS.md requires before a knowingly failing state may be
+  committed. It carries the in-flight work of several concurrent lanes: the
+  agent stage runner and its stage implementations in internal/coordinator, the
+  pipeline stage ledger and its two migrations, the spend attribution and
+  artifact repositories in internal/storage, the memory and settings-spend
+  services in internal/transport, internal/openaimodel, the repository, file
+  tree, atom collection, appearance, readout, and settings surfaces in
+  web/frontend and web/client, and 439 lines of new task records in TODOS.md.
+  It also carries two changes made to clear earlier gates: gofmt applied to 20
+  files under web/, and five headings in web/frontend/codecollection that
+  carried no type-scale class, given design.HeadingPanel to match the pattern
+  already used in web/frontend/reviewactions
+Affected-behavior: Unknown in aggregate. This commit is a snapshot of partly
+  finished work across several lanes, not one coherent change, and it is
+  recorded as such rather than described as something it is not
+Compatibility-or-migration: Adds migrations 000030_pipeline_stage_ledger.sql and
+  000031_pipeline_stage_documentation.sql. Migrations are immutable once merged,
+  so a later correction must be a new migration
+Verification: FAILING AND COMMITTED ANYWAY. gofmt is clean and go build ./...
+  exits 0. staticcheck reports 44 findings -- 35 U1000 unused, 5 SA1019
+  deprecated, 2 ST1018, 1 S1002, 1 S1011 -- concentrated in web/client (19) and
+  internal/coordinator (11), which are declarations written ahead of the code
+  that will use them. codeflux-dev test-fast exits 1; the failing package was
+  not captured because the run's output was truncated to its tail, and the suite
+  was not re-run because the user directed that testing stop. No claim is made
+  here that this revision is correct
+Dev-Log: DL-20260802-018
+
 Change-ID: CL-20260802-008
 Date: 2026-08-02
 Type: The interface design references are tracked as source rather than left
