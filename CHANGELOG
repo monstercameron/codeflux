@@ -16,9 +16,21 @@ Resolve the final commit with:
 
 git log --grep="Change-Log: CL-YYYYMMDD-NNN"
 
+The Commit field carries the real hash, written AFTER the commit exists. Write
+the entry with "Commit: pending", commit it, then fill the short hash in. That
+edit stays in the working tree and is swept up by the next feature commit, so it
+costs no commit of its own.
+
+The newest entry therefore reads "pending" until the next feature lands, and the
+last entry of a session stays pending until the next session. That is expected.
+The Change-Log trailer is the binding that always works; the hash is a
+convenience, and where the two disagree -- after a rebase, squash, or
+cherry-pick, all of which change the hash -- the trailer is right.
+
 Entry fields
 ------------
 Change-ID:
+Commit:
 Date:
 Type:
 Request-or-TODO:
@@ -30,6 +42,38 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-014
+Commit: pending
+Date: 2026-08-02
+Type: Commits become feature-atomic, and ledger entries carry the real commit
+  hash, back-filled
+Request-or-TODO: User: "next lets define how the agent does work, I want feature
+  atomic commits, so not to congolmerate all teh changes into a single commit, I
+  want feature atomic commits, devlog notes, and changelog notes with the commit
+  id, so refine this idea and then refine the agent file"; then, on how the hash
+  gets there: "just append/prepend thee hash after the commit and the next
+  feature will pick it up dont over think it"
+Outcome: A commit is now scoped to one feature, not to one work session and not
+  to whatever the working tree happens to contain. AGENTS.md states the test --
+  if the honest subject needs an "and", it is more than one commit -- and
+  requires the split to be decided before staging rather than discovered
+  mid-commit, each commit to be individually sound so the sequence never passes
+  through a broken state, and each to carry its own CL and DL pair. It also
+  bans git add -A and git commit -a outright and says that a path you cannot
+  account for belongs to another lane. Both ledgers gain a Commit field carrying
+  the real short hash. Because a commit cannot contain its own hash, it is
+  back-filled: write the entry with "pending", commit, fill the hash in, and
+  leave that edit uncommitted for the next feature commit to sweep up, so it
+  costs no commit of its own. ledger-scribe was rewritten to plan the commit
+  split before drafting anything and to perform the back-fill
+Affected-behavior: None at runtime. This governs how work is committed
+Compatibility-or-migration: Entries written before this commit have no Commit
+  field and are not back-filled; the Change-Log trailer already resolves them
+Verification: No Go source touched, so the gates are unaffected. This entry's
+  own hash is filled in by the next feature commit, which is the mechanism
+  working as described
+Dev-Log: DL-20260802-024
+
 Change-ID: CL-20260802-013
 Date: 2026-08-02
 Type: CI splits into a non-gating dev pass and the gated main pass

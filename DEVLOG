@@ -12,6 +12,7 @@ Dev-Log:
 Date:
 Status:
 Change-ID:
+Commit:
 Request-or-TODO:
 Goal:
 Assumptions:
@@ -24,6 +25,52 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-024
+Date: 2026-08-02
+Status: Feature-atomic commit discipline defined; hash back-fill adopted
+Change-ID: CL-20260802-014
+Commit: pending
+Request-or-TODO: User: "next lets define how the agent does work, I want feature
+  atomic commits, so not to congolmerate all teh changes into a single commit, I
+  want feature atomic commits, devlog notes, and changelog notes with the commit
+  id, so refine this idea and then refine the agent file"; then "just
+  append/prepend thee hash after the commit and the next feature will pick it up
+  dont over think it"
+Goal: Stop a session collapsing into one commit, and get a real hash into the
+  ledger without inventing machinery
+Assumptions: "The agent file" means AGENTS.md, which is authoritative for how
+  work is done, plus the subagent that implements it. Refining only the subagent
+  would leave the rule unstated for any agent that does not load it
+Decisions: The hash is back-filled into the NEXT feature commit rather than
+  carried by git notes or a generated index. Both alternatives were drafted and
+  dropped on the user's instruction not to overthink it, and he is right that
+  they cost more than they return here: notes need a separate ref pushed and are
+  invisible on GitHub, and an index needs tooling plus a drift check. Back-fill
+  costs one edit that something else was going to commit anyway. AGENTS.md
+  previously said the trailer exists "without trying to embed a commit hash",
+  which now reads as contradicting the new field; it was rewritten to say why
+  embedding is impossible AND how the hash arrives afterwards, because leaving
+  two rules that appear to disagree is how a later agent picks the wrong one.
+  The trailer stays authoritative over the hash, which a rebase, squash, or
+  cherry-pick all invalidate. This landed as ONE commit rather than a split,
+  because it is one policy asked for in one sentence and the new rule itself
+  forbids splitting artificially into commits that do not stand alone
+Files-or-schemas: AGENTS.md, CHANGELOG header, DEVLOG header,
+  .claude/agents/ledger-scribe.md. No schema change
+Validation: No Go source touched, so the gates are unaffected. The Commit field
+  on this entry is "pending" by design and is filled by the next feature commit
+Failures-or-discarded-approaches: git notes and a generated CL-to-hash index
+  were both worked up and rejected as above. DL-20260802-023 was claimed by a
+  concurrent lane between drafting and writing this entry, so it was renumbered
+  to 024 -- which is the reason the procedure says to re-read the sequence
+  immediately before writing rather than reserve a number early
+Known-limitations: Nothing enforces any of this. A commit lumping four features
+  together, or an entry left "pending" forever, fails no gate. A lint rule
+  comparing the newest entry's Commit field against git log would close that and
+  does not exist
+Next-safe-step: Pull the dev-pass failure artifact from run 30759213084 to name
+  the failing test package, then triage the 44 staticcheck findings by lane
+
 Dev-Log: DL-20260802-022
 Date: 2026-08-02
 Status: Two-pass CI in place; dev pass non-gating, main gate unchanged in name

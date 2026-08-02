@@ -81,8 +81,10 @@ The tracked extensionless files `CHANGELOG` and `DEVLOG` are the repository's au
 - Keep `CHANGELOG` synchronized with every authorized commit.
 - Give each entry a stable identifier in the form `CL-YYYYMMDD-NNN`.
 - Add the entry in the same commit as the change it describes.
-- Add a matching `Change-Log: CL-YYYYMMDD-NNN` trailer to the commit message. The trailer binds the entry to the commit without trying to embed a commit hash inside the commit that creates it.
+- Add a matching `Change-Log: CL-YYYYMMDD-NNN` trailer to the commit message. The trailer binds the entry to the commit without trying to embed a commit hash inside the commit that creates it, which is impossible: writing the hash in would change it.
 - A reviewer must be able to resolve the commit later with `git log --grep="Change-Log: CL-YYYYMMDD-NNN"`.
+- Carry the real hash in a `Commit:` field, back-filled. Write the entry with `Commit: pending`, commit it, then immediately fill in the short hash. Leave that edit uncommitted; the next feature commit sweeps it up, so it never costs a commit of its own. The newest entry reads `pending` until the next feature lands, and the last entry of a session stays pending until the next session — both are expected, not omissions.
+- The trailer is authoritative and the hash is a convenience. A rebase, squash, or cherry-pick changes the hash and leaves the field stale; when the two disagree, believe the trailer.
 - Record the date, change type, governing TODO or request, concise outcome, affected behavior, compatibility or migration impact, and verification.
 - Describe completed outcomes, not intentions, raw work notes, or marketing claims.
 - Record internal, test-only, documentation, and build changes as such; do not omit them merely because they are not user-facing.
@@ -103,6 +105,24 @@ The tracked extensionless files `CHANGELOG` and `DEVLOG` are the repository's au
 
 - These rules do not authorize creating a commit. Commit only when the user or an authorized repository workflow requests it.
 - Every commit must represent one coherent, independently reviewable change with one clear reason to exist.
+
+#### Feature-atomic, not session-atomic
+
+A commit is scoped to **one feature**, not to one work session and not to everything the working tree happens to contain. "Commit my work" is an instruction to commit, not permission to collapse a session into a single commit.
+
+- **The test:** can the subject line name the observable change without using "and"? If the honest subject is "add X and fix Y and reformat Z", that is three commits.
+- **A feature is the smallest change that leaves the tree coherent.** Its production code, its narrow tests, its migration, its regenerated source, and its two ledger entries belong together, because separating them leaves a state that is misleading or does not build.
+- **Split before staging, not after.** Decide the commit boundaries first, then stage explicit paths for each. Discovering mid-commit that the diff has two purposes means the split was skipped.
+- Order the sequence so that **every commit is individually sound**. A dependency lands before the code that imports it. Prefer a compiling intermediate to a tidy final state reached through broken ones.
+- Each commit gets **its own** `CL-` and `DL-` pair. Two features never share an entry, and one feature never gets two.
+- If a change genuinely cannot be split — a rename that touches forty files, a generated artifact — say so in the entry rather than splitting it artificially into commits that do not build.
+- A **checkpoint commit**, collapsing unrelated work into one, requires the user to ask for it explicitly and must be labelled as such in its subject and its `CHANGELOG` entry, including what is failing at that revision.
+
+#### Working-tree hygiene when other lanes are active
+
+- Commit only what your own task changed. Files another lane left modified or untracked are not yours to sweep in, even when they sit in the same directory.
+- `git add -A` and `git commit -a` are prohibited. Stage explicit paths, or hunks when one file carries two purposes.
+- Before staging, list what changed and account for every path. A path you cannot explain belongs to someone else.
 - Stage explicit paths or hunks. Do not use broad staging to absorb unrelated user changes.
 - Keep feature code, its narrow tests, required migration, generated source, and directly affected ledger entries together when separating them would leave a misleading or broken state.
 - Separate unrelated refactors, formatting sweeps, dependency upgrades, documentation changes, and behavior changes into different commits.
