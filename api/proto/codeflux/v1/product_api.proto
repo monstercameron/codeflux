@@ -51,6 +51,11 @@ message InspectRepositoryRequest {
 message InspectRepositoryResponse {
   RepositorySummary repository = 1;
   repeated RedactedText warnings = 2;
+  // working_tree_read reports whether Git actually answered. Without it a
+  // caller cannot tell a clean tree from a tree nobody could read: both arrive
+  // as a summary with dirty unset, and "clean" is the claim somebody starts an
+  // agent on the strength of.
+  bool working_tree_read = 3;
 }
 
 service ThreadService {
@@ -632,6 +637,79 @@ message OpenInEditorResponse {
   SafePath path = 2;
 }
 
+// MemoryService reads governed project memory.
+//
+// The surface is read-only. Memory artifacts are created by the coordinator
+// from evidence it observed, and their maturity is governed by transition
+// rules the browser has no authority over; a client that could write here
+// could launder an assertion into a durable fact.
+service MemoryService {
+  rpc ListMemoryArtifacts(ListMemoryArtifactsRequest) returns (ListMemoryArtifactsResponse);
+  rpc GetMemoryArtifact(GetMemoryArtifactRequest) returns (GetMemoryArtifactResponse);
+}
+
+message ListMemoryArtifactsRequest {
+  StableIdentity project_id = 1;
+  PageRequest page = 2;
+}
+
+// MemoryArtifactSummary is one artifact at its latest revision, carrying only
+// what the inspector lists: identity, kind, governed maturity, and a redacted
+// one-line summary. Content and evidence stay behind the detail read.
+message MemoryArtifactSummary {
+  StableIdentity artifact_id = 1;
+  StableIdentity revision_id = 2;
+  string kind = 3;
+  string maturity = 4;
+  RedactedText summary = 5;
+  bool created_from_correction = 6;
+  StableIdentity scope_repository_id = 7;
+  google.protobuf.Timestamp created_at = 8;
+  uint64 revision_number = 9;
+}
+
+message ListMemoryArtifactsResponse {
+  repeated MemoryArtifactSummary artifacts = 1;
+  PageInfo page = 2;
+}
+
+message GetMemoryArtifactRequest {
+  StableIdentity project_id = 1;
+  StableIdentity artifact_id = 2;
+}
+
+// MemoryArtifactLineageView is what the artifact was derived from and what
+// influenced it. Origin and supporting episodes carry an explicit known flag:
+// an unresolved origin is reported as unresolved rather than shown as "none",
+// because those two claims are not the same and only one of them is true.
+message MemoryArtifactLineageView {
+  repeated StableIdentity derived_from = 1;
+  repeated StableIdentity influenced_by = 2;
+  bool origin_known = 3;
+  StableIdentity origin_artifact_id = 4;
+  string origin_unknown_reason = 5;
+  bool supporting_episodes_known = 6;
+  repeated StableIdentity supporting_episodes = 7;
+  string supporting_episodes_unknown_reason = 8;
+}
+
+// MemoryArtifactField is one already-redacted line of an artifact's typed
+// content, rendered as a label and value pair. Sending the payload this way
+// keeps the browser from having to know eight content shapes to display them.
+message MemoryArtifactField {
+  string label = 1;
+  RedactedText value = 2;
+}
+
+message GetMemoryArtifactResponse {
+  MemoryArtifactSummary summary = 1;
+  repeated MemoryArtifactField fields = 2;
+  MemoryArtifactLineageView lineage = 3;
+  StableIdentity supersedes_revision_id = 4;
+  string binding_state = 5;
+  string content_sha256 = 6;
+}
+
 service SettingsService {
   rpc GetModels(GetModelsRequest) returns (GetModelsResponse);
   rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
@@ -921,4 +999,129 @@ message SubscribeSessionResponse {
 // subscription time has been delivered. Events after this boundary are live.
 message SessionReplayBoundary {
   uint64 through_sequence = 1;
+}
+
+// CodeCollectionService reads what code a repository contains at an exact
+// revision: its packages, its declarations, and the documentation a
+// declaration carries about itself. It is strictly read-only. Nothing here
+// writes source, and no response carries a declaration's body — this is a
+// directory of what the collection offers, not an editor.
+service CodeCollectionService {
+  rpc ListCodePackages(ListCodePackagesRequest) returns (ListCodePackagesResponse);
+  rpc ListCodeSymbols(ListCodeSymbolsRequest) returns (ListCodeSymbolsResponse);
+  rpc InspectCodeSymbol(InspectCodeSymbolRequest) returns (InspectCodeSymbolResponse);
+}
+
+// CodeCollectionRevisionView states which repository revision an answer
+// describes. Every response carries it, because a directory of code that does
+// not say which revision it read will eventually describe a tree that moved on.
+message CodeCollectionRevisionView {
+  string revision = 1;
+  bool dirty = 2;
+  repeated RedactedText warnings = 3;
+}
+
+message CodePackageView {
+  string import_path = 1;
+  string name = 2;
+  string module_path = 3;
+  uint32 file_count = 4;
+  uint32 test_file_count = 5;
+  uint32 symbol_count = 6;
+  uint32 atom_count = 7;
+}
+
+message CodeSymbolView {
+  // key is the opaque identity InspectCodeSymbol accepts. It is never a path a
+  // caller can act on directly.
+  string key = 1;
+  string name = 2;
+  string kind = 3;
+  string receiver = 4;
+  string import_path = 5;
+  string workspace_relative_path = 6;
+  uint32 line = 7;
+  bool exported = 8;
+  // atom reports an admitted atom: the declaration carries the directive and
+  // its documentation parsed. atom_problem carries why a directive-bearing
+  // declaration was not admitted.
+  bool atom = 9;
+  string atom_problem = 10;
+}
+
+message CodeSymbolReferenceView {
+  string name = 1;
+  string workspace_relative_path = 2;
+  uint32 line = 3;
+}
+
+message CodeAtomFieldView {
+  string label = 1;
+  RedactedText text = 2;
+  repeated RedactedText items = 3;
+}
+
+message ListCodePackagesRequest {
+  StableIdentity repository_id = 1;
+  string search = 2;
+  PageRequest page = 3;
+}
+
+message ListCodePackagesResponse {
+  CodeCollectionRevisionView revision = 1;
+  repeated CodePackageView packages = 2;
+  PageInfo page = 3;
+  uint32 total_packages = 4;
+  uint32 total_symbols = 5;
+  uint32 total_atoms = 6;
+}
+
+message ListCodeSymbolsRequest {
+  StableIdentity repository_id = 1;
+  string import_path = 2;
+  string search = 3;
+  bool exported_only = 4;
+  bool atoms_only = 5;
+  PageRequest page = 6;
+}
+
+message ListCodeSymbolsResponse {
+  CodeCollectionRevisionView revision = 1;
+  repeated CodeSymbolView symbols = 2;
+  PageInfo page = 3;
+  uint32 total_matched = 4;
+}
+
+message InspectCodeSymbolRequest {
+  StableIdentity repository_id = 1;
+  string key = 2;
+}
+
+message InspectCodeSymbolResponse {
+  CodeCollectionRevisionView revision = 1;
+  CodeSymbolView symbol = 2;
+  // signature is the declaration without its body.
+  RedactedText signature = 3;
+  // documentation is the declaration's own comment, unchanged and never
+  // generated.
+  repeated RedactedText documentation = 4;
+  string atom_opening_sentence = 5;
+  uint32 atom_schema_version = 6;
+  repeated CodeAtomFieldView atom_fields = 7;
+  repeated CodeSymbolReferenceView callers = 8;
+  repeated CodeSymbolReferenceView callees = 9;
+  repeated string implements = 10;
+  repeated string implemented_by = 11;
+  // source is the declaration exactly as written, including the comment above
+  // it. A promise stated in a comment is only worth as much as the code under
+  // it, so the surface that shows the promise has to be able to show the code.
+  // source_start_line is the file line the first returned line came from, so a
+  // reader can cite what they are looking at.
+  RedactedText source = 12;
+  uint32 source_start_line = 13;
+  bool source_truncated = 14;
+  // tests are the declarations in test files that reference this one. They are
+  // separated from callers because "what exercises this" and "what depends on
+  // this" are different questions, and only one of them is evidence.
+  repeated CodeSymbolReferenceView tests = 15;
 }

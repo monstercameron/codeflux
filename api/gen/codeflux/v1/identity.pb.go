@@ -25,29 +25,32 @@ const (
 type StableIdentityKind int32
 
 const (
-	StableIdentityKind_STABLE_IDENTITY_KIND_UNSPECIFIED    StableIdentityKind = 0
-	StableIdentityKind_STABLE_IDENTITY_KIND_PROJECT        StableIdentityKind = 1
-	StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY     StableIdentityKind = 2
-	StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE      StableIdentityKind = 3
-	StableIdentityKind_STABLE_IDENTITY_KIND_THREAD         StableIdentityKind = 4
-	StableIdentityKind_STABLE_IDENTITY_KIND_MESSAGE        StableIdentityKind = 5
-	StableIdentityKind_STABLE_IDENTITY_KIND_TASK           StableIdentityKind = 6
-	StableIdentityKind_STABLE_IDENTITY_KIND_RUN            StableIdentityKind = 7
-	StableIdentityKind_STABLE_IDENTITY_KIND_EVENT          StableIdentityKind = 8
-	StableIdentityKind_STABLE_IDENTITY_KIND_CHECKPOINT     StableIdentityKind = 9
-	StableIdentityKind_STABLE_IDENTITY_KIND_APPROVAL       StableIdentityKind = 10
-	StableIdentityKind_STABLE_IDENTITY_KIND_GRAPH          StableIdentityKind = 11
-	StableIdentityKind_STABLE_IDENTITY_KIND_GRAPH_REVISION StableIdentityKind = 12
-	StableIdentityKind_STABLE_IDENTITY_KIND_NODE           StableIdentityKind = 13
-	StableIdentityKind_STABLE_IDENTITY_KIND_EDGE           StableIdentityKind = 14
-	StableIdentityKind_STABLE_IDENTITY_KIND_VALIDATION     StableIdentityKind = 15
-	StableIdentityKind_STABLE_IDENTITY_KIND_EVIDENCE       StableIdentityKind = 16
-	StableIdentityKind_STABLE_IDENTITY_KIND_ARTIFACT       StableIdentityKind = 17
-	StableIdentityKind_STABLE_IDENTITY_KIND_ATOM           StableIdentityKind = 18
-	StableIdentityKind_STABLE_IDENTITY_KIND_MODEL_REQUEST  StableIdentityKind = 19
-	StableIdentityKind_STABLE_IDENTITY_KIND_PROVIDER       StableIdentityKind = 20
-	StableIdentityKind_STABLE_IDENTITY_KIND_BUDGET         StableIdentityKind = 21
-	StableIdentityKind_STABLE_IDENTITY_KIND_SESSION        StableIdentityKind = 22
+	StableIdentityKind_STABLE_IDENTITY_KIND_UNSPECIFIED              StableIdentityKind = 0
+	StableIdentityKind_STABLE_IDENTITY_KIND_PROJECT                  StableIdentityKind = 1
+	StableIdentityKind_STABLE_IDENTITY_KIND_REPOSITORY               StableIdentityKind = 2
+	StableIdentityKind_STABLE_IDENTITY_KIND_WORKSPACE                StableIdentityKind = 3
+	StableIdentityKind_STABLE_IDENTITY_KIND_THREAD                   StableIdentityKind = 4
+	StableIdentityKind_STABLE_IDENTITY_KIND_MESSAGE                  StableIdentityKind = 5
+	StableIdentityKind_STABLE_IDENTITY_KIND_TASK                     StableIdentityKind = 6
+	StableIdentityKind_STABLE_IDENTITY_KIND_RUN                      StableIdentityKind = 7
+	StableIdentityKind_STABLE_IDENTITY_KIND_EVENT                    StableIdentityKind = 8
+	StableIdentityKind_STABLE_IDENTITY_KIND_CHECKPOINT               StableIdentityKind = 9
+	StableIdentityKind_STABLE_IDENTITY_KIND_APPROVAL                 StableIdentityKind = 10
+	StableIdentityKind_STABLE_IDENTITY_KIND_GRAPH                    StableIdentityKind = 11
+	StableIdentityKind_STABLE_IDENTITY_KIND_GRAPH_REVISION           StableIdentityKind = 12
+	StableIdentityKind_STABLE_IDENTITY_KIND_NODE                     StableIdentityKind = 13
+	StableIdentityKind_STABLE_IDENTITY_KIND_EDGE                     StableIdentityKind = 14
+	StableIdentityKind_STABLE_IDENTITY_KIND_VALIDATION               StableIdentityKind = 15
+	StableIdentityKind_STABLE_IDENTITY_KIND_EVIDENCE                 StableIdentityKind = 16
+	StableIdentityKind_STABLE_IDENTITY_KIND_ARTIFACT                 StableIdentityKind = 17
+	StableIdentityKind_STABLE_IDENTITY_KIND_ATOM                     StableIdentityKind = 18
+	StableIdentityKind_STABLE_IDENTITY_KIND_MODEL_REQUEST            StableIdentityKind = 19
+	StableIdentityKind_STABLE_IDENTITY_KIND_PROVIDER                 StableIdentityKind = 20
+	StableIdentityKind_STABLE_IDENTITY_KIND_BUDGET                   StableIdentityKind = 21
+	StableIdentityKind_STABLE_IDENTITY_KIND_SESSION                  StableIdentityKind = 22
+	StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT          StableIdentityKind = 23
+	StableIdentityKind_STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION StableIdentityKind = 24
+	StableIdentityKind_STABLE_IDENTITY_KIND_EPISODE                  StableIdentityKind = 25
 )
 
 // Enum value maps for StableIdentityKind.
@@ -76,31 +79,37 @@ var (
 		20: "STABLE_IDENTITY_KIND_PROVIDER",
 		21: "STABLE_IDENTITY_KIND_BUDGET",
 		22: "STABLE_IDENTITY_KIND_SESSION",
+		23: "STABLE_IDENTITY_KIND_MEMORY_ARTIFACT",
+		24: "STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION",
+		25: "STABLE_IDENTITY_KIND_EPISODE",
 	}
 	StableIdentityKind_value = map[string]int32{
-		"STABLE_IDENTITY_KIND_UNSPECIFIED":    0,
-		"STABLE_IDENTITY_KIND_PROJECT":        1,
-		"STABLE_IDENTITY_KIND_REPOSITORY":     2,
-		"STABLE_IDENTITY_KIND_WORKSPACE":      3,
-		"STABLE_IDENTITY_KIND_THREAD":         4,
-		"STABLE_IDENTITY_KIND_MESSAGE":        5,
-		"STABLE_IDENTITY_KIND_TASK":           6,
-		"STABLE_IDENTITY_KIND_RUN":            7,
-		"STABLE_IDENTITY_KIND_EVENT":          8,
-		"STABLE_IDENTITY_KIND_CHECKPOINT":     9,
-		"STABLE_IDENTITY_KIND_APPROVAL":       10,
-		"STABLE_IDENTITY_KIND_GRAPH":          11,
-		"STABLE_IDENTITY_KIND_GRAPH_REVISION": 12,
-		"STABLE_IDENTITY_KIND_NODE":           13,
-		"STABLE_IDENTITY_KIND_EDGE":           14,
-		"STABLE_IDENTITY_KIND_VALIDATION":     15,
-		"STABLE_IDENTITY_KIND_EVIDENCE":       16,
-		"STABLE_IDENTITY_KIND_ARTIFACT":       17,
-		"STABLE_IDENTITY_KIND_ATOM":           18,
-		"STABLE_IDENTITY_KIND_MODEL_REQUEST":  19,
-		"STABLE_IDENTITY_KIND_PROVIDER":       20,
-		"STABLE_IDENTITY_KIND_BUDGET":         21,
-		"STABLE_IDENTITY_KIND_SESSION":        22,
+		"STABLE_IDENTITY_KIND_UNSPECIFIED":              0,
+		"STABLE_IDENTITY_KIND_PROJECT":                  1,
+		"STABLE_IDENTITY_KIND_REPOSITORY":               2,
+		"STABLE_IDENTITY_KIND_WORKSPACE":                3,
+		"STABLE_IDENTITY_KIND_THREAD":                   4,
+		"STABLE_IDENTITY_KIND_MESSAGE":                  5,
+		"STABLE_IDENTITY_KIND_TASK":                     6,
+		"STABLE_IDENTITY_KIND_RUN":                      7,
+		"STABLE_IDENTITY_KIND_EVENT":                    8,
+		"STABLE_IDENTITY_KIND_CHECKPOINT":               9,
+		"STABLE_IDENTITY_KIND_APPROVAL":                 10,
+		"STABLE_IDENTITY_KIND_GRAPH":                    11,
+		"STABLE_IDENTITY_KIND_GRAPH_REVISION":           12,
+		"STABLE_IDENTITY_KIND_NODE":                     13,
+		"STABLE_IDENTITY_KIND_EDGE":                     14,
+		"STABLE_IDENTITY_KIND_VALIDATION":               15,
+		"STABLE_IDENTITY_KIND_EVIDENCE":                 16,
+		"STABLE_IDENTITY_KIND_ARTIFACT":                 17,
+		"STABLE_IDENTITY_KIND_ATOM":                     18,
+		"STABLE_IDENTITY_KIND_MODEL_REQUEST":            19,
+		"STABLE_IDENTITY_KIND_PROVIDER":                 20,
+		"STABLE_IDENTITY_KIND_BUDGET":                   21,
+		"STABLE_IDENTITY_KIND_SESSION":                  22,
+		"STABLE_IDENTITY_KIND_MEMORY_ARTIFACT":          23,
+		"STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION": 24,
+		"STABLE_IDENTITY_KIND_EPISODE":                  25,
 	}
 )
 
@@ -192,7 +201,7 @@ const file_codeflux_v1_identity_proto_rawDesc = "" +
 	"\x1acodeflux/v1/identity.proto\x12\vcodeflux.v1\"[\n" +
 	"\x0eStableIdentity\x123\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1f.codeflux.v1.StableIdentityKindR\x04kind\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value*\xac\x06\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value*\xab\a\n" +
 	"\x12StableIdentityKind\x12$\n" +
 	" STABLE_IDENTITY_KIND_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cSTABLE_IDENTITY_KIND_PROJECT\x10\x01\x12#\n" +
@@ -217,7 +226,10 @@ const file_codeflux_v1_identity_proto_rawDesc = "" +
 	"\"STABLE_IDENTITY_KIND_MODEL_REQUEST\x10\x13\x12!\n" +
 	"\x1dSTABLE_IDENTITY_KIND_PROVIDER\x10\x14\x12\x1f\n" +
 	"\x1bSTABLE_IDENTITY_KIND_BUDGET\x10\x15\x12 \n" +
-	"\x1cSTABLE_IDENTITY_KIND_SESSION\x10\x16B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
+	"\x1cSTABLE_IDENTITY_KIND_SESSION\x10\x16\x12(\n" +
+	"$STABLE_IDENTITY_KIND_MEMORY_ARTIFACT\x10\x17\x121\n" +
+	"-STABLE_IDENTITY_KIND_MEMORY_ARTIFACT_REVISION\x10\x18\x12 \n" +
+	"\x1cSTABLE_IDENTITY_KIND_EPISODE\x10\x19B6Z4codeflux.dev/codeflux/api/gen/codeflux/v1;codefluxv1b\x06proto3"
 
 var (
 	file_codeflux_v1_identity_proto_rawDescOnce sync.Once

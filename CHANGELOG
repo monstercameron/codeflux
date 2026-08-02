@@ -30,6 +30,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-002
+Date: 2026-08-02
+Type: Internal, generated: regenerate the API for concurrently added services
+Request-or-TODO: User: "commit the codeflux changed code in groups"; the
+  generated output could not be split, and the user chose to commit it as one
+  declared mechanical change
+Outcome: The protobuf contract and its generated Go output are regenerated from
+  the current definitions.
+Affected-behavior: None on its own. This commit adds declarations, not
+  behavior: CodeCollectionService and its views for the code-collection
+  surface, MemoryService and its views, three memory identity kinds, and
+  InspectRepositoryResponse.working_tree_read. The services they declare are
+  registered by their own commits.
+Compatibility-or-migration: Additive only. No field number, name, or type is
+  reused or changed, so an older client remains compatible.
+Verification: `codeflux-dev generate-check` reports the generated output
+  matches its definitions; go build ./...; GOOS=js GOARCH=wasm go build
+  ./web/...
+Dev-Log: DL-20260802-002
+
 Change-ID: CL-20260802-001
 Date: 2026-08-02
 Type: Reachable settings, so a person can see what governs their runs

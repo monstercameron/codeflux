@@ -1783,6 +1783,160 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	MemoryService_ListMemoryArtifacts_FullMethodName = "/codeflux.v1.MemoryService/ListMemoryArtifacts"
+	MemoryService_GetMemoryArtifact_FullMethodName   = "/codeflux.v1.MemoryService/GetMemoryArtifact"
+)
+
+// MemoryServiceClient is the client API for MemoryService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// MemoryService reads governed project memory.
+//
+// The surface is read-only. Memory artifacts are created by the coordinator
+// from evidence it observed, and their maturity is governed by transition
+// rules the browser has no authority over; a client that could write here
+// could launder an assertion into a durable fact.
+type MemoryServiceClient interface {
+	ListMemoryArtifacts(ctx context.Context, in *ListMemoryArtifactsRequest, opts ...grpc.CallOption) (*ListMemoryArtifactsResponse, error)
+	GetMemoryArtifact(ctx context.Context, in *GetMemoryArtifactRequest, opts ...grpc.CallOption) (*GetMemoryArtifactResponse, error)
+}
+
+type memoryServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewMemoryServiceClient(cc grpc.ClientConnInterface) MemoryServiceClient {
+	return &memoryServiceClient{cc}
+}
+
+func (c *memoryServiceClient) ListMemoryArtifacts(ctx context.Context, in *ListMemoryArtifactsRequest, opts ...grpc.CallOption) (*ListMemoryArtifactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMemoryArtifactsResponse)
+	err := c.cc.Invoke(ctx, MemoryService_ListMemoryArtifacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoryServiceClient) GetMemoryArtifact(ctx context.Context, in *GetMemoryArtifactRequest, opts ...grpc.CallOption) (*GetMemoryArtifactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMemoryArtifactResponse)
+	err := c.cc.Invoke(ctx, MemoryService_GetMemoryArtifact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// MemoryServiceServer is the server API for MemoryService service.
+// All implementations must embed UnimplementedMemoryServiceServer
+// for forward compatibility.
+//
+// MemoryService reads governed project memory.
+//
+// The surface is read-only. Memory artifacts are created by the coordinator
+// from evidence it observed, and their maturity is governed by transition
+// rules the browser has no authority over; a client that could write here
+// could launder an assertion into a durable fact.
+type MemoryServiceServer interface {
+	ListMemoryArtifacts(context.Context, *ListMemoryArtifactsRequest) (*ListMemoryArtifactsResponse, error)
+	GetMemoryArtifact(context.Context, *GetMemoryArtifactRequest) (*GetMemoryArtifactResponse, error)
+	mustEmbedUnimplementedMemoryServiceServer()
+}
+
+// UnimplementedMemoryServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedMemoryServiceServer struct{}
+
+func (UnimplementedMemoryServiceServer) ListMemoryArtifacts(context.Context, *ListMemoryArtifactsRequest) (*ListMemoryArtifactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMemoryArtifacts not implemented")
+}
+func (UnimplementedMemoryServiceServer) GetMemoryArtifact(context.Context, *GetMemoryArtifactRequest) (*GetMemoryArtifactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMemoryArtifact not implemented")
+}
+func (UnimplementedMemoryServiceServer) mustEmbedUnimplementedMemoryServiceServer() {}
+func (UnimplementedMemoryServiceServer) testEmbeddedByValue()                       {}
+
+// UnsafeMemoryServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MemoryServiceServer will
+// result in compilation errors.
+type UnsafeMemoryServiceServer interface {
+	mustEmbedUnimplementedMemoryServiceServer()
+}
+
+func RegisterMemoryServiceServer(s grpc.ServiceRegistrar, srv MemoryServiceServer) {
+	// If the following call panics, it indicates UnimplementedMemoryServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&MemoryService_ServiceDesc, srv)
+}
+
+func _MemoryService_ListMemoryArtifacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMemoryArtifactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).ListMemoryArtifacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_ListMemoryArtifacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).ListMemoryArtifacts(ctx, req.(*ListMemoryArtifactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoryService_GetMemoryArtifact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMemoryArtifactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).GetMemoryArtifact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_GetMemoryArtifact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).GetMemoryArtifact(ctx, req.(*GetMemoryArtifactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// MemoryService_ServiceDesc is the grpc.ServiceDesc for MemoryService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var MemoryService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "codeflux.v1.MemoryService",
+	HandlerType: (*MemoryServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListMemoryArtifacts",
+			Handler:    _MemoryService_ListMemoryArtifacts_Handler,
+		},
+		{
+			MethodName: "GetMemoryArtifact",
+			Handler:    _MemoryService_GetMemoryArtifact_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "codeflux/v1/product_api.proto",
+}
+
+const (
 	SettingsService_GetModels_FullMethodName               = "/codeflux.v1.SettingsService/GetModels"
 	SettingsService_GetPolicy_FullMethodName               = "/codeflux.v1.SettingsService/GetPolicy"
 	SettingsService_SetPolicy_FullMethodName               = "/codeflux.v1.SettingsService/SetPolicy"
@@ -2329,5 +2483,195 @@ var SessionService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
+	Metadata: "codeflux/v1/product_api.proto",
+}
+
+const (
+	CodeCollectionService_ListCodePackages_FullMethodName  = "/codeflux.v1.CodeCollectionService/ListCodePackages"
+	CodeCollectionService_ListCodeSymbols_FullMethodName   = "/codeflux.v1.CodeCollectionService/ListCodeSymbols"
+	CodeCollectionService_InspectCodeSymbol_FullMethodName = "/codeflux.v1.CodeCollectionService/InspectCodeSymbol"
+)
+
+// CodeCollectionServiceClient is the client API for CodeCollectionService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// CodeCollectionService reads what code a repository contains at an exact
+// revision: its packages, its declarations, and the documentation a
+// declaration carries about itself. It is strictly read-only. Nothing here
+// writes source, and no response carries a declaration's body — this is a
+// directory of what the collection offers, not an editor.
+type CodeCollectionServiceClient interface {
+	ListCodePackages(ctx context.Context, in *ListCodePackagesRequest, opts ...grpc.CallOption) (*ListCodePackagesResponse, error)
+	ListCodeSymbols(ctx context.Context, in *ListCodeSymbolsRequest, opts ...grpc.CallOption) (*ListCodeSymbolsResponse, error)
+	InspectCodeSymbol(ctx context.Context, in *InspectCodeSymbolRequest, opts ...grpc.CallOption) (*InspectCodeSymbolResponse, error)
+}
+
+type codeCollectionServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewCodeCollectionServiceClient(cc grpc.ClientConnInterface) CodeCollectionServiceClient {
+	return &codeCollectionServiceClient{cc}
+}
+
+func (c *codeCollectionServiceClient) ListCodePackages(ctx context.Context, in *ListCodePackagesRequest, opts ...grpc.CallOption) (*ListCodePackagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCodePackagesResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_ListCodePackages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeCollectionServiceClient) ListCodeSymbols(ctx context.Context, in *ListCodeSymbolsRequest, opts ...grpc.CallOption) (*ListCodeSymbolsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCodeSymbolsResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_ListCodeSymbols_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *codeCollectionServiceClient) InspectCodeSymbol(ctx context.Context, in *InspectCodeSymbolRequest, opts ...grpc.CallOption) (*InspectCodeSymbolResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InspectCodeSymbolResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_InspectCodeSymbol_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CodeCollectionServiceServer is the server API for CodeCollectionService service.
+// All implementations must embed UnimplementedCodeCollectionServiceServer
+// for forward compatibility.
+//
+// CodeCollectionService reads what code a repository contains at an exact
+// revision: its packages, its declarations, and the documentation a
+// declaration carries about itself. It is strictly read-only. Nothing here
+// writes source, and no response carries a declaration's body — this is a
+// directory of what the collection offers, not an editor.
+type CodeCollectionServiceServer interface {
+	ListCodePackages(context.Context, *ListCodePackagesRequest) (*ListCodePackagesResponse, error)
+	ListCodeSymbols(context.Context, *ListCodeSymbolsRequest) (*ListCodeSymbolsResponse, error)
+	InspectCodeSymbol(context.Context, *InspectCodeSymbolRequest) (*InspectCodeSymbolResponse, error)
+	mustEmbedUnimplementedCodeCollectionServiceServer()
+}
+
+// UnimplementedCodeCollectionServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedCodeCollectionServiceServer struct{}
+
+func (UnimplementedCodeCollectionServiceServer) ListCodePackages(context.Context, *ListCodePackagesRequest) (*ListCodePackagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCodePackages not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) ListCodeSymbols(context.Context, *ListCodeSymbolsRequest) (*ListCodeSymbolsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCodeSymbols not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) InspectCodeSymbol(context.Context, *InspectCodeSymbolRequest) (*InspectCodeSymbolResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InspectCodeSymbol not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) mustEmbedUnimplementedCodeCollectionServiceServer() {}
+func (UnimplementedCodeCollectionServiceServer) testEmbeddedByValue()                               {}
+
+// UnsafeCodeCollectionServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to CodeCollectionServiceServer will
+// result in compilation errors.
+type UnsafeCodeCollectionServiceServer interface {
+	mustEmbedUnimplementedCodeCollectionServiceServer()
+}
+
+func RegisterCodeCollectionServiceServer(s grpc.ServiceRegistrar, srv CodeCollectionServiceServer) {
+	// If the following call panics, it indicates UnimplementedCodeCollectionServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&CodeCollectionService_ServiceDesc, srv)
+}
+
+func _CodeCollectionService_ListCodePackages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCodePackagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).ListCodePackages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_ListCodePackages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).ListCodePackages(ctx, req.(*ListCodePackagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeCollectionService_ListCodeSymbols_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCodeSymbolsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).ListCodeSymbols(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_ListCodeSymbols_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).ListCodeSymbols(ctx, req.(*ListCodeSymbolsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CodeCollectionService_InspectCodeSymbol_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InspectCodeSymbolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).InspectCodeSymbol(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_InspectCodeSymbol_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).InspectCodeSymbol(ctx, req.(*InspectCodeSymbolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// CodeCollectionService_ServiceDesc is the grpc.ServiceDesc for CodeCollectionService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CodeCollectionService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "codeflux.v1.CodeCollectionService",
+	HandlerType: (*CodeCollectionServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListCodePackages",
+			Handler:    _CodeCollectionService_ListCodePackages_Handler,
+		},
+		{
+			MethodName: "ListCodeSymbols",
+			Handler:    _CodeCollectionService_ListCodeSymbols_Handler,
+		},
+		{
+			MethodName: "InspectCodeSymbol",
+			Handler:    _CodeCollectionService_InspectCodeSymbol_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "codeflux/v1/product_api.proto",
 }
