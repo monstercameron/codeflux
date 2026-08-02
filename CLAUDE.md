@@ -11,3 +11,5 @@ Before beginning work in this repository:
 `AGENTS.md` is the authoritative repository-wide agent instruction file. This file is intentionally a thin Claude Code compatibility entry point so the same rules are not duplicated and allowed to drift.
 
 Everything a Claude Code session needs beyond that lives in `AGENTS.md` and is not repeated here: the branch model, the tracked configuration under `.claude/`, the subagents, and the vendored skills.
+
+The coding discipline is partly informed by the community-maintained [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills/tree/2c606141936f1eeef17fa3043a72095b4765b9c2), vendored and pinned at that commit. It is not an official Andrej Karpathy repository, and `AGENTS.md` takes precedence over it.

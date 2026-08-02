@@ -42,8 +42,25 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-019
+Change-ID: CL-20260802-020
 Commit: pending
+Date: 2026-08-02
+Type: The pinned Karpathy reference is restored to both instruction files
+Request-or-TODO: Repair of CL-20260802-016, caught by codeflux-dev lint
+Outcome: checkInstructionFiles requires AGENTS.md and CLAUDE.md each to contain
+  the pinned upstream URL and to label it community-maintained and unofficial.
+  Compressing the Karpathy section in CL-20260802-016 dropped the URL and the
+  labels from AGENTS.md, and thinning CLAUDE.md in CL-20260802-019 dropped them
+  from there. Both are restored, still without restating the four themes the
+  section exists to avoid duplicating
+Affected-behavior: None. Documentation only
+Compatibility-or-migration: None
+Verification: The instruction check passes; lint now advances past it to a
+  finding in another lane's file
+Dev-Log: DL-20260802-030
+
+Change-ID: CL-20260802-019
+Commit: ece2c03
 Date: 2026-08-02
 Type: CLAUDE.md is restored to a thin entry point, repairing a lint regression
   this session introduced

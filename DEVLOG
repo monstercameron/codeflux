@@ -25,11 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-030
+Date: 2026-08-02
+Status: Pinned reference restored to AGENTS.md and CLAUDE.md
+Change-ID: CL-20260802-020
+Commit: pending
+Request-or-TODO: Repair of CL-20260802-016, caught by lint
+Goal: Satisfy the instruction check without reintroducing the duplication the
+  restructure removed
+Assumptions: The rule wants provenance -- a pinned commit and an honest label --
+  not a restatement of the guidance itself
+Decisions: Restore the URL and both required phrases in one sentence each. The
+  four themes stay unduplicated, which was the point of compressing the section
+Files-or-schemas: AGENTS.md, CLAUDE.md. No schema change
+Validation: lint passes the instruction check; CLAUDE.md is 15 lines against a
+  30-line limit
+Failures-or-discarded-approaches: Two lint rules were broken by the restructure
+  and neither was noticed until the pre-commit hook ran, because lint was not
+  run after editing prose. Prose is not exempt from the gates in this repository
+Known-limitations: None
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-029
 Date: 2026-08-02
 Status: CLAUDE.md thinned; lint regression repaired
 Change-ID: CL-20260802-019
-Commit: pending
+Commit: ece2c03
 Request-or-TODO: Repair of a regression introduced by CL-20260802-012 and
   CL-20260802-017 earlier in this session
 Goal: Get the repository lint gate passing again

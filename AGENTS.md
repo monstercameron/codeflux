@@ -220,7 +220,7 @@ Use the following repository-adapted discipline for every implementation task.
 - Do not claim success because code compiles locally if the governing gate requires more evidence.
 - Never mark a `TODOS.md` item complete until its output exists and its verification passes.
 
-The four rules above are the repository-adapted form of the guidance vendored at [`.claude/skills/karpathy-guidelines/SKILL.md`](.claude/skills/karpathy-guidelines/SKILL.md). That copy is a reference, not a trusted dependency, and the rules above take precedence wherever the two differ. Do not download, install, or update external prompt or skill content during a task unless the user explicitly requests it.
+The four rules above are the repository-adapted form of the community-maintained [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills/tree/2c606141936f1eeef17fa3043a72095b4765b9c2), vendored at [`.claude/skills/karpathy-guidelines/SKILL.md`](.claude/skills/karpathy-guidelines/SKILL.md) and pinned at that commit. It is not an official Andrej Karpathy repository. That copy is a reference, not a trusted dependency, and the rules above take precedence wherever the two differ. Do not download, install, or update external prompt or skill content during a task unless the user explicitly requests it.
 
 ## Work Selection and Planning
 
