@@ -30,6 +30,86 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-004
+Date: 2026-08-02
+Type: The run-settings package is committed so the surfaces that read it can be
+Request-or-TODO: Dependency of CL-20260802-005. internal/pipeline was authored
+  in a concurrent lane and left uncommitted, and nothing that reads a run
+  setting compiles without it
+Outcome: internal/pipeline is committed as its author left it: the phases a run
+  moves through, the model ladder it climbs, the escalation rules, and
+  Settings, which is the declaration of every choice the delivery flow leaves
+  open. It is committed on its own, ahead of anything that depends on it, so
+  the commit that hooks it to the settings surface carries only that hooking
+  and this one can be attributed to the lane that wrote it
+Affected-behavior: None. Nothing at this commit imports the package, so it adds
+  a declaration and changes no behaviour
+Compatibility-or-migration: None. Additive package, no schema change
+Verification: go build ./...; go test ./internal/pipeline/... passes at this
+  snapshot, which is why this snapshot is the one committed
+Dev-Log: DL-20260802-009
+
+Change-ID: CL-20260802-006
+Date: 2026-08-02
+Type: The settings sheet gains controls that fit it, and a way to find one
+  setting among twenty
+Request-or-TODO: User: "the value change inputs look like dogshit so they need
+  to be redesigned and lets add a search on this page to find a setting and
+  allows the user to jump to that section"; then "do another visual pass for
+  spacing and overlapping and other visual issues"; then "Model that decides how
+  work is split has overlapping issues, visually inspect it"
+Outcome: Every control on the settings sheet now looks like the value it edits
+  and sits on the sheet's shared axis. A number is a stepper that enforces the
+  engine's bound, a switch offers both states, a posture with a long option set
+  is a list rather than a segmented control wider than its own row, and the
+  choices belonging to this browser -- appearance and local telemetry -- render
+  against the same column as everything else. A search field finds a setting by
+  name, key, group, or what it does, ranked by where it matched, and jumps to
+  the row and marks it
+Affected-behavior: Settings, at /settings. No coordinator behaviour changes: the
+  values, their bounds, and the save path are unchanged
+Compatibility-or-migration: None. No schema change, no migration, no API change
+Verification: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt
+  clean; go test for web/frontend/settingsview, appearanceview, telemetryview,
+  and web/client. Inspected in Chromium at 1600, 1280, and 1024 with a scripted
+  audit asserting nothing paints outside its grid cell or past the sheet edge at
+  any width, and that every value ends on the same column; the search was driven
+  end to end
+Dev-Log: DL-20260802-010, DL-20260802-011
+
+Change-ID: CL-20260802-005
+Date: 2026-08-02
+Type: The settings page is a specification sheet, and the run settings on it are
+  the ones the engine enforces
+Request-or-TODO: User: "there is a new settings api being created find it and
+  hook it up to the settings page", then "the shape/structure/design of the
+  settings page needs a redesign, use the front end design skill, visually
+  inspect it first then redesign from scratch"
+Outcome: internal/pipeline.Settings -- the choices the run flow leaves open,
+  which the agent engine already read and nothing exposed or persisted -- is
+  readable and changeable end to end. The page renders the engine's own
+  declaration: label, help, kind, choices, and bounds travel with each value, so
+  a setting the engine adds appears without the interface changing, and the
+  coordinator resolves a key to its field by convention rather than a list that
+  goes stale. Changes are held until saved, validated as one configuration, and
+  handed to the running engine. The surface holding them was rebuilt: seven
+  rounded cards in a two-column grid, 4,990 pixels tall with roughly two
+  thousand of them empty, are now one column of rows on a shared value axis,
+  opening with the four facts that decide what a run would do now
+Affected-behavior: Settings, at /settings; GetFlowSettings and SetFlowSettings
+  on the product API
+Compatibility-or-migration: Additive API. No schema change and no migration: the
+  flow configuration shares the user settings layer with the non-secret
+  configuration under its own document key, and both writers carry the other
+  key forward
+Verification: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt
+  clean; go test for internal/transport, internal/coordinator settings suites,
+  web/frontend/settingsview, web/frontend/shell, and web/client. Driven in
+  Chromium: changed a number, a posture, and a switch, read the diff in the
+  commit bar, saved, reloaded, and confirmed the coordinator reports the new
+  values with the default markers correct
+Dev-Log: DL-20260802-009
+
 Change-ID: CL-20260802-003
 Date: 2026-08-02
 Type: A repository's own code is readable, with its documented atoms marked

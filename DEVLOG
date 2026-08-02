@@ -24,6 +24,585 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-011
+Date: 2026-08-02
+Status: A setting can be found and changed on the sheet without reading it
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "I like this design better but the value change inputs
+  look like dogshit so they need to be redesigned and lets add a search on this
+  page to find a setting and allows the user to jump to that section", then "do
+  another visual pass for spacing and overlapping and other visual issues", then
+  "Model that decides how work is split has overlapping issues, visually inspect
+  it"
+Goal: Make every control on the sheet look like the thing it edits, give the
+  page a way to find one setting among twenty, and hold the value axis straight
+  at every width
+Assumptions: DL-20260802-010's axis is the layout contract: a control that
+  cannot sit against the axis is the control that is wrong, not the axis
+Decisions: Search jumps rather than filters. Filtering answers "which settings
+  match this word" and leaves somebody reading a page whose shape changed under
+  them; jumping answers the question they actually have -- where is the one I
+  came for -- and puts them in front of it with the rest of the configuration
+  still around it, which is the context that makes a setting worth changing. A
+  result is ranked by where it matched, name before group before rationale, and
+  says which, so a hit on an explanation does not look arbitrary. The row jumped
+  to is marked until the next search rather than faded on a timer, because a
+  mark that vanishes while somebody is still reading answers a question they had
+  already stopped asking. Controls: a number is a stepper whose bounds are the
+  control's, not a native spin field whose arrows crowd the digit; a switch is a
+  two-option segmented control, so which state is off is as visible as which is
+  on; a posture with a long option set is a list, because eight model identities
+  laid side by side are wider than the row and paint over the setting's own
+  name. The choices that belong to this browser rather than to a run now render
+  on the same axis as everything else: appearance is given the sheet's column
+  geometry rather than guessing at it, and the telemetry log fills the sheet so
+  its status column lands on the page's right edge
+Files-or-schemas: web/frontend/settingsview/search.go (new), controls.go (new),
+  rows.go, grid.go, sheet.go (published column geometry; machine panels placed
+  on the axis or held to the prose measure),
+  web/frontend/appearanceview/component.go (optional axis layout),
+  web/frontend/telemetryview/component.go (a destructive control at the width of
+  its own label), web/client/settings_mounted_wasm.go (query state and the jump);
+  no schema change, no migration
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt clean;
+  go test for web/frontend/settingsview, appearanceview, telemetryview, and
+  web/client. Visually inspected in Chromium at 1600, 1280, and 1024 after every
+  revision, with a scripted audit asserting no element paints outside its own
+  grid cell or past the sheet edge at any of the three, and that every value on
+  the page -- including the borrowed appearance panels -- ends on the same
+  column. Drove the search: typed a query, read the ranked results, clicked one,
+  and confirmed the page scrolled to the row, marked it, and focused its control
+Failures-or-discarded-approaches: A list rendered as a real list element kept
+  its markers: list-style none on the list and then on each item both lost to
+  the browser's own stylesheet, so the results carry list semantics on divs
+  instead. The value axis zigzagged until every row reserved the control column
+  whether or not it had a control. The segmented control was used for every
+  discrete setting, which is what put an eight-option model ladder across the
+  full row and over its label; the fit test is now explicit, three options and
+  twenty-six characters, and anything longer becomes a list
+Known-limitations: Search covers the run settings only. The contract, credential,
+  routing, and machine rows are not indexed, because those are read rather than
+  hunted for. The jump marks one row at a time
+Next-safe-step: Index the rest of the sheet's rows so a query for "timeout"
+  finds the routing readout as well as the test-timeout setting
+
+Dev-Log: DL-20260802-008
+Date: 2026-08-02
+Status: The recorded cost metric measures the ledger production writes
+Change-ID: None until a commit is authorized
+Request-or-TODO: M22-094, reconciled. User asked to track per-call token counts
+  and model, keep a cost ledger, and expose usage through a clean API
+Goal: Make the recorded cost metric read the ledger that production actually
+  writes, so a spend figure reflects calls that happened
+Assumptions: A window containing no provider call is exactly zero spend, not
+  unknown spend, so an empty window keeps a known zero. Attempts whose cost was
+  never priced stay outside the subtotal and are counted separately, matching
+  AttemptAccountingSummary's known-subtotal-plus-unknown-count shape
+Decisions: The per-call ledger already exists and is wired -- migrations 000009
+  and 000010, written from internal/coordinator/provider_execution.go at eight
+  points in the stream lifecycle -- so no new ledger was designed. The defect is
+  that CostMetrics reads usage_records and model_requests from migration 000001,
+  which have zero writers anywhere in the repository; the metric therefore
+  returned a confident zero for every window while real spend accumulated in
+  provider_attempt_accounting. Repointed the query rather than backfilling the
+  dead tables, because usage_records.cost_minor is a whole-minor-unit integer
+  and a single call routinely costs a fraction of one minor unit, so that column
+  rounds most individual calls to free; the 000009 numerator/denominator pair is
+  exact. Left the dead tables in place: dropping them needs a forward migration
+  and schema_test.go asserts usage_records exists, which is separable work.
+  Accounting rows are append-only with UNIQUE(attempt_id, sequence) and up to
+  four sources per attempt (estimated, provider-partial, provider-final,
+  reconciled), so the query takes the highest sequence per attempt; summing
+  every row would multiply-count usage by up to four. Exact cost is summed by
+  grouping on (currency, denominator) in SQL and accumulating big.Rat in Go,
+  which is exact and bounded by the number of distinct denominators rather than
+  by the number of calls. Kept CostMinorUnits as a Count so the scorecard's
+  regression comparison and surprise check stay untouched, and added KnownCost
+  as the exact authoritative figure. Mixed currencies in one window now report
+  unknown instead of summing unlike minor units into one meaningless integer
+Files-or-schemas: internal/storage/metrics_repository.go,
+  internal/storage/metrics_cost_ledger_test.go; no schema change, no migration
+Validation: go test ./internal/storage/ passes in full, 136.9s, including the
+  scorecard comparison and surprise checks that read CostMinorUnits. Two new
+  tests seed spend through the production repository writes -- pricing revision,
+  logical request, physical attempt, appended accounting -- rather than raw SQL,
+  so they exercise the same path provider_execution.go uses. Both were shown to
+  be non-vacuous by mutation: replacing recency = 1 with recency >= 1 reports 3
+  input and 8 output tokens against the 2 and 5 that were bought, and forcing
+  the source ledger empty reproduces the original defect exactly, a confident
+  zero for every field. go build ./... clean; go vet ./internal/storage/ clean;
+  gofmt clean on both changed files. codeflux-dev lint fails on 21 web/ files
+  with CRLF line endings, all modified by unrelated in-flight work and none
+  touched here
+Failures-or-discarded-approaches: Rejected adding usage RPCs to
+  api/proto/codeflux/v1/product_api.proto in this pass. The proto and both
+  generated files are already modified by in-flight work in a 187-file dirty
+  worktree; regenerating would mix this change into that one, against the rule
+  that unrelated worktree content is preserved. Rejected the earlier sketch of
+  rational money on the wire: conventions.proto already fixes exact money as
+  Money{currency_code, minor_units, decimal_places} with absence, not a zero or
+  a known flag, denoting unknown
+Known-limitations: An attempt is attributed to the window containing its final
+  accounting row, so a call whose accounting spans a window edge counts once, at
+  settlement. The read scans the accounting table and is bounded only by the
+  local prototype database, matching the existing metrics queries. No API
+  surface is exposed yet; that is the next unit and it needs a clean proto
+  worktree
+Next-safe-step: Once the in-flight proto change lands, add the usage read RPCs
+  and a governing TODO ID for them, reusing conventions.proto Money
+Unrelated-observation: DEVLOG has two entries numbered DL-20260802-007, at lines
+  27 and 128 before this entry was added; not touched here
+
+Dev-Log: DL-20260802-007
+Date: 2026-08-02
+Status: The atom inspector shows the SQL behind what is on screen, and copies it
+Change-ID: None until a commit is authorized
+Request-or-TODO: "I also wanna know the sql query to access it with a click to
+  copy"
+Goal: Let a person read and take away the exact statement that produced what
+  they are looking at
+Decisions: The statements are constants in the coordinator, executed and
+  displayed from the same string: a query rewritten for display drifts from the
+  one that ran, and a console that teaches a statement nobody executes is worse
+  than one that shows none. Three are offered -- the read of this atom by key,
+  the search that produced the current result with its match expression and
+  bound written in, and the table both run against. The section says outright
+  that these run against the coordinator's in-memory atom index and that the
+  durable database has no atom tables, because a person handed SQL will
+  reasonably go looking for a database file to run it in.
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto (access_query,
+  index_schema, search_query), api/gen,
+  internal/coordinator/code_collection_search.go (AtomSearchSQL, AtomSelectSQL,
+  AtomSchemaSQL), internal/coordinator/code_collection_application.go,
+  internal/transport/code_collection_records.go,
+  internal/transport/code_collection_service.go,
+  web/frontend/atomcollection/component.go and its test,
+  web/client/atom_collection.go, web/client/atom_collection_mounted_wasm.go,
+  web/client/clipboard_wasm.go
+Validation: Verified live at :47311/atoms -- all three statements render, the
+  copy control acknowledges itself, and the clipboard receives the statement
+  read back through navigator.clipboard in the browser. Component tests cover
+  the three blocks, the copy seam, and the absence of a copy control when there
+  is nowhere to copy to.
+Failures-or-discarded-approaches: The clipboard took three attempts. Writing
+  through the interop helper inside ui.SafeGo succeeded in Go and did nothing
+  in the page: a browser honours a clipboard write only while it is handling
+  the gesture that asked for one. Moving the same call inline did not work
+  either, because that helper awaits the promise and the promise resolves on
+  the loop the handler is holding. It now issues navigator.clipboard.writeText
+  inside the click and does not await it, with the execCommand path kept for a
+  browser outside a secure context. Separately, primitives.IconButton renders
+  its Icon as literal text, so the clear control printed the word "close"
+  inside the search field until it was drawn with the icon mark directly.
+Known-limitations: The queries are true of the in-memory index only. There is
+  no durable atom table to run them against, so they are for reading and for
+  running against an index a person rebuilds themselves.
+Next-safe-step: If the durable atom tables ever get written, point these
+  statements at them instead, since the same schema would then be queryable
+  from outside the coordinator.
+
+Dev-Log: DL-20260802-006
+Date: 2026-08-02
+Status: The atom inspector reports the structural measurements the run's own
+  atom stages make, and the schema's field coverage
+Change-ID: None until a commit is authorized
+Request-or-TODO: "for the atoms I dont see space time complexity, review the
+  pipeline stages to to see all atom details", then "for the atom input add a
+  clear button and make the debounce a little longer"
+Goal: Show the facts the pipeline already computes about an atom, rather than
+  only the ones its author wrote down
+Assumptions: A measurement the product makes in two places with two
+  definitions will eventually disagree with itself, so the page reads the
+  pipeline's own analysis rather than writing a second one
+Decisions: The detail now calls describeBody and callsAnythingImpure -- the
+  same functions StageAtomComplexity, StageAtomCaseSynthesis and StageAtoms
+  call -- and reports the time bound from loop nesting through the pipeline's
+  own complexityLabel, the space claim it records, the decision points that
+  decide how many cases a suite must reach, and whether the declaration reaches
+  outside its arguments. Every line says it is structural: "O(1) by structure,
+  from no loop" is a different claim from a measured growth curve, and only the
+  first was made. Added schema coverage from atomdoc.CanonicalFieldLabels: an
+  atom that answers thirteen of the nineteen declared fields looks documented
+  and is not, and only naming the missing six tells an author which promises
+  were never made. The search field gained a clear control, shown only when
+  there is something to clear, and the debounce moved from 250ms to 450ms so a
+  typed phrase is one query rather than one per word.
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto
+  (CodeSymbolStructureView, documented_fields, missing_fields), api/gen,
+  internal/coordinator/code_collection_application.go (measureDeclaration,
+  splitSchemaFields), internal/transport/code_collection_records.go,
+  internal/transport/code_collection_service.go,
+  web/frontend/atomcollection/component.go and its test,
+  web/client/atom_collection.go, web/client/atom_collection_mounted_wasm.go
+Validation: Verified live at :47311/atoms -- ReserveStockUntilCheckoutExpires
+  reports "O(1) by structure, from no loop", the recorded space claim, "2
+  decision points", "Nothing outside its arguments", and "13 of 19 declared
+  fields answered" with the six missing ones named; the clear control appears
+  with a term, empties the field, and restores the whole collection. Component
+  tests cover the measured shape, the schema split, the clear control, and the
+  quoted match reason.
+Failures-or-discarded-approaches: The fixture atoms had been written with
+  invented field labels -- "Failure modes", "Retry", "Security" -- none of
+  which are in the schema, which is why no complexity field appeared: the
+  schema declares "Complexity and limits" and nothing had ever written one.
+  They now use the canonical labels.
+Known-limitations: The time bound is structural. It reads loop nesting, so a
+  linear-time function that calls a quadratic one still reports O(n), and
+  recursion is not counted at all. The space claim is the pipeline's recorded
+  sentence rather than a measurement. Both are stated as structural on screen
+  so neither reads as a benchmark.
+Next-safe-step: Carry the call graph into the bound, so a function that calls a
+  quadratic one stops claiming to be linear.
+
+Dev-Log: DL-20260802-010
+Date: 2026-08-02
+Status: The settings page is a specification sheet rather than seven panels
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "the shape/structure/design of the settings page needs a
+  redesign, use the front end design skill, visually inspect it first then
+  redesign from scratch"
+Goal: Make the page answer the question somebody opens it with — what will this
+  machine do if I start a run — and let a whole configuration be read in one
+  pass
+Assumptions: This page lives inside an established console, so the console's
+  own tokens are the palette and type system; what is redesigned is the
+  information structure, not a second visual identity
+Decisions: Inspected the page first and measured it: 4,990 pixels of stacked
+  cards in a two-column grid whose right column stood empty for roughly two
+  thousand of them, because grid rows yoke their heights. Every setting was a
+  label, a paragraph, and a full-width control at equal weight, which left the
+  value — the thing a person opens the page to read — as the least prominent
+  element on it. Replaced the panels with one column of rows on a shared value
+  axis: every value, whatever its kind, sits on the same vertical line in the
+  console's mono face, with its bound or its default marker directly beneath.
+  Panels were removed rather than restyled, because settings are the one
+  surface where many values are compared at once and a panel breaks the axis
+  the comparison runs along. The page speaks in the two voices the token system
+  already provides and this page had used interchangeably: machine values in
+  mono, human rationale in the reading serif. Four facts open the sheet as an
+  operating contract — model, credential, attempts, verification floor — each
+  saying "not answered" rather than guessing. Numbers and switches are edited
+  on the axis itself, so the value is not printed twice; a posture keeps its
+  segmented control beside the axis because the control shows alternatives the
+  axis cannot. An unsaved change shows the value it replaces struck through
+  beside the value it will become, and a sticky commit bar names every change
+  as from and to
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto (FlowSettingView
+  at_default, GetFlowSettingsResponse/SetFlowSettingsResponse unrenderable),
+  api/gen, internal/coordinator/flow_settings.go (default comparison read the
+  same way values are; unknown kinds reported rather than blank),
+  internal/transport/settings_configuration_service.go,
+  web/frontend/settingsview/sheet.go, grid.go, rows.go, commit.go,
+  contract.go, component.go, flow.go, web/frontend/shell/shell.go (the settings
+  route owns its frame so the commit bar stays with the reader),
+  web/client/settings_resource.go, settings_transport_wasm.go,
+  settings_mounted_wasm.go; no schema change, no migration
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt
+  clean; go test for internal/transport, internal/coordinator settings suites,
+  web/frontend/settingsview, web/frontend/shell, and web/client. The retired
+  card renderers and their tests were removed and replaced with tests over the
+  sheet. Visually inspected in Chromium throughout, not only at the end: the
+  before state was measured, and each revision was rebuilt, restarted, and
+  looked at. Drove the final page: changed a number on the axis, a posture, and
+  a switch, read the diff in the commit bar, saved, reloaded, and confirmed the
+  coordinator reports the new values with the default markers correct
+Failures-or-discarded-approaches: Three real defects were found by looking
+  rather than by tests. Every setting reported itself as changed, because the
+  client projection never copied the at-default marker across the wire.
+  Settings the engine had newly declared as sets, sequences, and mappings drew
+  as label-only rows with no value; they are now rendered read-only and say so.
+  A transparent border was written through the hex helper, which emitted an
+  invalid colour and left the browser's default box drawn around every number
+  field. The first layout also printed each number twice, once to read and once
+  to change, which made the axis look like a label for the control instead of
+  the value itself
+Known-limitations: The sheet is about four thousand pixels tall with eighteen
+  settings, because each carries its full rationale and that prose is the
+  content rather than chrome; the density per setting is roughly two and a half
+  times tighter than before, but scanning the whole list still scrolls. Set,
+  sequence, and mapping settings are reported and not editable here. The
+  operating contract reads pending values, so it answers what a run would do
+  after the unsaved changes are saved
+Next-safe-step: Give sets, sequences, and mappings controls of their own, so
+  the escalation settings are editable where they are read
+
+Dev-Log: DL-20260802-009
+Date: 2026-08-02
+Status: The run settings a person changes are the ones the engine enforces
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "there is a new settings api being created find it and
+  hook it up to the settings page"
+Goal: Connect internal/pipeline.Settings -- the choices the run flow leaves
+  open, which the agent engine already read and nothing exposed or persisted --
+  to the settings page, end to end
+Assumptions: The flow configuration belongs to the machine rather than to a
+  workspace, so it shares the user settings layer with the non-secret
+  configuration and is revised with it
+Decisions: The page renders the engine's own declaration rather than a copy.
+  Label, help, kind, choices, and bounds travel with each value across the
+  wire, so a bound the engine tightened cannot be exceeded by a control drawn
+  from a stale list, and a setting the engine adds appears without the
+  interface changing. The coordinator resolves a declared key to its field by
+  convention -- snake_case key names the PascalCase field -- rather than by a
+  hand-kept list; the first version used a list, and a list is exactly what
+  goes stale when the engine gains a setting, producing a control that renders,
+  shows a zero, and silently drops what somebody typed. A key that resolves to
+  no field is now an error, and a test walks every declared setting to prove
+  none does. Changes are held on the page until saved, because the engine
+  validates one configuration as a whole and a half-applied one would leave a
+  run doing something nobody asked for. A saved change is handed to the running
+  engine immediately: storing a configuration the coordinator does not use
+  would tell somebody their next run had changed when it had not. A value the
+  engine would refuse is refused with the engine's own words, which name the
+  setting and the bound
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto (GetFlowSettings,
+  SetFlowSettings, FlowSettingView, FlowSettingChange), api/gen,
+  internal/coordinator/flow_settings.go,
+  internal/coordinator/settings_application.go (engine handle),
+  internal/coordinator/application.go (hands the engine to the settings path),
+  internal/transport/settings_configuration_service.go,
+  internal/transport/product_contract_test.go (the declared method surface),
+  web/frontend/settingsview/flow.go, web/frontend/settingsview/component.go,
+  web/frontend/shell/shell.go (the Run settings region),
+  web/client/settings_resource.go, web/client/settings_transport_wasm.go,
+  web/client/settings_mounted_wasm.go; no schema change, no migration
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt
+  clean; go test for internal/transport, internal/coordinator (the settings
+  suites), web/frontend/settingsview, web/frontend/shell, and web/client. New
+  coverage: the described settings against a real database, a change persisted
+  and handed to the engine with untouched settings unmoved, an out-of-range
+  value refused before it reaches the engine, an undeclared key refused, a
+  stale revision refused, the shared document keeping both layers, every
+  declared key resolving to a field, the transport carrying description and
+  bound, and the rendered controls including the unsaved-change state.
+  Visually inspected in Chromium at http://127.0.0.1:47311/settings and driven:
+  changed the ambiguity posture and the adversarial review switch, saved, and
+  confirmed after a full page reload that the coordinator reports "assume" and
+  "Off" while untouched settings kept their values
+Failures-or-discarded-approaches: The first mapping was a hand-kept switch per
+  key. A concurrent change adding capability settings to the engine showed what
+  that costs: the new controls would have rendered with zero values and dropped
+  every edit. Replaced with the convention plus a test over every declared
+  setting
+Known-limitations: The flow layer and the non-secret configuration share one
+  JSON document under distinct keys; a future writer of that document must
+  carry the other key forward, as both writers here do. The page reads the
+  settings the coordinator process is running with, so a second coordinator
+  against the same database would not see the first one's live engine adopt a
+  change until it restarted
+Next-safe-step: Bind the flow settings revision to each task the way the
+  policy revision is bound, so a completed run can say which configuration it
+  ran under
+
+Dev-Log: DL-20260802-005
+Date: 2026-08-02
+Status: The atom search reads what atoms promise, through an FTS5 index, and an
+  end-to-end suite proves it
+Change-ID: None until a commit is authorized
+Request-or-TODO: "can the atom search use ft5 searches?", then "also e2e test
+  the search"
+Goal: Answer whether FTS5 is available here and, if it is, make the atom search
+  reach the documented promises instead of only the declaration names
+Assumptions: modernc.org/sqlite is the driver everywhere in this product, so
+  whether FTS5 exists is a property of that build rather than of a registration
+  the caller performs
+Decisions: Verified FTS5 is compiled into modernc.org/sqlite v1.55.0 -- the
+  ENABLE_FTS5 compile option is present and a virtual table, a MATCH query, and
+  a prefix query all work with no registration. Built the index in memory
+  beside the parsed repository map rather than in the coordinator's database:
+  atoms are derived from the working tree at an exact revision and are already
+  recomputed when that revision moves, so persisting them would create a second
+  account of what the code says and the two would eventually disagree. Indexed
+  each atom's name both whole and split at its case boundaries, because FTS5
+  reads a Go identifier as one token and nobody searching for "checkout" types
+  ReserveStockUntilCheckoutExpires. Ranked with bm25 weighted toward the name.
+  Kept the old substring match as the fallback, so a mid-token query still
+  finds what it always found. Quoted and prefixed every typed term, so nothing
+  a person types can be read as FTS5 syntax.
+Files-or-schemas: internal/coordinator/code_collection_search.go (new),
+  internal/coordinator/code_collection_application.go,
+  web/client/atom_collection_mounted_wasm.go, web/client/debounce_wasm.go
+  (new), web/frontend/atomcollection/component.go,
+  internal/frontendtest/atom_search_console_test.go (new)
+Validation: Verified live at :47311/atoms -- "shoppers" appears in one atom's
+  Purpose and in no atom's name and finds exactly that atom; "retry" finds both
+  atoms that declare the label; "checkout" finds the atom whose name contains
+  it; "commit" ranks the atom named for it first; "eserve" still finds both
+  Reserve atoms through the fallback; a nonsense term finds nothing. The new
+  end-to-end suite builds the assets and the executable, writes a Git fixture
+  repository whose atom names and promises share no distinguishing word,
+  starts the real console against it, and drives Chromium through all six of
+  those cases plus the empty-result copy and a console-error check.
+Failures-or-discarded-approaches: Sending the query on every keystroke would
+  have dialled the bridge per letter, so the typed term settles for 250ms
+  first; the local narrowing keeps the list responsive in the meantime, and the
+  page says it is still searching rather than showing "nothing matched" for a
+  question it has not asked yet.
+Known-limitations: The index covers admitted atoms only. An ordinary symbol
+  search is still a name substring match, which is what the code collection
+  route uses and what it has always done. Matching is prefix-based, not fuzzy:
+  a typo finds nothing. The index is rebuilt whenever the repository map is,
+  which is on every revision or dirty-state change.
+Next-safe-step: Decide whether the code collection's own symbol search should
+  read the same index, which would need every declaration's doc comment
+  indexed rather than only the atoms'.
+
+Dev-Log: DL-20260802-004
+Date: 2026-08-02
+Status: The atom inspector shows the code, the notes, the tests, and what the
+  naming grammar makes of the name
+Change-ID: None until a commit is authorized
+Request-or-TODO: "I wanna see the atom code, notes and tests aswell as all
+  other atom related metadata"
+Goal: Make an atom's page show the thing itself -- its body, its comment as
+  written, what exercises it, and every derived fact the product already knows
+  about it
+Assumptions: A promise stated in a comment is only worth as much as the code
+  under it, so the surface that shows the promise has to show the code
+Decisions: Added source, source_start_line, source_truncated, tests,
+  naming_checked and naming_finding to InspectCodeSymbolResponse. The source is
+  sliced out of the file rather than reprinted from the syntax tree, because a
+  reprint is the compiler's formatting of the code and not the code. It starts
+  at the declaration rather than at its comment: the comment is returned
+  separately as the notes, and repeating forty lines of it above the body would
+  push the body off the screen on the one surface that exists to show it. Test
+  references are split from callers by the rule Go itself uses -- a file name
+  ending in _test.go -- because "what exercises this" and "what depends on
+  this" are different questions and only one is evidence. Ran the product's own
+  atom-naming grammar per admitted atom and stated the result either way, since
+  "nothing was said" and "checked and fine" are not the same. Folded the raw
+  comment behind a disclosure and flipped the page's proportions so the
+  inspector, not the index, gets the width.
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto, api/gen,
+  internal/transport/code_collection_records.go,
+  internal/transport/code_collection_service.go,
+  internal/coordinator/code_collection_application.go,
+  web/frontend/atomcollection/component.go and its test,
+  web/client/atom_collection.go, web/client/atom_collection_mounted_wasm.go
+Validation: Verified live at :47311/atoms against a demo repository carrying
+  two documented atoms, one malformed directive, and three tests: the inspector
+  shows the body at its real file lines (55-63), the parsed documentation, the
+  folded comment, all three tests with their file and line, the call edges, the
+  location, and "Follows the atom naming grammar". Component and client tests
+  extended to cover the source block, the line numbers, the tests, and the
+  naming result; go build ./... and the frontend, client, transport, and code
+  collection coordinator suites pass.
+Failures-or-discarded-approaches: The first version included the comment in the
+  source slice, which put a forty-line comment above every body and made the
+  code the last thing on the page.
+Known-limitations: The durable atom tables -- atom_names and
+  atom_documentation, with canonical names, aliases, admitted revisions, and
+  embedding inputs -- are written by nothing in the product; only their own
+  tests insert rows. So every fact this surface shows is derived from the
+  source at the current revision, and an atom's rename history cannot be
+  followed. The naming grammar runs with the default lexicon and no reviewed
+  exceptions, so a name that carries a legitimate documented exception is
+  reported as a violation.
+Next-safe-step: Have the coordinator admit atom revisions and register
+  canonical names during a run, which is what would make rename lineage and
+  cross-revision atom history real.
+
+Dev-Log: DL-20260802-003
+Date: 2026-08-02
+Status: A top-level atom collection route explores every atom and its
+  documentation
+Change-ID: None until a commit is authorized
+Request-or-TODO: "there needs to be a way to see the code that is being
+  generated and the atoms, add a new top level atom collection page, I want to
+  be able to explore the atoms and their metadata"
+Goal: Give atoms a surface of their own: every declaration admitted as an atom
+  across every package, the documentation each one carries, and the directives
+  that asked to be atoms and were refused
+Assumptions: The code collection route being built in another lane answers
+  "what is in this package"; this one answers "what can be called, what does it
+  promise, and what did it refuse to promise", so it reuses that lane's
+  CodeCollectionService rather than declaring a second one
+Decisions: Read the collection through ListCodeSymbols with atoms_only for the
+  ordinary view, and drop to the unfiltered listing only when a person asks for
+  refused directives, because atoms_only returns admitted atoms alone and the
+  wider read is a cost the default view should not pay. Kept refused directives
+  as first-class rows with the coordinator's own reason and the comment exactly
+  as written: a directive that did not admit is the most useful thing this
+  surface can show an author. Rejoined lines the author wrapped in the source,
+  since a Go comment wrapped at column 72 rendered as a ragged column that
+  broke mid-sentence.
+Files-or-schemas: web/frontend/routes/routes.go (Atoms route and unscoped
+  entry), web/frontend/atomcollection/component.go and its test,
+  web/client/atom_collection.go and its test,
+  web/client/atom_collection_mounted_wasm.go, web/frontend/shell/shell.go,
+  web/frontend/shell/reference_chrome.go (navigation entry), web/client/main.go
+Validation: Verified live at :47311/atoms against a demo repository seeded with
+  two documented atoms and one deliberately malformed directive: the list, the
+  search, the package filter, the refused toggle, and the inspector all answer;
+  the inspector renders purpose, use-when, do-not-use-when, semantics, effects,
+  failure modes, retry, verification, the signature, callers and callees, and
+  the file it lives in. New component tests cover refused rows, the documented
+  fields, and the empty-collection versus empty-search distinction; new client
+  tests cover the projection, the filters, and the prose rejoin.
+Failures-or-discarded-approaches: The server refused /atoms until the route was
+  added to the unscoped entry paths and the binary rebuilt -- the browser
+  document is served by the same route table the client parses, so a new route
+  is two changes, not one.
+Known-limitations: The surface reads one repository at a time and shows atoms
+  the source declares; the atom-name lexicon, aliases, and the durable atom
+  revisions in storage are not surfaced yet. Generated code from a run is not
+  shown here: what an agent wrote is visible in the run's diff and evidence,
+  and the code collection route covers the repository directory.
+Next-safe-step: Surface the durable atom records -- canonical names, aliases,
+  and admitted revisions -- beside the source-declared ones, so an atom that
+  was renamed can be followed across revisions.
+
+Dev-Log: DL-20260802-002
+Date: 2026-08-02
+Status: Two settings sections stopped describing controls that were not there
+Change-ID: None until a commit is authorized
+Request-or-TODO: "the setting page needs to be visually inspected", then
+  "do the fucking settings make sense and are visually appealing visually
+  inspect and aggresively check their usefulness"
+Goal: Judge the settings page against what a person can actually do on it, and
+  make the sections that were prose into sections that work
+Assumptions: The providers, models, and policy sections belong to the lane
+  currently rebuilding the settings data path, so they were measured and
+  reported rather than restyled
+Decisions: Built Appearance as three real choices -- theme, density, motion --
+  because all three already existed in the token system and none could be
+  selected: the theme could only be cycled blindly from the top bar, compact
+  density was computed on every render, and reduced motion was read from the
+  operating system with no override. Stored the choice in a sibling key rather
+  than inside the layout envelope, whose strict versioned schema would have
+  made every existing stored layout unreadable on the first boot after the
+  change. Built Data as the only local data this console can honestly speak
+  for -- the route, layout, and theme this browser holds -- with a confirmed
+  forget that clears both stores and says outright that nothing in the
+  coordinator changes. Wired the route region inset and gap to the density
+  tokens so the density choice changes a measurable pixel.
+Files-or-schemas: web/frontend/appearanceview/component.go and its test,
+  web/frontend/dataview/component.go and its test,
+  web/frontend/preferences/appearance.go and its test,
+  web/frontend/shell/shell.go, web/client/appearance_preferences_wasm.go,
+  web/client/local_data_wasm.go, web/client/main.go
+Validation: Verified live at :47311 -- theme, density, and motion each take
+  effect immediately, survive a reload (the appearance record reads
+  {"theme":"light","density":"compact","motion":"reduce"} and the document
+  agrees), and the density choice moves the region inset from 24px to 16px;
+  the forget flow confirms, clears both keys, and reports what it did
+Failures-or-discarded-approaches: The theme control has always claimed the
+  choice persists and nothing wrote it: a reload returned to dark. The first
+  version of the forget action cleared only the layout envelope while the copy
+  promised the theme too, which the live check caught.
+Known-limitations: A provider credential cannot be configured at all: the
+  Providers section refuses because no model is catalogued, and nothing in the
+  product writes model_catalog -- only a test does. The Models section
+  therefore cannot ever show a row. Policy is read-only although
+  SettingsService declares SetPolicy and SetBudgetDefaults and the coordinator
+  now implements WritePolicyPreset and WriteDefaultHardBudget. There is no
+  budgets section at all, although the plan names budgets as a settings
+  concern and the top bar enforces a cap. The policy list renders as a
+  staircase of indented terms.
+Next-safe-step: Give the coordinator something that writes model_catalog, or
+  let a credential be bound without one; either unblocks the only mutation the
+  settings page currently offers.
+
 Dev-Log: DL-20260802-004
 Date: 2026-08-02
 Status: A repository's own code is browsable, with its documented atoms marked
@@ -109,6 +688,62 @@ Next-safe-step: Put the selected package and declaration in the URL so a
   atom_documentation_revisions so the directory survives a restart and can be
   retrieved against
 
+Dev-Log: DL-20260802-001
+Date: 2026-08-02
+Status: The repositories page reads real repositories, and three static routes
+  stopped hiding most of their own content
+Change-ID: None until a commit is authorized
+Request-or-TODO: "do the repositiory page now", then "the setting page needs to
+  be visually inspected"
+Goal: Replace the placeholder repository chooser with a surface that shows what
+  the coordinator recorded and what Git says about it, then inspect the
+  settings route and fix what the inspection turned up
+Assumptions: Only one repository is open per coordinator process; opening
+  another means restarting with --repository, because OpenWorkspace is
+  deliberately refused until a durable repository approval exists
+Decisions: Built the page as a list beside one inspection, reusing the listing
+  the chooser already performs rather than asking the coordinator twice, and
+  reading the working tree only for the selected row. Said outright how a
+  repository is recorded instead of drawing a browse button that cannot open
+  one. Added working_tree_read to InspectRepositoryResponse: the service falls
+  back to the stored summary when Git does not answer, and that fallback
+  carries dirty unset, so the page was printing "Clean" for a repository whose
+  tree had never been read. Gave settings and diagnostics the same route-level
+  scroll owner first-run already had, and bounded the telemetry log.
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto
+  (InspectRepositoryResponse.working_tree_read), api/gen,
+  internal/transport/workspace_service.go,
+  web/frontend/shell/repository_workspace.go, web/frontend/shell/shell.go
+  (routeScrollOwner, routeIsAboutARun, Repositories prop),
+  web/frontend/primitives/icon.go (warning mark),
+  web/frontend/telemetryview/component.go, web/client/repository_page.go,
+  web/client/repository_page_wasm.go, web/client/repository_choices_wasm.go,
+  web/client/threadrail_transport.go, web/client/main.go
+Validation: Four new shell tests cover the list, the unread-tree claim, the
+  absence of an entry action without a thread, and empty versus unreachable;
+  verified live at :47311 with two recorded repositories, including selection,
+  the warning block, and the honest unknown state for a directory that no
+  longer exists; settings and diagnostics measured before and after (settings
+  main was 4114px inside a 936px clipped frame with no scrollbar anywhere,
+  and is now 1829px inside a scrolling owner)
+Failures-or-discarded-approaches: Recording a second repository emptied the
+  thread rail on every page whose route carries no repository: the rail
+  resolved its scope by "exactly one repository exists" and ignored the
+  repository the session was started against. Fixed by preferring the
+  bootstrap's selected repository when it is authorized. Rejected restyling
+  web/frontend/settingsview: another lane is actively rebuilding the settings
+  data path and that component with it.
+Known-limitations: The repositories page cannot open a repository, switch to
+  another, or create a thread in one -- all three need authority the
+  coordinator does not yet record. The list shows no path, because
+  RepositorySummary deliberately omits absolute paths. Settings still carries
+  placeholder Appearance and Data sections, duplicate reload controls, a
+  staircase-indented policy list, and a marketing tagline in its header; those
+  live in the lane currently rebuilding settings.
+Next-safe-step: Decide whether repository switching deserves a durable approval
+  record, which is what would make OpenWorkspace and this page's missing
+  actions real.
+
 Dev-Log: DL-20260801-019
 Date: 2026-08-01
 Status: The settings page reads the coordinator instead of static sentences
@@ -191,6 +826,271 @@ Known-limitations: Nothing in this product writes model_catalog, so the model
 Next-safe-step: Catalogue models when a provider is registered, so the model
   list and the credential binding both become reachable; then reconcile the
   remaining half of AUDIT-016 by exercising ConfigureProvider end to end
+
+Dev-Log: DL-20260801-018
+Date: 2026-08-01
+Status: The memory page reads real project memory from the coordinator
+Change-ID: None until a commit is authorized
+Request-or-TODO: "get the memories page hooked up"
+Goal: Give /memory a real read path end to end -- storage, service, transport,
+  client, and a surface that shows what this project has learned instead of
+  three placeholder regions
+Assumptions: Memory is read per project, not per task; the browser may read
+  memory and may not write it, because maturity is governed by transitions the
+  console has no authority over
+Decisions: Added MemoryService with a list and a detail read only. Scoped both
+  reads by project inside the SQL rather than in the caller, and reported an
+  artifact from another project as not found rather than as forbidden so the
+  answer discloses nothing. Flattened the eight typed content shapes into
+  labelled lines in the coordinator so the browser never has to know them.
+  Built the surface in web/frontend/shell rather than mounting
+  web/frontend/memoryinspector, because that package's Ready state requires
+  correction, quarantine, invalidation, and deletion callbacks that no service
+  backs; rendering those controls would have put four working-looking buttons
+  on screen that cannot do anything.
+Files-or-schemas: api/proto/codeflux/v1/identity.proto (memory artifact,
+  memory artifact revision, and episode identity kinds),
+  api/proto/codeflux/v1/product_api.proto (MemoryService,
+  ListMemoryArtifacts, GetMemoryArtifact and their messages), api/gen,
+  internal/storage/memory_artifact_repository.go
+  (ListLatestMemoryArtifactRevisionsForProject, GetMemoryArtifactProject),
+  internal/transport/memory_service.go, internal/transport/identity.go,
+  internal/coordinator/memory_query.go, internal/coordinator/application.go,
+  web/frontend/memoryinspector/labels.go,
+  web/frontend/shell/memory_workspace.go, web/frontend/shell/shell.go,
+  internal/transport/boundary.go, internal/coordinator/catalog.go,
+  internal/frontendtest/galleryfixture/main.go,
+  web/client/memory_resource.go, web/client/memory_mounted_wasm.go,
+  web/client/main.go
+Validation: go build ./... for the native tree and GOOS=js GOARCH=wasm go build
+  ./web/client; new storage test proves the listing returns the newest revision
+  per artifact and never crosses the project boundary; new coordinator test
+  exercises both reads over real gRPC against real SQLite, including the
+  cross-project refusal and the unauthenticated refusal; new shell tests prove
+  the list, the empty-versus-unreadable distinction, unresolved provenance
+  reported as unresolved, and the absence of governance controls no service
+  backs; verified live at http://127.0.0.1:47311/memory with three seeded
+  artifacts -- three rows, kind and maturity marks, and a detail panel showing
+  content, provenance and identity, with no console errors
+Failures-or-discarded-approaches: the detail read failed live with
+  InvalidArgument even though the coordinator returned a correct view: the
+  boundary's stable-identity validator rejects any identity kind it has no
+  parse case for, and the three new kinds had none, so every request carrying a
+  memory identity was refused before the handler ran. Adding the cases fixed
+  it. The RPC contract catalog is a closed set checked against the generated
+  descriptor, so both new methods had to be declared there too. Also: go run
+  ./cmd/codeflux-dev generate does not
+  invoke buf -- it only regenerates the migration catalog, asset manifest,
+  event registry, and version stamps -- so the first protobuf change produced
+  no Go at all; regenerated with buf directly. Rejected rendering
+  memoryinspector.Component with a fabricated Ready state for the reason above.
+Known-limitations: The surface is read-only: correcting, quarantining,
+  invalidating, deleting, and exporting memory are declared in
+  web/frontend/memoryinspector but have no transport, and the page says so
+  rather than implying otherwise. Last-confirmation attribution is not stored
+  anywhere yet, so no row claims one. Origin and lineage roots are reported as
+  undetermined because the storage lane persists only direct derived_from and
+  influenced_by edges (M21-019/M21-020); the page says so rather than showing
+  "none". No memory artifact is written by a real run yet, so the live check
+  used seeded rows.
+Next-safe-step: Decide whether the governed mutations -- correction,
+  quarantine, invalidation, deletion, export -- deserve a transport surface, or
+  whether the coordinator should first start writing memory from real runs so
+  there is something to govern.
+
+Dev-Log: DL-20260801-017
+Date: 2026-08-01
+Status: The task graph draws what the engine actually recorded, and what the
+  engine records is now measured rather than assumed
+Change-ID: CL-20260801-017
+Request-or-TODO: The graphs look underdeveloped — is that all the engine is
+  generating
+Goal: Separate what the coordinator emits into the graph from what the client
+  failed to draw of it, and fix the client half
+Assumptions: Local simulated run; the graph recorder in the coordinator belongs
+  to another lane and was not modified
+Decisions: Give the graph and memory routes a subject by adopting the thread the
+  coordinator reports as selected, since neither route names one; suppress the
+  canvas's own vocabulary key where the surface already carries it; fold the
+  observation rail on the graph route so the canvas keeps the width; count the
+  authoritative revision rather than the local store in both the rail summary
+  and the page header; draw node labels in a foreignObject
+Files-or-schemas: web/client/main.go, web/frontend/shell/{shell.go,
+  reference_chrome.go}, web/frontend/graphcanvas/authoritative.go
+Validation: Measured against a real run. The engine recorded four nodes and
+  three edges at revision four: the requirement, one atom operation per file the
+  agent wrote (cmd/generated/main.go, cmd/generated/main_test.go) and one effect
+  for the command it ran (go test ./...), each Passed. Before these fixes the
+  graph page reported "0 nodes" and drew nothing; the canvas measured 536x240
+  and fitted nodes to 86x32; and every label was created in the HTML namespace
+  inside the SVG, so the diagram was four blank rectangles. After: canvas
+  916x568, nodes 156x57, every label and status painted, go test ./web/... green
+Failures-or-discarded-approaches: Setting the label colour as an SVG
+  presentation attribute, then as an inline style, both failed for the same
+  underlying reason — the element was never an SVG element to begin with,
+  because the renderer's namespace tag set has no entry for "text"
+Known-limitations: The engine emits no plan-region nodes — the recorder says the
+  durable plan revision is not written for this run and points every step at the
+  requirement instead — and nothing yet emits validation, obligation, artifact or
+  evidence nodes, so the Evidence and Execution modes show the same four nodes
+  as Program and the vocabulary's remaining classes and edge kinds are unused.
+  The renderer's missing "text" namespace entry is a dependency defect worked
+  around here rather than fixed
+Next-safe-step: Ask the coordinator lane to record the durable plan revision and
+  emit validation and evidence facts, then re-review the Evidence mode against a
+  run that has them
+
+Dev-Log: DL-20260801-016
+Date: 2026-08-01
+Status: A request from the composer now starts work and the run is legible
+  while it happens
+Change-ID: CL-20260801-016
+Request-or-TODO: Connect the frontend client to the backend work and make the
+  outputs useful to observe
+Goal: Close the gap between pressing a button and watching a run: find why a
+  request did not become a task, keep the live session through the task it
+  creates, and make what the run emits readable
+Assumptions: Local simulated execution; the coordinator's agent loop belongs to
+  another lane and was not modified
+Decisions: Move the kind of change out of the options modal and next to the
+  message field, because it is the one field that decides whether the button
+  starts work, and label the button "Start work" when it will; give the submit
+  path a deadline the whole chain can finish inside rather than three seconds
+  that expired mid-chain; separate a failed start from a failed send so the
+  message stands and the reason is reported; report an opening session as
+  Connecting rather than Disconnected; accept a session snapshot that does not
+  yet mention a newly created task, and let a snapshot naming a *different*
+  task replace the projection when it is not behind, while still refusing one
+  that erases a task or predates the applied cursor; give the observation rail
+  compact single-column panels instead of viewport-driven columns; replace the
+  rail's unreadable canvas with a graph summary counted from the authoritative
+  revision; name every durable event kind in plain words with the raw kind as
+  the fallback
+Files-or-schemas: web/client/{composer_preview.go,composer_bridge_wasm.go,
+  task_start_chain.go,session_snapshot.go,execution_projection.go,session.go},
+  web/frontend/sessionprojection/reducer.go, web/frontend/executionview/
+  component.go, web/frontend/composer/component.go,
+  web/frontend/shell/{shell.go,reference_chrome.go}
+Validation: go test ./web/... and ./internal/frontendserver/... green, including
+  new guards for a lagging snapshot, a second task in a thread, and the event
+  phrasing fallback; a run was driven from the browser end to end and observed
+  streaming: state Running, transcript growing with message, tool-activity and
+  graph-change entries, current step named "Started a tool", ten timeline steps,
+  ten log lines, three graph nodes counted in the rail, spend against cap drawn
+  in the header
+Failures-or-discarded-approaches: The first suspicion — the snapshot's task
+  identity check — was only half of it; the projection reducer refused the new
+  task as well, and both had to give way before a second request in a thread
+  stopped disconnecting the console
+Known-limitations: The simulated run does not reach a terminal state: the task
+  stays Running after the scripted work finishes, so completion, final cost and
+  token counts remain unobserved and the console honestly reports zero spend
+  and unknown forecast throughout. The transcript still reports "Recovering 1
+  missing event range(s)" after the projection repairs itself. Both belong to
+  the coordinator's execution and event paths rather than to the client
+Next-safe-step: Ask the coordinator lane to drive a simulated run to a terminal
+  state, then re-review completion, cost and evidence surfaces against it
+
+Dev-Log: DL-20260801-015
+Date: 2026-08-01
+Status: One icon system, one modal shell, tighter geometry, and a rail that
+  stopped opening with three pieces of housekeeping
+Change-ID: CL-20260801-015
+Request-or-TODO: Put the composer options behind modals; fix the modals; tighten
+  the radii; remove the rail's close and resize controls; rebuild the threads
+  section; make the glyph sizes uniform and give everything a mark
+Goal: Take the redesign from structurally right to finished, by removing the
+  places where the interface still assembled itself differently every time
+Assumptions: Desktop only; the pointer-target floor, the AA pair set, the
+  redundant status encodings and the landmark and focus contracts remain law
+Decisions: Bind icons to three sizes tied to type roles and draw every one of
+  them from the same 24-unit grid, then give every navigation destination,
+  section heading, thread row, filter and action its own mark and delete the
+  Unicode stand-ins; wrap every mark in a box of its exact size so a flex
+  column cannot stretch one into a drawing; add one Modal shell — marked title,
+  single close, measured body, footer that separates committing from dismissal
+  — and move the composer's policy, budget, model and effort overrides, the
+  task controls, the global search and the task actions onto it; tighten the
+  radius scale from 4/8/14/20 to 2/5/8/12; reduce the rail head to one collapse
+  chevron; make the thread list a dense marked list with a segmented filter and
+  a quiet new-thread action; name the budget field in cents rather than minor
+  units
+Files-or-schemas: web/frontend/primitives/{icon.go,controls.go,foundation.go,
+  overlays.go}, web/frontend/design/tokens.go, web/frontend/composer/component.go,
+  web/frontend/threadrail/{component.go,virtual_list.go},
+  web/frontend/shell/reference_chrome.go, web/client/main.go
+Validation: go test ./web/... and ./internal/frontendserver/... green; every
+  modal was driven in a browser and each opens, places focus inside itself,
+  closes on Escape and returns focus to the control that opened it; the gallery
+  fixture was re-shot in all three themes; the workspace was re-shot at desktop
+  widths with no horizontal overflow
+Failures-or-discarded-approaches: Placing an icon directly in a flex column
+  stretched a fourteen-pixel mark to two hundred pixels, which is why the mark
+  now carries its own box; reducing the row height without moving the virtual
+  list's stride overlapped the thread rows
+Known-limitations: The graph canvas still draws its own zoom controls with
+  typographic plus and minus rather than the drawn marks; the attachment picker
+  keeps its hand-built header pending the same treatment; the running-state
+  visuals remain reviewed through the gallery because a task will not start in
+  the simulated profile
+Next-safe-step: Give the graph canvas controls and the attachment picker the
+  same marks and shell, then seed a running task and review the run header,
+  execution panels and graph against real data
+
+Dev-Log: DL-20260801-014
+Date: 2026-08-01
+Status: The console is redesigned around a reading column and an observation
+  rail, and the dead touch points that redesign exposed are fixed
+Change-ID: CL-20260801-014
+Request-or-TODO: Redesign the interface; make every touch point functional and
+  event managed; model the graph and task surfaces separately; keep the desktop
+  responsive; screenshot every component and its interactive states
+Goal: Replace the inherited three-rails-and-a-split layout and its flat green
+  palette with a console whose structure says what it is for, and prove every
+  control on it either acts or explains why it cannot
+Assumptions: Desktop only; local single-operator use; no remote assets; the
+  design token contract, its WCAG AA pair verification, and the redundant
+  status encodings remain law
+Decisions: Retune the tokens to a cold graphite instrument with a warm paper
+  action key, reserving saturated colour for machine state and cyan for live
+  delivery alone; set reading and display roles in Sitka; open dark whatever the
+  desktop prefers; make the transcript a measured reading column with a
+  continuous sequence spine, the composer docked to it, and move the graph,
+  execution panels and spend meter into an observation rail; give /graphs its
+  own surface with canvas and node inspector rather than the task workspace with
+  a panel; format exact money and token counts for reading in one shared package
+  rather than printing minor units; report a reachable coordinator with nothing
+  selected as Ready rather than Disconnected
+Files-or-schemas: web/frontend/design/tokens.go, web/frontend/readout (new),
+  web/frontend/shell/{shell.go,reference_chrome.go,hosts.go},
+  web/frontend/{composer,primitives,timelineview,threadrail,state,routes},
+  web/client/{main.go,task_topbar.go,threadrail_mounted.go},
+  internal/frontendtest/galleryfixture (new)
+Validation: go test ./web/... green, including the AA contrast pair set and the
+  landmark, focus-order and status-encoding contracts; a new guard renders the
+  thread workspace at every viewport class; the gallery fixture was screenshotted
+  in all three themes and drove out an invisible inline-alert title in the light
+  treatment and a wrapping definition-term column; a live instance was driven at
+  1280, 1440, 1600, 1920 and 2560 with no horizontal overflow; every visible
+  control on /, /graphs, /settings and /diagnostics was clicked and now either
+  acts or carries a reason; skip link, search dialog, theme cycle and thread
+  selection were each verified by hand
+Failures-or-discarded-approaches: Keying the route surface by route name to
+  force a remount emptied every route; hiding a panel title with the hidden
+  attribute failed because a display rule beats it; lifting the workspace's one
+  hook and matching the root element type did not fix the blank workspace on
+  navigation, which turned out to be a dropped first render pass
+Known-limitations: The router's first render pass after a navigation does not
+  reach the document, so the application forces one more commit and includes
+  that commit in the selection dependency; the underlying GWC behaviour is not
+  fixed here. The repository browser suite still expects a Home destination at
+  "/" and an unscoped "/tasks" destination, and its typed-card checks need a
+  seeded run, so it fails against a demo instance for reasons that predate this
+  work. A task could not be started in the simulated profile, so the running
+  states were reviewed through the gallery rather than a live run
+Next-safe-step: Seed a scenario with a running task and re-review the run
+  header, execution panels and graph against real data; then commit when
+  authorized
 
 Dev-Log: DL-20260801-013
 Date: 2026-08-01
