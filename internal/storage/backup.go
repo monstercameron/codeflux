@@ -111,6 +111,9 @@ func prepareBackupDestination(databasePath, destination string) (string, error) 
 	if err := os.MkdirAll(filepath.Dir(resolved), 0o700); err != nil {
 		return "", classify("create backup directory", err)
 	}
+	if err := restrictToCurrentUser(filepath.Dir(resolved)); err != nil {
+		return "", err
+	}
 	file, err := os.OpenFile(resolved, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
 		return "", classify("reserve backup destination", err)
@@ -118,6 +121,13 @@ func prepareBackupDestination(databasePath, destination string) (string, error) 
 	if err := file.Close(); err != nil {
 		_ = os.Remove(resolved)
 		return "", classify("close backup destination", err)
+	}
+	// A backup is a byte-for-byte copy of the authoritative store, so it needs
+	// the same grant. Restricting it before the copy runs means it is never
+	// readable, rather than readable for the duration of the copy.
+	if err := restrictToCurrentUser(resolved); err != nil {
+		_ = os.Remove(resolved)
+		return "", err
 	}
 	return resolved, nil
 }

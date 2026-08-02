@@ -178,7 +178,10 @@ func TestRepositoryInstructionsRemainUntrustedAndApprovalGated(t *testing.T) {
 		t.Fatalf("unapproved instruction = %+v", blocked)
 	}
 
-	query.ApprovedInstructionPaths = []string{"AGENTS.md"}
+	// AUDIT-011: approval is resolved against the exact revision and bytes
+	// rather than asserted by the caller, so the fixture answers for the
+	// digest of the file as it actually is.
+	query.InstructionApprovals = approvalsFor(t, root, repositoryMap.RepositoryRevision, "AGENTS.md")
 	approved, err := SelectContext(t.Context(), root, repositoryMap, query, ExecRunner{}, pipeline)
 	if err != nil {
 		t.Fatal(err)

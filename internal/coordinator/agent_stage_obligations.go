@@ -115,14 +115,21 @@ func checkSimplification(worktree string) stageOutcome {
 	if len(functions) == 0 {
 		return skipped("the run produced nothing to simplify")
 	}
+	// The gate says the atom is rewritten to be simpler where it can be. No
+	// rewrite is performed, so this stage may not report satisfied: doing so
+	// claimed a rewrite that never happened, in the ledger whose whole rule is
+	// that "we did not check this" and "this passed" must not render the same
+	// way (PIPE-010). The candidates are kept as evidence, because naming what
+	// is worth simplifying is the useful part of what the check did do.
 	if len(candidates) > 0 {
-		return held(fmt.Sprintf(
-			"%d function(s) are tangled enough to be worth simplifying: %s; "+
-				"nothing was rewritten, because a rewrite is only safe once "+
-				"the tests are known to detect a mistake",
+		return skippedWith(fmt.Sprintf(
+			"no rewrite is performed by this build; %d function(s) are tangled "+
+				"enough to be worth simplifying: %s",
 			len(candidates), strings.Join(candidates, ", ")), evidence)
 	}
-	return held("no function is tangled enough to be worth rewriting", evidence)
+	return skippedWith(
+		"no rewrite is performed by this build; no function is tangled enough "+
+			"to be worth rewriting in any case", evidence)
 }
 
 // stateCompositionObligations says what each composition has to guarantee.
@@ -191,53 +198,68 @@ func stateControlObligations(worktree string) stageOutcome {
 // to be wrong. The program's branches are counted from the source and compared
 // against whether any test provokes one.
 func checkControlTests(worktree string) stageOutcome {
-	files, err := producedGoFiles(worktree)
-	if err != nil {
-		return broke("the produced tests could not be read: "+err.Error(), nil)
-	}
-	fileSet := token.NewFileSet()
-	cases := 0
-	for _, file := range files {
-		if !strings.HasSuffix(file, "_test.go") {
-			continue
-		}
-		tree, parseErr := parser.ParseFile(
-			fileSet, filepath.Join(worktree, file), nil, parser.SkipObjectResolution)
-		if parseErr != nil {
-			continue
-		}
-		ast.Inspect(tree, func(node ast.Node) bool {
-			switch node.(type) {
-			case *ast.IfStmt, *ast.CaseClause:
-				cases++
-			}
-			return true
-		})
-	}
 	functions, err := readProducedFunctions(worktree)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	branches := 0
+	referenced, err := testedNames(worktree)
+	if err != nil {
+		return broke("the produced tests could not be read: "+err.Error(), nil)
+	}
+
+	// The gate is about declared paths, and this counted `if` and `case` nodes
+	// in test files instead (PIPE-015). One `if err != nil` anywhere in any
+	// test therefore satisfied a claim about every failure path in the
+	// program, and adding a branch to the code could not make the stage fail.
+	//
+	// A path is declared by the function that takes the decision, so that is
+	// the unit: every function with a branch must be reached by a test. It is
+	// weaker than "each individual path has a test" and much stronger than
+	// counting nodes, and what it cannot establish is stated rather than
+	// implied.
+	var (
+		declaring []string
+		examined  []string
+		untested  []string
+		branches  int
+	)
 	for _, function := range functions {
-		if !isTestScaffolding(function) {
-			branches += function.Branches
+		if isTestScaffolding(function) || function.Branches == 0 {
+			continue
 		}
+		branches += function.Branches
+		declaring = append(declaring, function.Name)
+		if referenced[function.Name] {
+			examined = append(examined, function.Name)
+			continue
+		}
+		untested = append(untested, function.Name)
 	}
+	sort.Strings(declaring)
+	sort.Strings(examined)
+	sort.Strings(untested)
+
 	evidence := map[string]any{
-		"program_branches": branches, "test_cases": cases,
+		"branching_functions": declaring,
+		"examined":            examined,
+		"untested":            untested,
+		"program_branches":    branches,
+		"unit": "one branching function, not one individual path: a function " +
+			"reached by a test may still have a path no test provokes",
 	}
-	if branches == 0 {
-		return skipped("the program takes no decision, so it has no path to test")
+	if len(declaring) == 0 {
+		return skippedWith(
+			"the program takes no decision, so it declares no path to test",
+			evidence)
 	}
-	if cases == 0 {
+	if len(untested) > 0 {
 		return broke(fmt.Sprintf(
-			"the program takes %d decision(s) and no test provokes any of them",
-			branches), evidence)
+			"%d function(s) take a decision that no test reaches: %s",
+			len(untested), strings.Join(untested, ", ")), evidence)
 	}
 	return held(fmt.Sprintf(
-		"%d test case(s) against %d program decision(s)", cases, branches),
-		evidence)
+		"every one of the %d branching function(s) is reached by a test, "+
+			"covering %d decision point(s)", len(declaring), branches), evidence)
 }
 
 // checkMoleculeTests requires each composition to be named by a test.

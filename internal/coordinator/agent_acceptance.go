@@ -197,7 +197,27 @@ func (execution *AgentExecution) checkAcceptance(
 	requirement string,
 	examples []acceptanceExample,
 ) (stageOutcome, []string) {
+	// Named-test examples are checked first and independently of any command
+	// (PIPE-118). They are the form work with no command-line surface can
+	// state, so requiring a runnable command before looking at them would put
+	// the general form behind the specific one.
+	named := parseNamedTestExamples(requirement)
+	namedPassed, namedFailures := runNamedTestExamples(ctx, worktree, named)
+
 	if len(examples) == 0 {
+		switch {
+		case len(namedFailures) > 0:
+			return broke(fmt.Sprintf(
+				"%d named acceptance test(s) did not pass: %s",
+				len(namedFailures), strings.Join(namedFailures, "; ")),
+				map[string]any{"named_tests_passed": namedPassed,
+					"named_test_failures": namedFailures}), namedFailures
+		case len(namedPassed) > 0:
+			return held(fmt.Sprintf(
+				"%d named acceptance test(s) pass: %s",
+				len(namedPassed), strings.Join(namedPassed, ", ")),
+				map[string]any{"named_tests_passed": namedPassed}), nil
+		}
 		return skipped("no executable acceptance example was supplied, so " +
 			"there is nothing for the built program to reproduce"), nil
 	}

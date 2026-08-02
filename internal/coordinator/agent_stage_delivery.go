@@ -187,8 +187,12 @@ func describeCalls(calls []string) string {
 func (execution *AgentExecution) assembleEvidence(
 	ctx context.Context,
 	taskID domain.TaskID,
+	attempt uint64,
 ) (stageOutcome, bool) {
-	recorded, err := execution.repositories.ListPipelineStages(ctx, taskID, 1)
+	// The attempt is passed in rather than assumed to be one (PIPE-003). A
+	// bundle assembled from attempt one while the run wrote attempt two
+	// describes the previous run and says nothing about this one.
+	recorded, err := execution.repositories.ListPipelineStages(ctx, taskID, attempt)
 	if err != nil {
 		return broke("the run's own record could not be read: "+err.Error(), nil), false
 	}
@@ -214,10 +218,11 @@ func (execution *AgentExecution) assembleEvidence(
 	// The bundle is complete whether or not the news is good. Refusing to
 	// assemble it on a failing run would remove the evidence exactly when
 	// somebody most needs to read it.
-	// The bundle is assembled before the three delivery stages are recorded,
-	// so it counts what came before it and says so. Reporting a total of
-	// thirty-five while holding thirty-two would be the bundle's first
-	// inaccuracy, in the one artifact whose whole purpose is to be accurate.
+	// The bundle is assembled before the delivery stages are recorded, so it
+	// counts what came before it and says so. Both numbers are derived from
+	// len(pipeline.Flow) rather than written out: claiming a total the flow no
+	// longer has would be the bundle's first inaccuracy, in the one artifact
+	// whose whole purpose is to be accurate (PIPE-007).
 	evidence["stages_not_yet_recorded"] = len(pipeline.Flow) - len(recorded)
 	return held(fmt.Sprintf(
 		"of the %d stage(s) recorded before this one: %d satisfied, %d failed, "+

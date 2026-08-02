@@ -15,7 +15,7 @@ import (
 // TestEveryStageOfTheFlowIsRecordedIncludingTheOnesNothingImplements is the
 // check that keeps this build honest about itself.
 //
-// The delivery flow has thirty-two stages. This build performs a handful. The
+// This build performs a handful of the flow's stages. The
 // danger is not the gap — it is that the gap leaves no trace: a run that
 // derived no contracts, generated no atoms, wrote no test before any code,
 // discharged no composition obligation, and measured no coverage still ends
@@ -151,9 +151,9 @@ func TestEveryStageOfTheFlowIsRecordedIncludingTheOnesNothingImplements(t *testi
 		t.Errorf("%d stage(s) still report not-implemented",
 			counts[pipeline.StateNotImplemented])
 	}
-	// A run of a one-file program cannot honestly satisfy every stage of a
-	// thirty-five stage flow. If it ever does, the gates have stopped asking
-	// anything rather than the work having become perfect.
+	// A run of a one-file program cannot honestly satisfy every stage of the
+	// flow, whatever its length. If it ever does, the gates have stopped
+	// asking anything rather than the work having become perfect.
 	if counts[pipeline.StateSatisfied] == len(pipeline.Flow) {
 		t.Error("every stage reported satisfied, which no run of a single " +
 			"scripted file should be able to claim")

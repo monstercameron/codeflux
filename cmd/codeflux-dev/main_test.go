@@ -99,17 +99,20 @@ func TestRegistryJSONIsVersionedAndStable(t *testing.T) {
 func TestUnavailableCommandHasStableExitAndJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run(context.Background(), &stdout, &stderr, []string{"seed", "--json"})
+	code := run(context.Background(), &stdout, &stderr, []string{"package", "--json"})
 	if code != exitUnavailable {
-		t.Fatalf("seed exit = %d, want %d", code, exitUnavailable)
+		t.Fatalf("package exit = %d, want %d", code, exitUnavailable)
 	}
 	if !strings.Contains(stderr.String(), `"status":"unavailable"`) {
-		t.Fatalf("seed JSON = %q", stderr.String())
+		t.Fatalf("package JSON = %q", stderr.String())
 	}
 }
 
 func TestCurrentSkeletonCommandsAreHonestlyUnavailable(t *testing.T) {
-	for _, command := range []string{"doctor", "inspect-db", "package", "replay", "seed"} {
+	// seed, replay, and inspect-db were removed from this list by AUDIT-029:
+	// they are implemented, and asserting they are unavailable would freeze the
+	// defect that ticket exists to repair.
+	for _, command := range []string{"doctor", "package"} {
 		t.Run(command, func(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer

@@ -135,21 +135,30 @@ func (execution *AgentExecution) Run(
 
 	// Every stage of the flow is written down as the run goes, and the ones
 	// this build cannot perform are written down too. Without that, a run that
-	// performed six of thirty-two stages left the same record as one that
+	// performed six of the flow's stages left the same record as one that
 	// performed all of them.
-	ledger := newPipelineLedger(execution.repositories, taskID, runID)
+	ledger := newPipelineLedger(ctx, execution.repositories, taskID, runID)
 	defer ledger.close(ctx)
 	// The gate allows a request with no executable example only if the absence
 	// is explicit. Nothing supplies examples yet, so the absence is what gets
 	// recorded — stating it is the difference between a gate that is met and
 	// one that is merely not checked.
+	// The instructions stage now counts both acceptance forms (PIPE-118): a
+	// command's expected output, and a named test that must pass.
+	//
+	// It does not yet *require* one. Making the example mandatory is PIPE-019
+	// and is deliberately not done here — see that item for why.
 	examples := parseAcceptanceExamples(scope.requirement)
+	namedExamples := parseNamedTestExamples(scope.requirement)
+	totalExamples := len(examples) + len(namedExamples)
 	ledger.satisfied(ctx, pipeline.StageInstructions,
-		acceptanceDetail(len(examples)),
+		acceptanceDetail(totalExamples),
 		map[string]any{
 			"requirement_bytes":   len(scope.requirement),
 			"acceptance_examples": len(examples),
-			"absence_declared":    len(examples) == 0,
+			"named_test_examples": len(namedExamples),
+			"total_examples":      totalExamples,
+			"absence_declared":    totalExamples == 0,
 		})
 
 	// A request that reads two ways is settled before anything is written. The
@@ -420,7 +429,22 @@ func (execution *AgentExecution) Run(
 		if approvalErr != nil {
 			return approvalErr
 		}
-		context := worktreeContextItems(scope.worktree)
+		// AUDIT-010: the first round now plans against deterministic context
+		// selection with a persisted manifest, not against a directory
+		// listing. The listing remains the fallback, and a run that falls back
+		// says so rather than quietly planning against less.
+		selection := selectAgentContext(
+			ctx, execution.repositories, scope.repositoryID, scope.worktree,
+			scope.revision, scope.requirement, execution.redactor,
+			execution.repositories.InstructionApprovalResolverFor(
+				scope.projectID, scope.repositoryID, "agent-first-round"),
+		)
+		if selection.Degraded {
+			execution.say(ctx, scope, events.KindMessageFinal,
+				"Planning against the worktree listing rather than selected "+
+					"context: "+selection.Reason)
+		}
+		context := selection.Items
 		if failure != "" {
 			context = append(context, agentContextItem(
 				"last-test-run-output", failure))
@@ -585,14 +609,22 @@ func (execution *AgentExecution) Run(
 		validationDetail(narrator),
 		map[string]any{"command": "go test ./...", "attempts": attempts})
 	if !verified {
-		// Everything downstream of verification is blocked rather than
-		// silently skipped: nothing was adversarially checked, no evidence
-		// bundle can be assembled, and nothing may be delivered, because all
-		// three would be claims about work that is not known to be correct.
+		// Only the two stages that genuinely cannot proceed are blocked here
+		// (PIPE-001).
+		//
+		// This swept five stages, including three the run goes on to compute
+		// below: the adversarial probe, the acceptance check, and the evidence
+		// bundle. Stage storage is first-write-wins, so the blocked row landed
+		// first and the three real verdicts were computed and then discarded.
+		// A reader of a failing run's ledger saw "blocked" where the run had an
+		// answer, and the evidence bundle — the thing most worth reading when
+		// the news is bad — was the one most reliably lost.
+		//
+		// Acceptance and delivery are different: they are decisions about
+		// whether to hand the work over, and an unverified run cannot reach
+		// either. Those stay blocked.
 		for _, stage := range []pipeline.Number{
-			pipeline.StageEndToEndTests, pipeline.StageAdversarial,
-			pipeline.StageEvidenceBundle, pipeline.StageHumanAcceptance,
-			pipeline.StageDeliver,
+			pipeline.StageHumanAcceptance, pipeline.StageDeliver,
 		} {
 			ledger.blocked(ctx, stage,
 				"the run's own verification did not pass, so nothing after it "+
@@ -623,7 +655,7 @@ func (execution *AgentExecution) Run(
 		ctx, scope.worktree, scope.requirement, examples)
 	ledger.decide(ctx, pipeline.StageEndToEndTests, acceptance)
 
-	execution.examineStructure(ctx, ledger, scope.worktree, compiles, verified)
+	execution.examineStructure(ctx, ledger, scope, compiles, verified)
 	if compiles {
 		ledger.decide(ctx, pipeline.StageRecall,
 			execution.recallKnownAtoms(ctx, scope, scope.worktree))
@@ -636,7 +668,7 @@ func (execution *AgentExecution) Run(
 	// whether to trust this work needs it most when the news is bad. Whether
 	// the work may then be handed over is a separate question, and the answer
 	// is no while anything is still failing.
-	bundle, clean := execution.assembleEvidence(ctx, taskID)
+	bundle, clean := execution.assembleEvidence(ctx, taskID, ledger.currentAttempt())
 	ledger.decide(ctx, pipeline.StageEvidenceBundle, bundle)
 	if clean && verified {
 		ledger.record(ctx, pipeline.StageHumanAcceptance, pipeline.StateBlocked,
@@ -1308,6 +1340,7 @@ func coverageDetail(covered float64, err error) string {
 }
 
 // acceptanceDetail says what the request came with.
+// acceptanceDetail states what the request is judged against.
 func acceptanceDetail(count int) string {
 	if count == 0 {
 		return "the request was recorded as a message; no executable " +
@@ -1315,6 +1348,6 @@ func acceptanceDetail(count int) string {
 			"than assumed"
 	}
 	return fmt.Sprintf("the request was recorded as a message and carries %d "+
-		"executable acceptance example(s) the finished program must reproduce",
+		"executable acceptance example(s) the finished work must satisfy",
 		count)
 }

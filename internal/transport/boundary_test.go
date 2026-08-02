@@ -27,6 +27,21 @@ const (
 	boundaryTestUUID  = "01890f3c-4a00-7abc-8def-0123456789ab"
 )
 
+// TestEveryProductMethodThroughAuthenticatedInProcessAPI checks the boundary,
+// not the services.
+//
+// It installs an unknown-service handler that echoes an empty response, so
+// what it proves is that every declared method is routable, survives the
+// authentication and logging interceptors, and round-trips its declared
+// request and response types. It deliberately reaches no production
+// implementation.
+//
+// AUDIT-008 recorded that M07-057 cited this as coverage of "every method",
+// which it is not. The claim that every declared method reaches a registered
+// production service now lives in
+// TestAUDIT008_EveryDeclaredProductMethodReachesARegisteredService, in
+// internal/coordinator, where the real services are registered. Do not
+// re-describe this test as API coverage.
 func TestEveryProductMethodThroughAuthenticatedInProcessAPI(t *testing.T) {
 	connection, cleanup := startBoundaryTestServer(t, nil)
 	defer cleanup()

@@ -51,6 +51,16 @@ func (database *Database) Migrate(
 		flock.SetPermissions(0o600),
 	)
 	locked, err := lock.TryLockContext(ctx, 25*time.Millisecond)
+	if locked {
+		// flock's SetPermissions is a POSIX mode and is inert on Windows, so
+		// the lock file is narrowed explicitly once it exists. It gates who
+		// may apply schema changes, which is why it is on the protected list
+		// rather than treated as a scratch file.
+		if restrictErr := restrictToCurrentUser(database.path + ".migration.lock"); restrictErr != nil {
+			_ = lock.Close()
+			return MigrationResult{}, restrictErr
+		}
+	}
 	if err != nil {
 		return MigrationResult{}, &Error{
 			Kind:      ErrMigrationLocked,
@@ -278,6 +288,29 @@ func (database *Database) ensureMigrationControl(
 		return classify("commit migration-control schema", err)
 	}
 	return nil
+}
+
+// SchemaVersion reports the applied application schema version, or zero when
+// the database has none yet.
+//
+// An unmigrated database is an ordinary state — it is what an operator has
+// immediately after the file is created — so it is reported as a version of
+// zero rather than as a missing-table error. currentSchemaVersion keeps the
+// stricter behaviour, because inside a migration a missing version table is a
+// genuine fault.
+func (database *Database) SchemaVersion(ctx context.Context) (int, error) {
+	var present string
+	if err := database.sql.QueryRowContext(
+		ctx,
+		`SELECT name FROM sqlite_master
+		 WHERE type = 'table' AND name = 'codeflux_schema_version'`,
+	).Scan(&present); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, classify("look for the schema version table", err)
+	}
+	return database.currentSchemaVersion(ctx)
 }
 
 func (database *Database) currentSchemaVersion(ctx context.Context) (int, error) {

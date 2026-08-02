@@ -286,6 +286,7 @@ func startEngineWith(t *testing.T, agent ApplicationOptions) engineFixture {
 		TaskControls:      &applicationTaskControlStub{},
 		AgentModel:        agent.AgentModel,
 		AgentModelFactory: agent.AgentModelFactory,
+		CredentialStore:   agent.CredentialStore,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -322,7 +323,8 @@ func (engine engineFixture) request(t *testing.T, body string) domain.MessageID 
 	if _, err := engine.repositories.AppendMessage(
 		context.Background(), storage.AppendMessage{
 			ID: messageID, ThreadID: engine.threadID, Role: storage.MessageRoleUser,
-			BodyRedacted: body, IdempotencyKey: "engine-request",
+			BodyRedacted:   body,
+			IdempotencyKey: "engine-request",
 		},
 	); err != nil {
 		t.Fatalf("recording the request failed: %v", err)

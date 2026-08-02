@@ -97,6 +97,14 @@ func Open(ctx context.Context, options OpenOptions) (*Database, error) {
 		_ = sqlDB.Close()
 		return nil, err
 	}
+	// WAL mode is set by the DSN above, so the write-ahead log and the shared
+	// memory file exist by now. They carry committed rows, so leaving them at
+	// the inherited permissions would expose the database through its sidecars
+	// after the database itself was restricted.
+	if err := restrictDatabaseArtifacts(path); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 	return database, nil
 }
 

@@ -115,7 +115,11 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		if code := validateCommandRoot(spec.Name, invocation, stderr); code != exitSuccess {
 			return code
 		}
-		return runGo(ctx, stdout, stderr, "test", "./...")
+		// The same ten-minute default package timeout test-race already raises
+		// for. internal/coordinator's engine test builds and runs generated
+		// programs and takes over nine minutes on this host, so the default
+		// turns a passing suite into a panic that reads like a hang.
+		return runGo(ctx, stdout, stderr, "test", "-timeout=20m", "./...")
 	case "test-race":
 		return runRace(ctx, stdout, stderr, invocation)
 	case "test-coverage":
@@ -138,6 +142,21 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		return runIntegrationTests(ctx, stdout, stderr, invocation)
 	case "test-security":
 		return runSecurityTests(ctx, stdout, stderr, invocation)
+	case "seed", "replay", "inspect-db":
+		// These write nothing, but --root is still validated: a command that
+		// silently accepts a root it would have refused elsewhere teaches the
+		// wrong thing about where output may go.
+		if code := validateCommandRoot(spec.Name, invocation, stderr); code != exitSuccess {
+			return code
+		}
+		switch spec.Name {
+		case "seed":
+			return runSeed(stdout, stderr, invocation)
+		case "replay":
+			return runReplay(stdout, stderr, invocation)
+		default:
+			return runInspectDB(ctx, stdout, stderr, invocation)
+		}
 	default:
 		if code := validateCommandRoot(spec.Name, invocation, stderr); code != exitSuccess {
 			return code
@@ -309,14 +328,34 @@ func runBuild(
 		return exitFailure
 	}
 
-	binDir, err := resolveCommandRoot(root, "bin", invocation.Root)
-	if err != nil {
-		fmt.Fprintf(stderr, "codeflux-dev build: root: %v\n", err)
-		return exitUsage
+	// build emits more than one kind of artifact, so its --root names the one
+	// root they share rather than any single output directory. Without a
+	// --root this is `.artifacts`, which keeps the default layout — bin/ and
+	// frontend/ — exactly as it was.
+	outputRoot := filepath.Join(root, ".artifacts")
+	if invocation.Root != "" {
+		outputRoot, err = resolveCommandRoot(root, "build", invocation.Root)
+		if err != nil {
+			fmt.Fprintf(stderr, "codeflux-dev build: root: %v\n", err)
+			return exitUsage
+		}
 	}
+	binDir := filepath.Join(outputRoot, "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "codeflux-dev build: create artifact directory: %v\n", err)
 		return exitFailure
+	}
+
+	// M01-026 asks one invocation to answer "does this tree build?" for every
+	// artifact the product ships. Generated protobuf source is part of that
+	// answer: a tree whose committed generated code no longer matches its
+	// .proto sources compiles perfectly and ships the wrong contract, which is
+	// the failure a separate opt-in check does not prevent.
+	if code := runGenerateCheck(ctx, stdout, stderr, invocation); code != exitSuccess {
+		fmt.Fprintf(stderr,
+			"codeflux-dev build: committed generated output does not match its "+
+				"sources; run `codeflux-dev generate` and commit the result\n")
+		return code
 	}
 
 	if code := runGoIn(ctx, root, stdout, stderr, "build", "./..."); code != exitSuccess {
@@ -359,6 +398,19 @@ func runBuild(
 		); code != exitSuccess {
 			return code
 		}
+	}
+
+	// The browser client is the third artifact the product ships and the one a
+	// server binary alone cannot serve. Building it here, under the same root,
+	// is what makes a single `build` the whole answer rather than two thirds of
+	// it followed by a runtime failure at the first page load.
+	if code := buildFrontendAssets(ctx, root, frontendAssetBuild{
+		Directory:       filepath.Join(outputRoot, frontendAssetDirectory),
+		ApplicationName: "CodeFlux",
+		ModulePath:      "codeflux.dev/codeflux/frontend-assets",
+		ClientPackage:   "./web/client",
+	}, stdout, stderr, "codeflux-dev build"); code != exitSuccess {
+		return code
 	}
 	return exitSuccess
 }

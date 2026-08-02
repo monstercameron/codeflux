@@ -70,13 +70,28 @@ func parseStartArguments(args []string) (startArguments, error) {
 		}
 	}
 	if arguments.address == "" {
-		arguments.address = "127.0.0.1:0"
+		arguments.address = DefaultListenAddress
 	}
 	if err := validateLoopbackAddress(arguments.address); err != nil {
 		return startArguments{}, err
 	}
 	return arguments, nil
 }
+
+// DefaultListenAddress is the fixed loopback address the coordinator binds when
+// no --address is given.
+//
+// The port is fixed rather than ephemeral because a moving port is hostile to
+// everything that has to find it again: a bookmarked tab, a browser session
+// cookie scoped to an origin, a screenshot of a URL, and an agent that started
+// a server three steps ago. An ephemeral port also hides the mistake this
+// repository actually makes, which is leaving old servers running — with :0
+// every stale server got its own port and nothing ever collided, so nothing
+// ever complained.
+//
+// 47311 sits in the IANA dynamic range, well clear of the ports development
+// tooling commonly claims.
+const DefaultListenAddress = "127.0.0.1:47311"
 
 // validateLoopbackAddress refuses a non-loopback bind.
 //

@@ -36,4 +36,7 @@ var Catalog = []Descriptor{
 	{Number: 29, Name: "000029_deterministic_retrieval_recall_reviews.sql", SHA256: "f885c5f69393b38a6fbd87f1f7da0e8341d01944213c040ac3cd42c353e8781a"},
 	{Number: 30, Name: "000030_pipeline_stage_ledger.sql", SHA256: "8a66515641e3b50e2ac65ae7d4c68add8c2bb077953969c1ebf366f7aac7a54f"},
 	{Number: 31, Name: "000031_pipeline_stage_documentation.sql", SHA256: "aeb82fc8256fff0ffb9670e70680b1db885298505adaddb44699c2fbb8bdf2de"},
+	{Number: 32, Name: "000032_repository_instruction_approvals.sql", SHA256: "2b979c95fdf13d0e58b2b3a440694522d09975bc12cd3f2bc0a96e3fe2c8708a"},
+	{Number: 33, Name: "000033_non_functional_baselines.sql", SHA256: "57ac513199348edffea70649241830f8645e488b3c71b5d3d1af671c3979fecc"},
+	{Number: 34, Name: "000034_proof_obligations.sql", SHA256: "2a1cc18b4a14c839cc866696a9816d600c8502d86dfcadc84017dceaf8f9dcab"},
 }

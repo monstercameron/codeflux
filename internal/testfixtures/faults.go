@@ -257,3 +257,22 @@ func RunWithFault(
 	}
 	return work(ctx)
 }
+
+// StringPointInjector adapts a FaultInjector to the string-keyed interface
+// production boundaries declare.
+//
+// Production packages must not import this one, so they declare a narrow
+// interface over plain strings. This adapter is what lets a test arm the same
+// vocabulary the boundary consults, and it keeps the two in one place so a
+// renamed point breaks the adapter rather than silently never firing.
+type StringPointInjector struct {
+	Injector *FaultInjector
+}
+
+// Check consults the wrapped injector at the named point.
+func (adapter StringPointInjector) Check(point string) error {
+	if adapter.Injector == nil {
+		return nil
+	}
+	return adapter.Injector.Check(FaultPoint(point))
+}

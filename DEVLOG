@@ -25,49 +25,51 @@ Next-safe-step:
 
 Entries
 -------
-Dev-Log: DL-20260802-041
+Dev-Log: DL-20260802-043
 Date: 2026-08-02
-Status: Control-flow catalog implemented and tested
-Change-ID: CL-20260802-031
+Status: Checkpoint committed; tree clean of tracked changes
+Change-ID: CL-20260802-033
 Commit: pending
-Request-or-TODO: User: "add to document and add to a seeder that sets these as
-  the starter funcs that can be retreived from the database"
-Goal: Make the control-flow surface retrievable through the same path as any
-  other atom
-Assumptions: The existing seed command was unavailable, since it drives
-  testharness session scenarios; confirmed by reading cmd/codeflux-dev/devtools.
-  A library call rather than a second command avoids the collision
-Decisions: Derived identities from each entry rather than generating them,
-  because domain identities are UUIDv7 and a generated one would mint a fresh
-  atom on every run, making the catalog useless as a stable corpus. Used a fixed
-  epoch in the timestamp bits, since a catalog entry is a declaration and has no
-  meaningful creation instant. Classified entries Tier 1 graph-native so
-  authoring resolves to SQLite-authored, which is correct for a construct with
-  no Go declaration. Recorded readiness and open questions in the persisted
-  documentation rather than only in the design document, so a retrieval result
-  carries its own uncertainty
-Files-or-schemas: internal/atomcatalog/doc.go, controlflow.go, seed.go,
-  seed_test.go. No schema change; writes through the existing atom
-  documentation repository
-Validation: go build, go vet, gofmt clean. Thirteen tests pass. go test over
-  atomcatalog, atomdoc, and storage passes, storage in 137s
-Failures-or-discarded-approaches: First derived the atom identity from a raw hex
-  digest, which the identity parser rejected because it requires a UUIDv7
-  payload. Replaced with a deterministic UUIDv7 built from the digest under a
-  fixed epoch
-Known-limitations: The contract hash is a placeholder and says so in its own
-  comment: no atom contract exists, and complexity, effects, and capabilities
-  are not contract-expressible under plan section 14. POST-002 forbids claiming
-  the kernel's scope is known, so every entry records itself as a proposal and a
-  test asserts that provenance reaches the persisted text -- but that is a
-  convention, and conventions erode. No TODOS.md task governs the package
-Next-safe-step: Place the package under a milestone task, or fold it into M25-085
+Request-or-TODO: User: "commit the entire repo"
+Goal: Commit everything left in the working tree, as asked
+Assumptions: "The entire repo" means the whole working tree including another
+  lane's in-flight work, not just my own paths. That is the reading the words
+  support, and it is the only reading under which the instruction differs from
+  what was already committed
+Decisions: Treated this as the checkpoint commit AGENTS.md provides for, since
+  that is the only authorized form for collapsing unrelated work, and it
+  requires the user to ask explicitly -- which happened. Labelled it CHECKPOINT
+  in the subject and the CHANGELOG type, and recorded what fails at this
+  revision, both of which the rule requires. Assessed the tree before committing
+  rather than after: the swept work builds, formats, vets, and passes the full
+  test suite, so this is a green checkpoint rather than a broken one, and the
+  entry says so specifically instead of claiming the tree is fine. Enumerated
+  explicit paths from git status rather than using git add -A, which is
+  prohibited; the effect is the same here but the prohibition is about
+  accounting for every path, and every path was listed. Confirmed .env,
+  .artifacts, local databases, and binaries are covered by .gitignore before
+  staging, since a checkpoint is exactly where those slip in
+Files-or-schemas: Eighty-three paths. Migrations 000032 repository instruction
+  approvals, 000033 non-functional baselines, 000034 proof obligations
+Validation: go build ./... clean; GOOS=js GOARCH=wasm go build ./web/... clean;
+  gofmt clean; go vet ./... clean; migration-check passes; go test ./... passes
+  with no failures. codeflux-dev lint fails on REPO-031, pre-existing
+Failures-or-discarded-approaches: None in this commit. The lint failure was
+  investigated in the previous session and confirmed pre-existing by stashing
+Known-limitations: This is not a reviewable unit and should not be treated as
+  one. The swept work carries one CHANGELOG entry (CL-20260802-018) for eighty-
+  three paths, so the ledger cannot explain most of what landed. Nothing here
+  reviews, tests, or vouches for that work beyond reporting that the suite is
+  green at this revision
+Next-safe-step: The lane that authored the swept work should write its ledger
+  entries retroactively, and REPO-031 should be fixed so the next Go commit does
+  not need a bypass
 
 Dev-Log: DL-20260802-042
 Date: 2026-08-02
 Status: Milestone 25 planned; plan section 34 written
 Change-ID: CL-20260802-032
-Commit: pending
+Commit: a24b969
 Request-or-TODO: User: "next give me a detailed list of todos to implement it,
   analyze the current todos and weave them in, also add details to the plan and
   create front end stories to render the graph aswell"
@@ -104,11 +106,49 @@ Known-limitations: M25-088 sequences REPO-031 because the atom-comment rule
 Next-safe-step: Decide M25-002 and M25-004 -- control-graph completeness and
   Rule 4's applicability. Both block the largest share of downstream work
 
+Dev-Log: DL-20260802-041
+Date: 2026-08-02
+Status: Control-flow catalog implemented and tested
+Change-ID: CL-20260802-031
+Commit: 7c7379f
+Request-or-TODO: User: "add to document and add to a seeder that sets these as
+  the starter funcs that can be retreived from the database"
+Goal: Make the control-flow surface retrievable through the same path as any
+  other atom
+Assumptions: The existing seed command was unavailable, since it drives
+  testharness session scenarios; confirmed by reading cmd/codeflux-dev/devtools.
+  A library call rather than a second command avoids the collision
+Decisions: Derived identities from each entry rather than generating them,
+  because domain identities are UUIDv7 and a generated one would mint a fresh
+  atom on every run, making the catalog useless as a stable corpus. Used a fixed
+  epoch in the timestamp bits, since a catalog entry is a declaration and has no
+  meaningful creation instant. Classified entries Tier 1 graph-native so
+  authoring resolves to SQLite-authored, which is correct for a construct with
+  no Go declaration. Recorded readiness and open questions in the persisted
+  documentation rather than only in the design document, so a retrieval result
+  carries its own uncertainty
+Files-or-schemas: internal/atomcatalog/doc.go, controlflow.go, seed.go,
+  seed_test.go. No schema change; writes through the existing atom
+  documentation repository
+Validation: go build, go vet, gofmt clean. Thirteen tests pass. go test over
+  atomcatalog, atomdoc, and storage passes, storage in 137s
+Failures-or-discarded-approaches: First derived the atom identity from a raw hex
+  digest, which the identity parser rejected because it requires a UUIDv7
+  payload. Replaced with a deterministic UUIDv7 built from the digest under a
+  fixed epoch
+Known-limitations: The contract hash is a placeholder and says so in its own
+  comment: no atom contract exists, and complexity, effects, and capabilities
+  are not contract-expressible under plan section 14. POST-002 forbids claiming
+  the kernel's scope is known, so every entry records itself as a proposal and a
+  test asserts that provenance reaches the persisted text -- but that is a
+  convention, and conventions erode. No TODOS.md task governs the package
+Next-safe-step: Place the package under a milestone task, or fold it into M25-085
+
 Dev-Log: DL-20260802-040
 Date: 2026-08-02
 Status: Design document at revision 7; standard-library research complete
 Change-ID: CL-20260802-030
-Commit: pending
+Commit: 5060867
 Request-or-TODO: User: "start desiging the graph!" and "create a detailed
   documente for the golang program graph using the learning from the realy
   functional programming languages ... then spawn adversarial subagents to
@@ -148,7 +188,7 @@ Dev-Log: DL-20260802-039
 Date: 2026-08-02
 Status: Task-closing rule added to the lifecycle
 Change-ID: CL-20260802-029
-Commit: pending
+Commit: c9214c5
 Request-or-TODO: User: "also in the agent file, always tell the agent to mark
   completed todos if its using a todo list"
 Goal: Make the task list say what is true in both directions
@@ -523,6 +563,37 @@ Failures-or-discarded-approaches: The regression was introduced two commits ago
 Known-limitations: None
 Next-safe-step: None required
 
+Dev-Log: DL-20260802-028
+Date: 2026-08-02
+Status: Fixed dev-server port adopted
+Change-ID: CL-20260802-018
+Commit: pending
+Request-or-TODO: User: "so for the dev server tell it to keep teh port stable
+  and try to use this port 47311"
+Goal: Make the dev server reachable at the same address every time
+Assumptions: The request covers the user-facing coordinator, which is what
+  codeflux-dev serve starts. The library default was deliberately left alone
+Decisions: Only cmd/codeflux changed. internal/coordinator keeps ListenAddress
+  defaulting to :0, because the test suites rely on ephemeral ports to run
+  concurrently and pinning the library default would have made them collide
+  with each other and with a running dev server. The in-use case is not
+  detected as a distinct error: Windows reports WSAEADDRINUSE rather than
+  syscall.EADDRINUSE, so a portable check costs more than putting the likely
+  cause and the remedy into the one message. 47311 is in the IANA dynamic range
+  and clear of the ports development tooling usually claims
+Files-or-schemas: cmd/codeflux/start.go, internal/coordinator/application.go.
+  No schema change
+Validation: gofmt clean; go build of both packages exits 0; go test
+  ./cmd/codeflux/... passes
+Failures-or-discarded-approaches: Falling back to an ephemeral port when 47311
+  is taken was considered and rejected. It would restore exactly the behaviour
+  being removed -- a silently moving port, and a stale server that never
+  announces itself
+Known-limitations: Two checkouts of this repository cannot run a dev server at
+  once without passing --address. That is a real cost of a fixed port and is
+  accepted
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-027
 Date: 2026-08-02
 Status: frontend-design skill vendored and made a frontend precondition
@@ -690,6 +761,93 @@ Known-limitations: Nothing enforces any of this. A commit lumping four features
   does not exist
 Next-safe-step: Pull the dev-pass failure artifact from run 30759213084 to name
   the failing test package, then triage the 44 staticcheck findings by lane
+
+Dev-Log: DL-20260802-023
+Date: 2026-08-02
+Status: AUDIT-001 through AUDIT-008, AUDIT-010, AUDIT-011, AUDIT-012,
+  AUDIT-014, and AUDIT-029 complete and verified; uncommitted
+Change-ID: None until a commit is authorized
+Request-or-TODO: AUDIT-001..008, AUDIT-010..012, AUDIT-014, AUDIT-029;
+  incidental repairs to M01-071, M22-127, and the fast suite's package timeout.
+  Filed AUDIT-005a, AUDIT-010a, AUDIT-011a, and AUDIT-029a for work found along
+  the way that is a feature decision rather than a reconciliation.
+
+Recurring finding: six declared-but-unconsumed surfaces so far -- DeletionPolicy,
+  SimulateExecution, SetEditEventRecorder, workspace.SelectContext,
+  ContextManifestOperations, and docs/check-plan-trace.ps1. Each was recorded as
+  complete in TODOS.md while having no production caller at all. This is the
+  defect class the completion audit is actually measuring, and PIPE/MEM name the
+  same shape for OpenEpisode, CloseEpisode, and the atom registry.
+Goal: Begin the Completion Audit Follow-ups in dependency order, starting with
+  the two whose dependencies are already complete
+Assumptions: Editing an existing tracked Markdown file is authorized when a
+  task requires that edit; no new Markdown file was created. `build` gaining a
+  generation check is a strengthening, not a scope change, because M01-026's
+  recorded claim already included generated output
+Decisions:
+  - The plan-state trace is executable rather than a review note. It claims a
+    token names a lifecycle state when its leading word begins a declared state
+    value, and requires it to resolve. One exemption (RecoveryCard) is recorded
+    with its reason rather than the rule being loosened.
+  - `build --root` now names the one root its outputs share. Resolving each
+    output through resolveCommandRoot would have collapsed the binaries and the
+    browser client into the same directory whenever --root was given.
+  - M22-G01's assertion was rewritten to check its stated intent (no build
+    tags, no environment gating, CI runs it) rather than an exact call string,
+    and tightened with a -run/-short prohibition. A -timeout does not narrow
+    what the suite runs; a -run filter does, and that was previously unchecked.
+  - The AUDIT-002 manifest is Go data in internal/plantrace, not a JSON or YAML
+    sidecar. It follows internal/pipeline: the plan explains intent and the Go
+    declaration is what the checks quantify over. A sidecar would also have sat
+    outside the compiler, so a milestone rename would not have broken it.
+  - The manifest is enforced through runRepositoryChecks rather than through
+    docs/check-plan-trace.ps1, because no workflow and no command invokes that
+    script. A gate wired to nothing is the defect AUDIT-002 names; putting the
+    new rules in the same unrun place would have reproduced it.
+  - AUDIT-004 names only the current user in the DACL. Administrators and
+    SYSTEM can take ownership regardless, so naming them would widen the grant
+    without adding a capability and would make "only this user is named"
+    untestable. PROTECTED_DACL_SECURITY_INFORMATION is the load-bearing flag
+    and has its own test, because a DACL set without it still inherits.
+  - AUDIT-005 records restriction rather than cascade: no migration declares
+    ON DELETE for the graph or vector relations. The orphan check was also
+    shown to be capable of failing before its passing runs were treated as
+    evidence.
+  - AUDIT-029 changed two existing tests that asserted seed, replay, and
+    inspect-db were unavailable. Leaving them would have frozen the defect the
+    ticket exists to repair. They now cover doctor and package, which really
+    are skeletons.
+Files-or-schemas: docs/plan.md, docs/developing.md, TODOS.md,
+  cmd/codeflux-dev/main.go, cmd/codeflux-dev/registry.go,
+  cmd/codeflux-dev/checks.go, cmd/codeflux-dev/m22_gate_test.go,
+  cmd/codeflux-dev/plan_state_trace_test.go (new),
+  cmd/codeflux-dev/build_completeness_test.go (new),
+  cmd/codeflux-dev/scope_manifest_test.go (new),
+  internal/plantrace/manifest.go (new), internal/plantrace/validate.go (new),
+  internal/plantrace/validate_test.go (new),
+  internal/coordinator/application_settings_test.go
+Validation: `go test ./cmd/codeflux-dev/` green. AUDIT-001 proven discriminating
+  by reinstating `AwaitingAcceptance` and observing both trace tests fail with
+  the token named, then restoring. AUDIT-003 proven by
+  CODEFLUX_BUILD_COMPLETENESS=1 over a temporary root, and from a clean
+  `git clone --no-hardlinks` with the working diff applied, where one `build`
+  exits 0 and produces the server, the worker, and the browser client.
+Failures-or-discarded-approaches:
+  - A first clean-clone run proved nothing: the clone carried committed HEAD,
+    not the uncommitted change, so it exercised the old build. Re-run with the
+    working diff applied to the clone.
+  - A first attempt placed the reviewed atom example under "## Golden paths",
+    where TestM22_130 requires every subsection to name a test layer. The
+    example is a reference, not a golden path, so it moved to its own section.
+Known-limitations: The full-repository suite has not completed in this session;
+  it is running in the background. `internal/coordinator`'s engine test alone
+  takes over nine minutes and another lane is actively adding cases to it, so
+  per-ticket full-suite verification is not workable at this repository size.
+  The clean-clone proof reused the shared Go build and module caches, so it
+  demonstrates a clean source tree, not a cold toolchain.
+Next-safe-step: AUDIT-002 (machine-readable feature/deferred manifest), or
+  AUDIT-004 if the Windows DACL work is preferred first. Both are independent
+  of the frontend lane currently rewriting web/frontend/shell.
 
 Dev-Log: DL-20260802-022
 Date: 2026-08-02

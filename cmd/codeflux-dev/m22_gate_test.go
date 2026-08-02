@@ -28,12 +28,20 @@ func TestM22_G01_FastTestsAreReliableEnoughToRunOnEveryChange(t *testing.T) {
 	if fastAt < 0 {
 		t.Fatal("there is no fast suite")
 	}
-	window := string(dispatch)[fastAt:min(fastAt+400, len(dispatch))]
-	if !strings.Contains(window, `runGo(ctx, stdout, stderr, "test", "./...")`) {
-		t.Fatalf("the fast suite is not a plain go test invocation:\n%s", window)
+	window := string(dispatch)[fastAt:min(fastAt+700, len(dispatch))]
+	if !strings.Contains(window, `runGo(ctx, stdout, stderr, "test",`) ||
+		!strings.Contains(window, `"./..."`) {
+		t.Fatalf("the fast suite is not a plain go test invocation over ./...:\n%s", window)
 	}
 	if strings.Contains(window, "-tags") {
 		t.Fatal("the fast suite requires build tags, so it is not the default path")
+	}
+	// A -run filter would make the suite pass by testing less, which is the
+	// failure this gate exists to catch. A -timeout is not that: it bounds how
+	// long the same set of tests may take, and without one the ten-minute
+	// default aborts internal/coordinator's engine test mid-run.
+	if strings.Contains(window, "-run") || strings.Contains(window, "-short") {
+		t.Fatal("the fast suite narrows what it runs, so passing it proves less than it claims")
 	}
 
 	// Anything expensive must opt IN behind an environment gate, so the

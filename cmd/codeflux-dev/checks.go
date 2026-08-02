@@ -16,7 +16,25 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"codeflux.dev/codeflux/internal/plantrace"
 )
+
+// checkPrototypeScopeManifest enforces M00-G01 and M00-G02 on every lint run.
+//
+// The plan states both rules in prose and TODOS.md records them as gates, but
+// until now nothing executed them: a capability could ship with no journey or
+// measurement, and a prototype journey could acquire a dependency on deferred
+// work, with the document still reading as though neither were possible.
+func checkPrototypeScopeManifest() error {
+	findings := plantrace.Validate()
+	if len(findings) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"prototype scope manifest (M00-G01, M00-G02):\n  %s",
+		strings.Join(findings, "\n  "))
+}
 
 var (
 	migrationNamePattern = regexp.MustCompile(`^([0-9]{6})_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$`)
@@ -57,6 +75,9 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 		return err
 	}
 	if err := checkAtomDeclarations(root, tracked); err != nil {
+		return err
+	}
+	if err := checkPrototypeScopeManifest(); err != nil {
 		return err
 	}
 	if err := checkAtomDocumentationObligations(root, tracked); err != nil {

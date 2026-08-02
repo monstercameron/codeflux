@@ -31,6 +31,46 @@ type AuthorizedToolRequest struct {
 	AllowedEnvironment       []string
 	Redactor                 *redact.Pipeline
 	Progress                 ToolProgressSink
+	// Faults, when set, is consulted at the named injection points before an
+	// irreversible step. It is an interface declared here rather than a test
+	// package's type so production imports nothing test-only, and it is nil in
+	// production.
+	//
+	// AUDIT-027: the fault vocabulary existed and no production boundary
+	// consulted it, so every crash and recovery claim rested on a ledger that
+	// never entered the code it described.
+	Faults FaultInjector
+}
+
+// FaultInjector reports an injected fault at one named boundary.
+//
+// A nil injector never faults, which is what makes wiring this into a
+// production path safe: the check is a nil comparison unless a test armed one.
+type FaultInjector interface {
+	// Check returns a non-nil error when a fault is armed at the point.
+	Check(point string) error
+}
+
+// Named injection points inside mediated command execution.
+//
+// The strings match internal/testfixtures.FaultPoint values exactly, so the
+// declared vocabulary and the wired boundaries cannot drift apart silently.
+const (
+	// FaultPointBeforeCommandStart fires after authorization and before the
+	// process exists, which is where a crash leaves an approved-but-unstarted
+	// command.
+	FaultPointBeforeCommandStart = "worker-during-command-execution"
+	// FaultPointAfterCommandStart fires with the process running, which is the
+	// case that leaves a real orphan to reconcile.
+	FaultPointAfterCommandStart = "worker-after-command-start"
+)
+
+// checkFault consults the injector when one is present.
+func checkFault(faults FaultInjector, point string) error {
+	if faults == nil {
+		return nil
+	}
+	return faults.Check(point)
 }
 
 // ToolProgress is a bounded redacted lifecycle or output update.
@@ -121,12 +161,27 @@ func ExecuteAuthorizedTool(
 	if err != nil {
 		return ToolResult{}, err
 	}
+	// AUDIT-014: output is streamed while the process runs rather than only
+	// after it exits. The durable redaction streams still receive every byte;
+	// these writers tee into them.
+	stdoutLive := newLiveProgressWriter(
+		ctx, stdout, authorized, "stdout", redact.BoundaryLogPersistence)
+	stderrLive := newLiveProgressWriter(
+		ctx, stderr, authorized, "stderr", redact.BoundaryLogPersistence)
+
 	command := exec.Command(resolved, values[1:]...)
 	command.Dir = directory
 	command.Env = environment
-	command.Stdout = stdout
-	command.Stderr = stderr
+	command.Stdout = stdoutLive
+	command.Stderr = stderrLive
 	prepareProcessTree(command)
+
+	// The last point before the command becomes real. A fault here must leave
+	// no process behind, which is what distinguishes it from the point below.
+	if err := checkFault(authorized.Faults, FaultPointBeforeCommandStart); err != nil {
+		return ToolResult{}, err
+	}
+
 	started := time.Now()
 	if err := command.Start(); err != nil {
 		return ToolResult{}, fmt.Errorf("start command: %w", err)
@@ -134,6 +189,16 @@ func ExecuteAuthorizedTool(
 	publishProgress(ctx, authorized.Progress, ToolProgress{
 		RequestID: request.ID, State: "running",
 	})
+
+	// A fault with the process already running must not strand it. The tree is
+	// terminated before returning, so an injected crash here reproduces a
+	// worker dying mid-command rather than leaking one into the test host.
+	if err := checkFault(authorized.Faults, FaultPointAfterCommandStart); err != nil {
+		_ = terminateProcessTree(command)
+		_ = command.Wait()
+		return ToolResult{}, err
+	}
+
 	waited := make(chan error, 1)
 	go func() {
 		waited <- command.Wait()
@@ -156,6 +221,8 @@ func ExecuteAuthorizedTool(
 		_ = terminateProcessTree(command)
 		waitErr = <-waited
 	}
+	stdoutLive.flush()
+	stderrLive.flush()
 	stdoutResult, stdoutErr := stdout.Finalize()
 	stderrResult, stderrErr := stderr.Finalize()
 	if stdoutErr != nil || stderrErr != nil {
@@ -191,8 +258,12 @@ func ExecuteAuthorizedTool(
 		result.StdoutTruncated,
 		result.StderrTruncated,
 	)
-	publishRedactedOutput(ctx, authorized.Progress, request.ID, "stdout", stdoutResult.Text)
-	publishRedactedOutput(ctx, authorized.Progress, request.ID, "stderr", stderrResult.Text)
+	// Output already streamed while the process ran, so republishing the whole
+	// finalized text would duplicate it in the timeline. What is published
+	// here is only what streaming could not carry: the part the budget
+	// withheld, named as withheld rather than silently missing.
+	reportWithheldOutput(ctx, authorized.Progress, request.ID, "stdout", stdoutLive)
+	reportWithheldOutput(ctx, authorized.Progress, request.ID, "stderr", stderrLive)
 	publishProgress(ctx, authorized.Progress, ToolProgress{
 		RequestID: request.ID, State: state,
 	})

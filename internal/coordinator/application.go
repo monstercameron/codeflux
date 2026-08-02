@@ -99,6 +99,14 @@ type ApplicationOptions struct {
 	// because it writes real files and real events and the only thing that
 	// makes it not real is that no provider was ever asked anything.
 	SimulateExecution bool
+	// CredentialStore resolves provider secrets. It defaults to the platform
+	// store, which is the only correct choice in production.
+	//
+	// It is injectable because M04-G01 is a claim about what does not reach
+	// SQLite after a real credential is resolved, and a hardcoded platform
+	// store leaves no way to put a known canary on the resolving side of that
+	// boundary. A gate that cannot be exercised is a gate nobody has checked.
+	CredentialStore credentials.Store
 }
 
 type OrphanedWorkerCandidate struct {
@@ -143,11 +151,17 @@ type Application struct {
 	now                 func() time.Time
 	monitorStop         context.CancelFunc
 	monitorDone         chan struct{}
-	accepting           atomic.Bool
-	serveDone           chan error
-	closeOnce           sync.Once
-	closeErr            error
-	checkpointClose     func() error
+	// dispatchSignal asks the dispatch pump to look for startable work.
+	// dispatchStop and dispatchDone give that goroutine an owner and a
+	// cancellation path, matching the heartbeat monitor beside it.
+	dispatchSignal  chan struct{}
+	dispatchStop    context.CancelFunc
+	dispatchDone    chan struct{}
+	accepting       atomic.Bool
+	serveDone       chan error
+	closeOnce       sync.Once
+	closeErr        error
+	checkpointClose func() error
 }
 
 func StartApplication(
@@ -226,7 +240,10 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	credentialStore := credentials.NewPlatformStore()
+	credentialStore := options.CredentialStore
+	if credentialStore == nil {
+		credentialStore = credentials.NewPlatformStore()
+	}
 	providerDependencies, err := newProviderDependencies(
 		credentialStore, repositories,
 	)
@@ -269,7 +286,9 @@ func StartApplication(
 		secret:    base64.RawURLEncoding.EncodeToString(secretBytes),
 		serveDone: make(chan error, 1),
 		heartbeat: options.HeartbeatTimeout, now: options.Now,
-		monitorDone: make(chan struct{}),
+		monitorDone:    make(chan struct{}),
+		dispatchSignal: make(chan struct{}, 1),
+		dispatchDone:   make(chan struct{}),
 	}
 	cleanupTaskListener := true
 	cleanupCheckpointing := true
@@ -375,8 +394,19 @@ func StartApplication(
 		if err != nil {
 			return nil, err
 		}
+		// Releasing the slot and asking for the next task are two steps, and
+		// only the first was wired. A run finishing freed capacity and nothing
+		// looked at the queue, so a task queued beyond the limit waited until
+		// some unrelated launch happened to call StartNext (AUDIT-018).
 		if err := application.supervisor.SetCompletionObserver(
-			application.runtime.Complete,
+			func(taskID domain.TaskID, runID domain.RunID) error {
+				err := application.runtime.Complete(taskID, runID)
+				// The pump is signalled even when the release failed. The slot
+				// may still have been freed by another path, and a spurious
+				// pass costs one query.
+				application.notifyDispatch()
+				return err
+			},
 		); err != nil {
 			return nil, err
 		}
@@ -785,6 +815,9 @@ func StartApplication(
 	monitorContext, stopMonitor := context.WithCancel(context.Background())
 	application.monitorStop = stopMonitor
 	go application.monitorWorkerHeartbeats(monitorContext)
+	dispatchContext, stopDispatch := context.WithCancel(context.Background())
+	application.dispatchStop = stopDispatch
+	go application.startDispatchPump(dispatchContext)
 	cleanupLock = false
 	cleanupDatabase = false
 	cleanupListener = false
@@ -1000,6 +1033,10 @@ func (application *Application) Shutdown(ctx context.Context) error {
 		}
 		application.monitorStop()
 		<-application.monitorDone
+		if application.dispatchStop != nil {
+			application.dispatchStop()
+			<-application.dispatchDone
+		}
 		var workerErr error
 		if application.workers != nil {
 			workerErr = application.workers.CheckpointAndStopAll(ctx)
@@ -1096,7 +1133,20 @@ func listenLoopback(address string) (net.Listener, error) {
 	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("listen on coordinator loopback: %w", err)
+		// The cause is named rather than left as a bare syscall error because
+		// on a fixed port it is nearly always the same one: a coordinator from
+		// an earlier run that was never stopped. The previous ephemeral default
+		// hid that failure mode entirely — every stale server got its own port,
+		// so nothing collided and nothing was ever cleaned up.
+		//
+		// The in-use case is not detected separately: Windows reports
+		// WSAEADDRINUSE rather than syscall.EADDRINUSE, so a portable check
+		// costs more than telling the truth in one sentence.
+		return nil, fmt.Errorf(
+			"listen on coordinator loopback %s (if the port is in use, a "+
+				"coordinator from an earlier run is probably still running; stop "+
+				"it, or pass --address 127.0.0.1:PORT): %w",
+			address, err)
 	}
 	return listener, nil
 }

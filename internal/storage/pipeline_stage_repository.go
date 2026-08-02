@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/pipeline"
@@ -24,6 +25,14 @@ type RecordPipelineStage struct {
 	// prose so a later reader can compare two runs rather than read two
 	// paragraphs.
 	Evidence map[string]any
+	// StartedAt is when this stage began (PIPE-006).
+	//
+	// Both timestamp columns used to receive the write time, so the schema
+	// modelled a duration and no duration was recordable: every stage in every
+	// run took zero. A zero value here still writes the finish time into both,
+	// which keeps a caller that does not track starts honest rather than
+	// inventing a span for it.
+	StartedAt time.Time
 }
 
 // PipelineStageRecord is one recorded stage.
@@ -36,6 +45,18 @@ type PipelineStageRecord struct {
 	Gate           string
 	DetailRedacted string
 	EvidenceJSON   string
+	// StartedAt and FinishedAt bound the stage. They are equal for a stage
+	// recorded without a tracked start.
+	StartedAt  time.Time
+	FinishedAt time.Time
+}
+
+// Duration reports how long the stage took, or zero when no span was recorded.
+func (record PipelineStageRecord) Duration() time.Duration {
+	if record.StartedAt.IsZero() || record.FinishedAt.IsZero() {
+		return 0
+	}
+	return record.FinishedAt.Sub(record.StartedAt)
 }
 
 // RecordPipelineStageResult appends one stage outcome to the ledger.
@@ -82,6 +103,12 @@ func (repositories *Repositories) RecordPipelineStageResult(
 
 	identity := digestOfStage(input.TaskID.String(), input.Attempt, input.Stage)
 	_, micros := repositories.timestamp()
+	started := micros
+	if !input.StartedAt.IsZero() {
+		if candidate := input.StartedAt.UnixMicro(); candidate >= 0 && candidate <= micros {
+			started = candidate
+		}
+	}
 	if _, err := repositories.database.sql.ExecContext(
 		ctx,
 		`INSERT INTO pipeline_stage_records (
@@ -92,7 +119,7 @@ func (repositories *Repositories) RecordPipelineStageResult(
 		ON CONFLICT (task_id, attempt, stage_number) DO NOTHING`,
 		identity, input.TaskID, nullableRunID(input.RunID), input.Attempt,
 		int(input.Stage), stage.Name, string(input.State), stage.Gate,
-		detail, string(encoded), micros, micros,
+		detail, string(encoded), started, micros,
 	); err != nil {
 		return PipelineStageRecord{}, repositoryWriteError(
 			"record pipeline stage", err)
@@ -101,6 +128,8 @@ func (repositories *Repositories) RecordPipelineStageResult(
 		TaskID: input.TaskID, Attempt: input.Attempt, Stage: input.Stage,
 		Name: stage.Name, State: input.State, Gate: stage.Gate,
 		DetailRedacted: detail, EvidenceJSON: string(encoded),
+		StartedAt:  time.UnixMicro(started).UTC(),
+		FinishedAt: time.UnixMicro(micros).UTC(),
 	}, nil
 }
 
@@ -116,7 +145,8 @@ func (repositories *Repositories) ListPipelineStages(
 	rows, err := repositories.database.sql.QueryContext(
 		ctx,
 		`SELECT task_id, attempt, stage_number, stage_name, state,
-			gate_redacted, detail_redacted, evidence_json
+			gate_redacted, detail_redacted, evidence_json,
+			started_at_unix_micros, finished_at_unix_micros
 		 FROM pipeline_stage_records
 		 WHERE task_id = ? AND attempt = ?
 		 ORDER BY stage_number`,
@@ -130,12 +160,15 @@ func (repositories *Repositories) ListPipelineStages(
 	for rows.Next() {
 		var record PipelineStageRecord
 		var stageNumber int
+		var startedMicros, finishedMicros int64
 		if err := rows.Scan(&record.TaskID, &record.Attempt, &stageNumber,
 			&record.Name, &record.State, &record.Gate, &record.DetailRedacted,
-			&record.EvidenceJSON); err != nil {
+			&record.EvidenceJSON, &startedMicros, &finishedMicros); err != nil {
 			return nil, classify("scan pipeline stage", err)
 		}
 		record.Stage = pipeline.Number(stageNumber)
+		record.StartedAt = time.UnixMicro(startedMicros).UTC()
+		record.FinishedAt = time.UnixMicro(finishedMicros).UTC()
 		records = append(records, record)
 	}
 	return records, rows.Err()
@@ -152,4 +185,36 @@ func digestOfStage(
 	stage pipeline.Number,
 ) string {
 	return fmt.Sprintf("stage:%s:%d:%02d", taskID, attempt, stage)
+}
+
+// NextPipelineAttempt returns the attempt number one task's next run should
+// record under (PIPE-003).
+//
+// It is derived from the ledger rather than counted elsewhere, because the
+// ledger is where the number is used and the two cannot then disagree. A task
+// with no recorded stages is on attempt one.
+//
+// The read is not transactional with the writes that follow it. Two runs
+// starting for one task at the same instant could both compute the same
+// attempt, and the stage table's ON CONFLICT would then merge them. That is
+// bounded by the coordinator's own rule of at most one active task per
+// repository; a stricter guarantee needs the attempt minted inside the
+// transaction that creates the run, which is where it should move if that rule
+// ever relaxes.
+func (repositories *Repositories) NextPipelineAttempt(
+	ctx context.Context,
+	taskID domain.TaskID,
+) (uint64, error) {
+	if taskID.IsZero() {
+		return 0, errors.New("task ID must not be empty")
+	}
+	var highest uint64
+	if err := repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(MAX(attempt), 0) FROM pipeline_stage_records WHERE task_id = ?`,
+		taskID,
+	).Scan(&highest); err != nil {
+		return 0, classify("read the highest recorded pipeline attempt", err)
+	}
+	return highest + 1, nil
 }

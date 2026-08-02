@@ -14,7 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/pipeline"
+	"codeflux.dev/codeflux/internal/storage"
 )
 
 // stageOutcome is what one performed check found.
@@ -49,6 +51,19 @@ func broke(detail string, evidence map[string]any) stageOutcome {
 // skipped builds an outcome for a stage this run had no need of.
 func skipped(detail string) stageOutcome {
 	return stageOutcome{Skipped: true, Detail: detail}
+}
+
+// skippedWith records a stage the run declined to claim, keeping what it
+// found while declining to call it a pass.
+//
+// A check that examines the code and then cannot perform the gate's action has
+// two things to say: that the action did not happen, and what the examination
+// turned up. Reporting only the first throws away the useful half.
+func skippedWith(detail string, evidence map[string]any) stageOutcome {
+	if evidence == nil {
+		evidence = map[string]any{}
+	}
+	return stageOutcome{Skipped: true, Detail: detail, Evidence: evidence}
 }
 
 // platformTarget is one system and architecture a program claims to run on.
@@ -98,41 +113,90 @@ func checkPlatformMatrix(
 	if len(targets) == 0 {
 		targets = hostPlatform()
 	}
-	var failures []string
-	built := 0
+
+	// The gate used to say the program passes everywhere it claims to run,
+	// and the check only compiled. Compiling for a platform says nothing
+	// about whether the program works there, and a cross-compiled binary
+	// cannot be executed by this host at all, so the two claims are recorded
+	// separately and each target says which one it answered (PIPE-012).
+	var (
+		failures []string
+		ran      []string
+		compiled []string
+	)
 	for _, target := range targets {
+		if isHostPlatform(target) {
+			// The host can do better than compile: it can run the suite.
+			command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+			command.Dir = worktree
+			output, err := command.CombinedOutput()
+			if err != nil {
+				failures = append(failures, target.String()+" (running): "+
+					firstLineOf(strings.TrimSpace(string(output))))
+				continue
+			}
+			ran = append(ran, target.String())
+			continue
+		}
 		build := exec.CommandContext(ctx, "go", "build", "./...")
 		build.Dir = worktree
 		build.Env = append(os.Environ(),
 			"GOOS="+target.System, "GOARCH="+target.Architecture)
 		output, err := build.CombinedOutput()
 		if err != nil {
-			failures = append(failures,
-				target.String()+": "+firstLineOf(strings.TrimSpace(string(output))))
+			failures = append(failures, target.String()+" (compiling): "+
+				firstLineOf(strings.TrimSpace(string(output))))
 			continue
 		}
-		built++
+		compiled = append(compiled, target.String())
 	}
+
 	names := make([]string, 0, len(targets))
 	for _, target := range targets {
 		names = append(names, target.String())
 	}
 	evidence := map[string]any{
-		"declared": names, "built": built, "failures": failures,
+		"declared": names,
+		// Kept apart on purpose: a reader counting "built" would otherwise
+		// read a compile as a pass.
+		"ran_suite":     ran,
+		"compiled_only": compiled,
+		"failures":      failures,
+		"host":          runtime.GOOS + "/" + runtime.GOARCH,
+		"claim_per_target": "the host platform answers by running the suite; " +
+			"a cross target answers only that it compiles, because this host " +
+			"cannot execute it",
 	}
 	if len(failures) > 0 {
-		return broke("the module does not build everywhere it claims to run: "+
+		return broke("the module does not hold everywhere it claims to run: "+
 			strings.Join(failures, "; "), evidence)
 	}
-	if len(targets) == 1 {
-		// One platform is a complete answer to a claim about one platform. It
-		// says which, so nobody reads it as a portability result.
+	switch {
+	case len(ran) == 0:
+		// Nothing was executed anywhere. Compiling for every declared target
+		// is a real result and is not the gate's result, so this is a skip
+		// rather than a pass.
+		return skippedWith(fmt.Sprintf(
+			"the module compiles for %d declared platform(s) (%s) and the suite "+
+				"was run on none of them, so no platform is known to work",
+			len(compiled), strings.Join(compiled, ", ")), evidence)
+	case len(compiled) == 0:
 		return held(fmt.Sprintf(
-			"the module compiles for %s, the only platform this run claims",
-			names[0]), evidence)
+			"the suite passes on %s, the only platform this run claims",
+			strings.Join(ran, ", ")), evidence)
+	default:
+		return held(fmt.Sprintf(
+			"the suite passes on %s; %d further platform(s) compile but were not "+
+				"run, because this host cannot execute them: %s",
+			strings.Join(ran, ", "), len(compiled), strings.Join(compiled, ", ")),
+			evidence)
 	}
-	return held(fmt.Sprintf("the module compiles for all %d declared platforms: %s",
-		len(targets), strings.Join(names, ", ")), evidence)
+}
+
+// isHostPlatform reports whether a target is the machine this run is on, and
+// so whether its suite can actually be executed.
+func isHostPlatform(target platformTarget) bool {
+	return target.System == runtime.GOOS && target.Architecture == runtime.GOARCH
 }
 
 // checkRepetition runs the suite repeatedly and requires the same answer.
@@ -283,28 +347,138 @@ func checkGlobalInvariants(
 // number that looks measured. What it catches today is the honest extreme: a
 // program or suite that has become slow enough to be a different kind of
 // problem.
-func checkNonFunctional(ctx context.Context, worktree string) stageOutcome {
-	const budget = 60 * time.Second
+// nonFunctionalBaselines is the durable comparison point a run measures
+// against (PIPE-013).
+//
+// It is an interface so this check keeps working with nothing attached: a run
+// with no store records its measurement and says it had nothing to compare
+// with, rather than falling back on a number nobody chose.
+type nonFunctionalBaselines interface {
+	NonFunctionalBaselineFor(
+		context.Context, domain.RepositoryID,
+	) (storage.NonFunctionalBaseline, bool, error)
+	RecordNonFunctionalBaseline(
+		context.Context, storage.RecordNonFunctionalBaseline,
+	) (storage.NonFunctionalBaseline, error)
+}
+
+// nonFunctionalTolerance is how much slower than its baseline a suite may run
+// before the stage reports a regression.
+//
+// Half again is deliberately loose. The measurement is wall clock on a
+// developer machine, where a background build or a thermal limit moves the
+// number more than most changes do, and a check that cries wolf at ten percent
+// is a check people learn to ignore.
+const nonFunctionalTolerance = 1.5
+
+// checkNonFunctional measures the suite and compares it with the repository's
+// recorded baseline.
+//
+// It compared against a fixed sixty-second budget. A fixed number measures the
+// machine rather than the change: on a fast host every program passes however
+// much slower it just became, and on a slow one a correct program fails for
+// being run somewhere modest.
+func checkNonFunctional(
+	ctx context.Context,
+	worktree string,
+	scope nonFunctionalScope,
+) stageOutcome {
 	started := time.Now()
 	command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
 	command.Dir = worktree
 	_, err := command.CombinedOutput()
 	elapsed := time.Since(started)
 
+	host := runtime.GOOS + "/" + runtime.GOARCH
 	evidence := map[string]any{
 		"elapsed_ms": elapsed.Milliseconds(),
-		"budget_ms":  budget.Milliseconds(),
+		"host":       host,
 	}
 	if err != nil {
 		return skipped("the suite did not pass, so its duration measures nothing")
 	}
-	if elapsed > budget {
-		return broke(fmt.Sprintf(
-			"the suite took %s against a %s budget", elapsed.Round(time.Millisecond),
-			budget), evidence)
+
+	if scope.Baselines == nil || scope.RepositoryID.IsZero() {
+		evidence["baseline_available"] = false
+		return skippedWith(fmt.Sprintf(
+			"the suite completed in %s; no baseline store is attached, so there "+
+				"is nothing to compare it with",
+			elapsed.Round(time.Millisecond)), evidence)
 	}
-	return held(fmt.Sprintf("the suite completed in %s, within its %s budget",
-		elapsed.Round(time.Millisecond), budget), evidence)
+
+	baseline, found, baselineErr := scope.Baselines.NonFunctionalBaselineFor(
+		ctx, scope.RepositoryID)
+	if baselineErr != nil {
+		evidence["baseline_available"] = false
+		return skippedWith(fmt.Sprintf(
+			"the suite completed in %s; the baseline could not be read: %s",
+			elapsed.Round(time.Millisecond), baselineErr.Error()), evidence)
+	}
+
+	if !found {
+		// First run: there is nothing to compare with, so the measurement
+		// becomes the comparison point rather than a verdict. Reporting a pass
+		// here would be claiming a comparison that could not have happened.
+		if _, recordErr := scope.Baselines.RecordNonFunctionalBaseline(
+			ctx, storage.RecordNonFunctionalBaseline{
+				ProjectID: scope.ProjectID, RepositoryID: scope.RepositoryID,
+				Elapsed: elapsed, RepositoryRevision: scope.RepositoryRevision,
+				HostPlatform: host,
+			},
+		); recordErr != nil {
+			evidence["baseline_available"] = false
+			return skippedWith(fmt.Sprintf(
+				"the suite completed in %s and the baseline could not be "+
+					"recorded: %s", elapsed.Round(time.Millisecond),
+				recordErr.Error()), evidence)
+		}
+		evidence["baseline_available"] = false
+		evidence["baseline_recorded_ms"] = elapsed.Milliseconds()
+		return skippedWith(fmt.Sprintf(
+			"the suite completed in %s, which is now this repository's baseline; "+
+				"there was nothing to compare this run against",
+			elapsed.Round(time.Millisecond)), evidence)
+	}
+
+	evidence["baseline_available"] = true
+	evidence["baseline_ms"] = baseline.Elapsed.Milliseconds()
+	evidence["baseline_revision"] = baseline.RepositoryRevision
+	evidence["baseline_host"] = baseline.HostPlatform
+	evidence["tolerance"] = nonFunctionalTolerance
+
+	// A baseline measured elsewhere compares two machines rather than two
+	// revisions, so it is reported and not enforced.
+	if baseline.HostPlatform != host {
+		return skippedWith(fmt.Sprintf(
+			"the suite completed in %s against a baseline of %s measured on %s "+
+				"rather than %s; comparing them would measure the two machines",
+			elapsed.Round(time.Millisecond),
+			baseline.Elapsed.Round(time.Millisecond),
+			baseline.HostPlatform, host), evidence)
+	}
+
+	limit := time.Duration(float64(baseline.Elapsed) * nonFunctionalTolerance)
+	evidence["limit_ms"] = limit.Milliseconds()
+	if elapsed > limit {
+		return broke(fmt.Sprintf(
+			"the suite took %s against a baseline of %s, past the %.1fx tolerance",
+			elapsed.Round(time.Millisecond),
+			baseline.Elapsed.Round(time.Millisecond), nonFunctionalTolerance),
+			evidence)
+	}
+	return held(fmt.Sprintf(
+		"the suite completed in %s against a baseline of %s, within the %.1fx "+
+			"tolerance", elapsed.Round(time.Millisecond),
+		baseline.Elapsed.Round(time.Millisecond), nonFunctionalTolerance),
+		evidence)
+}
+
+// nonFunctionalScope is what the check needs to find and update a baseline.
+type nonFunctionalScope struct {
+	Baselines          nonFunctionalBaselines
+	ProjectID          domain.ProjectID
+	RepositoryID       domain.RepositoryID
+	RepositoryRevision string
 }
 
 // checkFuzzing runs Go's own fuzzing over any fuzz target the run wrote.
@@ -328,8 +502,31 @@ func checkFuzzing(ctx context.Context, worktree string) stageOutcome {
 		}
 		targets += strings.Count(string(body), "func Fuzz")
 	}
+	// Skipping whenever no target exists made the cheapest way to satisfy this
+	// stage writing no fuzzing at all, and no decoding boundary was ever
+	// enumerated (PIPE-014). The absence of a target is only a non-question
+	// when there is nothing to fuzz; otherwise it is the gap.
+	boundaries, boundaryErr := decodingBoundaries(worktree)
+	if boundaryErr != nil {
+		return broke("the produced source could not be examined for decoding "+
+			"boundaries: "+boundaryErr.Error(), nil)
+	}
+	boundaryEvidence := map[string]any{
+		"decoding_boundaries":     boundaries,
+		"decoding_boundary_count": len(boundaries),
+		"fuzz_targets":            targets,
+		"boundary_detection_rule": "a decoding verb in the name, or a string/[]byte parameter with an error result",
+	}
+	if len(boundaries) == 0 {
+		return skippedWith(
+			"no decoding boundary was found in the produced source, so there is "+
+				"nothing for fuzzing to examine", boundaryEvidence)
+	}
 	if targets == 0 {
-		return skipped("the run wrote no fuzz target, so there was nothing to fuzz")
+		return broke(fmt.Sprintf(
+			"%d decoding boundary(ies) were produced and no fuzz target was "+
+				"written for any of them: %s",
+			len(boundaries), strings.Join(boundaries, ", ")), boundaryEvidence)
 	}
 	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -337,14 +534,14 @@ func checkFuzzing(ctx context.Context, worktree string) stageOutcome {
 		"go", "test", "-run=^$", "-fuzz=.", "-fuzztime=20s", "./...")
 	command.Dir = worktree
 	output, err := command.CombinedOutput()
-	evidence := map[string]any{"fuzz_targets": targets}
 	if err != nil {
 		return broke("fuzzing found a failing input: "+
-			firstLineOf(strings.TrimSpace(string(output))), evidence)
+			firstLineOf(strings.TrimSpace(string(output))), boundaryEvidence)
 	}
 	return held(fmt.Sprintf(
-		"%d fuzz target(s) ran for 20s without finding a failing input",
-		targets), evidence)
+		"%d fuzz target(s) covering %d decoding boundary(ies) ran for 20s "+
+			"without finding a failing input", targets, len(boundaries)),
+		boundaryEvidence)
 }
 
 // producedGoFiles lists the Go source this run actually wrote.

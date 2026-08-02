@@ -208,3 +208,79 @@ use 15s–120s timeouts on purpose.
 4. Test layer: adapter tests against `httptest`, and a scripted-provider
    scenario. Ordinary tests never reach the network.
 
+## Atom review reference (`M01-071`)
+
+### Reviewed atom comment example
+
+The example below was not written for this document. It is
+`Repositories.AttributeSpend` in `internal/storage/spend_attribution_repository.go`,
+the first atom admitted to the repository, quoted after review. The plan blocks
+inventing an example earlier on purpose: a contract nobody implemented reads as
+precedent once it is in the tree.
+
+```go
+// AttributeSpend slices one window's recorded provider spend by flow phase,
+// stage, and model.
+//
+// Codeflux atom documentation (schema v1):
+//
+//	Purpose:
+//	  Answer "what did the atoms cost, what did the molecules cost, what did
+//	  the program cost" from the recorded provider ledger, so a person can see
+//	  where a task's money went rather than only how much of it went.
+//	Use when:
+//	  Reporting spend for a closed time window from the local database.
+//	Do not use when:
+//	  A caller needs live per-request cost during a run; subscribe to session
+//	  cost events instead. Do not use it to enforce a budget: the budget ledger
+//	  reserves and commits against the authoritative limit, and this is a
+//	  read-only summary that lags a call by the width of its own window.
+//	Semantics:
+//	  Each physical attempt contributes once, through its highest-sequence
+//	  accounting row. Stage attribution is approximate and documented on
+//	  SpendAttribution. Totals are independent of attribution.
+//	...
+//
+//codeflux:atom
+func (repositories *Repositories) AttributeSpend(
+	ctx context.Context,
+	window MetricsWindow,
+) (SpendAttribution, error)
+```
+
+The full field set is in the source; `AGENTS.md` lists every required field and
+`internal/atomdoc` parses them. What review looked for, and what a new atom is
+held to:
+
+1. **Purpose states the domain outcome, not the signature.** "Answer what the
+   atoms cost" is a question a person has; "slice a struct by a key" is not.
+2. **"Do not use when" names the near-matches.** Both exclusions are real ways a
+   caller could pick this atom and be wrong: live cost, and budget enforcement.
+   An exclusion list that names no plausible mistake is decoration.
+3. **The claims are bounded by what the code establishes.** "Stage attribution
+   is approximate" is in the comment because it is approximate. A comment
+   promising exact attribution would be the failure this obligation exists to
+   prevent, and no test would have caught it.
+4. **Verification names the test file**, so the comment's claims are traceable
+   to something that runs.
+
+## Running things
+
+```
+go run ./cmd/codeflux-dev lint             # staticcheck + vet + format
+go run ./cmd/codeflux-dev generate-check   # generated output is current
+go run ./cmd/codeflux-dev test-fast        # the whole default suite
+go run ./cmd/codeflux-dev test-integration # SQLite integration
+go run ./cmd/codeflux-dev test-security    # abuse suites
+go run ./cmd/codeflux-dev test-browser     # browser harness
+go run ./cmd/codeflux-dev benchmark performance
+go run ./cmd/codeflux-dev artifact-check   # artifact + credential scan
+go run ./cmd/codeflux-dev migration-check
+```
+
+CI runs the same commands by the same names. A gate that only existed in the
+workflow would be a gate nobody could run before pushing, so
+`TestM22_124_LocalAndCIShareTheSameCommandGraph` enforces the correspondence.
+
+None of these reach the network. The one command that does —
+`codeflux-dev run-live` — is deliberately not part of any suite.

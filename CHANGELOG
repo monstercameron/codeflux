@@ -42,8 +42,77 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-031
+Change-ID: CL-20260802-033
 Commit: pending
+Date: 2026-08-02
+Type: CHECKPOINT -- collapses one lane's in-flight work into a single commit at
+  explicit user request
+Request-or-TODO: User: "commit the entire repo"
+Outcome: A checkpoint commit, not a feature commit. It sweeps eighty-three paths
+  another lane left in the working tree -- thirty-seven modified, forty-six
+  untracked -- into one revision, because the user asked for the whole tree
+  rather than for a feature. The commit-boundary rules were not applied and no
+  attempt was made to split this into independently reviewable changes.
+  What it carries: three migrations (repository instruction approvals,
+  non-functional baselines, proof obligations) with their repositories; a new
+  internal/plantrace package; pipeline checks and acceptance forms; coordinator
+  work spanning proof obligations, stage boundaries, context selection, a
+  dispatch pump, and named test forms; executor live progress and fault
+  boundaries; storage permissions split by platform; and roughly twenty new test
+  files. Only the loopback-port change carries a CHANGELOG entry of its own
+  (CL-20260802-018); the rest has none, which is the deficit this commit records
+  rather than repairs
+Affected-behavior: Unknown in aggregate. This commit makes no claim about what
+  the swept work does, because it was not authored, reviewed, or scoped here
+Compatibility-or-migration: Three forward migrations, 000032 through 000034.
+  migration-check passes and the generated catalog is current
+Verification: PASSING at this revision -- go build ./..., GOOS=js GOARCH=wasm go
+  build ./web/..., gofmt, go vet ./..., migration-check, and the full go test
+  ./... suite. FAILING at this revision -- codeflux-dev lint, on
+  internal/storage/spend_attribution_repository.go:146, which is the open
+  REPO-031 blocker: the atom-comment rule reads one physical line where the
+  opening sentence wraps. That failure predates this commit and is unrelated to
+  anything in it. The pre-commit hook was bypassed with --no-verify under
+  explicit user authorization for the same reason
+Known-limitations: A checkpoint is not a reviewable unit. Bisecting through this
+  revision will land on eighty-three paths with one message. The swept work has
+  no ledger coverage beyond CL-20260802-018, so the CHANGELOG cannot answer why
+  most of it exists. Whoever owns that lane should still write its entries
+Dev-Log: DL-20260802-043
+
+Change-ID: CL-20260802-032
+Commit: a24b969
+Date: 2026-08-02
+Type: The functional program graph gets a planned milestone and the plan records
+  the decisions it is blocked on
+Request-or-TODO: User: "next give me a detailed list of todos to implement it,
+  analyze the current todos and weave them in, also add details to the plan and
+  create front end stories to render the graph aswell"
+Outcome: TODOS.md gains Milestone 25, 173 tasks in seventeen sections covering
+  the disposable graph-medium experiment end to end: authorization, the twelve
+  plan decisions that block it, representability, grammar and editor, the
+  intermediate representation, provenance, four structural rules, ten
+  well-formedness preconditions, the type layer, contract stubs, evaluator and
+  fixtures, Go lowering, traceability, the authoring surface, the conformance
+  suite, experiment execution, and nine gates. Twenty-three of those are
+  frontend stories for a program-graph authoring surface, which is a different
+  surface from M19's read-only explanatory pane: diagnostics render at the node
+  they concern, a key's derivation cone is directly inspectable, and proposed
+  constructs render distinguishably from frozen ones. plan.md gains section 34,
+  recording the fifteen-operation control-flow surface, three proposed
+  constructs, the surface specification, and twelve decisions the plan owes --
+  including that section 3's own frozen molecule fails the rules derived from
+  section 12. POST-001 and M19 now cross-reference the new milestone
+Affected-behavior: None at runtime. Planning and specification only; every M25
+  task is unchecked and M25-001 blocks the rest on deferred.Authorize
+Compatibility-or-migration: None
+Verification: Task and section counts confirmed by grep; codeflux-dev lint fails
+  only on the pre-existing REPO-031 blocker, verified identical with these
+  changes stashed
+Dev-Log: DL-20260802-042
+
+Change-ID: CL-20260802-031
+Commit: 7c7379f
 Date: 2026-08-02
 Type: Control-flow constructs become retrievable atom documentation
 Request-or-TODO: User: "add to document and add to a seeder that sets these as
@@ -78,39 +147,8 @@ Known-limitations: The contract hash is a placeholder derived from each entry's
   governs the package
 Dev-Log: DL-20260802-041
 
-Change-ID: CL-20260802-032
-Commit: pending
-Date: 2026-08-02
-Type: The functional program graph gets a planned milestone and the plan records
-  the decisions it is blocked on
-Request-or-TODO: User: "next give me a detailed list of todos to implement it,
-  analyze the current todos and weave them in, also add details to the plan and
-  create front end stories to render the graph aswell"
-Outcome: TODOS.md gains Milestone 25, 173 tasks in seventeen sections covering
-  the disposable graph-medium experiment end to end: authorization, the twelve
-  plan decisions that block it, representability, grammar and editor, the
-  intermediate representation, provenance, four structural rules, ten
-  well-formedness preconditions, the type layer, contract stubs, evaluator and
-  fixtures, Go lowering, traceability, the authoring surface, the conformance
-  suite, experiment execution, and nine gates. Twenty-three of those are
-  frontend stories for a program-graph authoring surface, which is a different
-  surface from M19's read-only explanatory pane: diagnostics render at the node
-  they concern, a key's derivation cone is directly inspectable, and proposed
-  constructs render distinguishably from frozen ones. plan.md gains section 34,
-  recording the fifteen-operation control-flow surface, three proposed
-  constructs, the surface specification, and twelve decisions the plan owes --
-  including that section 3's own frozen molecule fails the rules derived from
-  section 12. POST-001 and M19 now cross-reference the new milestone
-Affected-behavior: None at runtime. Planning and specification only; every M25
-  task is unchecked and M25-001 blocks the rest on deferred.Authorize
-Compatibility-or-migration: None
-Verification: Task and section counts confirmed by grep; codeflux-dev lint fails
-  only on the pre-existing REPO-031 blocker, verified identical with these
-  changes stashed
-Dev-Log: DL-20260802-042
-
 Change-ID: CL-20260802-030
-Commit: pending
+Commit: 5060867
 Date: 2026-08-02
 Type: The functional program graph gets a design document and the standard
   library research behind it
@@ -144,7 +182,7 @@ Known-limitations: Five items block on plan decisions this document cannot make:
 Dev-Log: DL-20260802-040
 
 Change-ID: CL-20260802-029
-Commit: pending
+Commit: c9214c5
 Date: 2026-08-02
 Type: Agents must close the tasks they finish, not only refrain from closing
   ones they have not
@@ -464,6 +502,29 @@ Affected-behavior: None. Documentation only
 Compatibility-or-migration: None
 Verification: codeflux-dev lint now passes this check; CLAUDE.md is 13 lines
 Dev-Log: DL-20260802-029
+
+Change-ID: CL-20260802-018
+Commit: pending
+Date: 2026-08-02
+Type: The coordinator binds a fixed loopback port instead of an ephemeral one
+Request-or-TODO: User: "so for the dev server tell it to keep teh port stable
+  and try to use this port 47311"
+Outcome: codeflux start now defaults to 127.0.0.1:47311 instead of
+  127.0.0.1:0, exported as DefaultListenAddress. codeflux-dev serve inherits it,
+  since it shells to start without an address. An explicit --address still wins,
+  and the coordinator library keeps its :0 default so tests continue to take
+  ephemeral ports and run in parallel. A fixed port also makes a stale server
+  visible: the bind now fails with a message naming the likely cause and the
+  --address escape, where the ephemeral default silently gave every abandoned
+  server a port of its own and nothing ever collided
+Affected-behavior: codeflux start binds 47311 by default. A second coordinator
+  cannot start while the first holds the port; that is the intended behaviour
+Compatibility-or-migration: Anything that assumed a random port and read it from
+  the printed URL still works, since the URL is still printed
+Verification: gofmt clean on the touched files; go build of cmd/codeflux and
+  internal/coordinator exits 0; go test ./cmd/codeflux/... passes. The existing
+  CLI tests pass --address explicitly, so the default change does not touch them
+Dev-Log: DL-20260802-028
 
 Change-ID: CL-20260802-017
 Commit: 13392a7

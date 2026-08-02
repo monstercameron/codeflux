@@ -55,6 +55,15 @@ func newApplicationCheckpointing(
 		return applicationCheckpointing{}, err
 	}
 	worktrees.SetCheckpointRepository(repositories)
+	// Without this the production service applies edit batches and records
+	// nothing: SetEditEventRecorder had no caller outside tests, so every
+	// mediated edit was invisible in the ordered task journal that the review
+	// surface and replay both read from.
+	editEvents, err := gitwork.NewStorageEditEventRecorder(repositories)
+	if err != nil {
+		return applicationCheckpointing{}, err
+	}
+	worktrees.SetEditEventRecorder(editEvents)
 	pipeline, err := redact.NewPipeline(
 		nil,
 		redact.Limits{

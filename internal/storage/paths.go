@@ -86,10 +86,8 @@ func ensureDatabaseFile(path string) error {
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return classify("create application-data directory", err)
 	}
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(directory, 0o700); err != nil {
-			return classify("restrict application-data directory", err)
-		}
+	if err := restrictToCurrentUser(directory); err != nil {
+		return err
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -98,9 +96,36 @@ func ensureDatabaseFile(path string) error {
 	if closeErr := file.Close(); closeErr != nil {
 		return classify("close created database file", closeErr)
 	}
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(path, 0o600); err != nil {
-			return classify("restrict database file", err)
+	return restrictToCurrentUser(path)
+}
+
+// databaseSidecarPaths returns the files SQLite creates beside the database.
+//
+// They are listed rather than inferred at each call site because forgetting
+// one is the whole failure: the write-ahead log holds committed rows that have
+// not yet been checkpointed, so a readable -wal is a readable database.
+func databaseSidecarPaths(path string) []string {
+	return []string{
+		path + "-wal",
+		path + "-shm",
+		path + ".migration.lock",
+	}
+}
+
+// restrictDatabaseArtifacts narrows the database and every file that carries
+// its contents to the current user.
+//
+// SQLite creates the write-ahead log and shared-memory file lazily, on first
+// write, so this runs after the connection is established rather than at
+// creation. restrictToCurrentUser treats an absent path as nothing to do,
+// which is why calling it for a sidecar that does not exist yet is safe.
+func restrictDatabaseArtifacts(path string) error {
+	if err := restrictToCurrentUser(path); err != nil {
+		return err
+	}
+	for _, sidecar := range databaseSidecarPaths(path) {
+		if err := restrictToCurrentUser(sidecar); err != nil {
+			return err
 		}
 	}
 	return nil

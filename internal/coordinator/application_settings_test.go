@@ -140,7 +140,7 @@ func TestTheSettingsSurfacesAnswerOverTheGeneratedClient(t *testing.T) {
 		storage.EnsureProviderRegistration{
 			DisplayName: "OpenAI", ProviderType: "openai",
 			AdapterName: "openai-responses", AdapterVersion: "1",
-			ProviderVersion: "responses-v1", EndpointRedacted: "https://api.openai.com/v1",
+			ProviderVersion: "responses-v1", EndpointRedacted: "https://api.openai.example/v1",
 			CapabilitiesJSON: `{"streaming":true}`,
 			ModelIdentifier:  "gpt-5.6-sol", ModelVersion: "2026-05",
 		},

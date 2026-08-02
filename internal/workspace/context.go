@@ -34,13 +34,23 @@ type ContextBudget struct {
 }
 
 type ContextQuery struct {
-	Requirement              string
-	ExplicitPaths            []string
-	ExplicitSymbols          []string
-	AdditionalPaths          []string
-	ApprovedInstructionPaths []string
-	IncludeRelevantHistory   bool
-	Budget                   ContextBudget
+	Requirement     string
+	ExplicitPaths   []string
+	ExplicitSymbols []string
+	AdditionalPaths []string
+	// InstructionApprovals resolves whether one repository instruction has a
+	// durable first-use approval. It is an interface rather than a list of
+	// paths because a caller-supplied list is an assertion, and repository
+	// content is untrusted input: any caller assembling a query could claim
+	// any instruction was approved, and nothing recorded who approved what,
+	// against which revision, or whether the approval had been used.
+	//
+	// A nil resolver approves nothing. That is the safe default and the one a
+	// caller falls into by forgetting, which is the direction a
+	// prompt-injection boundary has to fail in.
+	InstructionApprovals   InstructionApprovalResolver
+	IncludeRelevantHistory bool
+	Budget                 ContextBudget
 }
 
 type RequirementTerms struct {
@@ -173,10 +183,6 @@ func SelectContext(
 
 	parsed := ParseRequirement(query)
 	candidates := rankContextCandidates(root, repositoryMap, parsed, query)
-	approvedInstructions := make(map[string]struct{}, len(query.ApprovedInstructionPaths))
-	for _, path := range normalizeRelativePaths(query.ApprovedInstructionPaths) {
-		approvedInstructions[path] = struct{}{}
-	}
 	instructions := make(map[string]struct{}, len(repositoryMap.Instructions))
 	for _, instruction := range repositoryMap.Instructions {
 		instructions[instruction.Path] = struct{}{}
@@ -208,7 +214,25 @@ func SelectContext(
 			continue
 		}
 		if _, isInstruction := instructions[candidate.path]; isInstruction {
-			if _, approved := approvedInstructions[candidate.path]; !approved {
+			// The digest is taken from the bytes on disk now, not from the
+			// map, so an instruction edited after approval is a different
+			// instruction and is refused rather than admitted on the strength
+			// of a digest recorded earlier.
+			digest, digestErr := hashFileAt(root, candidate.path)
+			if digestErr != nil {
+				manifest.Exclusions = append(manifest.Exclusions, ContextExclusion{
+					Path: candidate.path, Reason: "repository-instruction-unreadable",
+				})
+				continue
+			}
+			approved, approvalErr := instructionApproved(
+				ctx, query.InstructionApprovals,
+				repositoryMap.RepositoryRevision, candidate.path, digest,
+			)
+			if approvalErr != nil {
+				return ContextManifest{}, approvalErr
+			}
+			if !approved {
 				manifest.Exclusions = append(manifest.Exclusions, ContextExclusion{
 					Path: candidate.path, Reason: "repository-instruction-awaiting-first-use-approval",
 				})
@@ -744,4 +768,64 @@ func contextItemFlags(item ContextItem) []string {
 	}
 	slices.Sort(flags)
 	return flags
+}
+
+// InstructionApprovalResolver answers whether one repository instruction has a
+// durable first-use approval for the exact revision and bytes being admitted.
+//
+// It lives here as an interface so internal/workspace keeps its existing
+// dependency shape: the resolver is implemented over SQLite in
+// internal/storage, and this package stays free of a storage import.
+type InstructionApprovalResolver interface {
+	// InstructionApproved reports whether the named instruction, at that
+	// revision and with exactly those bytes, may be admitted. It returns an
+	// error only when the decision could not be made; an unapproved
+	// instruction is (false, nil).
+	InstructionApproved(
+		ctx context.Context,
+		repositoryRevision string,
+		instructionPath string,
+		contentSHA256 string,
+	) (bool, error)
+}
+
+// instructionApproved applies the resolver, treating its absence as refusal.
+//
+// A nil resolver approving nothing is deliberate. The previous shape defaulted
+// to "approved if the caller says so", so the failure mode was a caller that
+// asserted too much; the failure mode here is a caller that has not wired
+// approvals yet, and that one is visible as an excluded instruction rather
+// than as untrusted text reaching a prompt.
+func instructionApproved(
+	ctx context.Context,
+	resolver InstructionApprovalResolver,
+	repositoryRevision string,
+	instructionPath string,
+	contentSHA256 string,
+) (bool, error) {
+	if resolver == nil {
+		return false, nil
+	}
+	return resolver.InstructionApproved(
+		ctx, repositoryRevision, instructionPath, contentSHA256)
+}
+
+// hashFileAt returns the SHA-256 of one repository-relative file's bytes.
+func hashFileAt(root string, relative string) (string, error) {
+	// The candidate path already comes from the repository map, which is built
+	// from tracked files, so it is repository-relative by construction. The
+	// check is kept anyway: this function decides whether untrusted text is
+	// admitted, and a path escaping the root here would read a file the
+	// approval was never about.
+	clean := filepath.Clean(filepath.FromSlash(relative))
+	if filepath.IsAbs(clean) || clean == ".." ||
+		strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("instruction path escapes the repository: %s", relative)
+	}
+	content, err := os.ReadFile(filepath.Join(root, clean))
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(content)
+	return hex.EncodeToString(sum[:]), nil
 }

@@ -41,6 +41,14 @@ func buildRunLauncher(
 	if err != nil {
 		return nil, fmt.Errorf("prepare the task worktree root: %w", err)
 	}
+	// A launched run is the path that actually edits a repository, so an
+	// unbound recorder here means the edits with the most to answer for are
+	// the ones with no durable record.
+	launcherEditEvents, err := gitwork.NewStorageEditEventRecorder(repositories)
+	if err != nil {
+		return nil, fmt.Errorf("prepare the edit event recorder: %w", err)
+	}
+	worktrees.SetEditEventRecorder(launcherEditEvents)
 
 	executable := strings.TrimSpace(options.WorkerExecutable)
 	if executable == "" {
@@ -65,6 +73,9 @@ func buildRunLauncher(
 type runLauncherRepositories interface {
 	taskRunLauncherStore
 	gitwork.BindingRepository
+	// A launched run's mediated edits are recorded in the ordered task
+	// journal, so the launcher's store must be able to append to it.
+	gitwork.TaskEventAppender
 }
 
 // unavailableRunLauncher refuses to start a run, by name.

@@ -168,10 +168,26 @@ func describeBody(
 		}
 		switch typed := node.(type) {
 		case *ast.CallExpr:
-			if identifier, ok := typed.Fun.(*ast.Ident); ok &&
-				declared[identifier.Name] && !seen[identifier.Name] {
-				seen[identifier.Name] = true
-				calls = append(calls, identifier.Name)
+			// A call reaches another produced function two ways, and only the
+			// first was counted (PIPE-009). A program composed entirely
+			// through methods therefore showed zero calls and was classified
+			// as atomic, and every phase B and C gate rests on that split.
+			//
+			// declared holds every produced FuncDecl name, methods included,
+			// so a selector is matched on its name. A package-qualified call
+			// whose function happens to share a produced name counts too; that
+			// errs toward finding a call, which is the direction that avoids
+			// calling a composed program atomic.
+			var callee string
+			switch target := typed.Fun.(type) {
+			case *ast.Ident:
+				callee = target.Name
+			case *ast.SelectorExpr:
+				callee = target.Sel.Name
+			}
+			if callee != "" && declared[callee] && !seen[callee] {
+				seen[callee] = true
+				calls = append(calls, callee)
 			}
 		case *ast.IfStmt, *ast.CaseClause, *ast.CommClause:
 			branches++
@@ -228,7 +244,19 @@ func atomsAndMolecules(
 	return atoms, molecules
 }
 
-// testedNames reports every produced function a test refers to.
+// testedNames reports every produced function a test actually calls
+// (PIPE-008).
+//
+// It collected every identifier in every test file, so an atom counted as
+// tested when any identifier of that name appeared anywhere in a test: a local
+// variable, a field, a type, a struct literal key. A gate that says "this was
+// tested" was satisfiable by coincidence.
+//
+// Only call sites count now: a plain call, and a method or package-qualified
+// call by its selector. A function invoked indirectly — passed as a value to
+// something that calls it later — is deliberately not counted. That makes the
+// check stricter than the truth rather than looser, which is the safe
+// direction for a gate whose whole claim is that something was examined.
 func testedNames(worktree string) (map[string]bool, error) {
 	files, err := producedGoFiles(worktree)
 	if err != nil {
@@ -246,8 +274,19 @@ func testedNames(worktree string) (map[string]bool, error) {
 			continue
 		}
 		ast.Inspect(tree, func(node ast.Node) bool {
-			if identifier, ok := node.(*ast.Ident); ok {
-				referenced[identifier.Name] = true
+			call, isCall := node.(*ast.CallExpr)
+			if !isCall {
+				return true
+			}
+			switch callee := call.Fun.(type) {
+			case *ast.Ident:
+				// A plain call: helper(...)
+				referenced[callee.Name] = true
+			case *ast.SelectorExpr:
+				// A method or package-qualified call: value.Method(...) or
+				// package.Function(...). The selector is the name that matches
+				// a produced function.
+				referenced[callee.Sel.Name] = true
 			}
 			return true
 		})
@@ -413,13 +452,32 @@ func checkComplexity(worktree string) stageOutcome {
 	if len(labels) == 0 {
 		return skipped("the run produced no function to measure")
 	}
+	// The gate requires a bound that measured growth across input sizes agrees
+	// with. Nothing here runs the produced code at two sizes and compares, so
+	// the stage may not report satisfied: a structural label is a reading of
+	// the source, not a measurement of the program (PIPE-011).
+	//
+	// The space claim is gone. "bounded by the input it is given" was asserted
+	// for every function without anything having looked at allocation, which
+	// made it a claim about memory derived from loop nesting.
+	//
+	// The label's own limits are recorded beside it, because a label that is
+	// wrong in a named way is usable while an unqualified one is not: it is
+	// read from loop nesting, so recursion and a call to a library sort are
+	// both labelled O(1).
 	evidence := map[string]any{
-		"time_labels": labels, "deepest_loop_nesting": deepest,
-		"space_claim": "bounded by the input it is given",
+		"time_labels":          labels,
+		"deepest_loop_nesting": deepest,
+		"label_source":         "loop nesting in the produced source",
+		"label_limits": "recursion and calls into other functions are not " +
+			"followed, so a recursive function and a call to a library sort " +
+			"are both labelled O(1)",
+		"growth_measured": false,
 	}
-	return held(fmt.Sprintf(
-		"%d function(s) labelled; the deepest is %s by structure, and measured "+
-			"growth is what a later run would have to disagree with",
+	return skippedWith(fmt.Sprintf(
+		"no growth measurement is performed by this build, so the structural "+
+			"label is unconfirmed; %d function(s) labelled from loop nesting, "+
+			"the deepest being %s",
 		len(labels), complexityLabel(deepest)), evidence)
 }
 
