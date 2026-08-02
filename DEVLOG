@@ -51,6 +51,67 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-045
+Date: 2026-08-02
+Status: Lint analyses browser packages under js/wasm; six newly-visible findings
+  handed to the clearance lane
+Change-ID: CL-20260802-035
+Commit: pending
+Request-or-TODO: REPO-018
+Goal: Make Staticcheck analyse each package under a build target it is actually
+  compiled for, because the browser packages were being judged under a target
+  they never run on
+Assumptions: The packages beneath web/ are compiled to WebAssembly and shipped
+  to a browser. The host target is not one of their targets and never was
+Decisions: Two lanes independently reached the same diagnosis before any code
+  changed, which is why this is a gate repair rather than a source cleanup.
+  Of the 51 findings recorded under REPO-018, 19 stood against live, wired
+  frontend code whose only callers sit behind //go:build js && wasm. Deleting
+  them, which is what the ticket's wording invited, would have broken the
+  shipped frontend. The same blind spot ran the other way: the wasm-tagged
+  files were never analysed at all, and six real findings had been sitting
+  unseen behind it, one of them a swallowed error.
+  Chose three passes over one. The host pass covers every non-browser package
+  with tests, unchanged. The browser packages get a host pass with U1000
+  disabled -- every check except unusedness, because unusedness is the one
+  check whose answer depends on which files are in view -- and a js/wasm pass
+  with tests disabled that decides unusedness where all the code is visible.
+  Rejected the simpler "just run everything under js/wasm": browser test files
+  are host tests that import the coordinator and through it SQLite, which does
+  not build for js/wasm, so that pass would have failed to compile rather than
+  analysed anything.
+  Enumerating the host packages from go list rather than hardcoding a list of
+  top-level directories, because a new top-level package would silently escape
+  a hardcoded list, and an escaped package is an unanalysed one. The
+  enumeration refuses an empty result for the same reason: Staticcheck given no
+  packages exits zero, so an empty list would turn the gate into a gate-shaped
+  no-op
+Files-or-schemas: cmd/codeflux-dev/main.go, cmd/codeflux-dev/main_test.go. No
+  schema change
+Validation: go test ./cmd/codeflux-dev/ -run TestREPO018 green. The partition
+  test covers the prefix trap -- a package path beginning with the browser
+  root's letters, such as .../webhooks, must stay in the host pass, and
+  excluding it would silently stop analysing it. A second test refuses an empty
+  host package list, which is the failure mode that would make the gate pass by
+  examining nothing. Measured before and after: the host pass and the
+  browser-host pass are both clean, and the js/wasm pass reports the six
+  findings that had never been visible
+Failures-or-discarded-approaches: Discarded a single js/wasm pass over ./web/...
+  with tests enabled -- it does not compile, for the SQLite reason above.
+  Discarded -checks=all,-U1000, which silently widens the check set: all is a
+  larger set than Staticcheck's default, and it turned up three ST1021 findings
+  that the repository has never enforced. inherit,-U1000 keeps the configured
+  set and subtracts exactly one check
+Known-limitations: A finding in a browser file visible to both targets can be
+  reported twice, once per pass. That is preferred to picking one target and
+  losing the other's coverage, and is documented at the function. go vet has
+  the same blind spot and is NOT fixed here: it has no -tests=false, so a
+  js/wasm vet pass hits the same SQLite compile failure. The browser packages'
+  wasm-only source is therefore still unvetted; that needs its own ticket and
+  is not claimed as done
+Next-safe-step: Clear the six newly-visible findings, then commit the gate
+  repair and the clearance as separate changes
+
 Dev-Log: DL-20260802-044
 Date: 2026-08-02
 Status: Repository check green; staticcheck still red on REPO-018

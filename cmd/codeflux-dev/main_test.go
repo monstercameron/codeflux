@@ -140,6 +140,59 @@ func TestStaticcheckExecutablePrefersBootstrappedTool(t *testing.T) {
 	}
 }
 
+// TestREPO018_BrowserPackagesAreAnalysedUnderTheirOwnBuildTarget pins the
+// partition that keeps the two Staticcheck passes from re-creating the defect
+// they exist to repair: a browser package analysed on the host reports its
+// wasm-only callers as absent, and a non-browser package excluded from the host
+// pass would not be analysed at all.
+func TestREPO018_BrowserPackagesAreAnalysedUnderTheirOwnBuildTarget(t *testing.T) {
+	const modulePath = "codeflux.dev/codeflux"
+	browser := []string{
+		modulePath + "/web",
+		modulePath + "/web/client",
+		modulePath + "/web/assets",
+		modulePath + "/web/frontend/shell",
+	}
+	host := []string{
+		modulePath + "/cmd/codeflux-dev",
+		modulePath + "/internal/storage",
+		// The prefix trap: a package whose path merely begins with the browser
+		// root's letters is not a browser package, and excluding it from the host
+		// pass would silently stop analysing it.
+		modulePath + "/webhooks",
+		modulePath + "/internal/web",
+	}
+	for _, importPath := range browser {
+		if !isBrowserPackage(modulePath, importPath) {
+			t.Errorf("isBrowserPackage(%q) = false, want true", importPath)
+		}
+	}
+	for _, importPath := range host {
+		if isBrowserPackage(modulePath, importPath) {
+			t.Errorf("isBrowserPackage(%q) = true, want false", importPath)
+		}
+	}
+
+	listed := append(append([]string{}, browser...), host...)
+	listed = append(listed, "", "   ")
+	got := hostPackagesOf(modulePath, listed)
+	if strings.Join(got, "\n") != strings.Join(host, "\n") {
+		t.Fatalf("hostPackagesOf = %q, want %q", got, host)
+	}
+}
+
+// TestREPO018_AnEmptyHostPackageListIsRefused guards the failure mode that would
+// make the gate pass by examining nothing: Staticcheck given no package succeeds.
+func TestREPO018_AnEmptyHostPackageListIsRefused(t *testing.T) {
+	const modulePath = "codeflux.dev/codeflux"
+	if got := hostPackagesOf(modulePath, []string{modulePath + "/web/client", ""}); len(got) != 0 {
+		t.Fatalf("hostPackagesOf = %q, want empty", got)
+	}
+	if _, err := hostAnalysisPackages(t.Context(), t.TempDir()); err == nil {
+		t.Fatal("hostAnalysisPackages in a non-module directory = nil error, want a refusal")
+	}
+}
+
 func TestCommandRejectsUndeclaredMachineOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

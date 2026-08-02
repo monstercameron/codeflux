@@ -66,6 +66,39 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-035
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- static analysis gate
+Request-or-TODO: REPO-018
+Outcome: codeflux-dev lint now analyses each package under a build target it is
+  actually compiled for. Non-browser packages are analysed on the host as
+  before. The packages beneath web/ are additionally analysed under GOOS=js
+  GOARCH=wasm, which is the target they ship to, and their unused-code check is
+  decided only there. Previously a single host pass judged the browser packages
+  under a target they never run on, which was wrong in both directions at once:
+  19 of the 51 findings recorded against REPO-018 stood against live, wired
+  frontend code whose only callers sit behind //go:build js && wasm, while the
+  wasm-tagged files were never analysed at all and six genuine findings had
+  never been seen
+Affected-behavior: codeflux-dev lint, and the pre-commit hook and CI that run
+  it. No product behavior changed. The finding set changes: 19 false positives
+  are gone and six previously invisible findings are now reported
+Compatibility-or-migration: None. No schema, no generated source, no public API
+Verification: go test ./cmd/codeflux-dev/ -run TestREPO018 green, covering the
+  package partition including the prefix trap (a package whose path merely
+  begins with the browser root's letters stays in the host pass) and the
+  refusal of an empty host package list, which is the failure mode that would
+  make the gate pass by examining nothing. lint measured before and after: host
+  and browser-host passes clean, js/wasm pass reporting the six newly visible
+  findings
+Known-limitations: A finding in a browser file visible to both targets can be
+  reported twice. go vet has the same blind spot and is not fixed here -- it
+  has no -tests=false, so a js/wasm vet pass fails to compile on browser test
+  files that reach SQLite. The browser packages' wasm-only source remains
+  unvetted and needs its own ticket
+Dev-Log: DL-20260802-045
+
 Change-ID: CL-20260802-034
 Commit: pending
 Date: 2026-08-02

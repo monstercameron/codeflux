@@ -551,7 +551,113 @@ func runLint(
 	if code := requireStaticcheckVersion(ctx, root, stderr, staticcheck); code != exitSuccess {
 		return code
 	}
-	return runCommandIn(ctx, root, stdout, stderr, staticcheck, "./...")
+	return runStaticcheckPerBuildTarget(ctx, root, stdout, stderr, staticcheck)
+}
+
+// runStaticcheckPerBuildTarget analyses each package under a build target it is
+// actually compiled for.
+//
+// The packages beneath web/ are compiled to WebAssembly, and much of their source
+// sits behind //go:build js && wasm. A single host-target pass over ./... gets
+// this wrong in both directions at once: a symbol that only a wasm-tagged file
+// calls is reported unused even though the shipped frontend calls it, while the
+// wasm-tagged files themselves are never analysed at all. Both were real —
+// nineteen U1000 findings stood against live, wired frontend code, and six
+// genuine findings in wasm-only source had never been seen.
+//
+// So unusedness of browser code is decided under GOOS=js GOARCH=wasm, where all
+// of it is visible, and every other check still runs on the host as well, so
+// browser test files — which are host tests — keep their analysis. A finding in a
+// browser file visible to both targets can therefore be reported twice; that is
+// preferred to choosing one target and losing the other's coverage.
+func runStaticcheckPerBuildTarget(
+	ctx context.Context,
+	root string,
+	stdout io.Writer,
+	stderr io.Writer,
+	staticcheck string,
+) int {
+	hostPackages, err := hostAnalysisPackages(ctx, root)
+	if err != nil {
+		fmt.Fprintf(stderr, "codeflux-dev lint: enumerate packages: %v\n", err)
+		return exitFailure
+	}
+	if code := runCommandIn(ctx, root, stdout, stderr, staticcheck, hostPackages...); code != exitSuccess {
+		return code
+	}
+	// Every check except unusedness, because the host cannot see the callers.
+	if code := runCommandIn(
+		ctx,
+		root,
+		stdout,
+		stderr,
+		staticcheck,
+		"-checks=inherit,-"+unusedCheckIdentifier,
+		browserPackagePattern,
+	); code != exitSuccess {
+		return code
+	}
+	// Tests are excluded because a browser test imports the coordinator, and
+	// through it SQLite, which does not build for js/wasm. Those tests run on the
+	// host and the host pass above analyses them.
+	return runCommandInWithEnvironment(
+		ctx,
+		root,
+		stdout,
+		stderr,
+		[]string{"GOOS=js", "GOARCH=wasm"},
+		staticcheck,
+		"-tests=false",
+		browserPackagePattern,
+	)
+}
+
+// hostAnalysisPackages lists every package analysed under the host build target,
+// which is every package that is not a browser package. It fails rather than
+// returning an empty list, because an empty package list makes Staticcheck
+// succeed without analysing anything, and a gate that passes by examining nothing
+// is worse than one that is absent.
+func hostAnalysisPackages(ctx context.Context, root string) ([]string, error) {
+	modulePath, err := commandOutputIn(ctx, root, "go", "list", "-m")
+	if err != nil {
+		return nil, fmt.Errorf("resolve module path: %w", err)
+	}
+	listed, err := commandOutputIn(ctx, root, "go", "list", "./...")
+	if err != nil {
+		return nil, fmt.Errorf("list packages: %w", err)
+	}
+	packages := hostPackagesOf(strings.TrimSpace(modulePath), strings.Split(listed, "\n"))
+	if len(packages) == 0 {
+		return nil, fmt.Errorf("go list ./... reported no non-browser packages")
+	}
+	return packages, nil
+}
+
+func hostPackagesOf(modulePath string, listed []string) []string {
+	var packages []string
+	for _, line := range listed {
+		importPath := strings.TrimSpace(line)
+		if importPath == "" || isBrowserPackage(modulePath, importPath) {
+			continue
+		}
+		packages = append(packages, importPath)
+	}
+	return packages
+}
+
+func isBrowserPackage(modulePath string, importPath string) bool {
+	browserRoot := modulePath + "/web"
+	return importPath == browserRoot || strings.HasPrefix(importPath, browserRoot+"/")
+}
+
+func commandOutputIn(ctx context.Context, root string, name string, args ...string) (string, error) {
+	command := exec.CommandContext(ctx, name, args...)
+	command.Dir = root
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
 }
 
 func unformattedGoFiles(root string) ([]string, error) {
@@ -604,6 +710,15 @@ func staticcheckExecutable(root string) string {
 
 func requireStaticcheckVersion(
 	ctx context.Context,
+const (
+	// browserPackagePattern names the packages compiled to WebAssembly and served
+	// to the browser.
+	browserPackagePattern = "./web/..."
+	// unusedCheckIdentifier is Staticcheck's unused-code check, which is the one
+	// check whose answer depends on which build target is in view.
+	unusedCheckIdentifier = "U1000"
+)
+
 	root string,
 	stderr io.Writer,
 	staticcheck string,
@@ -661,11 +776,30 @@ func runCommandIn(
 			fmt.Fprintf(stderr, "codeflux-dev: run %s %s: %v\n", name, args[0], err)
 		}
 		return exitFailure
+) int {
+	return runCommandInWithEnvironment(ctx, root, stdout, stderr, nil, name, args...)
+}
+
+// runCommandInWithEnvironment runs a command with additional environment
+// entries appended to the inherited environment, which is how a build target is
+// selected for one analysis pass without disturbing the toolchain selection the
+// rest of the process relies on.
+func runCommandInWithEnvironment(
+	ctx context.Context,
+	root string,
+	stdout io.Writer,
+	stderr io.Writer,
+	environment []string,
+	name string,
+	args ...string,
 	}
 	return exitSuccess
 }
 
 func repositoryRoot() (string, error) {
+	if len(environment) != 0 {
+		command.Env = append(os.Environ(), environment...)
+	}
 	current, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("get current directory: %w", err)
