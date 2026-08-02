@@ -1,4 +1,52 @@
 #!/bin/sh
+# Format, lint, and test before a commit is allowed.
+#
+# The point is to fail here rather than on GitHub. A red CI run costs a push, a
+# wait, and a context switch; this costs the wait alone, and catches the failure
+# while the change is still in your head.
+#
+# Bypass with --no-verify only when the user has explicitly asked for it. An
+# agent does not get to decide the gate is inconvenient.
+
 set -eu
 
-exec go run ./cmd/codeflux-dev lint
+cd "$(git rev-parse --show-toplevel)"
+
+GOTOOLCHAIN=local
+export GOTOOLCHAIN
+
+# Only Go changes need the Go gates. A commit touching CHANGELOG, DEVLOG, or a
+# workflow file has nothing for gofmt, staticcheck, or the test suite to say,
+# and making a ledger-only commit wait several minutes teaches people to reach
+# for --no-verify, which is worse than not having the hook at all.
+staged_go=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' || true)
+
+if [ -z "$staged_go" ]; then
+  echo "pre-commit: no staged Go files; skipping format, lint, and tests"
+  exit 0
+fi
+
+# 1. Format. Staged files are rewritten in place and re-staged, because failing
+#    a commit over whitespace the tool can fix itself is pure friction.
+unformatted=$(printf '%s\n' "$staged_go" | xargs gofmt -l 2>/dev/null || true)
+if [ -n "$unformatted" ]; then
+  echo "pre-commit: formatting:"
+  printf '  %s\n' $unformatted
+  printf '%s\n' "$unformatted" | xargs gofmt -w
+  printf '%s\n' "$unformatted" | xargs git add
+  echo "pre-commit: reformatted and re-staged the files above"
+fi
+
+# 2. Lint: gofmt, vet, staticcheck, migrations, and the secret scan.
+echo "pre-commit: lint"
+go run ./cmd/codeflux-dev lint
+
+# 3. Test.
+echo "pre-commit: test-fast"
+go run ./cmd/codeflux-dev test-fast
+
+# 4. Confirm nothing disposable escaped into the tree.
+echo "pre-commit: artifact-check"
+go run ./cmd/codeflux-dev artifact-check
+
+echo "pre-commit: ok"

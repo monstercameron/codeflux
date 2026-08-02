@@ -42,8 +42,36 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-020
+Change-ID: CL-20260802-021
 Commit: pending
+Date: 2026-08-02
+Type: The pre-commit hook formats, lints, and tests before a commit is allowed
+Request-or-TODO: User: "add pre commit hooks where we lint, format and test code
+  before allowing commits so agents dont have to wait for github"
+Outcome: .githooks/pre-commit ran only lint. It now formats staged Go files in
+  place and re-stages them, then runs lint, test-fast, and artifact-check. A
+  commit with no staged Go file skips all four and exits immediately, because
+  making a ledger-only or workflow-only commit wait several minutes is how a
+  hook teaches people to reach for --no-verify. core.hooksPath was also set to
+  .githooks in this clone; the hook existed but nothing had installed it, so it
+  had never run
+Affected-behavior: A commit touching Go now waits for lint and the fast suite
+Compatibility-or-migration: Anyone whose clone lacks core.hooksPath must run
+  git config core.hooksPath .githooks, as CONTRIBUTING already documents
+Verification: The no-Go fast path was exercised and exits immediately. The full
+  path was exercised repeatedly against real commits and correctly refused
+  three: a syntactically broken test file from a concurrent lane, an unformatted
+  file from another, and two lint regressions this session had introduced into
+  CLAUDE.md and AGENTS.md and pushed unnoticed
+Correction: CL-20260802-019 records only the CLAUDE.md repair, but its commit
+  ece2c03 also carried the "Stop What You Start" section of AGENTS.md, because
+  the whole file was staged rather than the intended hunk. Two features in one
+  commit, which is the rule CL-20260802-014 introduced. Recorded here rather
+  than corrected by rewriting the commit
+Dev-Log: DL-20260802-031
+
+Change-ID: CL-20260802-020
+Commit: 246c480
 Date: 2026-08-02
 Type: The pinned Karpathy reference is restored to both instruction files
 Request-or-TODO: Repair of CL-20260802-016, caught by codeflux-dev lint

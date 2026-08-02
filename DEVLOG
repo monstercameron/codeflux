@@ -25,11 +25,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-031
+Date: 2026-08-02
+Status: Pre-commit hook widened to format, lint, and test
+Change-ID: CL-20260802-021
+Commit: pending
+Request-or-TODO: User: "add pre commit hooks where we lint, format and test code
+  before allowing commits so agents dont have to wait for github"
+Goal: Fail locally instead of on GitHub
+Assumptions: The user reaffirmed lint, format, AND test on pre-commit after a
+  cheaper pre-commit/pre-push split was proposed, so all three run on commit
+Decisions: Formatting rewrites and re-stages rather than refusing, since failing
+  a commit over whitespace a tool can fix is pure friction. Commits with no
+  staged Go file skip every Go gate: the alternative teaches --no-verify, which
+  is worse than no hook. core.hooksPath was set in this clone; the hook had
+  existed since M01 and had never once run, which is why two lint regressions
+  reached the remote this session
+Files-or-schemas: .githooks/pre-commit. No schema change
+Validation: Fast path verified. Slow path verified by real use -- it blocked
+  four separate commits for four different real defects
+Failures-or-discarded-approaches: A pre-commit/pre-push split was proposed and
+  the user declined it
+Known-limitations: THIS IS THE IMPORTANT ONE. codeflux-dev lint is repository-
+  wide, and several agent lanes edit this working tree at once. A lane's commit
+  is therefore blocked by any other lane's unfinished file -- during this change
+  alone, commits were refused for a broken test file, an unformatted file, and
+  an incomplete atom comment, none of them belonging to the committing lane. The
+  hook is correct and the tree is genuinely red; but with concurrent lanes in
+  one worktree, the practical effect is that nobody can commit Go until every
+  lane is simultaneously clean. Isolating lanes in separate worktrees, or
+  scoping the hook's lint to staged packages, are the two ways out
+Next-safe-step: Decide between per-lane worktrees and a staged-scope lint, then
+  land the fixed-port change, which is written and blocked only by this
+
 Dev-Log: DL-20260802-030
 Date: 2026-08-02
 Status: Pinned reference restored to AGENTS.md and CLAUDE.md
 Change-ID: CL-20260802-020
-Commit: pending
+Commit: 246c480
 Request-or-TODO: Repair of CL-20260802-016, caught by lint
 Goal: Satisfy the instruction check without reintroducing the duplication the
   restructure removed
