@@ -25,11 +25,53 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-026
+Date: 2026-08-02
+Status: AGENTS.md restructured; content preserved
+Change-ID: CL-20260802-016
+Commit: pending
+Request-or-TODO: User: "refine the agents.md make sure its focused and not
+  confounding or perplexing"
+Goal: Make the file navigable without changing what it requires
+Assumptions: "Refine" means reorganise and deduplicate, not relax. AGENTS.md is
+  authoritative, so dropping a rule is a policy change and was out of scope
+Decisions: Reorganise and deduplicate only; no rule removed. Where content was
+  stated twice, one canonical statement was kept and the other replaced by a
+  pointer. The three procedural checklists were the main defect -- an agent
+  reading the file had to work out that Required Reading Order steps 1-6,
+  Atomic Inner Loop steps 1-9, and the eight Before-reporting steps were one
+  loop described three times at three levels of detail, and nothing said so.
+  The command list was deleted rather than corrected: it had already drifted
+  from the registry, and a stale list that reads as authoritative is worse than
+  no list, so help is now named as the only accurate source. The ReserveFlow
+  block was moved rather than cut; it is real governance for the M24 trial, but
+  47 lines of trial-specific procedure between the Go rules and the atom rules
+  is most of why the middle of the file read as noise for ordinary work
+Files-or-schemas: AGENTS.md only. No schema change
+Validation: Every removed line was extracted from the diff and searched for in
+  the new file. The residue is exactly the three duplicate checklists, four
+  replaced headings, the stale command list, and two rewritten paragraphs; each
+  rule they carried was confirmed present in its new home, including the ban on
+  fetching external skill content, which lived inside a deleted paragraph
+Failures-or-discarded-approaches: Rewriting the whole file in one pass was
+  rejected: 160 of its lines are atom naming and documentation rules that had
+  not been read in this session, and retyping governance nobody re-read is how
+  a rule quietly changes meaning. Targeted edits plus scripted section moves
+  were used instead, with a line-level survival check afterwards
+Known-limitations: Atom Naming Style and Atom Documentation Style are still 160
+  lines, about a quarter of the file, and were left untouched. They are dense
+  but each rule is specific and repository-particular, so they were not the
+  confounding part. Nothing verifies that the Task Lifecycle stays in step with
+  the detailed sections it summarises; a future edit can desynchronise them
+Next-safe-step: If the file is still too long, the atom sections are the next
+  candidate -- most likely by moving the worked examples into docs and keeping
+  the rules here
+
 Dev-Log: DL-20260802-025
 Date: 2026-08-02
 Status: Frontend verification rule written into the programming guide
 Change-ID: CL-20260802-015
-Commit: pending
+Commit: bce52d0
 Request-or-TODO: User: "also lets refine the programming guide, if the agent
   touches any front end code it MUST e2e test it via clicks and keyboard, pay
   attention to its events and their state and visually inspect the

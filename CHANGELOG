@@ -42,8 +42,42 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-015
+Change-ID: CL-20260802-016
 Commit: pending
+Date: 2026-08-02
+Type: AGENTS.md is restructured for focus; no rule removed
+Request-or-TODO: User: "refine the agents.md make sure its focused and not
+  confounding or perplexing"
+Outcome: The file described one workflow three times -- Required Reading Order,
+  Atomic Inner Loop buried under the commands section, and a Before-reporting
+  list at the end of Testing -- so an agent had to reconcile three overlapping
+  checklists to learn one loop. They are now a single Task Lifecycle near the
+  top, in three phases, holding every step the three lists contained. The
+  authority paragraph became a "Who decides what" table, since precedence is
+  looked up rather than read. The Karpathy section restated the four themes
+  already spelled out immediately above it and is now one paragraph pointing at
+  the vendored skill, keeping the rule against fetching external skill content.
+  The hardcoded list of eighteen codeflux-dev commands was already drifting from
+  the registry and from docs/developing.md; it is replaced by codeflux-dev help
+  as the source of truth, keeping only the notes help does not give. Frontend
+  guidance was split between a Frontend Rules section and a browser-verification
+  subsection three sections away; they are now together. The 47-line ReserveFlow
+  dogfood block, which applies only to the §28 / M24 trial, moved to a clearly
+  scoped appendix instead of sitting between the general Go and planning rules
+Affected-behavior: None. Governance prose only
+Compatibility-or-migration: Section headings moved, so anything citing
+  "Required Reading Order", "Atomic Inner Loop", or "Karpathy-Inspired
+  Reference" by name needs updating
+Verification: Every line removed relative to HEAD was diffed and checked for
+  survival elsewhere in the file. The only text that disappears is the three
+  duplicate checklists, the four replaced headings, the stale command list, and
+  two rewritten paragraphs -- each of whose rules was confirmed present in its
+  new location, including the prohibition on downloading external skill content.
+  No Go source touched
+Dev-Log: DL-20260802-026
+
+Change-ID: CL-20260802-015
+Commit: bce52d0
 Date: 2026-08-02
 Type: A frontend change now requires a browser driven by real clicks and real
   keystrokes, and a screenshot somebody actually looked at

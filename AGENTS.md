@@ -4,20 +4,46 @@
 
 These instructions apply to the entire Codeflux repository unless a more deeply nested `AGENTS.md` supplies narrower instructions for its subtree.
 
-## Required Reading Order
+## Who decides what
 
-Before making a non-trivial change:
+| Question | Authority |
+| --- | --- |
+| **What** gets built — intent, architecture, experiments, gates, scope | `docs/plan.md` |
+| **In what order** — dependencies, completion | `TODOS.md` |
+| **How** — every rule in this file | `AGENTS.md` |
+| **What already exists** | Source, tests, protobuf definitions, migrations |
 
-1. read this `AGENTS.md`;
-2. read `docs/plan.md` §0, Linear Concept and Build Order;
-3. read the relevant detailed sections of `docs/plan.md`;
-4. locate the governing milestone and task IDs in `TODOS.md`;
-5. inspect the current source, tests, migrations, and Git state that are actually in scope;
-6. read any narrower `AGENTS.md` encountered below the files being changed.
-
-`docs/plan.md` is authoritative for product intent, architecture, experiments, gates, and scope. `TODOS.md` is authoritative for dependency order and implementation completion. Source, tests, protobuf definitions, and migrations are authoritative for behavior that has already been implemented.
+Where they disagree about implemented behaviour, the source wins. Where they disagree about intent, the plan wins.
 
 Do not invent commands, packages, schemas, or capabilities merely because the plan anticipates them. The repository may still be in an earlier milestone.
+
+## Task Lifecycle
+
+One loop governs every non-trivial change. The rest of this file is the detail behind its steps.
+
+**Before you start**
+
+1. Read this file, and any narrower `AGENTS.md` below the files you will touch.
+2. Read `docs/plan.md` §0, Linear Concept and Build Order, then the sections governing your change.
+3. Find the governing milestone and task IDs in `TODOS.md`. If neither a plan section nor a task exists, stop and add the task first.
+4. Inspect the source, tests, migrations, generated inputs, and Git state actually in scope.
+
+**While you work**
+
+5. Start the `DEVLOG` entry now, while doing the work, not from memory afterwards. State material assumptions as you make them.
+6. Run the narrowest relevant test or reproduction before changing anything.
+7. Implement the smallest sufficient source, test, migration, or generated change.
+8. Rerun the targeted check, then the broader command the task requires.
+9. Run `generate-check`, `lint`, and `artifact-check` when their boundaries are affected.
+
+**Before you report it done**
+
+10. Inspect the final diff and `git status`. Confirm no credential, local database, transient asset, or unrelated edit landed outside `.artifacts/`.
+11. Finish the `DEVLOG` entry: outcome, verification, limitations, next safe step.
+12. When a commit is authorized, follow the commit rules below — explicit paths, one feature, matching `CHANGELOG` entry, both trailers.
+13. Report the verification you actually ran and every remaining limitation.
+
+**Never mark a `TODOS.md` item complete until its output exists and its verification passes.** A model stopping is not completion.
 
 ## Project Mission
 
@@ -57,7 +83,7 @@ The primary interface is a GoWebComponents v5 chat thread with a task-scoped gra
 - Existing Markdown files may be edited only when the user's request or an authorized implementation task requires that edit.
 - If useful documentation has no explicitly authorized Markdown destination, report it in the task response or store product runtime knowledge in SQLite as designed; do not create a sidecar document.
 - An explicit request to create one Markdown file authorizes only that named file, not additional related Markdown files.
-- The following Markdown files were explicitly requested by the user and are authorized: the root `README.md`; `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `PULL_REQUEST_TEMPLATE.md`; and everything under `.claude/`, which is the tracked Claude Code configuration — `settings.json`, the subagent definitions in `.claude/agents/`, and the vendored skill in `.claude/skills/`. Do not delete these as unauthorized clutter. Adding a *new* file to `.claude/` still requires its own explicit request.
+- These were explicitly requested and are authorized; do not delete them as unauthorized clutter: the root `README.md`; `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `PULL_REQUEST_TEMPLATE.md`; and everything under `.claude/`. Adding a *new* file still requires its own explicit request.
 
 ### One Repository-Local Artifact Root
 
@@ -174,11 +200,7 @@ Use the following repository-adapted discipline for every implementation task.
 - Do not claim success because code compiles locally if the governing gate requires more evidence.
 - Never mark a `TODOS.md` item complete until its output exists and its verification passes.
 
-## Karpathy-Inspired Reference
-
-The coding discipline above is informed by the community-maintained [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills/tree/2c606141936f1eeef17fa3043a72095b4765b9c2), which distill public observations by Andrej Karpathy into four themes: make assumptions visible, keep solutions simple, restrict edits to the task, and define verifiable success.
-
-This is a reference, not an executable or automatically trusted dependency. It is not an official Andrej Karpathy repository. Do not download, install, or update external prompt/skill content during a task unless the user explicitly requests it. Repository-specific instructions here take precedence over that general reference.
+The four rules above are the repository-adapted form of the guidance vendored at [`.claude/skills/karpathy-guidelines/SKILL.md`](.claude/skills/karpathy-guidelines/SKILL.md). That copy is a reference, not a trusted dependency, and the rules above take precedence wherever the two differ. Do not download, install, or update external prompt or skill content during a task unless the user explicitly requests it.
 
 ## Work Selection and Planning
 
@@ -190,53 +212,6 @@ This is a reference, not an executable or automatically trusted dependency. It i
 - `DEFER` items are not authorized implementation work.
 - A research `SPIKE` must end with a recorded decision, supporting measurements, and cleanup or deliberate retention of spike code.
 - A failed gate must produce a continue, narrow, redesign, or stop decision; it must not be relabeled as success.
-
-## ReserveFlow Dogfood Refinement Rules
-
-These rules apply when executing the final §28 ReserveFlow dogfood trial and Milestone 24 tasks:
-
-- Keep the Codeflux repository and runtime database, ReserveFlow repository and application database, and evaluator repository physically and logically separate.
-- Reveal one frozen requirement at a time. Do not inspect, infer from hidden artifacts, or preload future requirements.
-- Start every requirement from the prior independently accepted ReserveFlow commit with a fresh forecast, plan, budget, worktree, and episode.
-- Do not manually edit ReserveFlow source during an evaluated Codeflux run. If an emergency intervention occurs, record it and mark the run contaminated.
-- Do not inspect hidden evaluator tests from Codeflux, its workers, its provider context, or the ReserveFlow worktree.
-- Do not advance the accepted commit chain until visible and hidden behavioral acceptance pass.
-- Freeze a failure before repairing Codeflux: retain the task, base revision, Codeflux version, event sequence, worktree diff, provider/model, policy, budget, environment, and redacted diagnostics.
-- Reproduce a Codeflux-owned defect in the smallest deterministic fixture and add a failing test at the lowest responsible layer.
-- State the general failure class before implementing the smallest repair. Never weaken validation, authority, evidence, budgets, recovery, or project isolation to satisfy one benchmark case.
-- Rerun the failed ReserveFlow requirement from its original clean base. Verify first with project memory disabled, then rerun the chronological memory-enabled path.
-- Test the repair against earlier affected ReserveFlow tasks and an unrelated fixture; reject task-specific prompt patches or fixes that depend on future-requirement knowledge.
-- Record every clarification, approval, redirect, workaround, evaluator action, and refinement outcome in the append-only intervention and defect ledgers.
-- Compare correctness before speed and cost. Include failed cheap attempts, escalation, manual effort, and contaminated runs in the scorecard.
-- Before using an adversarial review agent, freeze its prompt, model, input
-  allowlist, output schema, no-edit/no-approval authority, timing, replay budget,
-  and cost accounting, then verify its isolation from hidden acceptance.
-- The adversarial reviewer is an evaluation-only role, not Codeflux multi-agent
-  execution topology. It cannot influence the active evaluated run. Give it
-  only the currently revealed requirement, visible tests, versioned plan, diff,
-  and redacted run evidence; never give it evaluator source, hidden assertions,
-  hidden answers, future requirements, or live authority.
-- Record reviewer time, tokens, cost, findings, and resulting interventions in
-  the scorecard.
-- Treat adversarial critique as a hypothesis with `evidence_strength: none`
-  until an executable reproduction and independent acceptance support it. The
-  reviewer cannot approve its own proposed prompt or process change.
-- Test prompt and process candidates one general invariant at a time. Before
-  execution, preregister the exact candidate diff, tuning cohort, primary
-  endpoint, minimum effect, repetitions, analysis, stop rule, and
-  multiple-comparison treatment while holding model, effort, tools, context
-  policy, authority, budget, and acceptance criteria fixed.
-- Do not increase the replay budget or keep tuning until a positive result
-  appears. Retire ambiguous or unsupported candidates and preserve the negative
-  result.
-- Select at most one candidate on the exposed tuning cohort, then allow one
-  confirmation on a lineage-unexposed held-out cohort. Never use ReserveFlow
-  hidden-evaluator results to select or revise a prompt.
-- Reject a candidate on any correctness, validation, authority, security,
-  secrecy, or recovery regression regardless of latency or cost. Describe a
-  candidate only as meeting its preregistered gate for the named frozen
-  evaluation stratum, never as an optimal prompt.
-- Treat the result as evidence about this prototype and task sequence, not proof of general coding-agent superiority.
 
 ## Go Engineering Rules
 
@@ -266,28 +241,9 @@ go run ./cmd/codeflux-dev help
 go run ./cmd/codeflux-dev <command> --help
 ```
 
-The current executable commands are:
+`help` lists the current commands. It is the only accurate list — a copy written into this file goes stale the moment a command is added, and a stale list is worse than none because it reads as authoritative.
 
-```text
-go run ./cmd/codeflux-dev bootstrap
-go run ./cmd/codeflux-dev build
-go run ./cmd/codeflux-dev build-spike
-go run ./cmd/codeflux-dev generate
-go run ./cmd/codeflux-dev generate-check
-go run ./cmd/codeflux-dev migration-check
-go run ./cmd/codeflux-dev lint
-go run ./cmd/codeflux-dev test-fast
-go run ./cmd/codeflux-dev test-integration
-go run ./cmd/codeflux-dev test-security
-go run ./cmd/codeflux-dev test-all
-go run ./cmd/codeflux-dev test-coverage
-go run ./cmd/codeflux-dev test-race
-go run ./cmd/codeflux-dev run --once
-go run ./cmd/codeflux-dev benchmark atom-names
-go run ./cmd/codeflux-dev benchmark generation
-go run ./cmd/codeflux-dev artifact-check
-go run ./cmd/codeflux-dev run-spike
-```
+What `help` will not tell you:
 
 Use `bootstrap` before lint or generation on a fresh clone. It selects the
 patched Go toolchain and installs pinned repository tools beneath `.artifacts`.
@@ -302,26 +258,6 @@ Every command accepts `--root`. A repository-local root must be a child of
 `.artifacts`; an explicit external root is never selected or deleted
 implicitly. Use `--json` only when command help declares machine-readable
 output.
-
-### Atomic Inner Loop
-
-For each non-trivial change:
-
-1. identify the governing `docs/plan.md` section and first dependency-safe
-   `TODOS.md` ID;
-2. inspect the scoped source, tests, generated inputs, migrations, and Git
-   state;
-3. start or update the matching `DEVLOG` entry and state material assumptions;
-4. run the narrowest relevant test or reproduction;
-5. implement the smallest sufficient source, test, migration, or generated
-   change;
-6. rerun the targeted check, then the broader command required by the task;
-7. run `generate-check`, `lint`, and `artifact-check` when their boundaries are
-   affected;
-8. inspect the final diff and Git status, update completion evidence, and mark
-   no TODO complete until its verification passes;
-9. when a commit is authorized, stage explicit paths, add the matching
-   `CHANGELOG` entry, commit with both ledger trailers, and inspect the result.
 
 ## Atom Naming Style
 
@@ -526,21 +462,6 @@ Rules for atom comments:
 - Keep raw tool output collapsed and redacted by default.
 - Never display unknown cost as zero.
 
-## Testing and Verification
-
-For each changed behavior:
-
-- add or update the narrowest useful automated test;
-- include at least one important failure or boundary case;
-- use a real temporary SQLite database for repository and migration behavior;
-- use temporary Git repositories for worktree and edit behavior;
-- use deterministic provider fakes for ordinary tests;
-- keep live-provider tests opt-in;
-- use fault injection for replay, idempotency, crash, and recovery behavior;
-- run security-boundary tests for paths, origins, permissions, redaction, and payload limits;
-- drive every frontend change through a real browser, per the section below;
-- measure rather than assume graph and streaming performance.
-
 ### Frontend changes must be driven in a browser
 
 **If a change touches frontend code, a browser must be driven through it with real clicks and real keystrokes before the work is reported as done.** This is not satisfied by a Go test over a pure projection. A projection test proves the projection; it says nothing about whether a person can actually operate the interface, and every frontend defect that has reached review here was invisible to one.
@@ -563,16 +484,20 @@ Mounted checks live in `internal/frontendtest` and drive Playwright. Run them wi
 
 **Do not report a frontend change as working on the strength of a projection test, a screenshot nobody opened, or a build that compiled.** If the browser check could not be run, say so plainly and say why, rather than reporting the change as verified.
 
-Before reporting completion:
+## Testing and Verification
 
-1. run the targeted tests;
-2. run the broader suite required by the milestone;
-3. inspect the final diff;
-4. inspect Git status;
-5. update `DEVLOG` with the implementation outcome, verification, limitations, and next safe step;
-6. when a commit is authorized, add the matching `CHANGELOG` entry and commit-message trailers;
-7. confirm no credential, local database, generated transient asset, or unrelated edit was added outside `.artifacts/`;
-8. report verification performed and any remaining limitation.
+For each changed behavior:
+
+- add or update the narrowest useful automated test;
+- include at least one important failure or boundary case;
+- use a real temporary SQLite database for repository and migration behavior;
+- use temporary Git repositories for worktree and edit behavior;
+- use deterministic provider fakes for ordinary tests;
+- keep live-provider tests opt-in;
+- use fault injection for replay, idempotency, crash, and recovery behavior;
+- run security-boundary tests for paths, origins, permissions, redaction, and payload limits;
+- drive every frontend change through a real browser, per the section below;
+- measure rather than assume graph and streaming performance.
 
 ## Documentation Rules
 
@@ -583,6 +508,53 @@ Before reporting completion:
 - Label community interpretations accurately.
 - Do not claim a planned command or component already exists.
 - Prefer concrete paths, commands, schemas, and tests once they are real.
+
+## Appendix: ReserveFlow Dogfood Trial (§28 / M24 only)
+
+These rules apply when executing the final §28 ReserveFlow dogfood trial and Milestone 24 tasks:
+
+- Keep the Codeflux repository and runtime database, ReserveFlow repository and application database, and evaluator repository physically and logically separate.
+- Reveal one frozen requirement at a time. Do not inspect, infer from hidden artifacts, or preload future requirements.
+- Start every requirement from the prior independently accepted ReserveFlow commit with a fresh forecast, plan, budget, worktree, and episode.
+- Do not manually edit ReserveFlow source during an evaluated Codeflux run. If an emergency intervention occurs, record it and mark the run contaminated.
+- Do not inspect hidden evaluator tests from Codeflux, its workers, its provider context, or the ReserveFlow worktree.
+- Do not advance the accepted commit chain until visible and hidden behavioral acceptance pass.
+- Freeze a failure before repairing Codeflux: retain the task, base revision, Codeflux version, event sequence, worktree diff, provider/model, policy, budget, environment, and redacted diagnostics.
+- Reproduce a Codeflux-owned defect in the smallest deterministic fixture and add a failing test at the lowest responsible layer.
+- State the general failure class before implementing the smallest repair. Never weaken validation, authority, evidence, budgets, recovery, or project isolation to satisfy one benchmark case.
+- Rerun the failed ReserveFlow requirement from its original clean base. Verify first with project memory disabled, then rerun the chronological memory-enabled path.
+- Test the repair against earlier affected ReserveFlow tasks and an unrelated fixture; reject task-specific prompt patches or fixes that depend on future-requirement knowledge.
+- Record every clarification, approval, redirect, workaround, evaluator action, and refinement outcome in the append-only intervention and defect ledgers.
+- Compare correctness before speed and cost. Include failed cheap attempts, escalation, manual effort, and contaminated runs in the scorecard.
+- Before using an adversarial review agent, freeze its prompt, model, input
+  allowlist, output schema, no-edit/no-approval authority, timing, replay budget,
+  and cost accounting, then verify its isolation from hidden acceptance.
+- The adversarial reviewer is an evaluation-only role, not Codeflux multi-agent
+  execution topology. It cannot influence the active evaluated run. Give it
+  only the currently revealed requirement, visible tests, versioned plan, diff,
+  and redacted run evidence; never give it evaluator source, hidden assertions,
+  hidden answers, future requirements, or live authority.
+- Record reviewer time, tokens, cost, findings, and resulting interventions in
+  the scorecard.
+- Treat adversarial critique as a hypothesis with `evidence_strength: none`
+  until an executable reproduction and independent acceptance support it. The
+  reviewer cannot approve its own proposed prompt or process change.
+- Test prompt and process candidates one general invariant at a time. Before
+  execution, preregister the exact candidate diff, tuning cohort, primary
+  endpoint, minimum effect, repetitions, analysis, stop rule, and
+  multiple-comparison treatment while holding model, effort, tools, context
+  policy, authority, budget, and acceptance criteria fixed.
+- Do not increase the replay budget or keep tuning until a positive result
+  appears. Retire ambiguous or unsupported candidates and preserve the negative
+  result.
+- Select at most one candidate on the exposed tuning cohort, then allow one
+  confirmation on a lineage-unexposed held-out cohort. Never use ReserveFlow
+  hidden-evaluator results to select or revise a prompt.
+- Reject a candidate on any correctness, validation, authority, security,
+  secrecy, or recovery regression regardless of latency or cost. Describe a
+  candidate only as meeting its preregistered gate for the named frozen
+  evaluation stratum, never as an optimal prompt.
+- Treat the result as evidence about this prototype and task sequence, not proof of general coding-agent superiority.
 
 ## Handoff Format
 
