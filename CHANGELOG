@@ -42,8 +42,29 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-023
+Change-ID: CL-20260802-024
 Commit: pending
+Date: 2026-08-02
+Type: The user guide stops instructing people to verify a release that does not
+  exist, and the issue tracker's role is stated
+Request-or-TODO: User: "use the gaps to refine the repo handling"
+Outcome: docs/using.md opened by telling a reader to download an artifact,
+  check it against SHA256SUMS, and verify a signature against the published
+  release key. There are no releases, no artifacts, no checksum file, and no
+  signing key, so every one of those steps was unfollowable. The section now
+  says so plainly and gives the build-from-source path, keeping the verification
+  steps for when releases exist. A guide that tells you to check a signature
+  that does not exist teaches you to skip the check. CONTRIBUTING now also
+  states that TODOS.md is the authoritative work list -- over two hundred open
+  items, none mirrored -- and that GitHub issues are the inbox rather than the
+  plan: an accepted issue becomes a TODOS task and is closed against that ID
+Affected-behavior: None
+Compatibility-or-migration: None
+Verification: Prose only; no Go source touched
+Dev-Log: DL-20260802-034
+
+Change-ID: CL-20260802-023
+Commit: 8a1886c
 Date: 2026-08-02
 Type: A scheduled job reports drift between the vendored skills and upstream
 Request-or-TODO: User: "use the gaps to refine the repo handling"

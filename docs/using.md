@@ -10,6 +10,22 @@ CodeFlux is one executable. It installs per user and never needs administrator
 rights: a coding agent asking for elevation is asking for far more trust than
 it needs.
 
+> **There is no published release yet.** No tagged version, no build artifact,
+> no `SHA256SUMS`, and no signing key exist at the time of writing, so the
+> verification steps below describe the intended install and cannot be followed
+> today. Build from source instead:
+>
+> ```
+> git clone https://github.com/monstercameron/codeflux.git
+> cd codeflux
+> go run ./cmd/codeflux-dev build
+> ```
+>
+> This note is here rather than omitted because a guide that instructs you to
+> check a signature that does not exist teaches you to skip the check.
+
+Once releases are published:
+
 1. Download the artifact for your platform and its `SHA256SUMS` file.
 2. Check the checksum:
    - Windows: `Get-FileHash codeflux-windows-amd64.exe -Algorithm SHA256`

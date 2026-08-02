@@ -72,6 +72,17 @@ So the useful first message is: *what outcome do you want, and which milestone
 does it belong to?* That conversation costs one issue. Discovering the answer
 after writing the code costs your weekend.
 
+### Issues and TODOS.md are not the same tracker
+
+`TODOS.md` is the authoritative work list and dependency order. It currently
+holds well over two hundred open items, and nothing in it is mirrored to GitHub.
+
+GitHub issues are the **inbox**, not the plan. A report or request arrives as an
+issue; if it is accepted, it becomes a task in `TODOS.md` under the milestone
+that governs it, and the issue is closed with a reference to that ID. Do not
+expect to find the roadmap in the issue tracker, and do not treat an open issue
+as scheduled work.
+
 **Always welcome without a preceding discussion:**
 
 - a reproducible bug report with the smallest fixture that shows it;

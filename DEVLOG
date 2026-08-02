@@ -25,11 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-034
+Date: 2026-08-02
+Status: Install guide and tracker roles corrected
+Change-ID: CL-20260802-024
+Commit: pending
+Request-or-TODO: User: "use the gaps to refine the repo handling"
+Goal: Remove two places where the documentation claimed more than the project
+  can currently do
+Assumptions: The install steps were written as the intended flow rather than as
+  a lie, so they are kept and clearly labelled as not yet available
+Decisions: Say it in the guide rather than quietly deleting the steps. This
+  project's whole argument is that it reports what is and is not established,
+  and a user guide that fails that standard undermines the claim more than a
+  missing feature does. On trackers, TODOS.md was made explicitly authoritative
+  rather than trying to mirror it into issues: 239 open items would be noise as
+  issues, and two trackers that disagree are worse than one
+Files-or-schemas: docs/using.md, .github/CONTRIBUTING.md. No schema change
+Validation: Prose only
+Failures-or-discarded-approaches: Deleting the verification steps entirely was
+  considered and rejected -- they are the intended install and worth stating
+Known-limitations: Nothing checks that this note is removed when releases do
+  start, so it will go stale in the opposite direction
+Next-safe-step: Remove the note in the commit that publishes the first release
+
 Dev-Log: DL-20260802-033
 Date: 2026-08-02
 Status: Vendored drift check added
 Change-ID: CL-20260802-023
-Commit: pending
+Commit: 8a1886c
 Request-or-TODO: User: "use the gaps to refine the repo handling"
 Goal: Make vendored copies re-read deliberately instead of trusted indefinitely
 Assumptions: Drift is not itself a defect. Upstream moving is expected; being
