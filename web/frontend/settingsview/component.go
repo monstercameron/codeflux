@@ -8,7 +8,6 @@
 package settingsview
 
 import (
-	"strconv"
 	"time"
 
 	"codeflux.dev/codeflux/web/frontend/design"
@@ -46,6 +45,54 @@ type CredentialCheck struct {
 	Summary  string
 }
 
+// FlowSetting is one choice the run flow leaves open, with the description the
+// coordinator sent and the value in force.
+//
+// The description is rendered rather than restated here: the engine declares
+// what each setting costs and what bounds it accepts, and a page that carried
+// its own copy would eventually offer a value the engine refuses.
+type FlowSetting struct {
+	Key     string
+	Label   string
+	Help    string
+	Kind    string
+	Choices []string
+	Minimum int32
+	Maximum int32
+	Group   string
+	Text    string
+	Number  int32
+	Enabled bool
+	// AtDefault reports that the value in force is the one the engine ships
+	// with, so the sheet can mark where this machine has departed from them.
+	AtDefault bool
+	// Items carries a setting whose value is a list of choices: a set, whose
+	// order says nothing, or a sequence, whose order is the setting.
+	Items []string
+	// Pairs carries a setting that gives named keys their own choice.
+	Pairs []FlowSettingPair
+}
+
+// FlowSettingPair is one named key and the choice given to it.
+type FlowSettingPair struct {
+	Key   string
+	Value string
+}
+
+// Flow setting kinds, as the coordinator names them.
+const (
+	FlowChoice = "choice"
+	FlowNumber = "number"
+	FlowSwitch = "switch"
+	// FlowSet, FlowSequence, and FlowMapping are values this sheet reports but
+	// does not yet offer a control for. Showing the value without a control is
+	// the honest half: a person can see what governs their runs even where
+	// this surface cannot change it.
+	FlowSet      = "set"
+	FlowSequence = "sequence"
+	FlowMapping  = "mapping"
+)
+
 // PolicyRow is the execution policy in force.
 type PolicyRow struct {
 	Preset          string
@@ -73,6 +120,19 @@ type Props struct {
 	Policy    PolicyRow
 	Providers []ProviderGroup
 
+	// Spend is what the recorded work cost, sliced by the flow's own phases
+	// and by model. It sits on this surface because a budget a person can see
+	// and a spend they cannot is half an answer.
+	Spend SpendPanel
+
+	// Appearance, LocalData, and Telemetry are the panels that belong to this
+	// browser rather than to a run, supplied by the application that owns those
+	// choices. They are nodes because the sheet places them; it does not know
+	// what is in them.
+	Appearance ui.Node
+	LocalData  ui.Node
+	Telemetry  ui.Node
+
 	// Reference holds what has been typed for each provider, keyed by provider
 	// identity. It is browser-only interaction state; the value it produces is
 	// an opaque operating-system reference, never a credential.
@@ -86,234 +146,37 @@ type Props struct {
 	Notice     string
 	NoticeTone design.Status
 
+	// Flow is every choice the run flow leaves open. FlowPending holds what has
+	// been changed on screen and not yet saved, so a person can see what they
+	// are about to commit before they commit it.
+	Flow []FlowSetting
+	// FlowUnrenderable names settings the coordinator declares that this
+	// surface cannot draw, so the sheet can say a row is missing rather than
+	// quietly understating what governs a run.
+	FlowUnrenderable  []string
+	FlowPending       map[string]FlowSetting
+	FlowBusy          bool
+	FlowNotice        string
+	FlowTone          design.Status
+	FlowRevisionKnown bool
+
+	// Search is what has been typed to find a setting, and Jumped is the one a
+	// result sent somebody to, so the row can say "this is the one" when they
+	// arrive at a page of rows that otherwise look alike.
+	Search string
+	Jumped string
+
 	OnReload          func()
+	OnSearch          func(query string)
+	OnJump            func(key string)
+	OnFlowChoice      func(key, value string)
+	OnFlowNumber      func(key string, value int32)
+	OnFlowSwitch      func(key string)
+	OnFlowSave        func()
+	OnFlowDiscard     func()
 	OnReferenceInput  func(providerID, value string)
 	OnCheckCredential func(providerID string)
 	OnConfigure       func(providerID, modelID string)
-}
-
-// Policy renders what governs every run.
-func Policy(props Props) ui.Node {
-	if node, handled := stateNode(props, "policy"); handled {
-		return node
-	}
-	if !props.Policy.Known {
-		return primitives.EmptyState(primitives.EmptyStateProps{
-			Title: "No policy answer",
-			Body:  "The coordinator has not reported the policy governing runs.",
-			Mode:  props.Mode,
-		})
-	}
-	revision := "compiled defaults"
-	if props.Policy.Revision > 0 {
-		revision = "settings revision " + strconv.FormatUint(props.Policy.Revision, 10)
-	}
-	terms := []ui.Node{
-		policyTerm("Preset", props.Policy.Preset),
-		policyTerm("Reasoning effort", props.Policy.ReasoningEffort),
-		policyTerm("Risk floor", props.Policy.RiskFloor),
-		policyTerm("Required assurance floor", props.Policy.AssuranceFloor),
-	}
-	// The request timeout arrives with the model list, because that is the one
-	// place the coordinator states it. A coordinator with no provider recorded
-	// has not reported one, and a row reading "unknown" would say the timeout
-	// is unknown to the product rather than not yet answered here.
-	if props.Policy.RequestTimeout > 0 {
-		terms = append(terms, policyTerm(
-			"Request timeout", props.Policy.RequestTimeout.String(),
-		))
-	}
-	terms = append(terms, policyTerm("Source", revision))
-	return html.Section(
-		html.Props{
-			Aria: map[string]string{"label": "Execution policy in force"},
-			Data: map[string]string{"component": "settings-policy"},
-		},
-		html.P(html.Props{
-			Text: "Routing uses one versioned policy for this prototype. These values " +
-				"are reported so you can see what governs a run; they are not " +
-				"controls, and nothing here changes them.",
-		}),
-		html.Tag("dl", html.Props{}, terms...),
-	)
-}
-
-// Providers renders the provider configurations and their controls.
-func Providers(props Props) ui.Node {
-	if node, handled := stateNode(props, "providers"); handled {
-		return node
-	}
-	if len(props.Providers) == 0 {
-		return primitives.EmptyState(primitives.EmptyStateProps{
-			Title: "No provider is recorded",
-			Body: "The coordinator records a provider the first time it prepares work " +
-				"for one. Until then there is nothing here to configure.",
-			ActionLabel: reloadLabel(props.OnReload),
-			Mode:        props.Mode,
-			OnAction:    props.OnReload,
-		})
-	}
-	children := []ui.Node{html.P(html.Props{
-		Text: "A credential is stored in this machine's operating-system credential " +
-			"store. CodeFlux keeps only an os://service/account reference to it and " +
-			"never displays or transmits the credential itself.",
-	})}
-	if props.Notice != "" {
-		children = append(children, primitives.InlineAlert(primitives.InlineAlertProps{
-			Title: "Provider configuration", Message: props.Notice,
-			Tone: props.NoticeTone, Mode: props.Mode,
-		}))
-	}
-	for _, provider := range props.Providers {
-		children = append(children, providerCard(props, provider))
-	}
-	return html.Section(
-		html.Props{
-			Aria: map[string]string{"label": "Provider configurations"},
-			Data: map[string]string{"component": "settings-providers"},
-		},
-		children...,
-	)
-}
-
-// Models renders the catalogued models and whether each can be used now.
-func Models(props Props) ui.Node {
-	if node, handled := stateNode(props, "models"); handled {
-		return node
-	}
-	rows := make([]ui.Node, 0)
-	for _, provider := range props.Providers {
-		for _, model := range provider.Models {
-			rows = append(rows, html.Li(
-				html.Props{
-					Data: map[string]string{
-						"component": "settings-model",
-						"model-id":  model.ID,
-						"available": boolLabel(model.Available),
-					},
-				},
-				html.Span(html.Props{Text: provider.Name + " · " + model.Name}),
-				html.Text(" "),
-				availabilityBadge(props.Mode, model.Available),
-			))
-		}
-	}
-	if len(rows) == 0 {
-		return primitives.EmptyState(primitives.EmptyStateProps{
-			Title: "No model is catalogued",
-			Body: "A model is catalogued with the exact revision and capabilities the " +
-				"coordinator recorded for it. Nothing has been recorded yet.",
-			ActionLabel: reloadLabel(props.OnReload),
-			Mode:        props.Mode,
-			OnAction:    props.OnReload,
-		})
-	}
-	return html.Section(
-		html.Props{
-			Aria: map[string]string{"label": "Catalogued models"},
-			Data: map[string]string{"component": "settings-models"},
-		},
-		html.P(html.Props{
-			Text: "Availability means a credential is bound and the provider is enabled. " +
-				"It is not evidence that the provider answered.",
-		}),
-		html.Ul(html.Props{Aria: map[string]string{"label": "Catalogued models"}}, rows...),
-	)
-}
-
-// providerCard renders one provider, its credential state, and its controls.
-func providerCard(props Props, provider ProviderGroup) ui.Node {
-	children := []ui.Node{
-		html.H3(html.Props{Text: provider.Name}),
-		availabilityBadge(props.Mode, provider.Available),
-	}
-	if check, present := props.Checks[provider.ID]; present {
-		switch {
-		case check.Running:
-			children = append(children, html.P(html.Props{
-				Text: "Checking the credential…", Aria: map[string]string{"live": "polite"},
-			}))
-		case check.Summary != "":
-			tone := design.StatusWarning
-			if check.Resolved {
-				tone = design.StatusSuccess
-			}
-			children = append(children, primitives.InlineAlert(primitives.InlineAlertProps{
-				Title: "Credential check", Message: check.Summary,
-				Tone: tone, Mode: props.Mode,
-			}))
-		}
-	}
-	busy := props.Busy == provider.ID
-	children = append(children, primitives.Button(primitives.ButtonProps{
-		Label: "Check credential", Mode: props.Mode,
-		AccessibleLabel: "Check the stored credential for " + provider.Name,
-		Busy:            props.Checks[provider.ID].Running,
-		Disabled:        props.OnCheckCredential == nil,
-		DisabledReason:  disabledReason(props.OnCheckCredential == nil, "This surface is not connected to the coordinator."),
-		OnClick: func() {
-			if props.OnCheckCredential != nil {
-				props.OnCheckCredential(provider.ID)
-			}
-		},
-	}))
-	reference := props.Reference[provider.ID]
-	children = append(children, primitives.TextField(primitives.TextFieldProps{
-		ID: "provider-reference-" + provider.ID, Label: "Credential reference",
-		AccessibleLabel: "Operating-system credential reference for " + provider.Name,
-		Value:           reference, Placeholder: "os://service/account",
-		Disabled: busy || props.OnReferenceInput == nil, Mode: props.Mode,
-		OnInput: func(value string) {
-			if props.OnReferenceInput != nil {
-				props.OnReferenceInput(provider.ID, value)
-			}
-		},
-	}))
-	if len(provider.Models) == 0 {
-		// The request contract names the model a credential is configured for,
-		// and the coordinator refuses one it has never catalogued. Saying so is
-		// more useful than a control that fails on click.
-		children = append(children, html.P(html.Props{
-			Text: "No model is catalogued for this provider yet, so a credential " +
-				"cannot be configured against one.",
-		}))
-		return providerSection(props, provider, children)
-	}
-	for _, model := range provider.Models {
-		modelID := model.ID
-		blocked := reference == "" || props.OnConfigure == nil
-		children = append(children, primitives.Button(primitives.ButtonProps{
-			Label: "Use for " + model.Name, Mode: props.Mode,
-			AccessibleLabel: "Configure " + provider.Name + " for " + model.Name +
-				" with the entered credential reference",
-			Busy: busy, Disabled: blocked || busy,
-			DisabledReason: disabledReason(
-				reference == "",
-				"Enter the os://service/account reference first.",
-			),
-			OnClick: func() {
-				if props.OnConfigure != nil {
-					props.OnConfigure(provider.ID, modelID)
-				}
-			},
-		}))
-	}
-	return providerSection(props, provider, children)
-}
-
-func providerSection(props Props, provider ProviderGroup, children []ui.Node) ui.Node {
-	_ = props
-	return html.Section(
-		html.Props{
-			Aria: map[string]string{"label": provider.Name},
-			Data: map[string]string{
-				"component":   "settings-provider",
-				"provider-id": provider.ID,
-				"configured":  boolLabel(provider.Available),
-			},
-		},
-		children...,
-	)
 }
 
 // stateNode renders the states in which a surface has no answer to draw.

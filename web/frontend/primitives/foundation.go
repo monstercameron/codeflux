@@ -132,6 +132,22 @@ func boolARIA(value bool) string {
 }
 
 func controlClass(tokens design.Tokens, primary bool) string {
+	return controlVariantClass(tokens, primary, false, false)
+}
+
+// controlVariantClass styles the three weights a control can carry: the filled
+// key that commits an action, the outlined default, and the quiet one that
+// belongs to its surface.
+//
+// compact drops the pointer-target floor, for an action that sits inside a
+// dense readout beside values rather than standing on its own. The floor is
+// sized for a fingertip; in a row of settings it makes the one action half
+// again as tall as everything around it, which reads as the loudest thing on a
+// page it is not the subject of.
+func controlVariantClass(tokens design.Tokens, primary, quiet, compact bool) string {
+	if quiet {
+		return quietControlClass(tokens)
+	}
 	background := tokens.Colors.Surface2
 	hoverBackground := tokens.Colors.Surface3
 	pressedBackground := tokens.Colors.SurfaceInset
@@ -144,13 +160,17 @@ func controlClass(tokens design.Tokens, primary bool) string {
 		foreground = tokens.Colors.OnAccent
 		border = tokens.Colors.Accent
 	}
+	floor := tokens.Interaction.MinimumPointerTarget
+	if compact {
+		floor = 30
+	}
 	rules := []css.Rule{
 		u.InlineFlex,
 		u.ItemsCenter,
 		u.JustifyCenter,
 		css.Gap(css.Px(tokens.Spacing.SM)),
-		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
-		css.MinWidth(css.Px(tokens.Interaction.MinimumPointerTarget)),
+		css.MinHeight(css.Px(floor)),
+		css.MinWidth(css.Px(floor)),
 		css.PaddingX(css.Px(tokens.Spacing.MD)),
 		css.Bg(css.Hex(string(background))),
 		css.TextColor(css.Hex(string(foreground))),
@@ -191,6 +211,104 @@ func controlClass(tokens design.Tokens, primary bool) string {
 		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
 		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
 		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Hex(string(tokens.Colors.BorderStrong))),
+	)...)
+	return css.New(rules...).String()
+}
+
+// segmentClass styles one option inside a segmented control.
+//
+// Three filters drawn as three full-weight buttons read as three unrelated
+// commands. As segments they read as one control with one option chosen, which
+// is what they are.
+// segmentClass styles one option of a segmented control.
+//
+// compact drops the pointer-target floor. The floor is sized for a fingertip
+// and is right wherever a control stands on its own; inside a dense readout it
+// makes every control half again as tall as the text it sits beside, which is
+// what a mouse-driven document does not need and what makes a page of them look
+// oversized. The declared height is the same either way.
+func segmentClass(tokens design.Tokens, pressed bool, compact bool) string {
+	background := css.Transparent
+	foreground := tokens.Colors.TextMuted
+	weight := css.FontWeight.Medium
+	if pressed {
+		background = css.Hex(string(tokens.Colors.Surface3))
+		foreground = tokens.Colors.TextPrimary
+		weight = css.FontWeight.Semibold
+	}
+	floor := tokens.Interaction.MinimumPointerTarget
+	if compact {
+		floor = 30
+	}
+	rules := []css.Rule{
+		u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
+		css.MinHeight(css.Px(floor)),
+		css.H(css.Px(30)),
+		css.PaddingX(css.Px(tokens.Spacing.SM)),
+		css.Bg(background),
+		css.TextColor(css.Hex(string(foreground))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Transparent),
+		css.Rounded(css.Px(tokens.Geometry.RadiusSmall)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		weight,
+		css.Cursor.Pointer,
+	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	)...)
+	rules = append(rules, css.Disabled(
+		css.OpacityNum(css.Num(0.5)), css.Cursor.NotAllowed,
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(-tokens.Geometry.FocusRingOffset)),
+	)...)
+	return css.New(rules...).String()
+}
+
+func quietControlClass(tokens design.Tokens) string {
+	rules := []css.Rule{
+		u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
+		css.Gap(css.Px(tokens.Spacing.XS)),
+		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
+		css.MinWidth(css.Px(tokens.Interaction.MinimumPointerTarget)),
+		css.PaddingX(css.Px(tokens.Spacing.SM)),
+		css.Bg(css.Transparent),
+		css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Transparent),
+		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
+		css.Font(css.FontStack(tokens.Fonts.UI)),
+		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
+		css.FontWeight.Semibold,
+		css.Cursor.Pointer,
+	}
+	if tokens.Motion.Control > 0 {
+		rules = append(rules, css.Transition(
+			css.TransitionProps(css.PropColors),
+			css.Ms(int(tokens.Motion.Control.Milliseconds())),
+			css.EaseOut,
+		))
+	}
+	rules = append(rules, css.Hover(
+		css.Bg(css.Hex(string(tokens.Colors.Surface3))),
+		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+	)...)
+	rules = append(rules, css.Active(css.Bg(css.Hex(string(tokens.Colors.SurfaceInset))))...)
+	rules = append(rules, css.Disabled(
+		css.OpacityNum(css.Num(0.5)), css.Cursor.NotAllowed,
+	)...)
+	rules = append(rules, css.FocusVisible(
+		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
+		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
 	)...)
 	return css.New(rules...).String()
 }

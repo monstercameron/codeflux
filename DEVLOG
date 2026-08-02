@@ -24,6 +24,195 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-012
+Date: 2026-08-02
+Status: The settings sheet is sized like a document rather than a dashboard
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "do a refinement pass on the control and font sizes for
+  the settings page as it looks childish"
+Goal: Make the page's type and controls read as one considered scale rather than
+  two extremes
+Assumptions: The console's token system already holds every size this page
+  needs, so the work is choosing the right token, not inventing a size
+Decisions: Measured the page before changing it: three hundred elements at
+  eleven pixels, forty-two at fifteen, fifteen at twenty-two, one at thirty-four.
+  That is not a scale, it is a seesaw -- almost everything at caption size, the
+  values two steps above everything, and nothing in between. Prose was the
+  defect underneath it: rationale set at the caption size forced the value to be
+  huge to feel like a value at all. So the rationale moved up one step to the
+  compact reading size, and the values came down to the size of the name they
+  sit beside, in the code face rather than the interface face. A mono value at
+  the same size as a sans name still reads as the value, because the face is
+  wider and more even; sixty of them two steps larger read as a dashboard, and a
+  settings page is not one. The four facts that open the sheet keep the emphasis,
+  at the section-title size, because they are the one thing the page is answering
+  and everything below is read against them. Controls: one height for anything in
+  a row and one for anything typed into, both below the fingertip floor, because
+  this is a mouse-driven document and a control half again as tall as the text
+  beside it is most of what made the page look like a toy. The fully-rounded
+  pill was dropped for the console's own control radius: a pill reads as a
+  consumer chip, and these are instrument controls
+Files-or-schemas: web/frontend/settingsview/grid.go (the value and contract
+  voices), sheet.go (one control height and one field height), controls.go,
+  rows.go, search.go, web/frontend/primitives/foundation.go and controls.go (a
+  Compact weight on the button and the toggle, which drops the pointer floor for
+  a control inside a dense readout and changes nothing for a control standing on
+  its own), web/frontend/appearanceview/component.go; no schema change
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt clean;
+  go test for settingsview, primitives, appearanceview, telemetryview. Measured
+  the rendered result the same way it was measured before: the page now reads
+  11/13/15/19 with one display size, no element paints outside its grid cell at
+  1600, 1280, or 1024, and every value on the page still ends on one column
+Failures-or-discarded-approaches: Dropping the pointer-target floor globally was
+  rejected: it would have moved every control on every page, including surfaces
+  not inspected here. The floor is opted out of per control instead. Found while
+  doing it that the console's segmented control already declared a thirty-pixel
+  height and then set a forty-four pixel floor over it, so its declared height
+  had never taken effect; the compact weight is what lets the declared height
+  apply where it should
+Known-limitations: Only the settings surface opts into the compact weight. Other
+  pages keep the fingertip floor, so a console-wide density decision is still
+  open
+Next-safe-step: Measure the same way on the pages that hold dense readouts --
+  the run timeline and the evidence report -- and decide the floor once
+
+Dev-Log: DL-20260802-013
+Date: 2026-08-02
+Status: The code page is the repository's own file tree, with Go source read
+  from disk and coloured by the language's own scanner
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "ok for the front end you will only use teh virtualized
+  version and render the file tree and onclick the file content based on the
+  graph", tree source answered as the repository map (all files); then "add
+  golang syntax highlighting to the code"
+Goal: Answer the question a person new to a repository actually arrives with --
+  what is in here -- in the shape the repository already has, and let them read
+  any file in it without leaving the console
+Assumptions: The repository map is the honest source for a tree because it
+  records every file, including the ones the Go loader ignores (the module
+  file, generated output, testdata); a tree built from packages would quietly
+  omit them and would not be the repository a person sees in their editor
+Decisions: ReadCodeFile resolves only paths the map already recorded, so a
+  directory listing cannot become a way to read anything the coordinator can
+  reach; reads stop at 4000 lines and say so rather than handing a browser a
+  whole large file; highlighting runs go/scanner rather than patterns, so a
+  "//" inside a string stays a string and scanner errors are ignored because a
+  file mid-edit is exactly when somebody is reading it; a separate syntax
+  palette lives in the design package rather than borrowing state colours,
+  keeps clear of the live cyan Active owns, and holds AA on both the plain and
+  the raised surface in all three themes; comments are dimmed but upright
+  because atom documentation makes a well-documented file mostly comment and a
+  screen of italics is tiring; colour stops past 2000 lines, where the node
+  count costs more than the colour returns
+Files-or-schemas: api/proto/codeflux/v1/product_api.proto (ListCodeFiles,
+  ReadCodeFile, CodeFileView); internal/coordinator/code_collection_files.go;
+  internal/coordinator/code_collection_application.go;
+  internal/coordinator/catalog.go; internal/transport/code_collection_records.go;
+  internal/transport/code_collection_service.go; web/frontend/filetree/;
+  web/frontend/design/syntax.go; web/frontend/routes/routes.go;
+  web/frontend/shell/shell.go; web/client/file_tree.go,
+  file_tree_mounted_wasm.go, main.go
+Validation: go test for filetree (7 component + 6 highlighter checks, including
+  the property that highlighting returns the file byte for byte), design (every
+  syntax colour at AA on both surfaces in all three themes), web/client
+  projections, and three coordinator checks covering the listing, a read with
+  its declarations in source order, and refusal of four paths the map never
+  recorded; driven live in Chromium at 127.0.0.1:47311 -- tree renders, filter
+  auto-expands to its matches, a click opens the file with its own line
+  numbers, a declaration chip marks the line that declares it, no page errors;
+  end-to-end console test added covering the same journey against a real
+  repository through the real executable
+Failures-or-discarded-approaches: /code was not in the server's unscoped entry
+  paths, so the route 404ed before the page could ever load -- the same gap
+  previously fixed for /atoms; the declaration strip was drawn 7.7px tall with
+  19px chips because the content column squeezed it instead of the source pane,
+  fixed by pinning the strip and letting the source absorb the remaining height
+Known-limitations: The code route now renders the tree instead of the package
+  and declaration listing another lane owns; that listing is still built and
+  reachable, but nothing in the navigation points at it. Binary and very large
+  files are listed but read as text.
+Next-safe-step: Decide with the other lane whether the package listing becomes
+  a second view on this route or moves under the atom directory.
+
+Dev-Log: DL-20260802-012
+Date: 2026-08-02
+Status: Recorded spend is readable, sliced by atoms, molecules, and program
+Change-ID: None until a commit is authorized
+Request-or-TODO: User: "implement this is the backend and hook it up to the
+  front end client, I also want per atom, per molecule and per program costs
+  even if its an approximation". Builds on DL-20260802-008
+Goal: Expose what recorded work cost and where the money went, from the ledger
+  through a read RPC to the settings sheet
+Assumptions: A window with no provider call is exactly zero spend. Phases are
+  the flow's own seven movements rather than a coarser three, because control
+  flow and verification consume real model time and folding them into "program"
+  would report assembly as expensive when the checking was
+Decisions: Provider calls do not record the stage that made them, so per-phase
+  cost is an approximation, and it is labelled as one in the type, in the proto
+  field, and on screen. PIPE-006 is still open, so a stage record writes one
+  timestamp into both its start and finish columns; interval containment would
+  therefore match nothing. The rule instead attributes a call to the first stage
+  whose record was written at or after it -- the next stage to finish, which is
+  the stage that was running -- and it becomes true containment once PIPE-006
+  lands. The stage is found with a correlated scalar subquery, not a join, so a
+  call can match at most one stage however the timestamps fall; a join would
+  double-count a call that two stage rows both claimed. Totals are summed from
+  the calls themselves and never from the phases, so unattributed spend is
+  missing from the breakdown but never from the total, and the remainder is
+  reported as its own row rather than left as an unexplained gap. Exact cost is
+  summed by grouping on (currency, denominator) in SQL and accumulating big.Rat
+  in Go, so the number of rational additions is the number of distinct prices
+  rather than the number of calls. Money crosses the wire as conventions.proto
+  Money at six extra decimal places with an exact flag: this repository already
+  interprets decimal_places relative to minor units, whole minor units would
+  round most single calls to free, and a rounded figure that claimed to be exact
+  is the failure the whole surface exists to prevent. Unknown cost is an absent
+  Money and renders "not priced", never a zero
+Files-or-schemas: internal/pipeline/phases.go(+test),
+  internal/storage/spend_attribution_repository.go(+test),
+  api/proto/codeflux/v1/product_api.proto (SettingsService.GetSpendSummary and
+  six messages, purely additive), regenerated api/gen/codeflux/v1,
+  internal/transport/settings_spend_service.go(+test),
+  internal/transport/settings_configuration_service.go (interface),
+  internal/coordinator/spend_summary.go,
+  web/frontend/settingsview/spend.go(+test), sheet.go, component.go,
+  web/client/spend_projection.go(+test), settings_transport_wasm.go,
+  settings_resource.go, settings_mounted_wasm.go. No schema change, no migration
+Validation: go build ./... clean; GOOS=js GOARCH=wasm go build ./web/client
+  clean; generate-check clean. Full suites pass: internal/storage 162.8s,
+  internal/pipeline, internal/transport, web/frontend/settingsview, web/client.
+  The attribution test drives the repository clock rather than observing it, so
+  the ordering the rule reads is fixed rather than dependent on how long SQLite
+  took between two writes. Mutation-checked: reversing the stage subquery's
+  order to pick the last stage instead of the next one loses the atom phase
+  entirely, so the rule is load-bearing and tested. The phase mapping test is
+  driven from pipeline.Flow, so a stage added later fails there rather than
+  silently dropping its spend out of the summary
+Failures-or-discarded-approaches: The first cut of the storage aggregator
+  indexed the per-key accumulator maps directly, which yields a nil pointer for
+  every key the first time it appears; replaced with an explicit accumulatorFor.
+  The first view cut routed unpriced rows through contractRow, which overrides
+  any value with "not answered" when known is false -- correct for a missing
+  answer, wrong here, because the coordinator did answer and what it said was
+  that these calls carried no price. The row now builds on the same primitives
+  with its own text
+Known-limitations: Per-phase and per-stage figures are estimates while a call
+  carries no stage; the total and the per-model figures are exact. The window is
+  fixed at the last thirty days on the settings page rather than selectable. The
+  read scans the accounting table, bounded only by the local database. No
+  governing TODO ID exists for the read surface; this traces to the user request
+Concurrency-note: Another session was editing this worktree throughout. The
+  proto change is purely additive (git diff shows zero removed lines) and their
+  CodeFileView work regenerated intact. Two of their transient compile errors
+  were observed and waited out rather than corrected. One cross-lane edit was
+  made: internal/transport/code_collection_service_test.go gained the
+  ListCodeFiles and ReadCodeFile fake methods their own interface change already
+  required, because without them the whole transport test package would not
+  compile and nothing in it could be verified. That addition is theirs to
+  replace
+Next-safe-step: Record the stage on the provider request so phase attribution
+  stops being an approximation, which also closes PIPE-006's effect here
+
 Dev-Log: DL-20260802-011
 Date: 2026-08-02
 Status: A setting can be found and changed on the sheet without reading it

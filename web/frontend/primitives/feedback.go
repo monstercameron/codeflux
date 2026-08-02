@@ -40,7 +40,13 @@ func InlineAlert(props InlineAlertProps) ui.Node {
 		}, html.Text(presentation.Icon)),
 	}
 	if props.Title != "" {
-		children = append(children, html.Strong(html.Props{}, html.Text(props.Title)))
+		children = append(children, html.Strong(html.Props{
+			Class: css.New(
+				css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+				css.FontWeight.Semibold,
+				css.WhiteSpace.NoWrap,
+			).String(),
+		}, html.Text(props.Title)))
 	}
 	children = append(children, html.Span(html.Props{}, html.Text(props.Message)))
 	return html.Div(
@@ -215,13 +221,22 @@ func statePanel(component, role, title, body, actionLabel string, mode Mode, onA
 		return contractError(component, "title is required")
 	}
 	tokens := mode.Tokens()
+	titleColor := tokens.Colors.TextPrimary
+	titleFace := tokens.Fonts.UI
+	titleWeight := css.FontWeight.Semibold
+	if component == "empty-state" {
+		titleColor = tokens.Colors.TextSecondary
+		titleFace = tokens.Fonts.Display
+		titleWeight = css.FontWeight.Normal
+	}
 	children := []ui.Node{html.H2(html.Props{
 		Class: css.New(
-			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+			css.TextColor(css.Hex(string(titleColor))),
 			css.Margin(css.Zero),
+			css.Font(css.FontStack(titleFace)),
 			css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
 			css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
-			css.FontWeight.Semibold,
+			titleWeight,
 		).String(),
 	}, html.Text(title))}
 	if body != "" {
@@ -241,6 +256,28 @@ func statePanel(component, role, title, body, actionLabel string, mode Mode, onA
 			Mode:    mode,
 			OnClick: onAction,
 		}))
+	}
+	// An empty panel is an invitation, not an incident. It is set on the
+	// surface it belongs to instead of inside a card of its own, centred in the
+	// room it has, because a bordered box drawn around the words "nothing yet"
+	// makes an absence look like a component that failed to load. An error
+	// keeps its panel: something did fail, and it should look like it.
+	if component == "empty-state" {
+		return html.Section(
+			html.Props{
+				Role: role,
+				Data: map[string]string{"component": component, "state": "empty"},
+				Class: css.New(
+					u.Flex, u.FlexCol, u.ItemsCenter, u.JustifyCenter,
+					css.Gap(css.Px(tokens.Spacing.SM)),
+					css.Padding(css.Px(tokens.Spacing.XL)),
+					css.TextAlign.Center,
+					css.MinHeight(css.Px(120)),
+					css.MinWidth(css.Zero), css.MaxWidth(css.Full),
+				).String(),
+			},
+			children...,
+		)
 	}
 	return html.Section(
 		html.Props{

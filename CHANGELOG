@@ -51,31 +51,41 @@ Dev-Log: DL-20260802-009
 
 Change-ID: CL-20260802-006
 Date: 2026-08-02
-Type: The settings sheet gains controls that fit it, and a way to find one
-  setting among twenty
+Type: The settings sheet gains controls that fit it, a way to find one setting
+  among twenty, and a type scale
 Request-or-TODO: User: "the value change inputs look like dogshit so they need
   to be redesigned and lets add a search on this page to find a setting and
   allows the user to jump to that section"; then "do another visual pass for
   spacing and overlapping and other visual issues"; then "Model that decides how
-  work is split has overlapping issues, visually inspect it"
-Outcome: Every control on the settings sheet now looks like the value it edits
-  and sits on the sheet's shared axis. A number is a stepper that enforces the
-  engine's bound, a switch offers both states, a posture with a long option set
-  is a list rather than a segmented control wider than its own row, and the
-  choices belonging to this browser -- appearance and local telemetry -- render
-  against the same column as everything else. A search field finds a setting by
-  name, key, group, or what it does, ranked by where it matched, and jumps to
-  the row and marks it
-Affected-behavior: Settings, at /settings. No coordinator behaviour changes: the
-  values, their bounds, and the save path are unchanged
+  work is split has overlapping issues"; then "do a refinement pass on the
+  control and font sizes for the settings page as it looks childish"
+Outcome: Every control on the settings sheet now looks like the value it edits.
+  A number is a stepper that enforces the engine's bound, a switch offers both
+  states, and a posture with a long option set is a list rather than a segmented
+  control wider than its own row -- which is what had been painting over the
+  name of the setting that chooses the planning model. A search field finds a
+  setting by name, key, group, or what it does, ranked by where it matched, and
+  jumps to the row and marks it. The page was then measured and re-sized: prose
+  moved up one step, values came down to the size of the name beside them, the
+  four facts that open the sheet keep the emphasis, and controls are sized to the
+  row instead of to a fingertip
+Affected-behavior: Settings, at /settings. primitives.Button and
+  primitives.ToggleButton gain a Compact weight, which nothing else sets, so no
+  other surface moves
 Compatibility-or-migration: None. No schema change, no migration, no API change
 Verification: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; gofmt
-  clean; go test for web/frontend/settingsview, appearanceview, telemetryview,
+  clean; go test for settingsview, primitives, appearanceview, telemetryview,
   and web/client. Inspected in Chromium at 1600, 1280, and 1024 with a scripted
   audit asserting nothing paints outside its grid cell or past the sheet edge at
-  any width, and that every value ends on the same column; the search was driven
+  any width and that every value ends on the same column; the search was driven
   end to end
-Dev-Log: DL-20260802-010, DL-20260802-011
+Known-limitation-of-this-commit: The route that mounts this sheet lives in
+  web/frontend/shell/shell.go, which four lanes are rewriting at once, and its
+  settings hunks cannot be separated from theirs without producing a tree that
+  does not compile. The shell wiring and the appearance panel's axis land with
+  those lanes; this commit carries the sheet, its controls, its search, and its
+  data path, all of which build and test on their own
+Dev-Log: DL-20260802-010, DL-20260802-011, DL-20260802-012
 
 Change-ID: CL-20260802-005
 Date: 2026-08-02

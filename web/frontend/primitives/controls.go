@@ -16,13 +16,21 @@ type ButtonProps struct {
 	AccessibleLabel string
 	Value           string
 	Primary         bool
-	Disabled        bool
-	Busy            bool
-	Expanded        *bool
-	Controls        string
-	DescribedBy     string
-	Mode            Mode
-	OnClick         func()
+	// Quiet marks a control that belongs to the surface it sits on rather
+	// than standing on top of it: a copy action inside a transcript entry, a
+	// rail's own housekeeping. It keeps the full pointer target and the same
+	// focus ring, and gives up its filled background and border.
+	Quiet bool
+	// Compact drops the pointer-target floor, for an action set inside a dense
+	// readout rather than standing on its own.
+	Compact     bool
+	Disabled    bool
+	Busy        bool
+	Expanded    *bool
+	Controls    string
+	DescribedBy string
+	Mode        Mode
+	OnClick     func()
 	// StableOnClick allows a hook-owning parent to pass ui.UseEvent without
 	// weakening the ordinary callback contract used by stateless callers.
 	OnClickHandler ui.Handler
@@ -31,6 +39,10 @@ type ButtonProps struct {
 	// still comes from Label or AccessibleLabel, so an icon-only control is
 	// never nameless: it looks like an icon and reads like a sentence.
 	Icon IconName
+	// LeadingIcon draws a mark before the label instead of replacing it. Every
+	// action in this console carries one, so a row of controls reads as a set
+	// rather than as a paragraph of words in boxes.
+	LeadingIcon IconName
 	// DisabledReason says why a control cannot be used. A control that is
 	// neither actionable nor explained is the worst state an interface can be
 	// in, because it looks like it works; the reason reaches both a pointer
@@ -53,7 +65,9 @@ func Button(props ButtonProps) ui.Node {
 	htmlProps.Type = "button"
 	htmlProps.Value = props.Value
 	htmlProps.Disabled = !state.Enabled()
-	htmlProps.Class = controlClass(props.Mode.Tokens(), props.Primary)
+	htmlProps.Class = controlVariantClass(
+		props.Mode.Tokens(), props.Primary, props.Quiet, props.Compact,
+	)
 	htmlProps.Aria = map[string]string{"label": name, "busy": boolARIA(props.Busy)}
 	if props.Expanded != nil {
 		htmlProps.Aria["expanded"] = boolARIA(*props.Expanded)
@@ -87,7 +101,13 @@ func Button(props ButtonProps) ui.Node {
 		htmlProps.Aria["label"] = name
 		// A mark alone in a 44-pixel target needs to be large enough to read
 		// as a shape rather than as a speck in a box.
-		return html.Button(htmlProps, Icon(IconProps{Name: props.Icon, Size: 20}))
+		return html.Button(htmlProps, Icon(IconProps{Name: props.Icon, Size: IconSizeLarge}))
+	}
+	if props.LeadingIcon != "" && !props.Busy {
+		return html.Button(htmlProps,
+			Icon(IconProps{Name: props.LeadingIcon, Size: IconSizeBase}),
+			html.Span(html.Props{Text: label}),
+		)
 	}
 	return html.Button(htmlProps, html.Text(label))
 }
@@ -141,7 +161,10 @@ type ToggleButtonProps struct {
 	Disabled        bool
 	Busy            bool
 	Mode            Mode
-	OnToggle        func(bool)
+	// Compact drops the pointer-target floor, for a control set inside a dense
+	// readout rather than standing on its own.
+	Compact  bool
+	OnToggle func(bool)
 }
 
 func ToggleButton(props ToggleButtonProps) ui.Node {
@@ -164,7 +187,7 @@ func toggleButton(props ToggleButtonProps, pressed bool, onClick func()) ui.Node
 	htmlProps.ID = props.ID
 	htmlProps.Type = "button"
 	htmlProps.Disabled = !state.Enabled()
-	htmlProps.Class = controlClass(props.Mode.Tokens(), pressed)
+	htmlProps.Class = segmentClass(props.Mode.Tokens(), pressed, props.Compact)
 	htmlProps.Aria = map[string]string{
 		"label":   name,
 		"pressed": boolARIA(pressed),

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"strconv"
 
 	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
@@ -40,8 +41,14 @@ func settingsViewForMountedSettings(props settingsview.Props) state.SettingsView
 
 // settingsAnswer is one coordinator answer about the settings surfaces.
 type settingsAnswer struct {
-	Policy    settingsview.PolicyRow
-	Providers []settingsview.ProviderGroup
+	Policy           settingsview.PolicyRow
+	Providers        []settingsview.ProviderGroup
+	Flow             []settingsview.FlowSetting
+	FlowUnrenderable []string
+	FlowRevision     uint64
+	// Spend is what the recorded work cost. It is absent rather than zeroed
+	// when the read failed, so the page says nothing instead of saying free.
+	Spend settingsview.SpendPanel
 }
 
 // projectSettingsPolicy turns the policy answer into the row the page draws.
@@ -128,4 +135,82 @@ func settingsRequestTimeout(response *codefluxv1.GetModelsResponse) (int64, bool
 		return int64(view.GetDefaultTimeout().AsDuration()), true
 	}
 	return 0, false
+}
+
+// projectFlowSettings turns the coordinator's described settings into rows.
+//
+// The description is carried through unchanged. A page that restated a label,
+// a bound, or a help sentence would eventually disagree with the engine that
+// enforces it.
+func projectFlowSettings(
+	response *codefluxv1.GetFlowSettingsResponse,
+) []settingsview.FlowSetting {
+	views := response.GetSettings()
+	settings := make([]settingsview.FlowSetting, 0, len(views))
+	for _, view := range views {
+		if view.GetKey() == "" || view.GetKind() == "" {
+			// A setting with no key cannot be changed, and one with no kind
+			// cannot be rendered. Drawing either would offer a control that
+			// does nothing.
+			continue
+		}
+		settings = append(settings, settingsview.FlowSetting{
+			Key:       view.GetKey(),
+			Label:     view.GetLabel(),
+			Help:      view.GetHelp().GetValue(),
+			Kind:      view.GetKind(),
+			Choices:   view.GetChoices(),
+			Minimum:   view.GetMinimum(),
+			Maximum:   view.GetMaximum(),
+			Group:     view.GetGroup(),
+			Text:      view.GetTextValue(),
+			Number:    view.GetNumberValue(),
+			Enabled:   view.GetSwitchValue(),
+			AtDefault: view.GetAtDefault(),
+			Items:     view.GetItemValues(),
+			Pairs:     projectFlowPairs(view.GetPairValues()),
+		})
+	}
+	return settings
+}
+
+// flowSettingChanges renders the pending edits as the command the coordinator
+// accepts.
+//
+// Only the field matching the setting kind is filled, because the coordinator
+// reads only that one and sending the others would imply a change nobody made.
+func flowSettingChanges(
+	pending map[string]settingsview.FlowSetting,
+) []*codefluxv1.FlowSettingChange {
+	changes := make([]*codefluxv1.FlowSettingChange, 0, len(pending))
+	for key, setting := range pending {
+		change := &codefluxv1.FlowSettingChange{Key: key}
+		switch setting.Kind {
+		case settingsview.FlowChoice:
+			change.TextValue = setting.Text
+		case settingsview.FlowNumber:
+			change.NumberValue = setting.Number
+		case settingsview.FlowSwitch:
+			change.SwitchValue = setting.Enabled
+		}
+		changes = append(changes, change)
+	}
+	sort.Slice(changes, func(first, second int) bool {
+		// One order, so a retry of the same edits is the same request.
+		return changes[first].GetKey() < changes[second].GetKey()
+	})
+	return changes
+}
+
+// projectFlowPairs turns a mapping setting's named choices into rows.
+func projectFlowPairs(
+	views []*codefluxv1.FlowSettingPair,
+) []settingsview.FlowSettingPair {
+	pairs := make([]settingsview.FlowSettingPair, 0, len(views))
+	for _, view := range views {
+		pairs = append(pairs, settingsview.FlowSettingPair{
+			Key: view.GetKey(), Value: view.GetValue(),
+		})
+	}
+	return pairs
 }

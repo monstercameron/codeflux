@@ -1,6 +1,7 @@
 package primitives
 
 import (
+	"strconv"
 	"strings"
 
 	"codeflux.dev/codeflux/web/frontend/design"
@@ -223,4 +224,147 @@ func accessibleOverlay(props ui.AccessibleOverlayProps) ui.Node {
 		props.Target = ui.PortalTarget{Selector: "#app"}
 	}
 	return ui.CreateElement(ui.AccessibleOverlay, props)
+}
+
+// ModalProps configures the console's one modal shell.
+type ModalProps struct {
+	ID          string
+	Title       string
+	Description string
+	Icon        IconName
+	Open        bool
+	Mode        Mode
+	// Width is the surface's maximum width in CSS pixels. It defaults to a
+	// measure that keeps a form readable rather than filling the display.
+	Width int
+	Body  ui.Node
+	// PrimaryLabel names the action that commits and closes. Left empty, the
+	// modal is a reading surface and shows only its dismissal.
+	PrimaryLabel          string
+	PrimaryDisabled       bool
+	PrimaryDisabledReason string
+	OnPrimary             func()
+	// DismissLabel names the way out. It defaults to Close.
+	DismissLabel         string
+	InitialFocusSelector string
+	AppRootSelector      string
+	OnDismiss            func()
+}
+
+// Modal is the single designed overlay every dialog in the console uses.
+//
+// Before it, each caller assembled its own: a heading here, a bare "×" there, a
+// row of buttons somewhere else, and no two the same width or rhythm. One shell
+// means a person learns the shape once — title on the left, the way out on the
+// right, the body between them, the committing action at the bottom.
+func Modal(props ModalProps) ui.Node {
+	tokens := props.Mode.Tokens()
+	width := props.Width
+	if width <= 0 {
+		width = 560
+	}
+	titleID := props.ID + "-title"
+	descriptionID := props.ID + "-description"
+	heading := []ui.Node{}
+	if props.Icon != "" {
+		heading = append(heading, Icon(IconProps{Name: props.Icon, Size: IconSizeBase}))
+	}
+	heading = append(heading, html.H2(html.Props{
+		ID: titleID,
+		Class: css.New(
+			css.Margin(css.Zero),
+			css.Font(css.FontStack(tokens.Fonts.Display)),
+			css.FontSize(css.Px(tokens.Typography.SectionTitle.Size)),
+			css.LineHeightLen(css.Px(tokens.Typography.SectionTitle.LineHeight)),
+			css.FontWeight.Normal,
+			css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
+		).String(),
+		Text: props.Title,
+	}))
+	children := []ui.Node{
+		html.Header(html.Props{
+			Class: css.New(
+				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				css.Gap(css.Px(tokens.Spacing.MD)),
+				css.Padding(css.RawLength("0 0 12px")),
+				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+			).String(),
+		},
+			html.Div(html.Props{
+				Class: css.New(u.Flex, u.ItemsCenter, css.Gap(css.Px(tokens.Spacing.SM))).String(),
+			}, heading...),
+			Button(ButtonProps{
+				ID: props.ID + "-close", Icon: IconClose, AccessibleLabel: "Close " + props.Title,
+				Quiet: true, Mode: props.Mode, OnClick: props.OnDismiss,
+			}),
+		),
+	}
+	if strings.TrimSpace(props.Description) != "" {
+		children = append(children, html.P(html.Props{
+			ID: descriptionID,
+			Class: css.New(
+				css.Margin(css.Zero),
+				css.MaxWidth(css.Ch(72)),
+				css.Font(css.FontStack(tokens.Fonts.Reading)),
+				css.FontSize(css.Px(tokens.Typography.CompactBody.Size)),
+				css.LineHeightLen(css.Px(tokens.Typography.Body.LineHeight)),
+				css.TextColor(css.Hex(string(tokens.Colors.TextSecondary))),
+			).String(),
+			Text: props.Description,
+		}))
+	}
+	children = append(children, html.Div(html.Props{
+		Class: css.New(
+			u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)),
+			css.MinHeight(css.Zero), css.OverflowY.Auto,
+			css.Padding(css.RawLength("4px 0")),
+		).String(),
+	}, props.Body))
+	footer := []ui.Node{}
+	if strings.TrimSpace(props.PrimaryLabel) != "" {
+		footer = append(footer, Button(ButtonProps{
+			ID: props.ID + "-primary", Label: props.PrimaryLabel, Primary: true,
+			Disabled: props.PrimaryDisabled, DisabledReason: props.PrimaryDisabledReason,
+			Mode: props.Mode, OnClick: props.OnPrimary,
+		}))
+	}
+	dismissLabel := props.DismissLabel
+	if strings.TrimSpace(dismissLabel) == "" {
+		dismissLabel = "Close"
+	}
+	footer = append([]ui.Node{Button(ButtonProps{
+		ID: props.ID + "-dismiss", Label: dismissLabel, Mode: props.Mode, OnClick: props.OnDismiss,
+	})}, footer...)
+	children = append(children, html.Footer(html.Props{
+		Class: css.New(
+			u.Flex, u.ItemsCenter, u.JustifyEnd,
+			css.Gap(css.Px(tokens.Spacing.SM)),
+			css.Padding(css.RawLength("12px 0 0")),
+			css.BorderTop(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
+		).String(),
+	}, footer...))
+	initialFocus := props.InitialFocusSelector
+	if strings.TrimSpace(initialFocus) == "" {
+		initialFocus = "#" + props.ID + "-close"
+	}
+	described := ""
+	if strings.TrimSpace(props.Description) != "" {
+		described = descriptionID
+	}
+	return Dialog(OverlayProps{
+		ID: props.ID, Open: props.Open,
+		LabelledBy: titleID, DescribedBy: described,
+		InitialFocusSelector: initialFocus,
+		AppRootSelector:      props.AppRootSelector,
+		Mode:                 props.Mode,
+		OnDismiss:            props.OnDismiss,
+		Content: html.Section(html.Props{
+			Data: map[string]string{"component": "modal", "modal": props.ID},
+			Class: css.New(
+				u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.MD)),
+				css.W(css.RawLength("min("+strconv.Itoa(width)+"px, calc(100vw - 48px))")),
+				css.MinHeight(css.Zero),
+			).String(),
+		}, children...),
+	})
 }

@@ -114,3 +114,38 @@ func safeCommandReason(err error) string {
 	}
 	return "the coordinator did not answer."
 }
+
+// saveMountedFlowSettings records changed run settings.
+//
+// The expected revision is the one the page read, so a change made against a
+// stale view is refused rather than overwriting somebody else's.
+func saveMountedFlowSettings(
+	ctx context.Context,
+	workspace *codefluxv1.StableIdentity,
+	changes []*codefluxv1.FlowSettingChange,
+	expectedRevision uint64,
+	idempotencyKey string,
+) ([]settingsview.FlowSetting, uint64, error) {
+	connection, err := openBrowserSettingsConnection(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = connection.Close() }()
+	response, err := codefluxv1.NewSettingsServiceClient(connection).SetFlowSettings(
+		ctx,
+		&codefluxv1.SetFlowSettingsRequest{
+			Control: &codefluxv1.MutationControl{
+				IdempotencyKey: idempotencyKey, ExpectedRevision: &expectedRevision,
+			},
+			WorkspaceId: workspace,
+			Changes:     changes,
+		},
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	saved := projectFlowSettings(&codefluxv1.GetFlowSettingsResponse{
+		Settings: response.GetSettings(), Revision: response.GetRevision(),
+	})
+	return saved, response.GetRevision(), nil
+}
