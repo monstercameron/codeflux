@@ -17,6 +17,25 @@ Where they disagree about implemented behaviour, the source wins. Where they dis
 
 Do not invent commands, packages, schemas, or capabilities merely because the plan anticipates them. The repository may still be in an earlier milestone.
 
+## Tracked Agent Configuration
+
+`.claude/` is committed, so every agent working here starts from the same setup rather than whatever its operator has locally. `CLAUDE.md` stays a thin pointer to this file — a repository lint rule enforces that — so the detail lives here.
+
+| Path | What it is |
+| --- | --- |
+| `.claude/settings.json` | Permissions. The `codeflux-dev` gates are pre-allowed. `run-live`, reading `.env`, and pushing to `main` are denied. |
+| `.claude/agents/plan-locator.md` | Finds the governing `docs/plan.md` section and `TODOS.md` ID; reports in scope, deferred, or unplanned. |
+| `.claude/agents/gate-runner.md` | Runs the gates and returns a triaged failure list rather than raw log output. |
+| `.claude/agents/ledger-scribe.md` | Plans the commit split and drafts the `CHANGELOG` and `DEVLOG` entries a commit requires. |
+| `.claude/skills/karpathy-guidelines/` | Vendored, pinned at `2c60614`. MIT by its own frontmatter; the upstream repository has no `LICENSE`, so nothing else from it may be copied. |
+| `.claude/skills/frontend-design/` | Vendored verbatim with its `LICENSE.txt`, Apache-2.0. Required reading before building or reshaping a surface. |
+
+The `run-live` denial is the one worth knowing: it is the only command that reaches a provider and spends money, and it is excluded from every suite.
+
+## Branches
+
+Work branches from `dev` and returns to it through a pull request. `dev` is the default branch and its CI is allowed to be red. `main` takes only `dev`, only through a pull request, and only with every check green; it refuses a direct push from everyone, including the repository owner. See `.github/CONTRIBUTING.md`.
+
 ## Task Lifecycle
 
 One loop governs every non-trivial change. The rest of this file is the detail behind its steps.
@@ -259,6 +278,34 @@ Every command accepts `--root`. A repository-local root must be a child of
 `.artifacts`; an explicit external root is never selected or deleted
 implicitly. Use `--json` only when command help declares machine-readable
 output.
+
+### Stop What You Start
+
+**Every process you start, you stop before the task ends.** This repository has
+repeatedly accumulated forty to sixty orphaned processes in a single session,
+because each agent starts a server, finishes with it, and leaves it running.
+Nothing reaps them, and the cost is real: exhausted memory, a machine that
+crawls, and the occupied ports that make the next run fail for reasons unrelated
+to the change.
+
+- **The dev server binds a fixed port, `127.0.0.1:47311`.** A second one cannot
+  start while the first is alive, and the bind error will say so. That is
+  deliberate — an ephemeral port let every stale server coexist invisibly, which
+  is precisely how they reached sixty.
+- **Before starting a server, check whether yours is already running.** Reuse it.
+  Starting a fresh one because it is easier than checking is the whole problem.
+- **Do not leave `go run`, `go test`, `gopls`, `staticcheck`, Playwright,
+  Chromium, or a worker detached** past the step that needed it. A backgrounded
+  process is yours until you stop it.
+- **Prefer foreground and short-lived.** Run the thing, read the output, let it
+  exit. Background it only when you genuinely need it alive across steps, and
+  then stop it explicitly when you no longer do.
+- **Stop by port or PID, never broadly.** Kill the process holding `47311` or
+  the PID you started; never a blanket kill of every `go`, `node`, or browser
+  process, which will take down the user's own work alongside yours.
+- **Report what you left running.** If something must outlive the task, say so
+  explicitly, say why, and say how to stop it. Silence here is how the count
+  climbs.
 
 ## Atom Naming Style
 

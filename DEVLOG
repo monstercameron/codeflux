@@ -25,11 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-029
+Date: 2026-08-02
+Status: CLAUDE.md thinned; lint regression repaired
+Change-ID: CL-20260802-019
+Commit: pending
+Request-or-TODO: Repair of a regression introduced by CL-20260802-012 and
+  CL-20260802-017 earlier in this session
+Goal: Get the repository lint gate passing again
+Assumptions: The rule is deliberate -- CLAUDE.md exists so Claude Code finds
+  AGENTS.md, and duplicating rules into it is exactly the drift it guards against
+Decisions: Move the content rather than delete it. The .claude/ map and the
+  branch summary are worth having; they were simply in the wrong file, and
+  AGENTS.md is the file every agent reads regardless of vendor
+Files-or-schemas: CLAUDE.md, AGENTS.md. No schema change
+Validation: CLAUDE.md is 13 lines against a 30-line limit and retains all three
+  required pointers
+Failures-or-discarded-approaches: The regression was introduced two commits ago
+  and pushed. It went unnoticed because lint was never run after editing
+  CLAUDE.md, and the dev-pass failure that did report it was misread as the
+  pre-existing staticcheck findings. The pre-commit hook caught it on its first
+  real use, which is the argument for the hook in one sentence
+Known-limitations: None
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-027
 Date: 2026-08-02
 Status: frontend-design skill vendored and made a frontend precondition
 Change-ID: CL-20260802-017
-Commit: pending
+Commit: 13392a7
 Request-or-TODO: User: "also import the claude front end design skill and store
   it in here for gpt models to use and when touching the front end use that
   skill"

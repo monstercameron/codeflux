@@ -42,8 +42,26 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-017
+Change-ID: CL-20260802-019
 Commit: pending
+Date: 2026-08-02
+Type: CLAUDE.md is restored to a thin entry point, repairing a lint regression
+  this session introduced
+Request-or-TODO: Repair of CL-20260802-012 and CL-20260802-017, found by the
+  new pre-commit hook on its first real use
+Outcome: A repository lint rule requires CLAUDE.md to stay under thirty lines
+  and to point at AGENTS.md, docs/plan.md, and TODOS.md. Earlier commits this
+  session grew it to thirty-seven lines with a branch section, a .claude/ table,
+  and skill provenance, which broke that rule. The content moves to AGENTS.md as
+  "Tracked Agent Configuration" and "Branches", where it belongs anyway, and
+  CLAUDE.md returns to a pointer
+Affected-behavior: None. Documentation only
+Compatibility-or-migration: None
+Verification: codeflux-dev lint now passes this check; CLAUDE.md is 13 lines
+Dev-Log: DL-20260802-029
+
+Change-ID: CL-20260802-017
+Commit: 13392a7
 Date: 2026-08-02
 Type: Anthropic's frontend-design skill is vendored, and reading it becomes a
   precondition for building or reshaping a surface
