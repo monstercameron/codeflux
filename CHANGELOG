@@ -42,8 +42,36 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-016
+Change-ID: CL-20260802-017
 Commit: pending
+Date: 2026-08-02
+Type: Anthropic's frontend-design skill is vendored, and reading it becomes a
+  precondition for building or reshaping a surface
+Request-or-TODO: User: "also import the claude front end design skill and store
+  it in here for gpt models to use and when touching the front end use that
+  skill"
+Outcome: .claude/skills/frontend-design/ holds SKILL.md and LICENSE.txt copied
+  verbatim from the official Anthropic plugin marketplace. It is Apache-2.0,
+  which permits redistribution provided the licence travels with it and the
+  files are unmodified or their modification is declared; both files are
+  byte-identical to source, verified by diff, and the licence sits beside them.
+  Checking it in is the point of the request: an agent that is not Claude Code
+  cannot load a skill, but any agent can read a file in the repository.
+  AGENTS.md now requires reading it before a new surface is built or an existing
+  one materially reshaped, and states the translation rule -- the skill talks
+  about palettes, typefaces, and CSS selector specificity because it was written
+  for projects that ship CSS, while this repository forbids handwritten CSS and
+  expresses colour, type, spacing, and motion through the Go design tokens in
+  web/frontend/design. Its design thinking applies; its implementation
+  vocabulary does not, and where they collide the product boundary wins
+Affected-behavior: None at runtime
+Compatibility-or-migration: None
+Verification: diff against the marketplace source confirms both files verbatim.
+  No Go source touched
+Dev-Log: DL-20260802-027
+
+Change-ID: CL-20260802-016
+Commit: 5c0dda8
 Date: 2026-08-02
 Type: AGENTS.md is restructured for focus; no rule removed
 Request-or-TODO: User: "refine the agents.md make sure its focused and not

@@ -84,6 +84,7 @@ The primary interface is a GoWebComponents v5 chat thread with a task-scoped gra
 - If useful documentation has no explicitly authorized Markdown destination, report it in the task response or store product runtime knowledge in SQLite as designed; do not create a sidecar document.
 - An explicit request to create one Markdown file authorizes only that named file, not additional related Markdown files.
 - These were explicitly requested and are authorized; do not delete them as unauthorized clutter: the root `README.md`; `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `PULL_REQUEST_TEMPLATE.md`; and everything under `.claude/`. Adding a *new* file still requires its own explicit request.
+- Vendored third-party files under `.claude/skills/` are copies, not repository prose. Keep them verbatim, keep their licence file beside them, and record any change prominently — `frontend-design` is Apache-2.0 and ships with its `LICENSE.txt`.
 
 ### One Repository-Local Artifact Root
 
@@ -461,6 +462,16 @@ Rules for atom comments:
 - Never expose private model reasoning; show plans, assumptions, actions, evidence, uncertainty, and decisions.
 - Keep raw tool output collapsed and redacted by default.
 - Never display unknown cost as zero.
+
+### Read the design skill before building or reshaping a surface
+
+Before creating a new surface or materially reshaping an existing one, read [`.claude/skills/frontend-design/SKILL.md`](.claude/skills/frontend-design/SKILL.md). It is vendored in the repository under Apache-2.0 precisely so that any agent can read it, not only ones that load skills automatically.
+
+Take from it the design thinking: ground the work in the subject rather than in a template, make the type hierarchy carry meaning, let structural devices encode something true instead of decorating, spend boldness in one place and keep everything around it quiet, and critique your own work with a screenshot before calling it finished.
+
+**Translate it, do not apply it literally.** The skill talks about palettes, typefaces, and CSS selector specificity because it was written for projects that ship CSS. This repository does not: colour, type, spacing, and motion come from the Go design tokens in `web/frontend/design` and the components in `primitives`, and handwritten CSS remains a product-boundary violation. Where the skill's advice and this repository's boundaries collide, the boundaries win — express the intent through tokens, or extend the token system deliberately.
+
+The skill's own quality floor is the repository's too: responsive, visible keyboard focus, reduced motion respected.
 
 ### Frontend changes must be driven in a browser
 

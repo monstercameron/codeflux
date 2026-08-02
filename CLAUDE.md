@@ -25,6 +25,7 @@ Work branches from `dev` and returns to it through a pull request. `dev` is the 
 | [`.claude/agents/gate-runner.md`](.claude/agents/gate-runner.md) | Runs the gates and returns a triaged failure list rather than raw log output. |
 | [`.claude/agents/ledger-scribe.md`](.claude/agents/ledger-scribe.md) | Drafts the `CHANGELOG` and `DEVLOG` entries and trailers a commit requires. |
 | [`.claude/skills/karpathy-guidelines/`](.claude/skills/karpathy-guidelines/SKILL.md) | The Karpathy guidelines skill, vendored. |
+| [`.claude/skills/frontend-design/`](.claude/skills/frontend-design/SKILL.md) | Anthropic's frontend-design skill, vendored verbatim under Apache-2.0 with its `LICENSE.txt`. Required reading before building or reshaping a surface — see `AGENTS.md`. It is checked in so any agent can read it, not only ones that load skills automatically. |
 
 The `run-live` denial is the one worth knowing: it is the only command that reaches a provider and spends money, and it is deliberately excluded from every suite.
 

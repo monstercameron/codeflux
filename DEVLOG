@@ -25,11 +25,47 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-027
+Date: 2026-08-02
+Status: frontend-design skill vendored and made a frontend precondition
+Change-ID: CL-20260802-017
+Commit: pending
+Request-or-TODO: User: "also import the claude front end design skill and store
+  it in here for gpt models to use and when touching the front end use that
+  skill"
+Goal: Make the design guidance available to every agent, not only ones that can
+  load a Claude Code skill
+Assumptions: "Store it in here for gpt models" means checked into the
+  repository and referenced from AGENTS.md, which every agent reads
+Decisions: The licence was checked before copying, as it was for the Karpathy
+  skill, and this time it permitted the copy outright: the plugin ships its own
+  LICENSE.txt under Apache-2.0. Both files are vendored byte-identical rather
+  than annotated, because Apache-2.0 requires a modified file to carry a
+  prominent notice of change, and keeping the copy pristine avoids that
+  obligation entirely -- so provenance and precedence live in AGENTS.md and
+  CLAUDE.md instead of inside the vendored file. The translation rule was
+  written because the skill and this repository genuinely disagree: it gives
+  advice about CSS selector specificity and typeface pairing, and this
+  repository forbids handwritten CSS. Left unqualified, an agent following the
+  skill literally would violate a non-negotiable product boundary while
+  believing it was following instructions
+Files-or-schemas: .claude/skills/frontend-design/SKILL.md and LICENSE.txt (new,
+  verbatim), AGENTS.md, CLAUDE.md. No schema change
+Validation: diff against the marketplace source shows both files identical
+Failures-or-discarded-approaches: Paraphrasing the skill into repository prose
+  was considered, which would have sidestepped the licence question, and
+  rejected: a paraphrase drifts from the original and loses the attribution
+  Apache-2.0 exists to preserve
+Known-limitations: Like the Karpathy copy this is a point-in-time snapshot with
+  nothing checking it against upstream, and the marketplace version carries no
+  version number, only the plugin name, so drift will be invisible
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-026
 Date: 2026-08-02
 Status: AGENTS.md restructured; content preserved
 Change-ID: CL-20260802-016
-Commit: pending
+Commit: 5c0dda8
 Request-or-TODO: User: "refine the agents.md make sure its focused and not
   confounding or perplexing"
 Goal: Make the file navigable without changing what it requires
