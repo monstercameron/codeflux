@@ -25,6 +25,59 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-038
+Date: 2026-08-02
+Status: Complete
+Change-ID: CL-20260802-028
+Request-or-TODO: User requested the engine ladder be extended to 150 and then
+  250 rungs, that requirements stop naming files, that the structure hold up for
+  side-effect-heavy third-party code, and that the suite be able to run all the
+  rungs against one project so pipeline artifacts accumulate
+Goal: Make the ladder describe the job -- systems, services, specifications and
+  integration -- and make the checks judge the work rather than its filenames
+Assumptions: The generated workspaces resolve their dependencies from the local
+  module cache; every library named by a rung was verified present there. The
+  HTTP and service rungs must drive themselves in-process and exit, because the
+  harness runs one binary, compares one exact stdout, and fails anything still
+  running after ten seconds
+Decisions: Containment rather than purity for the impure band -- a library may
+  be reachable from at most N packages, which is checkable without dictating a
+  design and is what keeps integration code from becoming the program. Read the
+  produced source with go/parser rather than matching for imports: a substring
+  search counts a path quoted in a comment and misses an aliased import, and a
+  structural check that is occasionally wrong is worse than none. Anchor the
+  purity check on an exported symbol the requirement names, not on a path. Count
+  a third-party path together with everything beneath it, since a library is one
+  dependency however many of its packages are used, but match a standard-library
+  path exactly, since net and net/http are two packages that share a prefix
+Files-or-schemas: internal/coordinator/engine_produces_program_test.go;
+  internal/coordinator/engine_produced_work_test.go (new). No schema
+Validation: gofmt clean; go vet ./internal/coordinator exits 0; fourteen
+  provider-free tests pass in 0.35s; the ladder itself skips with the reason
+  printed when CODEFLUX_LADDER is unset. Rung 1 was run once against a real
+  model during verification by mistake -- the -run pattern matched the model
+  test, which then still ran on the strength of a key in .env -- and that run
+  failed. The failure was not investigated because it was not what was being
+  verified, and the mistake is what produced the opt-in: a verification step
+  that can spend money by accident will
+Failures-or-discarded-approaches: The first structural checks matched substrings
+  and were replaced after a test showed importers("net") returning the package
+  that imports net/http. An early attempt to keep the file-naming requirements
+  and merely relax the checks was discarded: the checks would then have graded a
+  layout the run was never told about, which is the same defect one level up
+Known-limitations: None of the 250 rungs has been run against a model, so the
+  expected transcripts are reasoned rather than observed; the ones most likely
+  to need adjustment are the bcrypt verifier length, the prometheus series count
+  and the backoff delay sequence. The shared mode accumulates only what the run
+  path actually writes -- artifacts, the flow ledger, plan revisions, the tool
+  journal, graph nodes and evidence. Episodes, atom documentation, atom names
+  and memory artifacts have tables and no writer in the coordinator, so they
+  stay at zero; the per-rung census prints them at zero deliberately rather than
+  omitting them
+Next-safe-step: Run a short slice of the ladder against a model in the shared
+  mode with CODEFLUX_LADDER=shared and correct the transcripts the runs
+  disagree with, cheapest band first
+
 Dev-Log: DL-20260802-037
 Date: 2026-08-02
 Status: Coverage floor added at the push boundary; baseline still unmeasured

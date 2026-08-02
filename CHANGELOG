@@ -42,6 +42,68 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-028
+Commit: pending
+Date: 2026-08-02
+Type: The engine ladder grows to 250 rungs and is judged by properties of the
+  work rather than by paths it was told to write to
+Request-or-TODO: User: "expand the list to 150 programs, make sure each new
+  program is more complex than the last, above 100 lets start making it
+  integrate with the golang http framework"; then "the next 50 are full web
+  server multi stage requirements, make them complex like how a production
+  software company, many acs to hit, complex, large and fine grained";
+  "include sql(ite) related acs aswell"; "I dont like that you have filenames in
+  the test instructions, that should be abstracted away into the graph and it
+  and we should let the agent determine even the file names and func groupings";
+  "the complexity comes from the integration of 3rd party impure libraries for
+  side effect heavy code, lets make sure our structure can work well with less
+  structured code in a sane and scalable way"; "make sure these test if ran
+  store the pipeline artifacts ... lets add a flag to toggle full pipeline or a
+  passes over each test without artifacts"
+Outcome: The ladder was 48 single programs. It is now 250 in five bands: harder
+  algorithms and multi-package systems (49-100), HTTP services that serve and
+  call themselves on an ephemeral port (101-150), production specifications with
+  interacting acceptance criteria over a real SQLite database (151-200), and the
+  same work built on 29 third-party libraries (201-250). No requirement names a
+  file, a package or a function: the layout is the run's to decide and part of
+  what is judged. The checks were rebuilt to match. They read the produced work
+  once with go/parser and ask about properties -- how many packages the work was
+  separated into, whether the package an idea landed in reaches outside itself,
+  how far a library was allowed to spread, whether an interface exists to
+  substitute at, whether two runs print the same bytes, whether anything was
+  left on disk -- rather than about paths. Containment is what replaces purity
+  for impure code: a library may be reachable from one package, and asking a
+  package that drives a database driver to be pure describes nothing. The suite
+  also gained two modes. Isolated is the default and gives every rung its own
+  database; shared runs the whole ladder against one project so the recall stage
+  has a history to search, which is the only way that stage has ever had
+  anything to find.
+Affected-behavior: Test-only. No product code changed. Three defects that only
+  the shared mode exposes were fixed in the fixture: carryOut used constant
+  idempotency keys, so a second rung sharing a database would have matched the
+  first rung's key and been handed the first rung's task; the completion wait
+  read the thread's narration, which already holds the previous rung's
+  "Finished:" and would have returned at once; and four pre-existing rungs
+  passed command-line arguments containing spaces, which the acceptance block
+  joins and the engine's parser splits, so those rungs showed the model a
+  different invocation from the one they were judged by. Their inputs moved to
+  standard input, which the format escapes correctly.
+  A fourth defect was fixed on the user's instruction: the ladder ran whenever a
+  provider key could be found, which meant any `go test ./...` -- including the
+  one the pre-push hook runs -- charged 250 live model runs to whoever had a key
+  in their .env. It now skips unless CODEFLUX_LADDER names a mode, so spending
+  money is something a person asks for rather than something a hook does.
+Compatibility-or-migration: Running the ladder now requires CODEFLUX_LADDER to
+  be set to isolated or shared; without it the test skips. The rung table moved
+  out of the test function into ladderRungs so the checks that need no provider
+  key can read it.
+Verification: gofmt clean; go vet ./internal/coordinator exits 0; the fourteen
+  provider-free tests in engine_produced_work_test.go pass in 0.35s. The 250
+  rungs themselves have not been run against a model: that needs a key and
+  spends real money, and the expected transcripts are reasoned rather than
+  observed.
+Dev-Log: DL-20260802-038
+
 Change-ID: CL-20260802-027
 Commit: pending
 Date: 2026-08-02
