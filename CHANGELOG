@@ -42,8 +42,32 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-033
+Change-ID: CL-20260802-054
 Commit: pending
+Date: 2026-08-02
+Type: Fix -- pre-commit hook
+Request-or-TODO: REPO-042
+Outcome: The pre-commit hook no longer tries to build testdata directories as
+  packages. It derives the packages to test from the staged Go files' parent
+  directories, which named cmd/codeflux-dev/testdata/atomdocs whenever a lint
+  fixture changed. The Go tool ignores testdata precisely so fixtures may be
+  invalid on purpose; naming one explicitly overrides that. Those seven fixtures
+  all declare the same identifier by design, so the directory cannot compile,
+  and no commit touching a fixture could pass the hook
+Affected-behavior: A commit changing only fixtures is testable again. A staged
+  set consisting solely of testdata files now skips the unit-test step rather
+  than running go test with no arguments, which would have tested the current
+  directory
+Compatibility-or-migration: None
+Verification: Found by the hook refusing the REPO-031 commit, which adds two
+  fixtures. With the filter the same commit passes; the fixtures are still
+  exercised, by cmd/codeflux-dev's own tests reading them as data
+Known-limitations: The hook still tests only the changed packages, so a change
+  breaking a dependent package is caught later, at push and in CI
+Dev-Log: DL-20260802-064
+
+Change-ID: CL-20260802-033
+Commit: 92f1eed
 Date: 2026-08-02
 Type: CHECKPOINT -- collapses one lane's in-flight work into a single commit at
   explicit user request
@@ -504,7 +528,7 @@ Verification: codeflux-dev lint now passes this check; CLAUDE.md is 13 lines
 Dev-Log: DL-20260802-029
 
 Change-ID: CL-20260802-018
-Commit: pending
+Commit: 92f1eed
 Date: 2026-08-02
 Type: The coordinator binds a fixed loopback port instead of an ephemeral one
 Request-or-TODO: User: "so for the dev server tell it to keep teh port stable

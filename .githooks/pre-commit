@@ -59,10 +59,23 @@ go run ./cmd/codeflux-dev lint
 # A change here can still break a dependent package. That is caught by the full
 # suite at push time and again by CI; this hook is the fast, narrow layer of that
 # ladder, not the whole of it.
-packages=$(printf '%s\n' "$staged_go" | xargs -n1 dirname | sort -u | sed 's#^#./#')
-echo "pre-commit: unit tests for:"
-printf '  %s\n' $packages
-go test -timeout=5m $packages
+# testdata is excluded because it is not a package. The Go tool ignores such
+# directories precisely so fixtures can be invalid on purpose; naming one
+# explicitly overrides that and builds it. cmd/codeflux-dev/testdata/atomdocs
+# holds seven lint fixtures that all declare the same identifier, so it cannot
+# compile by design — and without this filter no commit touching a fixture could
+# ever pass the hook.
+packages=$(printf '%s\n' "$staged_go" | xargs -n1 dirname | sort -u |
+  grep -v -e '/testdata$' -e '/testdata/' | sed 's#^#./#')
+if [ -z "$packages" ]; then
+  echo "pre-commit: no testable packages staged; skipping unit tests"
+  packages=""
+fi
+if [ -n "$packages" ]; then
+  echo "pre-commit: unit tests for:"
+  printf '  %s\n' $packages
+  go test -timeout=5m $packages
+fi
 
 # 4. Confirm nothing disposable escaped into the tree.
 echo "pre-commit: artifact-check"

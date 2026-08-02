@@ -25,11 +25,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-064
+Date: 2026-08-02
+Status: Hook fixed; the blocked commit now passes
+Change-ID: CL-20260802-054
+Commit: pending
+Request-or-TODO: REPO-042
+Goal: Let a commit that touches a lint fixture through the hook
+Assumptions: testdata is not a package, and the fixtures under it are meant to
+  be invalid
+Decisions: Filtered any directory with a testdata path segment out of the
+  package list rather than special-casing atomdocs, since the reason applies to
+  every testdata directory and a narrower fix would only be found again later.
+  Added the empty-list guard as well: a commit staging nothing but fixtures
+  would otherwise have run go test with no arguments, which tests the current
+  directory -- a different command that happens not to fail, which is the worse
+  kind of wrong
+Files-or-schemas: .githooks/pre-commit
+Validation: Found by the hook refusing the REPO-031 commit with seven
+  redeclaration errors across the fixture directory. With the filter that commit
+  passes. The fixtures remain exercised as data by cmd/codeflux-dev's own tests
+Failures-or-discarded-approaches: None
+Known-limitations: The comment in this hook about the integration build tag is
+  now stale -- REPO-030 tagged six files -- and is corrected in that commit
+  rather than here, since that is the change that made it false
+Next-safe-step: Continue the commit sequence
+
 Dev-Log: DL-20260802-043
 Date: 2026-08-02
 Status: Checkpoint committed; tree clean of tracked changes
 Change-ID: CL-20260802-033
-Commit: pending
+Commit: 92f1eed
 Request-or-TODO: User: "commit the entire repo"
 Goal: Commit everything left in the working tree, as asked
 Assumptions: "The entire repo" means the whole working tree including another
