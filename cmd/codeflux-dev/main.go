@@ -374,7 +374,7 @@ func buildLinkerFlags(ctx context.Context, root string) (string, error) {
 	}
 	const prefix = "codeflux.dev/codeflux/internal/buildinfo."
 	return strings.Join([]string{
-		"-X", prefix + "version=0.0.0-dev",
+		"-X", prefix + "version=0.0.1",
 		"-X", prefix + "commit=" + commit,
 		"-X", prefix + "buildDate=" + buildDate,
 		"-X", prefix + "frontendVersion=" + buildinfo.Current().FrontendVersion,

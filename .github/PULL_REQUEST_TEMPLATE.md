@@ -1,6 +1,7 @@
 <!--
 Please read .github/CONTRIBUTING.md before opening this. In particular:
-open an issue first, and do not add new Markdown files.
+open an issue first, target `dev` and never `main`, and do not add new
+Markdown files.
 -->
 
 ## What changed
@@ -66,6 +67,26 @@ Governing task ID:
 - [ ] Existing migrations are unmodified; new schema is a new migration.
 - [ ] Interactive controls have accessible names; no state conveyed by color
       alone.
+
+## Atom naming review
+
+<!-- Delete this section only if the PR declares, renames, or retires no
+     `//codeflux:atom`. A name is the retrieval key: a later run finds this atom
+     by it or rebuilds the work. `AGENTS.md` holds the full grammar. -->
+
+Atoms declared, renamed, or retired:
+
+- [ ] A reviewer can tell what domain action each name performs, without
+      reopening the implementation.
+- [ ] Each name is distinguishable from the nearest plausible atom.
+- [ ] No name promises more than its contract and evidence support.
+- [ ] Each name still reads correctly as a graph-node label and a retrieval
+      candidate.
+- [ ] Every qualifier is semantically important, not implementation trivia.
+- [ ] Any naming exception carries a neighbouring
+      `//codeflux:atom-name-exception <kind>: <reason>` with a real reason.
+- [ ] A rename kept the stable atom ID, recorded the prior name as an alias, and
+      regenerated the affected embeddings.
 
 ## Agent involvement
 

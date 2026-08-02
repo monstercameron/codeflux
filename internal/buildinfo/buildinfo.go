@@ -5,7 +5,7 @@ package buildinfo
 import "runtime"
 
 var (
-	version         = "0.0.0-dev"
+	version         = "0.0.1"
 	commit          = "unknown"
 	buildDate       = "unknown"
 	frontendVersion = generatedFrontendVersion

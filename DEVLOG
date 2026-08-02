@@ -24,6 +24,42 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-020
+Date: 2026-08-02
+Status: Two-branch flow adopted; main protected; version 0.0.1
+Change-ID: CL-20260802-011
+Request-or-TODO: User: "lets start working on the devx, lets protect main, all
+  new contributions are in their own prs, them merge to dev, dev collects all
+  viable changes them merges to main main can only merge if all ci/ tests are
+  passing, for dev it doesnt"; and "also the current version is 0.0.1"
+Goal: Make the branch topology enforce the review flow rather than describe it
+Assumptions: dev becomes the default branch, confirmed with the user, so a pull
+  request and a Dependabot bump target it without anyone remembering to
+  retarget. main is strict with no administrator bypass, also confirmed: a CI
+  gate that the person most likely to bypass it can bypass is not a gate
+Decisions: File changes were committed and pushed to main BEFORE the ruleset was
+  created. Applying protection first would have locked the very commit that
+  documents the protection out of the branch it protects. dev keeps an
+  administrator bypass so day-to-day integration is not blocked on opening a
+  pull request against oneself, while main has none. The seven required checks
+  are named exactly as the jobs report them, read off a completed run rather
+  than guessed, because a required check whose name does not match a real job
+  blocks every merge forever while looking correct
+Files-or-schemas: internal/buildinfo/buildinfo.go, cmd/codeflux-dev/main.go,
+  .github/dependabot.yml, .github/workflows/codeql.yml,
+  .github/workflows/dependency-review.yml, .github/CONTRIBUTING.md,
+  .github/PULL_REQUEST_TEMPLATE.md. No schema change
+Validation: gofmt clean; go build of the touched packages exits 0; buildinfo
+  tests pass; the three edited YAML files parse
+Failures-or-discarded-approaches: None yet at the time of writing
+Known-limitations: main's CI is currently red -- 44 staticcheck findings and a
+  failing test-fast, recorded in CL-20260802-009. Because main now requires all
+  seven checks, NOTHING CAN MERGE INTO MAIN until those are fixed. That is the
+  intended behaviour of the gate the user asked for, not a misconfiguration, but
+  it means main is frozen at the current commit until the tree is green
+Next-safe-step: Fix the 44 staticcheck findings and the failing package on dev,
+  then open the first dev -> main pull request and confirm the gate passes
+
 Dev-Log: DL-20260802-019
 Date: 2026-08-02
 Status: Fixture tokens de-literalised; push still blocked by history

@@ -8,13 +8,51 @@ patch that ignores the governance is rejected no matter how good the code is.
 
 1. Open an issue first. Unsolicited pull requests are frequently declined for
    reasons that have nothing to do with quality.
-2. `docs/plan.md` decides **what** gets built. `TODOS.md` decides **in what
+2. Branch from `dev`, and open your pull request against `dev`. Never against
+   `main`.
+3. `docs/plan.md` decides **what** gets built. `TODOS.md` decides **in what
    order**. [`AGENTS.md`](../AGENTS.md) decides **how**. Source, protobuf
    definitions, migrations, and tests are authoritative for what already
    exists.
-3. Run `go run ./cmd/codeflux-dev lint` and `test-fast` before you push.
-4. Every commit adds one `CHANGELOG` entry and one `DEVLOG` entry, and carries
+4. Run `go run ./cmd/codeflux-dev lint` and `test-fast` before you push.
+5. Every commit adds one `CHANGELOG` entry and one `DEVLOG` entry, and carries
    the matching trailers.
+
+## Branches
+
+```
+  your branch  ──PR──>  dev  ──PR──>  main
+   one change            integration    released
+                         red CI ok      all checks green
+```
+
+**`dev` is where work lands.** It is the default branch, so a pull request
+targets it unless you deliberately change that. Every contribution arrives as
+its own pull request into `dev` — one coherent change per pull request, the same
+rule commits follow.
+
+CI runs on `dev`, and it is **allowed to be red there**. That is the point of
+having it: `dev` is where a half-finished integration is allowed to exist and be
+looked at. A red `dev` is information, not an emergency.
+
+**`main` is the released branch.** It only ever receives `dev`, and only through
+a pull request whose checks are all green:
+
+| Check | Runner |
+| --- | --- |
+| Quality | Windows 11 ARM64 |
+| Build and test | Windows 11 ARM64 |
+| Build and test | Windows Server 2025 AMD64 |
+| Build and test | macOS 15 ARM64 |
+| Build and test | Ubuntu 24.04 AMD64 |
+| Race tests | Ubuntu 24.04 AMD64 |
+| CodeQL | Analyze Go |
+
+Nobody pushes to `main` directly, force-pushes it, or deletes it — the ruleset
+refuses, and there is no administrator bypass. If `main` cannot take a change,
+the answer is to make the checks pass, not to route around them.
+
+Dependency bumps are contributions like any other: Dependabot targets `dev`.
 
 ## Why an issue first
 

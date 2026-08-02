@@ -30,6 +30,32 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-011
+Date: 2026-08-02
+Type: The repository adopts a two-branch flow, and the version becomes 0.0.1
+Request-or-TODO: User: "lets start working on the devx, lets protect main, all
+  new contributions are in their own prs, them merge to dev, dev collects all
+  viable changes them merges to main main can only merge if all ci/ tests are
+  passing, for dev it doesnt"; and "also the current version is 0.0.1"
+Outcome: Contributions now branch from dev and arrive as their own pull request
+  into dev, which is the default branch and is allowed to carry a red CI --
+  that is what an integration branch is for. main receives only dev, only
+  through a pull request, and only when all seven checks are green; it takes no
+  direct push, no force push, no deletion, and grants no administrator bypass.
+  CodeQL and dependency review now trigger on dev as well as main, so a pull
+  request into dev is actually checked rather than merely allowed to be red.
+  Dependabot retargets to dev, because a dependency bump is a contribution like
+  any other. The branching model is written into CONTRIBUTING so the rule is
+  discoverable rather than only enforced. The compiled version default moves
+  from 0.0.0-dev to 0.0.1 in both the buildinfo default and the release ldflags
+Affected-behavior: codeflux version now reports 0.0.1. No runtime behaviour
+  otherwise changes
+Compatibility-or-migration: Anyone with a local clone should retarget work to
+  dev. Pushing to main will now be refused
+Verification: gofmt clean; go build of the touched packages exits 0;
+  go test ./internal/buildinfo/... passes; all three edited YAML files parse
+Dev-Log: DL-20260802-020
+
 Change-ID: CL-20260802-010
 Date: 2026-08-02
 Type: The redaction suite's synthetic Slack tokens are assembled at runtime
