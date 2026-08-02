@@ -25,11 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-039
+Date: 2026-08-02
+Status: Task-closing rule added to the lifecycle
+Change-ID: CL-20260802-029
+Commit: pending
+Request-or-TODO: User: "also in the agent file, always tell the agent to mark
+  completed todos if its using a todo list"
+Goal: Make the task list say what is true in both directions
+Assumptions: "Todo list" covers TODOS.md and any ephemeral list an agent keeps
+  during a session, so the rule is written to cover both rather than naming only
+  the tracked file
+Decisions: Placed beside the existing guard rather than in a new section, and
+  explicitly framed as one rule with two halves. Kept apart they read as
+  opposing pressures, and the guard is the louder one -- which is how a
+  repository accumulates finished work under unchecked boxes. Requiring the box
+  to be checked in the same commit as the work makes the record atomic with the
+  change, matching how the CHANGELOG and DEVLOG entries already travel
+Files-or-schemas: AGENTS.md. No schema change
+Validation: Prose only
+Failures-or-discarded-approaches: None
+Known-limitations: Unenforced, like most of AGENTS.md. Nothing checks that a
+  commit implementing a task also checks its box; today's whole session ran with
+  no task at all until it was backfilled by CL-20260802-025
+Next-safe-step: Fold this into REPO-020, which already proposes checking ledger
+  trailers in lint -- the same check could require a TODOS diff when a commit
+  cites a task identifier
+
 Dev-Log: DL-20260802-038
 Date: 2026-08-02
 Status: Pre-commit narrowed to changed-package unit tests
 Change-ID: CL-20260802-028
-Commit: pending
+Commit: 6c59976
 Request-or-TODO: User: "make sure teh pre commit is only doing unit tests and
   not integration tests"
 Goal: Make the commit gate proportional to the change

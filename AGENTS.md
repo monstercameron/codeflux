@@ -62,7 +62,11 @@ One loop governs every non-trivial change. The rest of this file is the detail b
 12. When a commit is authorized, follow the commit rules below — explicit paths, one feature, matching `CHANGELOG` entry, both trailers.
 13. Report the verification you actually ran and every remaining limitation.
 
-**Never mark a `TODOS.md` item complete until its output exists and its verification passes.** A model stopping is not completion.
+**Close the tasks you finish.** Whenever you are working from a task list — `TODOS.md`, or an ephemeral list you keep during a session — mark each item complete as it lands, not in a batch at the end. Check the box in the same commit as the work it describes, and record the evidence beneath it: the identifier, the test that proves it, the file that now exists. A finished change sitting under an unchecked box is indistinguishable from work nobody started, and the next agent will either redo it or route around it.
+
+**But never mark an item complete until its output exists and its verification passes.** A model stopping is not completion. The two rules are one rule: the list must say what is true, which means neither leaving finished work open nor closing work that is not finished.
+
+If you finish something the list does not contain, add the item and check it in the same commit, so the record still matches the work.
 
 ## Project Mission
 

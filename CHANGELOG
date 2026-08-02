@@ -42,8 +42,29 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-028
+Change-ID: CL-20260802-029
 Commit: pending
+Date: 2026-08-02
+Type: Agents must close the tasks they finish, not only refrain from closing
+  ones they have not
+Request-or-TODO: User: "also in the agent file, always tell the agent to mark
+  completed todos if its using a todo list"
+Outcome: AGENTS.md carried only the guard -- never mark an item complete before
+  its output exists and its verification passes -- which reads as a reason to
+  leave boxes unchecked. The Task Lifecycle now states the other half: when
+  working from a task list, whether TODOS.md or an ephemeral session list, mark
+  each item as it lands rather than in a batch at the end, check the box in the
+  same commit as the work, and record the evidence beneath it. Finished work
+  under an unchecked box is indistinguishable from work nobody started, and the
+  next agent redoes it or routes around it. Work finished that the list does not
+  contain gets its item added and checked in the same commit
+Affected-behavior: None at runtime
+Compatibility-or-migration: None
+Verification: Prose only; no Go source touched
+Dev-Log: DL-20260802-039
+
+Change-ID: CL-20260802-028
+Commit: 6c59976
 Date: 2026-08-02
 Type: The pre-commit hook runs unit tests for the changed packages instead of
   the whole repository
@@ -68,7 +89,7 @@ Note: The audit found that no file in the repository carries the integration
 Dev-Log: DL-20260802-038
 
 Change-ID: CL-20260802-028
-Commit: pending
+Commit: 49061c4
 Date: 2026-08-02
 Type: The engine ladder grows to 250 rungs and is judged by properties of the
   work rather than by paths it was told to write to
