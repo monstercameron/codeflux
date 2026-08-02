@@ -30,6 +30,43 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-001
+Date: 2026-08-02
+Type: Reachable settings, so a person can see what governs their runs
+Request-or-TODO: User: "connect the front end to the backend, make sure the
+  settings are exposed"; governing item AUDIT-016 (construct and register the
+  production provider/settings services and verify their real capabilities
+  over generated RPC clients)
+Outcome: SettingsService answers the questions a settings page asks. GetPolicy
+  reports the execution policy in force, resolved from compiled defaults and
+  the stored user layer. GetModels reports the providers the coordinator has
+  recorded and the models catalogued against them, with a row for a provider
+  that has none. ConfigureProvider binds an opaque operating-system credential
+  reference to a provider, and TestProvider reports whether the coordinator can
+  obtain that credential.
+Affected-behavior: The settings surfaces read the coordinator instead of
+  rendering fixed English. A provider is reported as available only when it is
+  enabled and a credential is bound; availability is never a claim that the
+  provider answered. TestProvider makes no provider request and every summary
+  it returns says so, so a local credential check cannot be read as a
+  connection test. SetPolicy and SetBudgetDefaults remain unimplemented on
+  purpose: routing is one frozen versioned policy through prototype exit and
+  task intake reads no user layer, so those controls would change a stored row
+  nothing reads.
+Compatibility-or-migration: None. No schema change and no migration. The
+  settings service now requires both of its applications at construction, so a
+  service that reports itself constructed can no longer answer Unimplemented.
+Verification: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; go vet
+  ./...; gofmt clean. New tests: the settings surfaces answered over a
+  generated SettingsServiceClient against the real application, including
+  session authentication, an empty coordinator, a registered provider, a
+  credential check that names what it did not do, and a refused configuration;
+  the fixed configuration precedence read against a real SQLite database
+  including an unreadable stored layer; the two storage listings against real
+  SQLite; the transport service against a fake application; and the rendered
+  states of the surface.
+Dev-Log: DL-20260801-019
+
 Change-ID: CL-20260801-013
 Date: 2026-08-01
 Type: Reachable plan approval, so a typed request reaches a running worker

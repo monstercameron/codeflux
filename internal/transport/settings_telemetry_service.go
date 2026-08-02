@@ -19,19 +19,32 @@ type FrontendTelemetryApplication interface {
 	DeleteFrontendTelemetry(context.Context, frontendtelemetry.DeleteRequest) (frontendtelemetry.DeleteResult, error)
 }
 
-// SettingsService exposes the local telemetry controls alongside the product's
-// data settings. Other settings RPCs remain deliberately unimplemented until
-// their owning application services land.
+// SettingsService serves the settings surfaces: the execution policy, the
+// budget default, the provider and model lists, and the local telemetry
+// controls.
 type SettingsService struct {
 	codefluxv1.UnimplementedSettingsServiceServer
-	telemetry FrontendTelemetryApplication
+	telemetry     FrontendTelemetryApplication
+	configuration SettingsConfigurationApplication
 }
 
-func NewSettingsService(telemetry FrontendTelemetryApplication) (*SettingsService, error) {
+// NewSettingsService builds the service.
+//
+// Both dependencies are required rather than optional. A nil configuration
+// application would leave the policy, provider, and model calls answering
+// Unimplemented while the service reported itself as constructed, which is how
+// a settings page comes to be served by a coordinator that cannot answer it.
+func NewSettingsService(
+	telemetry FrontendTelemetryApplication,
+	configuration SettingsConfigurationApplication,
+) (*SettingsService, error) {
 	if telemetry == nil {
 		return nil, errors.New("frontend telemetry application is required")
 	}
-	return &SettingsService{telemetry: telemetry}, nil
+	if configuration == nil {
+		return nil, errors.New("settings configuration application is required")
+	}
+	return &SettingsService{telemetry: telemetry, configuration: configuration}, nil
 }
 
 func (service *SettingsService) RecordFrontendTelemetry(

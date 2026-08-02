@@ -24,6 +24,89 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260801-019
+Date: 2026-08-01
+Status: The settings page reads the coordinator instead of static sentences
+Change-ID: None until a commit is authorized
+Request-or-TODO: "codeflux, connect the front end to the backend, make sure the
+  settings are exposed http://127.0.0.1:47311/settings"; governing item is
+  AUDIT-016 (reconcile M11-004: construct and register production provider and
+  settings services and verify their real capabilities over generated clients)
+Goal: Make /settings answer from the coordinator -- the policy governing every
+  run, the providers recorded, the models catalogued, and whether the
+  credential a provider call needs can actually be obtained -- instead of six
+  headings over fixed English
+Assumptions: The settings answers are coordinator-wide; the workspace identity
+  the request contract requires on GetPolicy and GetModels does not scope them,
+  and is carried rather than used. Routing is one frozen versioned policy
+  through prototype exit, so the policy is reported and not offered as a
+  control
+Decisions: Implemented GetPolicy, GetModels, ConfigureProvider, and
+  TestProvider on the already-registered SettingsService and made its
+  configuration application a required constructor dependency, so a service
+  that reports itself constructed cannot answer Unimplemented. Left SetPolicy
+  and SetBudgetDefaults unimplemented: task intake applies the fixed baseline
+  and reads no user layer, so a preset or budget control would change a stored
+  row nothing reads while telling somebody their runs had changed. The user
+  settings layer is still read rather than assumed absent, and an unreadable
+  layer is reported instead of being replaced by a compiled default.
+  TestProvider performs a credential-store lookup and no provider request;
+  every summary it can produce says so, because a local lookup presented as a
+  connection test would claim the endpoint and network were checked when only
+  the key was. GetModels names a provider with a view carrying no model
+  identifier and each of its models with one, so a provider with nothing
+  catalogued is still listed -- it is the one that cannot be used yet, and
+  omitting it would leave nothing to configure. Exported
+  providers.DefaultRequestTimeout and policy.FixedBaselineReasoning rather than
+  copying either number into a settings surface that would keep reporting a
+  stale value
+Files-or-schemas: internal/storage/settings_catalog_repository.go
+  (ListConfiguredProviders, ListModelCatalog),
+  internal/storage/configuration_repository.go
+  (GetLatestSettingsRevisionForScope),
+  internal/transport/settings_configuration_service.go,
+  internal/transport/settings_telemetry_service.go (two required
+  dependencies), internal/coordinator/settings_application.go,
+  internal/coordinator/application.go, internal/policy/fixed.go,
+  internal/providers/transport.go, web/frontend/settingsview/component.go,
+  web/frontend/shell/shell.go, web/client/settings_resource.go,
+  web/client/settings_mounted_wasm.go, web/client/settings_transport_wasm.go,
+  web/client/main.go; no schema change, no migration
+Validation: go build ./...; GOOS=js GOARCH=wasm go build ./web/...; go vet
+  ./...; gofmt clean on every changed file; go test for internal/transport,
+  internal/coordinator, internal/storage, internal/policy, internal/providers,
+  web/frontend/settingsview, web/frontend/shell, and web/client. New coverage:
+  the settings surfaces answered over a generated SettingsServiceClient
+  against the real application, including session authentication, an empty
+  coordinator, a registered provider, a credential check that names what it did
+  not do, and a refused configuration; the fixed precedence read against a real
+  database including an unreadable stored layer; the two storage listings
+  against real SQLite; the transport service against a fake application; and
+  the surface's rendered states. Visually inspected the running console at
+  http://127.0.0.1:47311/settings in Chromium: the policy card renders the
+  coordinator's preset, reasoning effort, and floors, and the provider and
+  model cards render the coordinator's own empty states
+Failures-or-discarded-approaches: A live provider ListModels call was designed
+  for TestProvider and dropped: it needs endpoint, model identity, and
+  capability wiring that belongs to the provider execution lane, and a settings
+  page should not spend money or cross the network on its own. Two defects
+  found by looking at the rendered page rather than the tests: the policy card
+  reported "Request timeout: unknown" because the effective timeout rides on
+  the model views and no provider was recorded, and the appearance, data, and
+  local telemetry regions drew a skeleton for the life of the page because the
+  route's data state was seeded loading and nothing ever moved it. Both fixed;
+  local telemetry now shows its recorded rows and its controls
+Known-limitations: Nothing in this product writes model_catalog, so the model
+  list is empty in practice and ConfigureProvider cannot succeed: the request
+  contract requires a model identifier and the coordinator refuses one it has
+  never catalogued. The surface states that reason rather than offering a
+  control that would fail. Provider credential rebinding is refused by the
+  store, so a reference cannot yet be replaced. The environment overlay layer
+  of the configuration precedence is not consulted
+Next-safe-step: Catalogue models when a provider is registered, so the model
+  list and the credential binding both become reachable; then reconcile the
+  remaining half of AUDIT-016 by exercising ConfigureProvider end to end
+
 Dev-Log: DL-20260801-013
 Date: 2026-08-01
 Status: A typed request reaches a running worker; the interface reports it

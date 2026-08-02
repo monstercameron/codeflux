@@ -39,7 +39,7 @@ func TestSettingsTelemetryRecordListAndDeleteAreTypedAndBounded(t *testing.T) {
 	taskID, _ := domain.NewTaskID()
 	taskIdentity, _ := TaskIDToProto(taskID)
 	fake := &telemetryApplicationFake{}
-	service, err := NewSettingsService(fake)
+	service, err := NewSettingsService(fake, &settingsConfigurationFake{})
 	if err != nil {
 		t.Fatal(err)
 	}

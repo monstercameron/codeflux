@@ -23,6 +23,14 @@ const (
 	FixedBaselineProviderVersion = "responses-v1"
 	FixedBaselineModel           = "gpt-5.6-sol"
 
+	// FixedBaselineReasoning is the reasoning effort every run uses until an
+	// explicit, attributable manual override replaces it.
+	//
+	// It is exported because a settings surface reports the effort in force,
+	// and a settings page that named its own value would keep reporting one
+	// after this baseline changed.
+	FixedBaselineReasoning = domain.ReasoningEffortMaximum
+
 	defaultWarningCostMinorUnits int64 = 3_750
 	defaultHardCostMinorUnits    int64 = 5_000
 )
@@ -150,7 +158,7 @@ func Select(input SelectionInput) (Snapshot, error) {
 		Version:        FixedBaselineVersion,
 		Source:         SelectionSourceFixedBaseline,
 		Model:          baselineModel,
-		Reasoning:      domain.ReasoningEffortMaximum,
+		Reasoning:      FixedBaselineReasoning,
 		Limits:         limits,
 		BudgetDefaults: fixedBudgetDefaults(),
 		Phases:         fixedPhases(limits),

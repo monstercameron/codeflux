@@ -118,6 +118,37 @@ func (repositories *Repositories) GetSettingsRevision(
 	), "get settings revision")
 }
 
+// GetLatestSettingsRevisionForScope returns the newest revision written by one
+// precedence layer.
+//
+// Settings revisions are immutable history, so "the current user settings" is
+// not a row anybody updates — it is the highest-numbered row that layer wrote.
+// Reading it this way keeps every earlier revision intact for the tasks that
+// bound themselves to it.
+//
+// Absence is reported as ErrNotFound rather than as an empty configuration,
+// because "this layer has never been written" and "this layer is empty" lead a
+// caller to different conclusions about whose value is in force.
+func (repositories *Repositories) GetLatestSettingsRevisionForScope(
+	ctx context.Context,
+	scope SettingsScope,
+	repositoryID *domain.RepositoryID,
+) (SettingsRevision, error) {
+	return scanSettingsRevision(repositories.database.sql.QueryRowContext(
+		ctx,
+		`SELECT revision, scope, repository_id, configuration_json,
+		        content_sha256, approval_reference, idempotency_key,
+		        created_at_unix_micros
+		 FROM settings_revisions
+		 WHERE scope = ?
+		   AND ifnull(repository_id, '') = ifnull(?, '')
+		 ORDER BY revision DESC
+		 LIMIT 1`,
+		scope,
+		nullableRepositoryID(repositoryID),
+	), "get latest settings revision")
+}
+
 func (repositories *Repositories) RecordRunConfiguration(
 	ctx context.Context,
 	input RecordRunConfiguration,

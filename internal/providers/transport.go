@@ -17,8 +17,16 @@ import (
 	"unicode"
 )
 
+// DefaultRequestTimeout is the bound one provider request runs under when no
+// configuration supplies one.
+//
+// It is exported because a settings surface reports the timeout a request will
+// actually run under, and a second copy of the number written somewhere else
+// would eventually report a bound nothing enforces.
+const DefaultRequestTimeout = 5 * time.Minute
+
 const (
-	defaultProviderRequestTimeout = 5 * time.Minute
+	defaultProviderRequestTimeout = DefaultRequestTimeout
 	defaultMaximumRequestBytes    = 8 << 20
 	defaultMaximumJSONBytes       = 8 << 20
 	defaultMaximumErrorBytes      = 64 << 10

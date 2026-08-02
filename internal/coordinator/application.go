@@ -471,7 +471,15 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
-	settingsService, err := transport.NewSettingsService(frontendTelemetry)
+	// The settings service answered only its telemetry calls, so a settings
+	// page could report nothing about the policy governing every run, the
+	// providers the coordinator has recorded, or whether a credential those
+	// providers need can actually be obtained.
+	settingsConfiguration, err := newSettingsApplication(repositories, credentialStore)
+	if err != nil {
+		return nil, err
+	}
+	settingsService, err := transport.NewSettingsService(frontendTelemetry, settingsConfiguration)
 	if err != nil {
 		return nil, err
 	}
