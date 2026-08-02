@@ -25,6 +25,46 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-040
+Date: 2026-08-02
+Status: Design document at revision 7; standard-library research complete
+Change-ID: CL-20260802-030
+Commit: pending
+Request-or-TODO: User: "start desiging the graph!" and "create a detailed
+  documente for the golang program graph using the learning from the realy
+  functional programming languages ... then spawn adversarial subagents to
+  aggresively critique the plan in a refinement loop"
+Goal: Design the graph that composes atoms into programs, grounded in the plan
+  and in what strict-functional standard libraries actually settled
+Assumptions: "Strict" means eager evaluation, so Haskell is excluded and the six
+  surveyed languages are Standard ML, OCaml, F#, Scala 3, Elm, and Roc. Stated
+  in the research document rather than assumed silently
+Decisions: Reasoned from plan section 3's frozen notation over section 5's prose
+  wherever they disagree, because section 3 is a freeze. Recorded every conflict
+  rather than resolving it downstream. Ran five rounds of adversarial review and
+  revised after each; verified every Go claim against a live toolchain rather
+  than asserting it
+Files-or-schemas: docs/go-program-graph.md, docs/strict-fp-control-flow-research
+  .md. No schema change
+Validation: Nineteen adversarial reviews across six rounds. Empirical checks
+  falsified several claims: an interface with an unexported method is not sealed,
+  because embedding the interface satisfies it; a bare generic return cannot
+  distinguish a voided contract from a legitimate zero; a timeout does not
+  reclaim a blocked goroutine; reflective deep copy silently drops unexported
+  fields; generated symbol names shift across regenerations
+Failures-or-discarded-approaches: Rule 4 was specified wrongly three times, the
+  handler-laundering control three times, and the boundary-type restriction
+  twice. The cost layer's foundation cited a gate belonging to a different
+  subsystem entirely -- section 33's pipeline audit, not the graph -- which
+  dropped its assurance class from test-backed to assumed-external. Section 19
+  of the document records every repeated error and the pattern behind them
+Known-limitations: Five items block on plan decisions the document cannot make.
+  The frozen molecule fails the validator derived from the plan's own rules and
+  cannot be built with the plan's own six editor operations, so two frozen
+  artifacts are mutually inconsistent
+Next-safe-step: Answer the decisions now recorded in plan section 34, then
+  revise the document against answers rather than guesses
+
 Dev-Log: DL-20260802-039
 Date: 2026-08-02
 Status: Task-closing rule added to the lifecycle

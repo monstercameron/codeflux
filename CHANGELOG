@@ -42,6 +42,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-030
+Commit: pending
+Date: 2026-08-02
+Type: The functional program graph gets a design document and the standard
+  library research behind it
+Request-or-TODO: User: "start desiging the graph!" and "create a detailed
+  documente for the golang program graph using the learning from the realy
+  functional programming languages"
+Outcome: docs/go-program-graph.md designs the graph that composes atoms into
+  programs, grounded in the plan's own vocabulary and gated behind POST-001. It
+  covers the intermediate representation, the type layer, the provenance
+  algebra, logical effect identity, four structural rules with ten
+  well-formedness preconditions, the atom boundary, Go lowering, traceability
+  and debuggability, the evaluator, program completeness, and a cost layer. It
+  records twenty-two plan conflicts, nineteen residual risks sorted by whether
+  they block, and every place the document has been wrong more than once.
+  docs/strict-fp-control-flow-research.md is the survey it draws on: the
+  control-flow surface of six strict-functional standard libraries, verified
+  against primary sources
+Affected-behavior: None. Documentation only, with no build authority; POST-001
+  through POST-005 remain closed
+Compatibility-or-migration: None
+Verification: Seven revisions against nineteen adversarial reviews across six
+  rounds. Every Go claim marked verified was tested against a live Go 1.26.3
+  toolchain, including the sealed-interface hole, eliminator arity, panic
+  sealing, deep copy, symbol-name drift, and eleven determinism hazards
+Known-limitations: Five items block on plan decisions this document cannot make:
+  Rule 4's applicability, where provider deduplication scope lives, the grammar's
+  contradiction with the one-node-per-line rule, whether every control
+  transition needs an explicit arrow, and the fact that the frozen molecule both
+  fails the validator derived from the plan's rules and cannot be built with the
+  plan's own six editor operations
+Dev-Log: DL-20260802-040
+
 Change-ID: CL-20260802-029
 Commit: pending
 Date: 2026-08-02
