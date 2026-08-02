@@ -24,6 +24,48 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-021
+Date: 2026-08-02
+Status: .claude/ configuration, three subagents, and the vendored skill added
+Change-ID: CL-20260802-012
+Request-or-TODO: User: "lets create claude and agent files and also include the
+  karpathy skill aswell"
+Goal: Give every agent working here the same configuration, and vendor the
+  Karpathy skill the repository already cited
+Assumptions: The root AGENTS.md and CLAUDE.md already existed, so "claude and
+  agent files" meant the .claude/ tree, which was absent. The request is the
+  explicit authorization AGENTS.md requires for the Markdown files it contains
+Decisions: Only skills/karpathy-guidelines/SKILL.md was copied from upstream.
+  The upstream repository has NO LICENSE FILE -- GitHub reports its licence as
+  null -- so by default nothing in it may be redistributed. That one file
+  declares "license: MIT" in its own frontmatter, and that declaration is the
+  grant this copy relies on, which is why it is vendored verbatim with the
+  frontmatter intact and why the repository's CLAUDE.md, README, and EXAMPLES
+  were not taken. A provenance section was appended, marked as not part of the
+  original, naming the pinned commit and stating that AGENTS.md wins on
+  conflict. The subagents were chosen from friction actually observed rather
+  than from a generic list: each one encodes a mistake already made in this
+  session. AGENTS.md now names these files as authorized, because the
+  no-unrequested-Markdown rule would otherwise read them as clutter to remove
+Files-or-schemas: .claude/settings.json, .claude/agents/{plan-locator,
+  gate-runner,ledger-scribe}.md, .claude/skills/karpathy-guidelines/SKILL.md,
+  CLAUDE.md, AGENTS.md. No schema change
+Validation: settings.json parses as JSON; all four Markdown files carry valid
+  frontmatter with name, description, and model; no Go source touched, so the
+  gates are unaffected
+Failures-or-discarded-approaches: Vendoring the upstream CLAUDE.md as well was
+  considered and rejected on the licence finding above. Adding a formatting hook
+  to settings.json was considered and rejected as speculative -- .githooks
+  already runs the lint gate, and the skill being vendored argues against
+  unrequested additions
+Known-limitations: The vendored skill is a point-in-time copy pinned at 2c60614
+  and nothing checks it against upstream, so it will drift silently. The deny
+  rule for pushing to main duplicates a guarantee the branch ruleset already
+  enforces server-side; it is there so the attempt fails early and locally
+  rather than after a push round trip
+Next-safe-step: Use plan-locator and gate-runner on the 44 staticcheck findings
+  to decide, per finding, which lane owns it
+
 Dev-Log: DL-20260802-020
 Date: 2026-08-02
 Status: Two-branch flow adopted; main protected; version 0.0.1

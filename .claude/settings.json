@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(go run ./cmd/codeflux-dev lint:*)",
+      "Bash(go run ./cmd/codeflux-dev build:*)",
+      "Bash(go run ./cmd/codeflux-dev build-frontend:*)",
+      "Bash(go run ./cmd/codeflux-dev generate-check:*)",
+      "Bash(go run ./cmd/codeflux-dev test-fast:*)",
+      "Bash(go run ./cmd/codeflux-dev test-integration:*)",
+      "Bash(go run ./cmd/codeflux-dev test-race:*)",
+      "Bash(go run ./cmd/codeflux-dev test-security:*)",
+      "Bash(go run ./cmd/codeflux-dev test-coverage:*)",
+      "Bash(go run ./cmd/codeflux-dev migration-check:*)",
+      "Bash(go run ./cmd/codeflux-dev artifact-check:*)",
+      "Bash(go run ./cmd/codeflux-dev bootstrap:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go doc:*)",
+      "Bash(go list:*)",
+      "Bash(gofmt:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git check-attr:*)"
+    ],
+    "deny": [
+      "Bash(go run ./cmd/codeflux-dev run-live:*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(git push:* origin main)",
+      "Bash(git push:* --force origin main)"
+    ]
+  }
+}

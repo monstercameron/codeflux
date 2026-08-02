@@ -57,6 +57,7 @@ The primary interface is a GoWebComponents v5 chat thread with a task-scoped gra
 - Existing Markdown files may be edited only when the user's request or an authorized implementation task requires that edit.
 - If useful documentation has no explicitly authorized Markdown destination, report it in the task response or store product runtime knowledge in SQLite as designed; do not create a sidecar document.
 - An explicit request to create one Markdown file authorizes only that named file, not additional related Markdown files.
+- The following Markdown files were explicitly requested by the user and are authorized: the root `README.md`; `.github/SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `PULL_REQUEST_TEMPLATE.md`; and everything under `.claude/`, which is the tracked Claude Code configuration — `settings.json`, the subagent definitions in `.claude/agents/`, and the vendored skill in `.claude/skills/`. Do not delete these as unauthorized clutter. Adding a *new* file to `.claude/` still requires its own explicit request.
 
 ### One Repository-Local Artifact Root
 

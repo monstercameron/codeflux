@@ -30,6 +30,35 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-012
+Date: 2026-08-02
+Type: The repository gains a tracked Claude Code configuration, three subagents,
+  and the Karpathy guidelines skill
+Request-or-TODO: User: "lets create claude and agent files and also include the
+  karpathy skill aswell"
+Outcome: .claude/ is now tracked, so every agent working in this repository
+  starts from the same configuration rather than whatever its operator happens
+  to have locally. settings.json pre-allows the codeflux-dev gates and the
+  read-only git and go commands, and denies the three things that should never
+  happen by accident: run-live, which is the only command that reaches a
+  provider and spends money; reading .env; and pushing to main. Three subagents
+  encode work that is repetitive and has already been done wrong here --
+  plan-locator resolves the governing docs/plan.md section and TODOS.md ID and
+  will report "unplanned" rather than invent an authorization; gate-runner runs
+  the gates and returns a triaged list, and carries the traps that cost time
+  today, including that truncating a run to its tail discards the failing
+  package name and that gofmt -l counts .artifacts; ledger-scribe drafts these
+  entries with the correct next identifiers, newest-first placement, and the
+  rule that Verification states what actually ran. The Karpathy guidelines skill
+  is vendored as one file. CLAUDE.md gains the branch model and a map of
+  .claude/, and AGENTS.md records these files as authorized so a later agent
+  does not delete them under the no-unrequested-Markdown rule
+Affected-behavior: None at runtime. Agent tooling and documentation only
+Compatibility-or-migration: None
+Verification: settings.json parses; all four Markdown files carry valid
+  frontmatter; no Go source touched
+Dev-Log: DL-20260802-021
+
 Change-ID: CL-20260802-011
 Date: 2026-08-02
 Type: The repository adopts a two-branch flow, and the version becomes 0.0.1
