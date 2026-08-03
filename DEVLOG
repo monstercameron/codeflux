@@ -25,6 +25,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-123
+Date: 2026-08-03
+Status: Items 1 to 3 of the refinement analysis are in
+Change-ID: CL-20260803-113
+Commit: pending
+Request-or-TODO: The refinement analysis, items 1 to 3
+Goal: Stop a run losing work it had already verified, and stop enhancements
+  preempting defects
+Decisions: Restored only at the end of the loop and only when the current state
+  fails. Restoring on every regression would fight the refinement loop -- the
+  model's edit is reverted and it is then told the same thing about a file it
+  no longer recognises -- and the exhaustion case is where the loss actually
+  hurts.
+  Cleared the produced files before restoring rather than overwriting. An
+  overwrite leaves whatever a later attempt added, which is a state nobody
+  verified wearing the label of one that was.
+  Left a failed capture with no checkpoint at all. Half a worktree restored
+  over a whole one is worse than no restore.
+  Took acceptance out of the combined list entirely rather than ordering within
+  it. It stays in the invariant block, which is where a satisfied obligation
+  belongs
+Files-or-schemas: new internal/coordinator/verified_checkpoint.go and its test,
+  agent_execution.go, agent_outstanding.go
+Validation: Build, vet, gofmt, three checkpoint tests
+Failures-or-discarded-approaches: Using git in the generated worktree to hold
+  the checkpoint. It is a real repository with its own history, and a stash or
+  a commit there is a change to something the run does not own
+Known-limitations: Items 4 to 14 are not done. Domain-aware case generation,
+  the frozen obligation surface, the main-cannot-return-error adversarial rule,
+  minimal repair prompts, transactional multi-file edits, the unchanged-retry
+  fingerprint, ledger-derived completion, the terminal record, and the UTF-8
+  end-to-end test all remain
+Next-safe-step: Run rung 3 in a terminal and watch whether the checkpoint is
+  captured and whether acceptance is now sent back alone
+
 Dev-Log: DL-20260803-122
 Date: 2026-08-03
 Status: Registration is visible in the flow it belongs to

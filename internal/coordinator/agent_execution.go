@@ -545,6 +545,10 @@ func (execution *AgentExecution) Run(
 	// Computed once rather than per attempt. What the project knows does not
 	// change while this run is working, and re-reading it every attempt would
 	// spend a query to be told the same thing.
+	// The last state of the worktree that was known good, kept beside it so
+	// nothing the run does can see or edit its own safety net.
+	checkpoint := newVerifiedCheckpoint(scope.worktree)
+
 	preflight := execution.runMemoryPreflight(ctx, scope)
 	execution.say(ctx, scope, events.KindMessageFinal,
 		"Memory preflight: "+preflight.summary()+".")
@@ -729,32 +733,40 @@ func (execution *AgentExecution) Run(
 			continue
 		}
 
-		// Reaching here means the suite ran and passed on the worktree as it
-		// stands now, which is a stronger fact than the narrator's flags: those
-		// record what the agent's own tool calls did, and the agent's last act
-		// is almost always a write.
-		outstanding := execution.outstandingWork(
-			ctx, scope, caseRounds, documentationRounds, true)
-		if outstanding.any() && progress.lastAttempt() {
-			// Out of attempts with work still owed. Saying so is the whole
-			// point: the run used to fall through here and report
-			// implementation-complete while its own ledger recorded the gate
-			// it had just named as failed, which is the run and the record
-			// disagreeing about the same fact.
-			unfinished = outstanding.summary
-		}
-		if outstanding.any() && !progress.lastAttempt() {
-			if outstanding.askedForCases {
-				caseRounds++
-			}
-			if outstanding.askedForDocumentation {
-				documentationRounds++
-			}
-			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
+		// Acceptance is next, and alone.
+		//
+		// A program whose tests pass and which does not do what was asked is
+		// wrong in a way no amount of coverage or documentation compensates
+		// for, and the failing example names the difference exactly. Listing it
+		// beside three other asks invites a run to treat it as one item of
+		// four, which is how a run comes to spend its attempt on doc comments
+		// while the program prints the wrong thing.
+		acceptanceExamples := parseAcceptanceExamples(scope.requirement)
+		if _, acceptanceFailures := execution.checkAcceptance(
+			ctx, scope.worktree, scope.requirement, acceptanceExamples,
+		); len(acceptanceFailures) > 0 {
+			sendBack("acceptance",
+				"it does not do what was asked. Fix this before anything else; "+
+					"it is the only thing being asked for in this attempt:\n\n"+
+					acceptanceInstruction(acceptanceExamples, acceptanceFailures),
+				"it did not do what was asked")
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
-				"Attempt %d: %s Going back for all of it.",
-				attempt, outstanding.summary))
+				"Attempt %d: %s Fixing that first.",
+				attempt, acceptanceFailures[0]))
 			continue
+		}
+
+		// Compiles, tests pass, does what was asked. That is worth keeping
+		// before anything is allowed to refine it.
+		//
+		// Every attempt edits the same worktree in place, so a run that reached
+		// a good state and was then sent back for coverage could rewrite its
+		// way out of it and report, six attempts later, a failure it had
+		// already solved once. The copy is what makes "refine" mean refine
+		// rather than gamble.
+		if err := checkpoint.capture(scope.worktree,
+			"compiled, tests passed, acceptance matched"); err != nil {
+			tracef("checkpoint", "could not capture: %v", err)
 		}
 
 		// Blind spots are asked for once; defects are asked for until they are
@@ -813,6 +825,34 @@ func (execution *AgentExecution) Run(
 			}
 		}
 
+		// Reaching here means the suite ran and passed on the worktree as it
+		// stands now, which is a stronger fact than the narrator's flags: those
+		// record what the agent's own tool calls did, and the agent's last act
+		// is almost always a write.
+		outstanding := execution.outstandingWork(
+			ctx, scope, caseRounds, documentationRounds, true)
+		if outstanding.any() && progress.lastAttempt() {
+			// Out of attempts with work still owed. Saying so is the whole
+			// point: the run used to fall through here and report
+			// implementation-complete while its own ledger recorded the gate
+			// it had just named as failed, which is the run and the record
+			// disagreeing about the same fact.
+			unfinished = outstanding.summary
+		}
+		if outstanding.any() && !progress.lastAttempt() {
+			if outstanding.askedForCases {
+				caseRounds++
+			}
+			if outstanding.askedForDocumentation {
+				documentationRounds++
+			}
+			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
+			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+				"Attempt %d: %s Going back for all of it.",
+				attempt, outstanding.summary))
+			continue
+		}
+
 		if outcome.Kind == agentloop.OutcomeImplementationComplete ||
 			outcome.Kind == agentloop.OutcomeValidationComplete {
 			// MEM-002: the attempt that ends the loop by satisfying it,
@@ -829,6 +869,35 @@ func (execution *AgentExecution) Run(
 			break
 		}
 	}
+
+	// The loop is over. If what it left behind is worse than something it
+	// reached earlier, put the earlier state back.
+	//
+	// This is the whole point of the copy. A run that compiled, passed its
+	// tests and matched its acceptance examples, was sent back for coverage,
+	// and rewrote its way out of all three, currently reports the last state it
+	// happened to stop on — which is a worse answer than one it had already
+	// found and paid for. Restoring costs nothing and cannot lose work, because
+	// the state being replaced is by definition one that does not pass.
+	//
+	// Only when the current state fails. A run that ended better than its
+	// checkpoint keeps what it ended with, and one that never reached a
+	// checkpoint has nothing to go back to.
+	restoredFromCheckpoint := false
+	if checkpoint.taken {
+		if held, _ := revalidateAfterWrite(ctx, scope.worktree); !held {
+			restoredFromCheckpoint = checkpoint.restore(scope.worktree)
+			if restoredFromCheckpoint {
+				assembled = execution.assemble(ctx, scope.worktree)
+				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+					"The last attempts left the work failing, so it was put back "+
+						"to revision %s, which %s.",
+					checkpoint.digest, checkpoint.reason))
+			}
+		}
+	}
+	tracef("checkpoint", "restored=%t verified_revision=%s",
+		restoredFromCheckpoint, checkpoint.digest)
 
 	// The assembly gate. A run that cannot produce something that builds has
 	// not produced a program, whatever else it did, and everything downstream

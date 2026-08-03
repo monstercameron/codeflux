@@ -50,6 +50,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-113
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- protect the last verified revision, and order the gates
+Request-or-TODO: The refinement analysis, 2026-08-03, items 1 to 3
+Outcome: Three changes, in the order asked for.
+  A run now keeps a copy of the worktree at every point where it compiled,
+  passed its tests, and matched its acceptance examples, and puts that copy
+  back if the loop ends on a state that fails. Every attempt edits the same
+  worktree in place, so a run that reached a good state and was sent back for
+  coverage could rewrite its way out of all three and report, several attempts
+  later, a failure it had already solved once. The copy is what makes "refine"
+  mean refine rather than gamble. Version control and built binaries are
+  excluded: a .git restored over a live repository is actively harmful, and a
+  restored binary older than the source beside it is a lie about what the
+  source does.
+  Acceptance is now checked and sent back on its own, ahead of coverage and
+  documentation, rather than as one item of four in a combined list.
+  The full order a failure is now handled in is cancellation, provider,
+  compilation, tests, acceptance, adversarial correctness, coverage,
+  documentation. Adversarial review moved ahead of the coverage and
+  documentation asks, which is where it belongs: a demonstrated defect is not
+  a peer of a missing doc comment.
+Verification: Build, vet, gofmt, three new checkpoint tests covering restore
+  after a regression, the never-captured case, and the exclusion of version
+  control
+Dev-Log: DL-20260803-123
+
 Change-ID: CL-20260803-112
 Commit: pending
 Date: 2026-08-03

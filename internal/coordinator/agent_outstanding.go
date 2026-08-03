@@ -69,16 +69,12 @@ func (execution *AgentExecution) outstandingWork(
 		satisfied = append(satisfied, "The project's own test suite passes.")
 	}
 
-	examples := parseAcceptanceExamples(scope.requirement)
-	if _, failures := execution.checkAcceptance(
-		ctx, scope.worktree, scope.requirement, examples,
-	); len(failures) > 0 {
-		work.gate = "acceptance"
-		work.because = "it did not do what was asked"
-		parts = append(parts, acceptanceInstruction(examples, failures))
-		summaries = append(summaries,
-			"it does not do what was asked ("+failures[0]+")")
-	} else if len(examples) > 0 {
+	// Acceptance is not asked for here. It is checked and sent back on its own
+	// before this is reached, because a program that does not do what was asked
+	// is wrong in a way no amount of coverage compensates for, and listing it
+	// beside three other asks invites a run to treat it as one item of four.
+	// It appears below only as an invariant the next attempt must not break.
+	if len(parseAcceptanceExamples(scope.requirement)) > 0 {
 		satisfied = append(satisfied,
 			"The acceptance examples match exactly, byte for byte.")
 	}
