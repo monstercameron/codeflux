@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-072
+Date: 2026-08-02
+Status: Verified offline; paid path untouched
+Change-ID: CL-20260802-062
+Commit: pending
+Request-or-TODO: PIPE-020a
+Goal: Establish whether the ladder actually breaks under PIPE-019
+Assumptions: None taken from the ticket. Its premise was checked first, and it
+  was wrong
+Decisions: Checked the claim before acting on it. The ladder had already gained
+  acceptanceBlock() in a same-day commit, so the reported landmine did not
+  exist. Wrote the verification anyway, because an unchecked assurance is the
+  state this audit keeps finding to be false.
+  Called the real parsing and oracle functions rather than reimplementing the
+  predicates -- a reimplementation would prove only that two copies of one
+  reading agree.
+  Repaired rung 25 by reordering the diff rather than changing what the rung
+  asserts, keeping its deletions-before-insertions convention, so the fix does
+  not quietly weaken the case
+Files-or-schemas: internal/coordinator/engine_produces_program_test.go (one
+  rung), pipe020a_ladder_acceptance_test.go (new)
+Validation: All 251 rungs pass the instructions predicate and the oracle; the
+  control proves the oracle is not trivially satisfied
+Failures-or-discarded-approaches: None. The round-trip assertion is what caught
+  rung 25 -- a test written to check one thing finding another
+Known-limitations: Everything a real model does with this text remains
+  unverified. CODEFLUX_LADDER was never set
+Next-safe-step: Nothing until somebody deliberately funds a ladder run
+
 Dev-Log: DL-20260802-071
 Date: 2026-08-02
 Status: Normalised centrally

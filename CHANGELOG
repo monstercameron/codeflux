@@ -42,6 +42,39 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-062
+Commit: pending
+Date: 2026-08-02
+Type: Test -- ladder acceptance verified, and one rung repaired
+Request-or-TODO: PIPE-020a
+Outcome: The ticket's premise was already stale. It recorded that the escalation
+  ladder supplies no acceptance example, which was true of the 48-rung ladder it
+  was written against; commit 49061c4 expanded the ladder to 251 rungs the same
+  day and added acceptanceBlock(), appended to every rung's requirement. All 251
+  carry a non-empty expected value, so there was no landmine.
+  Verified rather than assumed, and without running the paid path: three tests
+  drive the real parseAcceptanceExamples, parseNamedTestExamples and
+  checkAcceptanceOracle over all 251 rungs. Each satisfies the instructions
+  predicate exactly as agent_execution.go computes it, each parses back to the
+  expected value the rung declares, and each fails against a bare worktree as
+  PIPE-020's oracle requires. A third test is the control: a worktree already
+  satisfying its example makes the oracle report broke, so held is not vacuous.
+  One independent pre-existing defect repaired. Rung 25's expected value began
+  with a literal space, and both normalizeProgramOutput and parseOneExample trim
+  the whole joined text, eating it -- so that rung's own correctness check could
+  never pass even for a perfect program. The diff was reordered so the first
+  differing line is a deletion, keeping the rung's existing convention
+Affected-behavior: Test-only. Rung 25 becomes satisfiable
+Compatibility-or-migration: None
+Verification: The three new tests green; the ladder still skips cleanly with
+  CODEFLUX_LADDER unset
+Known-limitations: CODEFLUX_LADDER was never set and run-live never invoked, so
+  what a real model does with this text is unverified: whether it satisfies
+  end-to-end-tests, whether reportFlow's other stages hold against real output,
+  and whether rung 25's new transcript is one a correct diff would produce.
+  Offline testing shows the string is self-consistent, not that it is achievable
+Dev-Log: DL-20260802-072
+
 Change-ID: CL-20260802-061
 Commit: pending
 Date: 2026-08-02

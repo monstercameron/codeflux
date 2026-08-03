@@ -433,8 +433,19 @@ func ladderRungs() []generatedProgram {
 				"leading space, a line only in the first is printed with a " +
 				"leading minus, and a line only in the second is printed with a " +
 				"leading plus. Keep the original order and print nothing else.",
-			stdin:    "a\nb\nc\n---\na\nx\nc\n",
-			expected: " a\n-b\n+x\n c",
+			// The expected transcript must not open with a line whose only
+			// content is the leading-space "unchanged" marker: buildAndRun
+			// compares against program.expected through normalizeProgramOutput,
+			// which strings.TrimSpace()s the whole transcript, and the
+			// acceptance block's own parser (parseOneExample, agent_acceptance.go)
+			// does the same to what it reads back. Either way a leading space
+			// that is the very first byte of the expected text is silently
+			// eaten, so the rung's own correctness check could never pass even
+			// for a correct program. Ordering the blocks so the first line
+			// differs (a deletion, not a context line) keeps the assertion
+			// meaningful.
+			stdin:    "a\nb\nc\n---\nx\nb\nc\n",
+			expected: "-a\n+x\n b\n c",
 		},
 		{
 			name: "26 reduces a lambda expression to normal form",
