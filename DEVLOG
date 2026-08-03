@@ -51,6 +51,41 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-050
+Date: 2026-08-02
+Status: Six bindings corrected; resolution now tested
+Change-ID: CL-20260802-040
+Commit: pending
+Request-or-TODO: PIPE-004a
+Goal: Make every declared stage performer resolve to a function that exists
+Assumptions: The PIPE-004 table's value is that a reader can go from a ledger
+  row to the code that produced it. A name resolving to nothing destroys that
+  without looking broken
+Decisions: Found this while reading Checks for unrelated work: ValidateChecks
+  requires only that a performer name be non-empty and space-free, so six of
+  thirty-seven named nothing. Four have never existed here; two were deleted
+  under REPO-018 while the table kept pointing at them -- which means clearing
+  dead code silently invalidated this table, and nothing said so.
+  Put the resolving test in internal/coordinator rather than internal/pipeline,
+  because that is the package whose declarations the names refer to and pipeline
+  cannot see them. It parses the package's own files, handles both the plain and
+  Receiver.Method forms, and counts test files as valid declaration sites since a
+  performer may legitimately live beside what it checks
+Files-or-schemas: internal/pipeline/checks.go (six entries),
+  internal/coordinator/stage_performers_test.go
+Validation: Green, and proven to discriminate by restoring measureCoverage and
+  watching it fail naming that entry and its stage. It fails rather than passes
+  on zero parsed declarations, so it cannot pass vacuously
+Failures-or-discarded-approaches: A PowerShell -creplace was used to inject the
+  discrimination probe and corrupted the file's UTF-8, adding a BOM and
+  mojibaking three section marks. Restored with git checkout and reapplied
+  through the Edit tool. PowerShell must not be used to edit file contents in
+  this environment, including for a probe that will be reverted -- reverting the
+  string does not revert the encoding
+Known-limitations: This proves a function of that name exists, not that it is
+  the one deciding the stage. Naming a different real function still passes
+Next-safe-step: None; the entries are correct as of this revision
+
 Dev-Log: DL-20260802-049
 Date: 2026-08-02
 Status: Three transitions signalling; application wiring in place

@@ -66,6 +66,29 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-040
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- stage-to-performer bindings
+Request-or-TODO: PIPE-004a
+Outcome: Six of the thirty-seven entries in pipeline.Checks named functions that
+  do not exist. Four had never existed in this repository
+  (checkDecompositionCoverage, synthesiseAtomCases, checkAtomPropertyTests,
+  checkAssembly); two were deleted as unreachable under REPO-018 while the table
+  kept pointing at them (documentAtoms, measureCoverage). All six now name the
+  function that really decides the stage, and a test resolves every binding
+  against the package's declarations
+Affected-behavior: None at runtime; Performer is descriptive. What changes is
+  that a reader chasing a satisfied ledger row now reaches real code
+Compatibility-or-migration: None
+Verification: go test ./internal/coordinator/ -run TestPIPE004a green, and
+  proven to discriminate -- restoring measureCoverage makes it fail naming that
+  entry and its stage. The test refuses to run against zero parsed declarations,
+  so it cannot pass vacuously
+Known-limitations: It confirms a function of that name exists, not that it is
+  the one that decides the stage. Naming the wrong real function still passes
+Dev-Log: DL-20260802-050
+
 Change-ID: CL-20260802-039
 Commit: pending
 Date: 2026-08-02
