@@ -181,8 +181,18 @@ func stepsForBehaviours(
 			State:           agentloop.StepPending,
 			SummaryRedacted: "Write " + file + " — " + shared,
 			MaterialEdit:    true, ValidationRequired: true,
-			ExpectedFiles:   []string{file},
-			CompletionTools: []executor.ToolName{executor.ToolApplyEdit},
+			ExpectedFiles: []string{file},
+			// Either way of writing the file completes the step.
+			//
+			// The loop offers a model only the tools an open step declares, so
+			// listing the whole-file tool alone made apply-patch unreachable:
+			// it was registered, described, tested, and never once appeared in
+			// tools_you_may_call. Ladder rung 6 wrote whole files eleven and
+			// thirteen times in single attempts with the patch tool sitting
+			// unoffered.
+			CompletionTools: []executor.ToolName{
+				executor.ToolApplyEdit, executor.ToolApplyPatch,
+			},
 		}
 		steps = append(steps, step)
 	}

@@ -659,6 +659,11 @@ func (execution *AgentExecution) Run(
 			break
 		}
 		progress.beginAttempt()
+		// Each attempt gets one wholesale write per file. The count is per
+		// attempt rather than per run, because a run that legitimately starts
+		// over on a later attempt should not be refused for what an earlier one
+		// did.
+		narrator.wholeFileWrites = map[string]int{}
 		tracef("attempt", "%d begins on rung %s", attempt, progress.currentRung())
 		// What another run has already found out about this provider, said
 		// before the wait rather than after it. Advisory: this run still tries,

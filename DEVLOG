@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-145
+Date: 2026-08-03
+Status: The patch path is reachable for the first time
+Change-ID: CL-20260803-135
+Commit: pending
+Request-or-TODO: The rung 6 trace after the structured-prompt change
+Goal: Make the patch tool something a run can actually call
+Decisions: Asserted the wiring in a test rather than fixing the two call sites
+  and moving on. Each file was individually correct — the tool was registered,
+  the step declared a tool — and the defect lived in the relationship between
+  them, which is exactly the kind that comes back.
+  Refused the second wholesale write rather than the first. Creating a file is
+  the right way to create a file; re-emitting it is the habit worth breaking.
+  Counted per attempt rather than per run, so a run legitimately starting over
+  on a later attempt is not refused for what an earlier one did
+Files-or-schemas: agent_narration.go, agent_planning.go, agent_execution.go,
+  edit_scope_test.go
+Validation: Build, vet, gofmt, the edit-scope suite
+Failures-or-discarded-approaches: None
+Known-limitations: Whether the model will use the patch tool now that it is
+  offered is unmeasured. The trace will say
+Next-safe-step: Rung 6 again, counting apply-patch calls against apply-edit
+
 Dev-Log: DL-20260803-144
 Date: 2026-08-03
 Status: The prompt path is structured end to end

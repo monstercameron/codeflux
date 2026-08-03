@@ -50,6 +50,30 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-135
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the patch tool nobody was offered, and the eleven-rewrite attempt
+Request-or-TODO: Observed in the rung 6 trace after CL-20260803-134
+Outcome: The JSON prompts worked: zero backticks in the whole run. The patch
+  tool did not, because it was never offered.
+  The loop shows a model only the tools an open plan step declares, and every
+  write step declared the whole-file tool alone. apply-patch was registered,
+  described, tested and unreachable — it never once appeared in
+  tools_you_may_call. A model cannot use a tool it is not given, and every
+  other change made for its sake was inert. A write step now accepts either,
+  and a test asserts it, because this is precisely the wiring that looks
+  correct in each file and is wrong between them.
+  A second wholesale rewrite of the same file in one attempt is now refused and
+  pointed at the patch tool. The first is how a file comes into existence; the
+  eleventh is a run that has stopped editing and started guessing. Rung 6 wrote
+  whole files eleven times in attempt four and thirteen in attempt five, each
+  re-sending two thousand bytes to move ten, each line re-sent a chance to drop
+  something that was working.
+Verification: Build, vet, gofmt, a new test that a write step can be completed
+  by a patch, and the edit-scope suite
+Dev-Log: DL-20260803-145
+
 Change-ID: CL-20260803-134
 Commit: pending
 Date: 2026-08-03

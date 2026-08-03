@@ -64,6 +64,14 @@ type narratingExecutor struct {
 	lastTestFailed      bool
 	// worktree is where the produced work lives, needed to fingerprint it.
 	worktree string
+	// wholeFileWrites counts how many times each path has been rewritten
+	// wholesale this attempt.
+	//
+	// The first is how a file comes into existence. The second is a rewrite of
+	// something that already exists, which is what apply-patch is for, and the
+	// eleventh is a run that has stopped editing and started guessing. Ladder
+	// rung 6 wrote whole files eleven and thirteen times in single attempts.
+	wholeFileWrites map[string]int
 	// permitted is what this attempt is allowed to change. Set by the attempt
 	// loop from the gate that sent the work back, and cleared to editAnything
 	// for an ordinary round.
@@ -110,6 +118,41 @@ func (narrator *narratingExecutor) ExecuteTool(
 	beforeWrite := ""
 	if executor.ToolName(name) == executor.ToolApplyEdit && narrator.worktree != "" {
 		beforeWrite = producedTreeDigest(narrator.worktree)
+	}
+
+	// A wholesale rewrite of a file that already exists is refused after the
+	// first, and pointed at the tool for the job.
+	//
+	// Not on the first: that is how a file is created, and a run that has just
+	// written main.go has done the right thing. What is refused is the habit of
+	// re-emitting two thousand bytes to move ten, which costs the tokens, risks
+	// every line it touches, and is the churn this whole patch tool exists to
+	// stop.
+	if executor.ToolName(name) == executor.ToolApplyEdit &&
+		narrator.worktree != "" {
+		path := toolArgument(request.Request, "path")
+		if narrator.wholeFileWrites == nil {
+			narrator.wholeFileWrites = map[string]int{}
+		}
+		narrator.wholeFileWrites[path]++
+		if narrator.wholeFileWrites[path] > 1 {
+			why := "You have already written " + path + " whole this attempt. " +
+				"Rewriting it again re-sends every line to change a few, and " +
+				"every line it re-sends is a chance to drop something that " +
+				"was working. Use apply-patch: \"*** Update File: " + path +
+				"\", then \"@@\", the lines to remove prefixed \"-\", the " +
+				"lines to add prefixed \"+\", and enough unprefixed context " +
+				"around them to say where the change goes. Read the file " +
+				"first if you need the exact text."
+			tracef("tool", "%-12s %-10s %s", name, "rewrite",
+				"already written whole this attempt: "+path)
+			narrator.execution.publishTool(narrator.ctx, narrator.scope,
+				events.KindToolCompleted, executionID, name,
+				string(domain.CommandExecutionStateFailed),
+				detail+" — refused: already written whole this attempt")
+			narrator.lastFailure = why
+			return executor.ToolResult{State: "failed", StdoutRedacted: why}, nil
+		}
 	}
 
 	// A write outside this round's scope is refused before it lands.
@@ -453,8 +496,18 @@ func agentPlanSteps(requirement string) []agentloop.PlanStep {
 			// reliably ends in a trailing newline.
 			SummaryRedacted: "Write " + file + " — " + requirementSummary(requirement),
 			MaterialEdit:    true, ValidationRequired: true,
-			ExpectedFiles:   []string{file},
-			CompletionTools: []executor.ToolName{executor.ToolApplyEdit},
+			ExpectedFiles: []string{file},
+			// Either way of writing the file completes the step.
+			//
+			// The loop offers a model only the tools an open step declares, so
+			// listing the whole-file tool alone made apply-patch unreachable:
+			// it was registered, described, tested, and never once appeared in
+			// tools_you_may_call. Ladder rung 6 wrote whole files eleven and
+			// thirteen times in single attempts with the patch tool sitting
+			// unoffered.
+			CompletionTools: []executor.ToolName{
+				executor.ToolApplyEdit, executor.ToolApplyPatch,
+			},
 		})
 	}
 	return append(steps, agentloop.PlanStep{
