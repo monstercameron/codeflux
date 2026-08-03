@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-125
+Date: 2026-08-03
+Status: Both unsatisfiable gates observed on rung 3 are closed
+Change-ID: CL-20260803-115
+Commit: pending
+Request-or-TODO: Refinement analysis items 4 and 7
+Goal: Stop asking for things no correct program can provide
+Decisions: Replaced the main finding rather than deleting it. main really can
+  swallow a failure; what it cannot do is return one, so the obligation is
+  reporting and exit status.
+  Asked nothing of a main that calls nothing fallible, so the rule does not
+  become the same unfollowable instruction in a different sentence.
+  Estimated cost from LoopDepth and an integer parameter. The precise question
+  -- does this function do work proportional to this argument -- is
+  undecidable, and a crude answer in the safe direction costs one case on a
+  function that could have afforded it, where a hung suite costs the run.
+  Kept a bounded pathological case rather than removing the class
+Files-or-schemas: agent_adversarial_review.go and a new test for it,
+  agent_stage_cases.go and its test
+Validation: Build, vet, gofmt, six new tests
+Failures-or-discarded-approaches: Letting rung 3 run to its ceiling to see
+  whether it recovered. It was on the most expensive rung against an impossible
+  demand, and the provider had begun refusing; it was stopped by PID
+Known-limitations: Items 5, 6, 8, 9, 12, 13 and 14 of the analysis remain: the
+  frozen obligation surface, isolated-mode memory skipping, minimal repair
+  prompts, transactional multi-file edits, ledger-derived completion, the
+  terminal record, and the UTF-8 end-to-end test
+Next-safe-step: Rung 3 again in a terminal, watching whether the adversarial
+  gate now closes instead of repeating
+
 Dev-Log: DL-20260803-124
 Date: 2026-08-03
 Status: The first structured-output call site exists; the working turns are

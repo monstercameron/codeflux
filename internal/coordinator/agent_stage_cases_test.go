@@ -284,3 +284,59 @@ func TestDigitsInsideAnIdentifierAreNotAValueTried(t *testing.T) {
 		t.Error("the array length 256 is a real literal and was not counted")
 	}
 }
+
+// TestAnOutputLinearFunctionIsNotAskedForMaxInt covers the cost guard.
+//
+// Ladder rung 3 is FizzBuzz: its whole body is a loop bounded by its argument,
+// and it was asked for math.MaxInt and math.MinInt. That test cannot finish.
+func TestAnOutputLinearFunctionIsNotAskedForMaxInt(t *testing.T) {
+	fizzbuzz := producedFunction{
+		Name: "printFizzBuzz", Parameters: []string{"int"}, LoopDepth: 1,
+	}
+	for _, candidate := range withoutExplosiveCases(
+		fizzbuzz, casesForType("int"),
+	) {
+		if strings.Contains(candidate.Shape, "math.MaxInt") ||
+			strings.Contains(candidate.Shape, "math.MinInt") {
+			t.Errorf("a loop bounded by its argument was asked for %s",
+				candidate.Shape)
+		}
+	}
+}
+
+// TestTheBoundaryStillGetsACase guards against the guard becoming a deletion:
+// well past what the author pictured is still worth asking, bounded.
+func TestTheBoundaryStillGetsACase(t *testing.T) {
+	fizzbuzz := producedFunction{
+		Name: "printFizzBuzz", Parameters: []string{"int"}, LoopDepth: 1,
+	}
+	pathological := 0
+	for _, candidate := range withoutExplosiveCases(
+		fizzbuzz, casesForType("int"),
+	) {
+		if candidate.Class == casePathological {
+			pathological++
+		}
+	}
+	if pathological == 0 {
+		t.Error("dropping the unrunnable cases left the boundary unexamined")
+	}
+}
+
+// TestAnAdderKeepsItsOverflowCase keeps the guard narrow: math.MaxInt is a fair
+// question for a function that adds.
+func TestAnAdderKeepsItsOverflowCase(t *testing.T) {
+	adder := producedFunction{
+		Name: "add", Parameters: []string{"int", "int"},
+		Results: []string{"int"}, Pure: true,
+	}
+	found := false
+	for _, candidate := range withoutExplosiveCases(adder, casesForType("int")) {
+		if strings.Contains(candidate.Shape, "math.MaxInt") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("a function with no loop lost its overflow case")
+	}
+}

@@ -114,7 +114,8 @@ func casesForType(typeName string) []atomCase {
 				"exactly one element, where off-by-one errors live", caseEdge},
 			{fmt.Sprintf("%s{%s, %s, %s}", typeName, sampleOf(element, 1),
 				sampleOf(element, 1), sampleOf(element, 1)),
-				"the same element repeated, so ties must be broken somehow",
+				"the same element repeated, so duplicate handling is decided " +
+					"rather than assumed",
 				caseComplex},
 			{fmt.Sprintf("%s{%s, %s} reversed and re-sorted", typeName,
 				sampleOf(element, 3), sampleOf(element, 1)),
@@ -138,7 +139,8 @@ func casesForType(typeName string) []atomCase {
 				"a single entry, where iteration order cannot hide a bug",
 				caseEdge},
 			{fmt.Sprintf("%s with entries whose values tie", typeName),
-				"ties, so the ordering rule is forced to be stated",
+				"entries whose values are equal, so the choice between them is " +
+					"decided rather than assumed",
 				caseComplex},
 		}
 	case typeName == "string":
@@ -275,7 +277,8 @@ func synthesiseCases(functions []producedFunction) map[string][]atomCase {
 		}
 		var cases []atomCase
 		for _, parameter := range function.Parameters {
-			cases = append(cases, casesForType(parameter)...)
+			cases = append(cases,
+				withoutExplosiveCases(function, casesForType(parameter))...)
 		}
 		// A function that can fail owes a case that makes it fail. Without one
 		// the failure path is written and never walked, which is where the
@@ -1022,4 +1025,68 @@ func untriedCaseInstruction(owed map[string][]atomCase, testsPassed bool) string
 			"assert the refusal rather than deleting the case: a value nothing " +
 			"tries is a value nobody has decided about.")
 	return instruction.String()
+}
+
+// withoutExplosiveCases drops cases whose cost is proportional to the value
+// being suggested.
+//
+// math.MaxInt is a fair question for a function that adds, and an impossible
+// one for a function that counts to its argument or prints that many lines: the
+// test cannot finish, and asking for it produces either a hung suite or a run
+// that spends its attempts arguing with a case it cannot satisfy. Ladder rung 3
+// is FizzBuzz. It was asked for math.MaxInt and math.MinInt while its whole
+// body is a loop bounded by that argument.
+//
+// The estimate is deliberately crude, because the precise question — does this
+// function do work proportional to this parameter — is undecidable, and a crude
+// answer in the safe direction costs one case on a function that could have
+// afforded it. A hung suite costs the run.
+//
+// Only the pathological integer cases are affected. Every other case is a fixed
+// small value or a shape, and none of them get more expensive as the number
+// gets bigger.
+func withoutExplosiveCases(
+	function producedFunction, cases []atomCase,
+) []atomCase {
+	if !workGrowsWithItsArgument(function) {
+		return cases
+	}
+	kept := make([]atomCase, 0, len(cases))
+	for _, candidate := range cases {
+		if candidate.Class == casePathological &&
+			(strings.Contains(candidate.Shape, "math.MaxInt") ||
+				strings.Contains(candidate.Shape, "math.MinInt")) {
+			continue
+		}
+		kept = append(kept, candidate)
+	}
+	// The boundary still deserves a case; what it does not deserve is a value
+	// that cannot be run. A bounded representative asks the same question --
+	// what happens well past what the author pictured -- and finishes.
+	return append(kept, atomCase{
+		Shape: "a large but bounded value, such as 100000",
+		Why: "far more than the author pictured, without asking for a run " +
+			"that cannot finish: this function does work proportional to " +
+			"this argument, so math.MaxInt is not a test, it is a hang",
+		Class: casePathological,
+	})
+}
+
+// workGrowsWithItsArgument reports whether a function loops or emits output in
+// proportion to what it is given.
+//
+// Read from the structure already recorded: a loop in the body, and an integer
+// among the parameters. A function with neither cannot be made slow by a large
+// number, and one with both very likely can.
+func workGrowsWithItsArgument(function producedFunction) bool {
+	if function.LoopDepth == 0 {
+		return false
+	}
+	for _, parameter := range function.Parameters {
+		switch parameter {
+		case "int", "int64", "int32", "uint", "uint64", "uint32":
+			return true
+		}
+	}
+	return false
 }

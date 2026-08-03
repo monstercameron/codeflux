@@ -50,6 +50,36 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-115
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- two gates that could not be satisfied by any correct program
+Request-or-TODO: Refinement analysis items 4 and 7, both observed live on rung 3
+Outcome: The adversarial critic told main it had swallowed an error by
+  returning none of its own. Go defines main as func main(), with no results; a
+  main that returned an error would not compile. Rung 3 was told this twice per
+  attempt, could not comply, was sent back three times for the same finding,
+  escalated to the most expensive rung on the resulting stall, and spent the
+  rest of its budget there before the provider gave out. A gate whose
+  instruction cannot be followed does not merely fail to improve the work -- it
+  consumes the run.
+  What main genuinely owes is now checked instead, and it is satisfiable: a
+  main that calls something fallible and then exits zero whatever happens has
+  produced a program that fails silently and reports success to whatever ran
+  it. Write the message to os.Stderr and call os.Exit(1). A main that already
+  exits non-zero, and a main that calls nothing fallible, owe nothing.
+  Separately, math.MaxInt is no longer proposed for a function whose work is
+  proportional to its argument. Rung 3 is FizzBuzz -- its whole body is a loop
+  bounded by that argument -- and the case cannot finish. The boundary still
+  gets a case, bounded, because "well past what the author pictured" is worth
+  asking and "a run that cannot finish" is not. A function with no loop keeps
+  its overflow case, which is a fair question there.
+  The two invented rationales are gone: "ties must be broken somehow" now reads
+  as duplicate handling being decided rather than assumed, which is what the
+  case was ever actually about.
+Verification: Build, vet, gofmt, six new tests
+Dev-Log: DL-20260803-125
+
 Change-ID: CL-20260803-114
 Commit: pending
 Date: 2026-08-03

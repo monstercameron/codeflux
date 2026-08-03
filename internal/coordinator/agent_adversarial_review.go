@@ -313,6 +313,26 @@ func findUnhandledFailures(functions []producedFunction) []adversarialFinding {
 		if isTestScaffolding(function) || function.ReturnsError {
 			continue
 		}
+		// main is exempt, because the remedy this finding names is impossible
+		// there. Go defines main as func main(), with no results; a main that
+		// returned an error would not compile, so "returns no error of its own"
+		// is a description of the language rather than of a defect.
+		//
+		// Ladder rung 3 was told this twice per attempt — that main swallowed
+		// fmt.Fprintln's error and run's error — could not comply, was sent
+		// back three times for the same finding, escalated to the most
+		// expensive rung on the resulting stall, and spent the rest of its
+		// budget there. A gate whose instruction cannot be followed does not
+		// merely fail to improve the work; it consumes the run.
+		//
+		// What main genuinely owes is checked by mainReportsAndExits below: an
+		// error it receives must reach the user and must set a non-zero exit
+		// status. That is the real obligation, and it is satisfiable.
+		if function.Name == "main" {
+			findings = append(findings,
+				mainReportsAndExits(function, canFail)...)
+			continue
+		}
 		// A function that calls another produced function able to fail, and
 		// returns no error of its own, has swallowed it.
 		for _, called := range function.Calls {
@@ -737,4 +757,57 @@ func findUntriedCaseFindings(worktree string) []adversarialFinding {
 		}
 	}
 	return findings
+}
+
+// mainReportsAndExits is what a Go entry point actually owes.
+//
+// It cannot return an error, so the question is not whether it returns one but
+// whether the error reaches anybody. A main that calls a fallible function and
+// neither prints the failure nor exits non-zero has produced a program that
+// fails silently and tells its caller it succeeded, which is a real defect and
+// a satisfiable one: report it and call os.Exit with a non-zero status.
+//
+// Only asked when main actually calls something that can fail. A main that
+// calls nothing fallible owes nothing here, and saying otherwise would be the
+// same unfollowable instruction in a different sentence.
+func mainReportsAndExits(
+	main producedFunction, canFail map[string]bool,
+) []adversarialFinding {
+	fallible := false
+	for _, called := range main.Calls {
+		if canFail[called] {
+			fallible = true
+			break
+		}
+	}
+	for _, effect := range main.Effects {
+		if knownFallibleStdlibCalls[effect] {
+			fallible = true
+			break
+		}
+	}
+	if !fallible {
+		return nil
+	}
+	exits := false
+	for _, effect := range main.Effects {
+		if effect == "os.Exit" || effect == "log.Fatal" ||
+			effect == "log.Fatalf" || effect == "log.Fatalln" {
+			exits = true
+			break
+		}
+	}
+	if exits {
+		return nil
+	}
+	return []adversarialFinding{{
+		Kind:  findingDefect,
+		Where: main.Name,
+		What: "calls something that can fail and then exits zero whatever " +
+			"happens, so a failed program reports success to whatever ran " +
+			"it. main cannot return an error: write the message to " +
+			"os.Stderr and call os.Exit(1)",
+		EvidenceLevel: findingEvidenceMechanicalRule,
+		Lineage:       findingLineageSwallowedError,
+	}}
 }
