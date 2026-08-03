@@ -185,6 +185,58 @@ func isNameRune(letter rune) bool {
 		(letter >= 'A' && letter <= 'Z')
 }
 
+// checkAcceptanceOracle proves the request's own acceptance examples
+// discriminate before anything is built to satisfy them (PIPE-020).
+//
+// PIPE-019 requires at least one executable example at the instructions
+// stage. Requiring one is not the same as the example being any good: an
+// expected string a stub already prints, a named test that never reaches the
+// function it claims to check, or a command example a pre-existing binary
+// already satisfies would pass StageInstructions and then pass
+// StageEndToEndTests too, without either stage having examined anything this
+// run actually did. An example that passes against nothing tests nothing.
+//
+// It runs the same check StageEndToEndTests runs later — checkAcceptance
+// itself — but here, against the worktree exactly as this run received it,
+// before its own attempt loop has written a single byte. checkAcceptance
+// holding at this point means the example was already true before this run
+// began, so it cannot be evidence about anything this run does; only an
+// example that fails here and is later reproduced by the finished work is
+// evidence of anything. It is deliberately the same check function rather
+// than a second implementation of it: two independent readings of "did the
+// program do what the example says" would drift, and a discriminator that
+// disagreed with the gate it is meant to validate would be worse than none.
+func (execution *AgentExecution) checkAcceptanceOracle(
+	ctx context.Context,
+	worktree string,
+	requirement string,
+	examples []acceptanceExample,
+) stageOutcome {
+	if len(examples) == 0 && len(parseNamedTestExamples(requirement)) == 0 {
+		return skipped("no executable acceptance example was supplied, so " +
+			"there is nothing to prove discriminates")
+	}
+	outcome, _ := execution.checkAcceptance(ctx, worktree, requirement, examples)
+	switch {
+	case outcome.Skipped:
+		// checkAcceptance found nothing to run despite an example being present
+		// above — for instance a named test whose package does not exist yet.
+		// Treated the same as no example: nothing was proven either way.
+		return skipped(outcome.Detail)
+	case outcome.Held:
+		return broke(fmt.Sprintf(
+			"the acceptance example(s) already hold against the repository "+
+				"exactly as this run received it, before any of this run's own "+
+				"work: %s. An example that passes before the work starts is not "+
+				"evidence the work happened", outcome.Detail), outcome.Evidence)
+	default:
+		return held(fmt.Sprintf(
+			"every acceptance example fails against the repository before "+
+				"this run's own work, so the example(s) are shown to "+
+				"discriminate it: %s", outcome.Detail), outcome.Evidence)
+	}
+}
+
 // checkAcceptance runs the built program against everything it was promised to
 // do.
 //

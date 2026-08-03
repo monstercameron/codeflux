@@ -54,7 +54,7 @@ func TestPhasesRunInFlowOrderWithoutInterleaving(t *testing.T) {
 		position[phase] = index
 	}
 	previous := -1
-	for stage := StageInstructions; stage <= StageDeliver; stage++ {
+	for stage := StageInstructions; stage <= StageAcceptanceOracle; stage++ {
 		phase, found := PhaseOf(stage)
 		if !found {
 			t.Fatalf("stage %d has no phase", stage)
@@ -71,7 +71,7 @@ func TestPhasesRunInFlowOrderWithoutInterleaving(t *testing.T) {
 // TestStagesOutsideTheFlowAreUnattributedRatherThanDefaulted proves an
 // out-of-range stage is refused instead of being filed under a phase.
 func TestStagesOutsideTheFlowAreUnattributedRatherThanDefaulted(t *testing.T) {
-	for _, stage := range []Number{-1, 0, StageDeliver + 1, 1000} {
+	for _, stage := range []Number{-1, 0, StageAcceptanceOracle + 1, 1000} {
 		if phase, found := PhaseOf(stage); found {
 			t.Errorf("stage %d was attributed to phase %q", stage, phase)
 		}

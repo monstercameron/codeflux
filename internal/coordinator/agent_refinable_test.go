@@ -62,6 +62,7 @@ var refinementGates = map[string]string{
 	"evidence-bundle":         "", // describes the ledger it is written into
 	"human-acceptance":        "", // a person's decision
 	"deliver":                 "", // the consequence of everything above
+	"acceptance-oracle":       "", // decided before any code exists, from the request and the untouched worktree alone
 }
 
 // TestEveryStageThatCanFailIsEitherRefinableOrDeclaredReportOnly is the guard

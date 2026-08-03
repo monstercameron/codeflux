@@ -170,6 +170,14 @@ func (execution *AgentExecution) Run(
 			"total_examples":      totalExamples,
 		})
 
+	// The acceptance-oracle control (PIPE-020): requiring an example is not
+	// the same as the example being any good. This runs before anything below
+	// touches scope.worktree, which is exactly the property the check needs —
+	// it proves the example(s) fail against the repository this run actually
+	// received, not against some other build of it.
+	ledger.decide(ctx, pipeline.StageAcceptanceOracle,
+		execution.checkAcceptanceOracle(ctx, scope.worktree, scope.requirement, examples))
+
 	// A request that reads two ways is settled before anything is written. The
 	// store refuses to record a plan for one that still needs an answer, so a
 	// run that pressed on reached a constraint failure instead of a question,

@@ -120,6 +120,23 @@ const (
 	StageEvidenceBundle  Number = 35
 	StageHumanAcceptance Number = 36
 	StageDeliver         Number = 37
+
+	// StageAcceptanceOracle proves the request's own acceptance examples
+	// discriminate: every one fails against the repository exactly as this run
+	// received it, before this run's own work exists to satisfy them (PIPE-020).
+	// It is the control that keeps PIPE-019's mandatory example from being
+	// satisfiable by nothing — an example a stub already passes would clear
+	// both the instructions gate and the end-to-end gate without either one
+	// having examined this run's work.
+	//
+	// It belongs, in the sequence a person reads, immediately after
+	// instructions: it needs only the request and the untouched worktree, and
+	// nothing before contracts depends on it having run. It is numbered and
+	// positioned last instead, additively, because renumbering the thirty-seven
+	// stages after it is PIPE-045's, not this ticket's, to do. Read this stage
+	// by name, not by its place in the printed order, until that renumbering
+	// lands.
+	StageAcceptanceOracle Number = 38
 )
 
 // State is what became of one stage in one attempt.
@@ -241,6 +258,11 @@ var Flow = []Stage{
 		"a person accepted the work, rejected it, or asked for a change"},
 	{StageDeliver, "deliver",
 		"the accepted change, its evidence, and its provenance are handed over"},
+
+	// PIPE-020, appended additively at the numeric end of the flow rather than
+	// beside instructions where it conceptually belongs; see StageAcceptanceOracle.
+	{StageAcceptanceOracle, "acceptance-oracle",
+		"every declared acceptance example fails when run against the repository before this run's own work, so the examples are shown to discriminate rather than being satisfiable by anything"},
 }
 
 // StageByNumber returns one stage of the flow.

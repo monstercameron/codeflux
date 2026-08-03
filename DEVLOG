@@ -51,6 +51,35 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-060
+Date: 2026-08-02
+Status: Stage added and wired
+Change-ID: CL-20260802-050
+Commit: pending
+Request-or-TODO: PIPE-020
+Goal: Prove an acceptance example discriminates before anything is built on it
+Assumptions: An example that already passes against the untouched repository
+  tests nothing, and every gate resting on it inherits that
+Decisions: Reused checkAcceptance against the pristine worktree and inverted its
+  meaning rather than writing a second acceptance runner, so the oracle and the
+  real check cannot drift apart.
+  Appended the stage as number 38 instead of inserting it in flow order, because
+  PIPE-045 owns renumbering. The consequence is that its number and its
+  dependency position diverge sharply -- last in the list, second to unblock --
+  which is precisely what PIPE-058's table exists to express.
+  Carried the requirements-table entry in this commit rather than a follow-up.
+  Two lanes landed these together and the table refused the new stage until an
+  entry existed; splitting them would have left one revision where the flow
+  holds a stage the dependency graph does not cover, and the point of that
+  validation is that no such revision should exist
+Files-or-schemas: internal/pipeline/stages.go, checks.go, phases.go,
+  internal/coordinator/agent_acceptance.go, agent_execution.go, and tests
+Validation: Proven to discriminate by inverting the held branch and watching the
+  already-true case fail, then reverting
+Failures-or-discarded-approaches: None
+Known-limitations: Inherits PIPE-019's
+Next-safe-step: PIPE-020a
+
 Dev-Log: DL-20260802-059
 Date: 2026-08-02
 Status: Diagnosed and reproduced; not repaired

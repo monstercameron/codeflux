@@ -66,6 +66,31 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-050
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- acceptance-oracle stage
+Request-or-TODO: PIPE-020
+Outcome: A new acceptance-oracle stage runs each declared acceptance example
+  against the repository before the run's own work and requires it to fail. An
+  example that is already true before anything is built discriminates nothing,
+  and every later gate that rests on it inherits that
+Affected-behavior: A run whose examples already pass now records the oracle
+  failed rather than proceeding as though the examples meant something
+Compatibility-or-migration: The stage is appended as number 38 rather than
+  renumbered, because PIPE-045 owns renumbering. Its number and its position in
+  the dependency graph therefore diverge: it is unblocked immediately after
+  instructions.
+  Its entry in PIPE-058's requirements table rides in this commit rather than a
+  follow-up, so no revision exists where the flow holds a stage the table does
+  not cover. That coverage check refused the stage the moment it was added,
+  which is the failure mode it was designed to produce
+Verification: Proven to discriminate -- inverting the held branch makes
+  TestPIPE020_AnExampleAlreadyTrueBeforeAnyWorkFailsTheOracle fail, and
+  reverting restores green
+Known-limitations: None beyond PIPE-019's, which it depends on
+Dev-Log: DL-20260802-060
+
 Change-ID: CL-20260802-049
 Commit: pending
 Date: 2026-08-02

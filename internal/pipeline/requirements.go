@@ -339,6 +339,21 @@ var Requirements = []Requirement{
 		StageEvidenceBundle,
 	}},
 
+	{StageAcceptanceOracle, []Number{
+		// The oracle runs the declared examples against the repository before
+		// this run touches it, so it needs the examples and nothing else. It is
+		// deliberately not a root: with no examples recorded there is nothing to
+		// run, and PIPE-019 is what guarantees instructions produced some.
+		//
+		// This stage's number is the highest in the flow because PIPE-020
+		// appended it rather than renumbering, which PIPE-045 owns. Its position
+		// in the dependency graph is therefore nothing like its position in the
+		// list -- it is unblocked immediately after instructions, and everything
+		// from contracts onward could run beside it. That divergence between
+		// declared order and dependency order is exactly what this table exists
+		// to express.
+		StageInstructions,
+	}},
 }
 
 // RequirementFor returns the declared dependency entry for one stage.

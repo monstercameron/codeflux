@@ -74,6 +74,8 @@ var Checks = []StageCheck{
 	{StageEvidenceBundle, "AgentExecution.assembleEvidence", true, ""},
 	{StageHumanAcceptance, "AgentExecution.Run", false, ""},
 	{StageDeliver, "AgentExecution.Run", false, ""},
+	// PIPE-020.
+	{StageAcceptanceOracle, "AgentExecution.checkAcceptanceOracle", true, ""},
 }
 
 // ValidateChecks reports every disagreement between Flow and Checks.

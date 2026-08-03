@@ -30,7 +30,10 @@ const (
 	// PhaseVerification is stages 30-34: whether the checking was worth
 	// anything.
 	PhaseVerification Phase = "verification"
-	// PhaseDelivery is stages 35-37: evidence, acceptance, and handover.
+	// PhaseDelivery is stages 35-38: evidence, acceptance, and handover, plus
+	// the acceptance-oracle stage PIPE-020 appended after StageDeliver rather
+	// than reorder the flow to give it the earlier position it conceptually
+	// holds; see StageAcceptanceOracle.
 	PhaseDelivery Phase = "delivery"
 )
 
@@ -60,7 +63,7 @@ var phaseBounds = []struct {
 	{StagePathCoverage, PhaseControlFlow},
 	{StageEndToEndTests, PhaseProgram},
 	{StageNonFunctional, PhaseVerification},
-	{StageDeliver, PhaseDelivery},
+	{StageAcceptanceOracle, PhaseDelivery},
 }
 
 // PhaseOf reports which phase a stage belongs to.
