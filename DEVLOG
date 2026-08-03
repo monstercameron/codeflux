@@ -51,6 +51,27 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-062
+Date: 2026-08-02
+Status: Fixed; suite still red for a different reason
+Change-ID: CL-20260802-052
+Commit: pending
+Request-or-TODO: REPO-039
+Goal: Stop the mounted matrix asserting headings the product no longer renders
+Assumptions: The rendered heading is the authority, not the matrix
+Decisions: Established each heading from the real route components rather than
+  guessing, and recorded where in the doc comment. Deliberately did not weaken
+  the assertion to a loose substring: the check's whole value is that it pins
+  real rendered content, and a vague matcher would have made it green while
+  removing the check
+Files-or-schemas: internal/frontendtest/matrix.go
+Validation: direct-route-heading passes on /tasks and /memory at every viewport
+Failures-or-discarded-approaches: None
+Known-limitations: This was one of three problems making test-browser red, not
+  the only one, and the smallest. See DL-20260802-062's sibling finding in
+  REPO-041
+Next-safe-step: REPO-041
+
 Dev-Log: DL-20260802-061
 Date: 2026-08-02
 Status: Migration 35 applied; lifecycle wired

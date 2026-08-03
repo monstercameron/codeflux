@@ -39,11 +39,20 @@ var Routes = []string{
 	"/first-run",
 }
 
-// RouteHeadings are the planned direct-load identities for each route.
+// RouteHeadings are the direct-load identities for each route, taken from the
+// H1 the product actually renders for a fresh, unauthenticated boot with no
+// repository open and no thread selected — not from the plan or from an
+// invented fixture. "/tasks" resolves to the unscoped ThreadWorkspace route
+// (web/frontend/routes/routes.go's isUnscopedEntryPath), whose header
+// (TaskWorkspaceHeader in web/frontend/shell/reference_chrome.go) falls back
+// taskTitle to "No task yet" when no task is selected. "/memory" resolves to
+// the unscoped Memory route, whose header (memoryHeader in
+// web/frontend/shell/memory_workspace.go) always renders the literal H1 text
+// "Project memory" regardless of load state.
 var RouteHeadings = map[string]string{
 	"/":            "Welcome to CodeFlux",
-	"/tasks":       "Implement the Codeflux frontend shell",
-	"/memory":      "Memory",
+	"/tasks":       "No task yet",
+	"/memory":      "Project memory",
 	"/settings":    "Settings",
 	"/diagnostics": "Diagnostics",
 	"/first-run":   "Welcome to CodeFlux",

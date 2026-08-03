@@ -66,6 +66,25 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-052
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- stale browser matrix expectations
+Request-or-TODO: REPO-039
+Outcome: internal/frontendtest/matrix.go's RouteHeadings named headings the
+  product stopped rendering when its demo fixture was removed -- including one
+  string production_console_test.go explicitly lists as content that must no
+  longer appear. direct-route-heading failed on /tasks and /memory at every
+  viewport and cascaded into every graph and mounted check behind a 30s timeout
+  each. The headings now match what is rendered
+Affected-behavior: Test expectations only
+Compatibility-or-migration: None
+Verification: direct-route-heading passes on both routes at every viewport. The
+  assertion still pins real rendered content and was not weakened to a substring
+Known-limitations: test-browser is still red. The residue is REPO-041, a
+  different and larger problem
+Dev-Log: DL-20260802-062
+
 Change-ID: CL-20260802-051
 Commit: pending
 Date: 2026-08-02
