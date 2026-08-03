@@ -66,6 +66,31 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-049
+Commit: pending
+Date: 2026-08-02
+Type: Diagnosis -- reproduced, not repaired
+Request-or-TODO: PIPE-019a
+Outcome: The reason scope.requirement cannot be trimmed, established by
+  reproduction. The ticket's own guess -- that the raw body is used as a key or
+  digest -- is wrong. AnalyzeTaskRequirement refuses an untrimmed body; the
+  ambiguity check swallows that error so clarification silently records
+  not-implemented; recordDurablePlan propagates it so the plan revision stays
+  zero and every stage needing a bound plan never runs. Decisively,
+  RecordTaskRequirement does not trust the caller's analysis: it re-reads the
+  message body from SQL and recomputes, requiring a byte-identical match, so
+  trimming at the source could never have worked
+Affected-behavior: None. Two reproduction tests are added and one explanatory
+  comment. The defect is unrepaired
+Compatibility-or-migration: None
+Verification: The trim was applied, both tests re-run, confirmed insufficient,
+  and reverted. TestPIPE019a_TrimmingRequirementOfAloneDoesNotFixIt refuses a
+  hand-trimmed analysis against an untrimmed stored message with ErrConstraint,
+  proving mechanically that the fix must live elsewhere
+Known-limitations: The fix belongs in internal/storage -- normalise once, either
+  inside AnalyzeTaskRequirement or where the body is persisted. Not done here
+Dev-Log: DL-20260802-059
+
 Change-ID: CL-20260802-048
 Commit: pending
 Date: 2026-08-02

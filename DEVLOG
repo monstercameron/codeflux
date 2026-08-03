@@ -51,6 +51,36 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-059
+Date: 2026-08-02
+Status: Diagnosed and reproduced; not repaired
+Change-ID: CL-20260802-049
+Commit: pending
+Request-or-TODO: PIPE-019a
+Goal: Find out why trimming the requirement stops every run
+Assumptions: None carried from the ticket -- its stated cause turned out to be
+  wrong, which is why this was worth reproducing rather than reasoning about
+Decisions: Reproduced before theorising. There are two independent computations
+  of AnalyzeTaskRequirement over the requirement, and a third check that does
+  not trust either: RecordTaskRequirement re-reads the message body from SQL and
+  recomputes, requiring a byte-identical match. So trimming at the source fixes
+  the first two and the third still refuses, with a vaguer error. That is why
+  the earlier attempt "broke every run" -- it could not have worked, and the
+  ticket's guess that the body is used as a digest is not what is happening.
+  Left the defect unrepaired: the fix is in internal/storage, which this lane
+  did not own, and normalising in the wrong place would have produced a third
+  disagreeing computation
+Files-or-schemas: internal/coordinator/pipe019a_repro_test.go, and a comment at
+  requirementOf recording the finding where the next person will look
+Validation: The trim was applied, both tests re-run, confirmed insufficient, and
+  reverted. The second test refuses a hand-trimmed analysis against an untrimmed
+  stored message with ErrConstraint, proving mechanically where the fix cannot
+  go
+Failures-or-discarded-approaches: The source-side trim, above
+Known-limitations: Silent error swallowing in the ambiguity check remains; the
+  failure still surfaces later as a plan-store constraint error
+Next-safe-step: Normalise once in internal/storage
+
 Dev-Log: DL-20260802-058
 Date: 2026-08-02
 Status: Gate tightened

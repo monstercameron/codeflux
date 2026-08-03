@@ -827,6 +827,18 @@ func agentPermissionPolicy(
 		}},
 	}
 }
+	// Deliberately not trimmed (PIPE-019a). storage.RecordTaskRequirement
+	// independently re-reads this same message row and re-derives its own
+	// analysis from those exact bytes, then requires it to match byte-for-byte
+	// the analysis this run computed from scope.requirement. Trimming here
+	// alone makes this side agree with a hand-trimmed scope.requirement while
+	// the store's side still reads the untrimmed row, so an untrimmed message
+	// still fails — now inside RecordTaskRequirement's generic constraint
+	// error instead of storage.AnalyzeTaskRequirement's own clearer one, and a
+	// run stalls after StageDecompositionCover either way. See PIPE-019a for
+	// the reproduction and the fix this actually needs (normalize inside
+	// storage.AnalyzeTaskRequirement, or when the message is first persisted —
+	// both are outside this package).
 
 // agentLoopLimits are the ceilings one run may not exceed.
 func agentLoopLimits(maximumCost providers.ExactAmount) agentloop.LoopLimits {
