@@ -39,4 +39,5 @@ var Catalog = []Descriptor{
 	{Number: 32, Name: "000032_repository_instruction_approvals.sql", SHA256: "2b979c95fdf13d0e58b2b3a440694522d09975bc12cd3f2bc0a96e3fe2c8708a"},
 	{Number: 33, Name: "000033_non_functional_baselines.sql", SHA256: "57ac513199348edffea70649241830f8645e488b3c71b5d3d1af671c3979fecc"},
 	{Number: 34, Name: "000034_proof_obligations.sql", SHA256: "2a1cc18b4a14c839cc866696a9816d600c8502d86dfcadc84017dceaf8f9dcab"},
+	{Number: 35, Name: "000035_episode_lifecycle_wiring.sql", SHA256: "450a0ed9b6c9ea427e6beb26e75524cdd61cd8833d210f9407e68a48b8e85c8b"},
 }

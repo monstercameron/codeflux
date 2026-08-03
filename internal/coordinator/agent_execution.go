@@ -365,6 +365,11 @@ func (execution *AgentExecution) Run(
 	sendBack := func(gate string, instruction string, because string) {
 		failure = instruction
 		sentBackBecause = because
+		// The rung THIS attempt actually ran on, captured before anything
+		// below might move progress to a new one for the NEXT attempt
+		// (MEM-002: the transition records what happened to the attempt
+		// that just ran, not what the next one will run on).
+		rung := progress.currentModel()
 		decision := progress.record(gate, instruction)
 		// A gate a project has pinned to a particular rung selects it for the
 		// attempt it is sending back, whatever the ladder has reached. It only
@@ -376,6 +381,7 @@ func (execution *AgentExecution) Run(
 			decision.Why = "this project pins " + gate + " to " + pinned +
 				", so the next attempt runs there"
 		}
+		outcome := storage.EpisodeAttemptOutcomeSentBack
 		switch {
 		case decision.Escalated != "" &&
 			execution.settings.NeedsApproval(decision.Escalated):
@@ -384,15 +390,18 @@ func (execution *AgentExecution) Run(
 			// stated plainly because a person told "waiting for approval"
 			// would reasonably expect it to carry on by itself.
 			awaitingApproval = decision.Escalated
+			outcome = storage.EpisodeAttemptOutcomeAwaitingApproval
 			execution.say(ctx, scope, events.KindMessageFinal,
 				approvalRequest(decision.Escalated, gate, instruction, progress))
 		case decision.Escalated != "" && execution.escalate != nil:
+			outcome = storage.EpisodeAttemptOutcomeEscalated
 			stronger, buildErr := execution.escalate(decision.Escalated)
 			if buildErr != nil {
 				execution.say(ctx, scope, events.KindMessageFinal,
 					"This run is stuck and the stronger model could not be "+
 						"built, so it continues on "+progress.currentModel()+
 						": "+buildErr.Error())
+				execution.recordAttemptTransition(ctx, episode, attempts, gate, instruction, rung, outcome)
 				return
 			}
 			rebuilt, loopErr := buildLoop(stronger)
@@ -400,6 +409,7 @@ func (execution *AgentExecution) Run(
 				execution.say(ctx, scope, events.KindMessageFinal,
 					"This run is stuck and could not be moved to a stronger "+
 						"model: "+loopErr.Error())
+				execution.recordAttemptTransition(ctx, episode, attempts, gate, instruction, rung, outcome)
 				return
 			}
 			loop = rebuilt
@@ -409,11 +419,13 @@ func (execution *AgentExecution) Run(
 			// the instruction to break the work down, ahead of the failure
 			// that prompted it, because the failure alone has already been
 			// tried against twice and produced this.
+			outcome = storage.EpisodeAttemptOutcomeDecomposed
 			failure = decompositionInstruction(scope.requirement) +
 				"\n\nThe check that keeps failing:\n" + instruction
 			sentBackBecause = "the request is being broken into smaller pieces"
 			execution.say(ctx, scope, events.KindMessageFinal, decision.Why)
 		}
+		execution.recordAttemptTransition(ctx, episode, attempts, gate, instruction, rung, outcome)
 	}
 	// The bound is the tracker's, not a flat count. A run that escalates or
 	// decomposes is granted a fresh allowance for the new approach, because
@@ -580,6 +592,10 @@ func (execution *AgentExecution) Run(
 
 		if outcome.Kind == agentloop.OutcomeImplementationComplete ||
 			outcome.Kind == agentloop.OutcomeValidationComplete {
+			// MEM-002: the attempt that ends the loop by satisfying it,
+			// rather than being sent back for another one.
+			execution.recordAttemptTransition(ctx, episode, attempt, "convergence", "",
+				progress.currentModel(), storage.EpisodeAttemptOutcomeConverged)
 			break
 		}
 		failure = narrator.lastFailure
@@ -811,6 +827,18 @@ func (execution *AgentExecution) requirementOf(
 	if err != nil {
 		return ""
 	}
+	// Deliberately not trimmed (PIPE-019a). storage.RecordTaskRequirement
+	// independently re-reads this same message row and re-derives its own
+	// analysis from those exact bytes, then requires it to match byte-for-byte
+	// the analysis this run computed from scope.requirement. Trimming here
+	// alone makes this side agree with a hand-trimmed scope.requirement while
+	// the store's side still reads the untrimmed row, so an untrimmed message
+	// still fails — now inside RecordTaskRequirement's generic constraint
+	// error instead of storage.AnalyzeTaskRequirement's own clearer one, and a
+	// run stalls after StageDecompositionCover either way. See PIPE-019a for
+	// the reproduction and the fix this actually needs (normalize inside
+	// storage.AnalyzeTaskRequirement, or when the message is first persisted —
+	// both are outside this package).
 	return message.BodyRedacted
 }
 
@@ -835,18 +863,6 @@ func agentPermissionPolicy(
 		}},
 	}
 }
-	// Deliberately not trimmed (PIPE-019a). storage.RecordTaskRequirement
-	// independently re-reads this same message row and re-derives its own
-	// analysis from those exact bytes, then requires it to match byte-for-byte
-	// the analysis this run computed from scope.requirement. Trimming here
-	// alone makes this side agree with a hand-trimmed scope.requirement while
-	// the store's side still reads the untrimmed row, so an untrimmed message
-	// still fails — now inside RecordTaskRequirement's generic constraint
-	// error instead of storage.AnalyzeTaskRequirement's own clearer one, and a
-	// run stalls after StageDecompositionCover either way. See PIPE-019a for
-	// the reproduction and the fix this actually needs (normalize inside
-	// storage.AnalyzeTaskRequirement, or when the message is first persisted —
-	// both are outside this package).
 
 // agentLoopLimits are the ceilings one run may not exceed.
 func agentLoopLimits(maximumCost providers.ExactAmount) agentloop.LoopLimits {

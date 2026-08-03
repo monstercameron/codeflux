@@ -66,6 +66,38 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-051
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- episode lifecycle, with migration
+Request-or-TODO: MEM-001, MEM-002, MEM-003, MEM-004, MEM-004a, MEM-005
+Outcome: Runs now open and close an episode. OpenEpisode and CloseEpisode had no
+  production caller, so the append-only record the learning layer is specified
+  against did not exist. Migration 000035 adds the attempt binding, an immutable
+  fingerprint carry table, attempt transitions, memory-influence events, and
+  write-once advisory exposure.
+  episodes.task_id was UNIQUE, permitting one episode per task ever, which
+  contradicts the requirement that a task started twice produce two episodes.
+  The table is rebuilt to UNIQUE(task_id, attempt), bound to the pipeline
+  ledger's existing attempt number rather than a second notion of attempt
+Affected-behavior: Every run records an episode. No user-visible change
+Compatibility-or-migration: Forward migration 000035. It rebuilds the episodes
+  table, which SQLite requires for a constraint change; migration-check accepts
+  it. This commit is not split further because the migration is atomic and the
+  repositories that read the new columns cannot land without it
+Verification: migration-check ok; go test ./internal/storage/ -run TestMEM (13
+  tests) and ./internal/coordinator/ -run TestMEM (5 tests) green; the full
+  storage suite green at 157s with no regressions. The advisory-exposure trigger
+  was proven load-bearing by deleting it, regenerating, and confirming the
+  discriminating test fails, then restoring it
+Known-limitations: CloseEpisode always closes unresolved, because no user
+  decision happens inside a run and the row freezes on close -- MEM-001a. Two
+  attempt-ending branches are not separately recorded. The memory-influence path
+  is built and deliberately not called, since the agent loop has no mechanism to
+  report a real used/adapted/rejected decision and recording an invented one
+  would be worse than recording none
+Dev-Log: DL-20260802-061
+
 Change-ID: CL-20260802-050
 Commit: pending
 Date: 2026-08-02

@@ -31,27 +31,42 @@ import (
 // always present once Status is Closed (see domain.EpisodeClosure and the
 // episodes table's all-or-nothing CHECK constraint).
 type Episode struct {
-	ID                       domain.EpisodeID
-	ProjectID                domain.ProjectID
-	RepositoryID             domain.RepositoryID
-	TaskID                   domain.TaskID
+	ID           domain.EpisodeID
+	ProjectID    domain.ProjectID
+	RepositoryID domain.RepositoryID
+	TaskID       domain.TaskID
+	// Attempt is the pipeline ledger's own attempt number this episode was
+	// opened under (PIPE-003, storage.NextPipelineAttempt; MEM-003). A task
+	// started twice has two episodes, one per attempt; neither inherits the
+	// other's evidence.
+	Attempt                  uint64
 	FingerprintSchemaVersion uint32
 	FingerprintHash          string
 	StartingRevision         string
 	EndingRevision           *string
 	Status                   domain.EpisodeStatus
 	Outcome                  *domain.EpisodeOutcome
-	IdempotencyKey           string
-	StartedAt                time.Time
-	ClosedAt                 *time.Time
+	// AdvisoryExposure is the MEM-005 write-once transition: every episode
+	// opens Unexposed, becomes Exposed the first time an advisory pattern
+	// enters the run, and can never be relabelled Unexposed again.
+	AdvisoryExposure domain.EpisodeAdvisoryExposure
+	IdempotencyKey   string
+	StartedAt        time.Time
+	ClosedAt         *time.Time
 }
 
 // OpenEpisode declares the facts fixed at episode start (M21-029).
 type OpenEpisode struct {
-	ID                       domain.EpisodeID
-	ProjectID                domain.ProjectID
-	RepositoryID             domain.RepositoryID
-	TaskID                   domain.TaskID
+	ID           domain.EpisodeID
+	ProjectID    domain.ProjectID
+	RepositoryID domain.RepositoryID
+	TaskID       domain.TaskID
+	// Attempt binds this episode to the pipeline ledger's own attempt
+	// number (MEM-003). The zero value defaults to 1, the same convention
+	// storage.RecordPipelineStage uses for its own Attempt field, so a
+	// caller opening a task's first episode does not have to know the
+	// ledger's numbering to get it right.
+	Attempt                  uint64
 	FingerprintSchemaVersion uint32
 	FingerprintHash          string
 	StartingRevision         string
@@ -68,22 +83,28 @@ type CloseEpisode struct {
 }
 
 const episodeSelect = `SELECT
-	id, project_id, repository_id, task_id, fingerprint_schema_version, fingerprint_hash,
-	starting_revision, ending_revision, status, outcome, idempotency_key,
+	id, project_id, repository_id, task_id, attempt, fingerprint_schema_version, fingerprint_hash,
+	starting_revision, ending_revision, status, outcome, advisory_exposure, idempotency_key,
 	started_at_unix_micros, closed_at_unix_micros
  FROM episodes`
 
 // OpenEpisode persists a new open episode, or returns the existing episode
-// on an idempotent retry. A task may have at most one episode
-// (episodes.task_id is UNIQUE): retrying with the same task but a different
+// on an idempotent retry. A task may have at most one episode PER ATTEMPT
+// (episodes carries UNIQUE(task_id, attempt), not a bare task_id UNIQUE;
+// MEM-003): retrying with the same task and attempt but a different
 // idempotency key or episode ID is a conflict, never a silent second
-// episode.
+// episode for that attempt. A task started again under a later attempt
+// opens a genuinely separate episode that inherits nothing from the first.
 func (repositories *Repositories) OpenEpisode(ctx context.Context, input OpenEpisode) (Episode, error) {
+	if input.Attempt == 0 {
+		input.Attempt = 1
+	}
 	if err := validateBounded("episode idempotency key", input.IdempotencyKey, 255); err != nil {
 		return Episode{}, err
 	}
 	if err := (domain.NewEpisode{
 		ID: input.ID, Project: input.ProjectID, Repository: input.RepositoryID, Task: input.TaskID,
+		Attempt:                  input.Attempt,
 		FingerprintSchemaVersion: input.FingerprintSchemaVersion, FingerprintHash: input.FingerprintHash,
 		StartingRevision: input.StartingRevision,
 	}).Validate(); err != nil {
@@ -92,13 +113,13 @@ func (repositories *Repositories) OpenEpisode(ctx context.Context, input OpenEpi
 	now, micros := repositories.timestamp()
 	var episode Episode
 	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
-		existing, found, err := findEpisodeByTask(ctx, transaction.sql, input.TaskID)
+		existing, found, err := findEpisodeByTaskAttempt(ctx, transaction.sql, input.TaskID, input.Attempt)
 		if err != nil {
 			return err
 		}
 		if found {
 			if existing.ID != input.ID || existing.IdempotencyKey != input.IdempotencyKey {
-				return typedError(ErrConflict, "open episode", errors.New("task already has a different episode"))
+				return typedError(ErrConflict, "open episode", errors.New("task already has a different episode for this attempt"))
 			}
 			episode = existing
 			return nil
@@ -106,10 +127,10 @@ func (repositories *Repositories) OpenEpisode(ctx context.Context, input OpenEpi
 		_, err = transaction.sql.ExecContext(
 			ctx,
 			`INSERT INTO episodes (
-				id, project_id, repository_id, task_id, fingerprint_schema_version, fingerprint_hash,
-				starting_revision, status, idempotency_key, started_at_unix_micros
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
-			input.ID, input.ProjectID, input.RepositoryID, input.TaskID,
+				id, project_id, repository_id, task_id, attempt, fingerprint_schema_version, fingerprint_hash,
+				starting_revision, status, advisory_exposure, idempotency_key, started_at_unix_micros
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', 'unexposed', ?, ?)`,
+			input.ID, input.ProjectID, input.RepositoryID, input.TaskID, input.Attempt,
 			input.FingerprintSchemaVersion, input.FingerprintHash, input.StartingRevision,
 			input.IdempotencyKey, micros,
 		)
@@ -118,9 +139,11 @@ func (repositories *Repositories) OpenEpisode(ctx context.Context, input OpenEpi
 		}
 		episode = Episode{
 			ID: input.ID, ProjectID: input.ProjectID, RepositoryID: input.RepositoryID, TaskID: input.TaskID,
+			Attempt:                  input.Attempt,
 			FingerprintSchemaVersion: input.FingerprintSchemaVersion, FingerprintHash: input.FingerprintHash,
 			StartingRevision: input.StartingRevision, Status: domain.EpisodeStatusOpen,
-			IdempotencyKey: input.IdempotencyKey, StartedAt: now,
+			AdvisoryExposure: domain.EpisodeAdvisoryExposureUnexposed,
+			IdempotencyKey:   input.IdempotencyKey, StartedAt: now,
 		}
 		return nil
 	})
@@ -203,23 +226,51 @@ func (repositories *Repositories) GetEpisode(ctx context.Context, id domain.Epis
 	return scanEpisode(repositories.database.sql.QueryRowContext(ctx, episodeSelect+` WHERE id = ?`, id), "get episode")
 }
 
-// GetEpisodeByTask reads the episode covering one task, if any.
+// GetEpisodeByTask reads the most recently opened episode for one task, if
+// any (i.e. the one under the highest attempt number). MEM-003 means a task
+// can now hold more than one episode, one per attempt; a caller that wants
+// a specific attempt rather than the newest one calls
+// GetEpisodeByTaskAttempt instead.
 func (repositories *Repositories) GetEpisodeByTask(ctx context.Context, taskID domain.TaskID) (Episode, error) {
 	if taskID.IsZero() {
 		return Episode{}, errors.New("task ID must not be empty")
 	}
-	episode, found, err := findEpisodeByTask(ctx, repositories.database.sql, taskID)
+	episode, err := scanEpisode(repositories.database.sql.QueryRowContext(
+		ctx, episodeSelect+` WHERE task_id = ? ORDER BY attempt DESC LIMIT 1`, taskID,
+	), "get episode by task")
+	if errors.Is(err, ErrNotFound) {
+		return Episode{}, typedError(ErrNotFound, "get episode by task", errors.New("task has no episode"))
+	}
+	return episode, err
+}
+
+// GetEpisodeByTaskAttempt reads the episode covering one task's specific
+// attempt (MEM-003), if any.
+func (repositories *Repositories) GetEpisodeByTaskAttempt(
+	ctx context.Context,
+	taskID domain.TaskID,
+	attempt uint64,
+) (Episode, error) {
+	if taskID.IsZero() {
+		return Episode{}, errors.New("task ID must not be empty")
+	}
+	if attempt == 0 {
+		attempt = 1
+	}
+	episode, found, err := findEpisodeByTaskAttempt(ctx, repositories.database.sql, taskID, attempt)
 	if err != nil {
 		return Episode{}, err
 	}
 	if !found {
-		return Episode{}, typedError(ErrNotFound, "get episode by task", errors.New("task has no episode"))
+		return Episode{}, typedError(ErrNotFound, "get episode by task attempt", errors.New("task has no episode for this attempt"))
 	}
 	return episode, nil
 }
 
-func findEpisodeByTask(ctx context.Context, queries queryRower, taskID domain.TaskID) (Episode, bool, error) {
-	episode, err := scanEpisode(queries.QueryRowContext(ctx, episodeSelect+` WHERE task_id = ?`, taskID), "find episode by task")
+func findEpisodeByTaskAttempt(ctx context.Context, queries queryRower, taskID domain.TaskID, attempt uint64) (Episode, bool, error) {
+	episode, err := scanEpisode(queries.QueryRowContext(
+		ctx, episodeSelect+` WHERE task_id = ? AND attempt = ?`, taskID, attempt,
+	), "find episode by task attempt")
 	if errors.Is(err, ErrNotFound) {
 		return Episode{}, false, nil
 	}
@@ -229,15 +280,17 @@ func findEpisodeByTask(ctx context.Context, queries queryRower, taskID domain.Ta
 func scanEpisode(row rowScanner, operation string) (Episode, error) {
 	var (
 		episode                    Episode
+		attempt                    int64
 		fingerprintSchemaVersion   int64
 		endingRevision, outcomeRaw sql.NullString
+		advisoryExposure           string
 		startedMicros              int64
 		closedMicros               sql.NullInt64
 	)
 	err := row.Scan(
-		&episode.ID, &episode.ProjectID, &episode.RepositoryID, &episode.TaskID,
+		&episode.ID, &episode.ProjectID, &episode.RepositoryID, &episode.TaskID, &attempt,
 		&fingerprintSchemaVersion, &episode.FingerprintHash, &episode.StartingRevision,
-		&endingRevision, &episode.Status, &outcomeRaw, &episode.IdempotencyKey,
+		&endingRevision, &episode.Status, &outcomeRaw, &advisoryExposure, &episode.IdempotencyKey,
 		&startedMicros, &closedMicros,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -246,7 +299,9 @@ func scanEpisode(row rowScanner, operation string) (Episode, error) {
 	if err != nil {
 		return Episode{}, classify(operation, err)
 	}
+	episode.Attempt = uint64(attempt)
 	episode.FingerprintSchemaVersion = uint32(fingerprintSchemaVersion)
+	episode.AdvisoryExposure = domain.EpisodeAdvisoryExposure(advisoryExposure)
 	episode.StartedAt = repositoryTime(startedMicros)
 	if endingRevision.Valid {
 		value := endingRevision.String
@@ -259,6 +314,62 @@ func scanEpisode(row rowScanner, operation string) (Episode, error) {
 	if closedMicros.Valid {
 		closedAt := repositoryTime(closedMicros.Int64)
 		episode.ClosedAt = &closedAt
+	}
+	return episode, nil
+}
+
+// RecordEpisodeAdvisoryExposure applies the MEM-005 write-once transition:
+// an episode opens Unexposed and this is the only way it ever becomes
+// Exposed. Calling it again on an already-Exposed episode is idempotent
+// (domain.ValidateEpisodeAdvisoryExposureTransition treats the same target
+// state as a no-op); the storage-layer episodes_advisory_exposure_write_once
+// trigger is what makes the reverse -- an attempt to relabel an Exposed
+// episode Unexposed -- structurally impossible, not merely refused here.
+func (repositories *Repositories) RecordEpisodeAdvisoryExposure(
+	ctx context.Context,
+	episodeID domain.EpisodeID,
+) (Episode, error) {
+	if episodeID.IsZero() {
+		return Episode{}, errors.New("episode ID must not be empty")
+	}
+	var episode Episode
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		current, err := scanEpisode(transaction.sql.QueryRowContext(
+			ctx, episodeSelect+` WHERE id = ?`, episodeID,
+		), "read episode before advisory exposure")
+		if err != nil {
+			return err
+		}
+		if err := domain.ValidateEpisodeAdvisoryExposureTransition(
+			current.AdvisoryExposure, domain.EpisodeAdvisoryExposureExposed,
+		); err != nil {
+			return err
+		}
+		if current.AdvisoryExposure == domain.EpisodeAdvisoryExposureExposed {
+			episode = current
+			return nil
+		}
+		result, err := transaction.sql.ExecContext(
+			ctx,
+			`UPDATE episodes SET advisory_exposure = 'exposed' WHERE id = ? AND advisory_exposure = 'unexposed'`,
+			episodeID,
+		)
+		if err != nil {
+			return repositoryWriteError("record episode advisory exposure", err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return classify("record episode advisory exposure", err)
+		}
+		if affected != 1 {
+			return typedError(ErrConflict, "record episode advisory exposure", errors.New("episode advisory exposure changed concurrently"))
+		}
+		current.AdvisoryExposure = domain.EpisodeAdvisoryExposureExposed
+		episode = current
+		return nil
+	})
+	if err != nil {
+		return Episode{}, err
 	}
 	return episode, nil
 }

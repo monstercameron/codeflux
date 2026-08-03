@@ -161,6 +161,197 @@ func TestOpenEpisodeRejectsMismatchedProjectOrRepository(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
+// MEM-003: a task started twice opens two episodes, one per pipeline
+// attempt, and neither inherits the other's evidence.
+// -----------------------------------------------------------------------
+
+// TestOpenEpisodeSecondAttemptOpensIndependentEpisode proves the MEM-003
+// defect is fixed: before this migration, episodes.task_id carried a bare
+// UNIQUE constraint, so opening a second episode for a task already holding
+// one -- exactly what a task started a second time needs -- was refused
+// with ErrConflict. If that defect were still present, the second
+// OpenEpisode call below (attempt 2, a new episode ID) would fail; instead
+// it must succeed as a genuinely independent row.
+func TestMEM003_OpenEpisodeSecondAttemptOpensIndependentEpisode(t *testing.T) {
+	ctx := t.Context()
+	repositories, task := createTaskFixture(t, 5300)
+	projectID := testProjectID(t, 5300)
+	repositoryID := testRepositoryID(t, 5301)
+	schemaVersion, hash := mustEpisodeFingerprint(t, projectID, repositoryID)
+
+	first, err := repositories.OpenEpisode(ctx, OpenEpisode{
+		ID: testEpisodeID(t, 5303), ProjectID: projectID, RepositoryID: repositoryID, TaskID: task.ID,
+		Attempt:                  1,
+		FingerprintSchemaVersion: schemaVersion, FingerprintHash: hash,
+		StartingRevision: "deadbeefcafefeed", IdempotencyKey: "attempt-1-open",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Attempt != 1 {
+		t.Fatalf("first episode attempt = %d, want 1", first.Attempt)
+	}
+	if _, err := repositories.CloseEpisode(ctx, CloseEpisode{
+		EpisodeID: first.ID, EndingRevision: "badc0ffee0ddf00d", Outcome: domain.EpisodeOutcomeRejected,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The defect this proves fixed: a second attempt at the SAME task must
+	// open a genuinely new episode rather than being refused as a conflict
+	// with the first (still-existing) one.
+	second, err := repositories.OpenEpisode(ctx, OpenEpisode{
+		ID: testEpisodeID(t, 5305), ProjectID: projectID, RepositoryID: repositoryID, TaskID: task.ID,
+		Attempt:                  2,
+		FingerprintSchemaVersion: schemaVersion, FingerprintHash: hash,
+		StartingRevision: "deadbeefcafefeed", IdempotencyKey: "attempt-2-open",
+	})
+	if err != nil {
+		t.Fatalf("opening a second attempt's episode: %v", err)
+	}
+	if second.Attempt != 2 {
+		t.Fatalf("second episode attempt = %d, want 2", second.Attempt)
+	}
+	if second.ID == first.ID {
+		t.Fatal("second attempt reused the first attempt's episode identity")
+	}
+
+	// Neither inherits the other's evidence: the first attempt's episode is
+	// still closed/rejected, exactly as it was left, and the second is its
+	// own fresh open episode.
+	unchangedFirst, err := repositories.GetEpisode(ctx, first.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unchangedFirst.Status != domain.EpisodeStatusClosed || unchangedFirst.Outcome == nil || *unchangedFirst.Outcome != domain.EpisodeOutcomeRejected {
+		t.Fatalf("first attempt's episode was disturbed by the second: %#v", unchangedFirst)
+	}
+	if second.Status != domain.EpisodeStatusOpen {
+		t.Fatalf("second attempt's episode status = %s, want open", second.Status)
+	}
+
+	// GetEpisodeByTaskAttempt reaches each one by its own attempt number.
+	byAttempt1, err := repositories.GetEpisodeByTaskAttempt(ctx, task.ID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !episodesEqual(byAttempt1, unchangedFirst) {
+		t.Fatalf("GetEpisodeByTaskAttempt(1) = %#v, want %#v", byAttempt1, unchangedFirst)
+	}
+	byAttempt2, err := repositories.GetEpisodeByTaskAttempt(ctx, task.ID, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !episodesEqual(byAttempt2, second) {
+		t.Fatalf("GetEpisodeByTaskAttempt(2) = %#v, want %#v", byAttempt2, second)
+	}
+
+	// GetEpisodeByTask (no attempt named) reaches the newest attempt.
+	newest, err := repositories.GetEpisodeByTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !episodesEqual(newest, second) {
+		t.Fatalf("GetEpisodeByTask = %#v, want the newest attempt %#v", newest, second)
+	}
+}
+
+// TestOpenEpisodeRejectsDuplicateAttemptForSameTask is the raw-SQL attack
+// proving the new UNIQUE(task_id, attempt) constraint -- not something
+// looser -- is what storage actually enforces: two distinct episode rows
+// naming the same (task_id, attempt) pair must be refused.
+func TestMEM003_OpenEpisodeRejectsDuplicateAttemptForSameTask(t *testing.T) {
+	ctx := t.Context()
+	repositories, task := createTaskFixture(t, 5310)
+	projectID := testProjectID(t, 5310)
+	repositoryID := testRepositoryID(t, 5311)
+	episode := mustOpenEpisode(t, repositories, 5313, projectID, repositoryID, task)
+	if episode.Attempt != 1 {
+		t.Fatalf("default attempt = %d, want 1", episode.Attempt)
+	}
+
+	if _, err := repositories.database.sql.ExecContext(
+		ctx,
+		`INSERT INTO episodes (
+			id, project_id, repository_id, task_id, attempt, fingerprint_schema_version, fingerprint_hash,
+			starting_revision, status, advisory_exposure, idempotency_key, started_at_unix_micros
+		) VALUES ('epi_raw_dup', ?, ?, ?, 1, 1, ?, 'deadbeefcafefeed', 'open', 'unexposed', 'raw-dup-key', 0)`,
+		projectID, repositoryID, task.ID, episode.FingerprintHash,
+	); !errors.Is(classify("raw duplicate attempt insert", err), ErrConstraint) {
+		t.Fatalf("raw duplicate (task_id, attempt) insert error = %v, want ErrConstraint", err)
+	}
+}
+
+// -----------------------------------------------------------------------
+// MEM-005: advisory_exposure is a write-once transition, never a property
+// asserted at open.
+// -----------------------------------------------------------------------
+
+// TestRecordEpisodeAdvisoryExposureIsWriteOnce proves both directions: an
+// episode opens Unexposed by default, RecordEpisodeAdvisoryExposure moves
+// it to Exposed and is idempotent once there, and -- the discriminating
+// half -- no path, including a raw-SQL attack that bypasses the repository
+// layer entirely, can ever relabel an Exposed episode Unexposed again. If
+// the write-once trigger were absent, the final raw UPDATE below would
+// succeed instead of failing with ErrConstraint.
+func TestMEM005_RecordEpisodeAdvisoryExposureIsWriteOnce(t *testing.T) {
+	ctx := t.Context()
+	repositories, task := createTaskFixture(t, 5320)
+	projectID := testProjectID(t, 5320)
+	repositoryID := testRepositoryID(t, 5321)
+	episode := mustOpenEpisode(t, repositories, 5323, projectID, repositoryID, task)
+
+	if episode.AdvisoryExposure != domain.EpisodeAdvisoryExposureUnexposed {
+		t.Fatalf("newly opened episode advisory exposure = %s, want unexposed (asserted at open, not earned)", episode.AdvisoryExposure)
+	}
+
+	exposed, err := repositories.RecordEpisodeAdvisoryExposure(ctx, episode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exposed.AdvisoryExposure != domain.EpisodeAdvisoryExposureExposed {
+		t.Fatalf("advisory exposure after recording = %s, want exposed", exposed.AdvisoryExposure)
+	}
+
+	// A second advisory pattern entering later in the same run is a no-op,
+	// not an error: exposure already happened once.
+	again, err := repositories.RecordEpisodeAdvisoryExposure(ctx, episode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.AdvisoryExposure != domain.EpisodeAdvisoryExposureExposed {
+		t.Fatalf("repeated advisory exposure = %s, want exposed", again.AdvisoryExposure)
+	}
+
+	// Raw-SQL attack: bypass the repository entirely and attempt to relabel
+	// the episode unexposed. The episodes_advisory_exposure_write_once
+	// trigger must refuse it.
+	if _, err := repositories.database.sql.ExecContext(
+		ctx, `UPDATE episodes SET advisory_exposure = 'unexposed' WHERE id = ?`, episode.ID,
+	); !errors.Is(classify("raw unexpose episode", err), ErrConstraint) {
+		t.Fatalf("raw relabel to unexposed error = %v, want ErrConstraint", err)
+	}
+
+	// The row is genuinely untouched by the attack.
+	unchanged, err := repositories.GetEpisode(ctx, episode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unchanged.AdvisoryExposure != domain.EpisodeAdvisoryExposureExposed {
+		t.Fatalf("episode advisory exposure after attack = %s, want still exposed", unchanged.AdvisoryExposure)
+	}
+}
+
+// TestRecordEpisodeAdvisoryExposureRejectsUnknownEpisode is the boundary
+// case: recording exposure against an episode identity that does not exist
+// must fail rather than silently succeed.
+func TestMEM005_RecordEpisodeAdvisoryExposureRejectsUnknownEpisode(t *testing.T) {
+	if _, err := (&Repositories{}).RecordEpisodeAdvisoryExposure(t.Context(), domain.EpisodeID{}); err == nil {
+		t.Fatal("expected an error for an empty episode ID")
+	}
+}
+
+// -----------------------------------------------------------------------
 // M21-034, M21-037, M21-038: close freezes the episode; raw-SQL attacks
 // against the freeze trigger.
 // -----------------------------------------------------------------------

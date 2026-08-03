@@ -51,6 +51,51 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-061
+Date: 2026-08-02
+Status: Migration 35 applied; lifecycle wired
+Change-ID: CL-20260802-051
+Commit: pending
+Request-or-TODO: MEM-001 through MEM-005
+Goal: Make the append-only episode record the learning layer is specified
+  against actually exist
+Assumptions: An episode that cannot be opened is better than one opened against
+  a fabricated fingerprint
+Decisions: Opened after the ledger exists and closed through a defer, so every
+  return path closes rather than only the successful one.
+  OpenEpisode needs an exact fingerprint whose inputs are never persisted on the
+  task row, so a small immutable carry table is written once at forecast time
+  and read once at open. Opening is best-effort: no binding means no episode.
+  episodes.task_id was UNIQUE, which is one episode per task for ever and the
+  direct opposite of what MEM-003 asks for. Rebuilt to UNIQUE(task_id, attempt)
+  and bound to the pipeline ledger's existing attempt rather than minting a
+  second notion of the same thing.
+  Named the transition table episode_attempt_transitions, not
+  episode_action_events: that name already belongs to the M21-032 mechanism over
+  the task_events journal, and reusing it would make two things look like one.
+  Enforced write-once advisory exposure with a BEFORE UPDATE trigger, since a
+  CHECK cannot compare OLD to NEW, following migration 34's precedent that a
+  rule worth stating belongs in the schema
+Files-or-schemas: migrations/000035_episode_lifecycle_wiring.sql, four new
+  storage repositories, internal/coordinator/episode_lifecycle.go, and narrow
+  edits to agent_execution.go and task_preflight.go
+Validation: migration-check ok; 13 storage and 5 coordinator MEM tests green;
+  full storage suite green at 157s. The advisory-exposure trigger was proven
+  load-bearing by deleting it, regenerating, and watching the discriminating
+  test fail before restoring it
+Failures-or-discarded-approaches: The table rebuild failed until the child
+  tables' triggers were dropped BEFORE the rename rather than after -- SQLite
+  re-validates every trigger body during ALTER TABLE RENAME TO. Established with
+  a throwaway harness rather than guessed, and the harness removed
+Known-limitations: CloseEpisode always closes unresolved, because no user
+  decision happens inside a run and the row freezes on close, so the outcome
+  column is currently uninformative for every episode -- MEM-001a. Two
+  attempt-ending branches are unrecorded. The memory-influence path is built and
+  deliberately uncalled: the agent loop cannot report a real used/adapted/
+  rejected verdict, and 31's quarantine is terminal, so an invented decision
+  could only ever be retired
+Next-safe-step: MEM-001a, then MEM-017 before the influence path is used
+
 Dev-Log: DL-20260802-060
 Date: 2026-08-02
 Status: Stage added and wired

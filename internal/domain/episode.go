@@ -119,10 +119,19 @@ const MaximumEpisodeRevisionFieldBytes = 255
 // one completed or terminated task (docs/plan.md §0 "Episode"): Task
 // therefore identifies the episode as much as its own EpisodeID does.
 type NewEpisode struct {
-	ID                       EpisodeID
-	Project                  ProjectID
-	Repository               RepositoryID
-	Task                     TaskID
+	ID         EpisodeID
+	Project    ProjectID
+	Repository RepositoryID
+	Task       TaskID
+	// Attempt binds this episode to the pipeline ledger's own attempt
+	// number (PIPE-003, storage.NextPipelineAttempt; MEM-003). It is fixed
+	// at open, like StartingRevision: a task started again after this one
+	// gets its own episode under the next attempt number, and neither
+	// inherits the other's evidence. The zero value is not a valid attempt
+	// (attempts are 1-based); a caller that means "the first attempt"
+	// states 1 explicitly rather than relying on a default here, so a
+	// forgotten field is a validation error instead of a silent attempt 1.
+	Attempt                  uint64
 	FingerprintSchemaVersion uint32
 	FingerprintHash          string
 	StartingRevision         string
@@ -140,6 +149,8 @@ func (value NewEpisode) Validate() error {
 		return valueError("episode.repository", "must not be empty")
 	case value.Task.IsZero():
 		return valueError("episode.task", "must not be empty")
+	case value.Attempt == 0:
+		return valueError("episode.attempt", "must be at least 1")
 	case value.FingerprintSchemaVersion == 0:
 		return valueError("episode.fingerprint_schema_version", "must not be zero")
 	case !isLowercaseHexSHA256(value.FingerprintHash):
@@ -151,6 +162,58 @@ func (value NewEpisode) Validate() error {
 	default:
 		return nil
 	}
+}
+
+// -----------------------------------------------------------------------
+// Advisory exposure (MEM-005)
+// -----------------------------------------------------------------------
+
+// EpisodeAdvisoryExposure classifies whether an advisory pattern has ever
+// entered an episode's run. It is a write-once transition, not a property
+// asserted at open (per the MEM-005 task direction): every episode opens
+// Unexposed, becomes Exposed the first time an advisory pattern enters, and
+// can never be relabelled Unexposed again -- see
+// ValidateEpisodeAdvisoryExposureTransition and the storage-layer mirror,
+// episodes_advisory_exposure_write_once. This is what lets the permanent
+// clean-room cohort §31 requires be identified after the fact rather than
+// asserted: a cohort member is an episode whose exposure has never once
+// flipped to Exposed, which only holds if Exposed can never be undone.
+type EpisodeAdvisoryExposure string
+
+const (
+	EpisodeAdvisoryExposureUnexposed EpisodeAdvisoryExposure = "unexposed"
+	EpisodeAdvisoryExposureExposed   EpisodeAdvisoryExposure = "exposed"
+)
+
+var allEpisodeAdvisoryExposures = []EpisodeAdvisoryExposure{
+	EpisodeAdvisoryExposureUnexposed, EpisodeAdvisoryExposureExposed,
+}
+
+// IsValid reports whether the advisory exposure value is declared.
+func (value EpisodeAdvisoryExposure) IsValid() bool {
+	return containsState(allEpisodeAdvisoryExposures, value)
+}
+
+// episodeAdvisoryExposureTransitions declares the entire exposure lifecycle:
+// Unexposed -> Exposed and nothing else. There is deliberately no edge back
+// out of Exposed.
+var episodeAdvisoryExposureTransitions = transitions(
+	[2]EpisodeAdvisoryExposure{EpisodeAdvisoryExposureUnexposed, EpisodeAdvisoryExposureExposed},
+)
+
+// ValidateEpisodeAdvisoryExposureTransition validates one advisory-exposure
+// transition. Requesting Exposed while already Exposed is idempotent (the
+// same target state is always a no-op transition, matching how
+// ValidateEpisodeStatusTransition and the storage layer both treat a
+// repeated close), so it does not go through the closed transition table
+// below; every OTHER transition -- most importantly Exposed -> Unexposed --
+// is refused.
+func ValidateEpisodeAdvisoryExposureTransition(from, to EpisodeAdvisoryExposure) error {
+	if from.IsValid() && from == to {
+		return nil
+	}
+	return validateTransition("episode advisory exposure", from, to,
+		EpisodeAdvisoryExposure.IsValid, episodeAdvisoryExposureTransitions)
 }
 
 // EpisodeClosure carries the facts fixed at an episode's terminal user

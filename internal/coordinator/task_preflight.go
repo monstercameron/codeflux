@@ -59,6 +59,16 @@ type taskPreflightStore interface {
 		context.Context,
 		storage.RecordForecastOutcome,
 	) (storage.ForecastOutcome, error)
+	// RecordTaskExactFingerprintBinding carries ForecastTask's exact
+	// fingerprint (schema version + hash) durably past the gap between
+	// forecast time and episode-open time (MEM-001): OpenEpisode runs at
+	// the start of a run, long after ForecastTask returns, and has no
+	// other way to learn what fingerprint retrieval already indexed this
+	// task under.
+	RecordTaskExactFingerprintBinding(
+		context.Context,
+		storage.RecordTaskExactFingerprintBinding,
+	) (storage.TaskExactFingerprintBinding, error)
 }
 
 // TaskForecastInput contains the fixed-policy features and stable identities
@@ -164,6 +174,16 @@ func (service *TaskPreflightService) ForecastTask(
 	}
 	fingerprintHash, err := exact.Hash()
 	if err != nil {
+		return ForecastedTask{}, err
+	}
+	// MEM-001: bind the exact fingerprint to the task now, while it is
+	// still in hand, so a run opening this task's episode much later can
+	// read back the same fingerprint retrieval already indexed the task
+	// under, rather than recomputing (and likely mismatching) one from
+	// whatever a run happens to still have access to.
+	if _, err := service.store.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: input.TaskID, FingerprintSchemaVersion: exact.SchemaVersion, FingerprintHash: fingerprintHash,
+	}); err != nil {
 		return ForecastedTask{}, err
 	}
 

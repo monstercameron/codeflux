@@ -230,7 +230,9 @@ func TestTaskPreflightServiceExposesPrepareStartAndOutcomeLifecycle(t *testing.T
 	if err != nil || outcome.RunID != runID {
 		t.Fatalf("outcome = %#v, %v", outcome, err)
 	}
-	if len(store.calls) != 9 {
+	// MEM-001 added one call ahead of the rest: ForecastTask now records the
+	// task's exact fingerprint binding before selecting a policy.
+	if len(store.calls) != 10 {
 		t.Fatalf("lifecycle calls = %#v", store.calls)
 	}
 }
@@ -315,9 +317,12 @@ func TestForecastTaskConsultsMemoryBeforePlanningWhenFingerprintMatchesPriorWork
 		t.Fatalf("retrieval = %#v, want the prior accepted repository fact eligible and not a fallback", forecasted.Retrieval)
 	}
 	// Ordinary planning still ran -- memory informs, it never replaces
-	// planning.
-	if len(store.calls) == 0 || store.calls[0] != "policy" {
-		t.Fatalf("store.calls = %#v, want ordinary planning to have proceeded", store.calls)
+	// planning. The exact fingerprint binding (MEM-001) is recorded first,
+	// ahead of policy selection, since it has nothing to do with retrieval
+	// or planning order and everything to do with being available before
+	// any run needs it.
+	if len(store.calls) < 2 || store.calls[0] != "fingerprint-binding" || store.calls[1] != "policy" {
+		t.Fatalf("store.calls = %#v, want the fingerprint binding recorded first and ordinary planning to have proceeded", store.calls)
 	}
 
 	// The discovery is durable, not merely an in-memory return value.
@@ -396,7 +401,8 @@ func TestForecastTaskFallsBackCleanlyAndStillPlansWhenNoEligibleMemoryExists(t *
 		t.Fatalf("retrieval = %#v, want a clean fallback", forecasted.Retrieval)
 	}
 
-	wantCalls := []string{"policy", "forecast", "create-budget", "get-budget"}
+	// MEM-001: the fingerprint binding is recorded first, ahead of the rest.
+	wantCalls := []string{"fingerprint-binding", "policy", "forecast", "create-budget", "get-budget"}
 	if len(store.calls) != len(wantCalls) {
 		t.Fatalf("store.calls = %#v, want ordinary planning to have run to completion: %v", store.calls, wantCalls)
 	}
@@ -429,6 +435,8 @@ type taskPreflightStoreFixture struct {
 	presentation   storage.TaskExecutionPresentation
 	started        storage.StartedTaskRun
 	outcome        storage.ForecastOutcome
+
+	fingerprintBindingInput storage.RecordTaskExactFingerprintBinding
 }
 
 func (store *taskPreflightStoreFixture) RecordExecutionPolicy(
@@ -512,6 +520,18 @@ func (store *taskPreflightStoreFixture) RecordForecastOutcome(
 ) (storage.ForecastOutcome, error) {
 	store.calls = append(store.calls, "outcome")
 	return store.outcome, nil
+}
+
+func (store *taskPreflightStoreFixture) RecordTaskExactFingerprintBinding(
+	_ context.Context,
+	input storage.RecordTaskExactFingerprintBinding,
+) (storage.TaskExactFingerprintBinding, error) {
+	store.calls = append(store.calls, "fingerprint-binding")
+	store.fingerprintBindingInput = input
+	return storage.TaskExactFingerprintBinding{
+		TaskID: input.TaskID, FingerprintSchemaVersion: input.FingerprintSchemaVersion,
+		FingerprintHash: input.FingerprintHash,
+	}, nil
 }
 
 // GetThread and CreateTask back IntakeTask (task_intake.go). The fixture
