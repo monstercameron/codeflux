@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-087
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- restore three TODOS.md notes filed under the wrong headings
+Request-or-TODO: Correction to CL-20260802-082 and CL-20260802-085
+Outcome: Six lanes share one checkout, so TODOS.md carries several lanes' notes
+  at once and each commit stages only its own hunks. The tool doing that split
+  diffed at zero context and applied with --unidiff-zero, which means git cannot
+  locate a hunk by its surrounding text and places it at the recorded line
+  number instead. Those numbers are correct only if every earlier hunk was also
+  applied; dropping another lane's hunk shifts every later offset.
+  The result was silent and plausible-looking: PIPE-132's and PIPE-133's
+  findings were filed under PIPE-136 in the Measurement Honesty section, and
+  three MEM notes landed under the Injection Surfaces heading. Nothing failed,
+  because a misplaced Markdown paragraph is still valid Markdown.
+  The splitter now diffs at three lines of context and applies without
+  --unidiff-zero, so placement is content-addressed and a dropped hunk cannot
+  displace a later one
+Affected-behavior: TODOS.md only. No code change
+Compatibility-or-migration: None
+Verification: The corrected file is the working tree that every lane has been
+  reading, so the fix is the diff between it and what was committed
+Known-limitations: The two commits that carried the misplacement are left as
+  they are rather than rewritten, and this entry is the record of what they got
+  wrong
+Dev-Log: DL-20260802-097
+
 Change-ID: CL-20260802-086
 Commit: pending
 Date: 2026-08-02

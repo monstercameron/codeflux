@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-097
+Date: 2026-08-02
+Status: Corrected, and the cause fixed rather than the symptom
+Change-ID: CL-20260802-087
+Commit: pending
+Request-or-TODO: Correction to CL-20260802-082 and CL-20260802-085
+Goal: Put three findings back under the tickets they belong to
+Assumptions: That the marker matching had picked the wrong hunks -- wrong. The
+  markers selected correctly; the placement was what failed
+Decisions: Fixed the splitter rather than only the file. Diffing at zero context
+  makes a hunk unlocatable by content, so git apply trusts a line number that is
+  only valid if nothing earlier was dropped -- which is precisely what a
+  per-lane split does on every call. Three lines of context makes placement
+  content-addressed and the failure mode impossible rather than unlikely.
+  Left the two bad commits alone. Rewriting them would hide the mistake in a
+  session where the whole discipline is that a partial or an error gets written
+  down; the correction belongs in the ledger, not in the history
+Files-or-schemas: TODOS.md, and the session's own staging helper
+Validation: The corrected file is what the lanes have been reading all along
+Failures-or-discarded-approaches: None
+Known-limitations: Any earlier commit split the same way could carry the same
+  defect. The visible ones are corrected here; nothing has been done to audit
+  every prior TODOS.md commit for it
+Next-safe-step: Nothing; the splitter is fixed for the remaining lanes
+
 Dev-Log: DL-20260802-096
 Date: 2026-08-02
 Status: Done
