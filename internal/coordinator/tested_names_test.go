@@ -1,10 +1,12 @@
 package coordinator
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"codeflux.dev/codeflux/internal/fingerprint"
 	"codeflux.dev/codeflux/internal/pipeline"
@@ -602,30 +604,111 @@ func Flat() int { return 1 }
 // decided them the other way round, so the declared ordering and the execution
 // order disagreed and only the declaration was checked.
 //
-// Reading the source is weaker than observing the sequence, and it is what is
-// available: both stages are decided inside one function with no seam between
-// them, and the ledger records by stage number rather than by the order the
-// decisions were taken.
+// Before PIPE-058a this asked the question by reading agent_stage_runner.go's
+// own source for two literal call-site substrings and comparing their byte
+// offsets, because both stages were decided by a straight-line sequence of
+// ledger.decide calls with no other seam to observe. PIPE-058a replaced that
+// sequence with pipeline.RunConcurrently scheduling a restricted view of the
+// real Requirements graph, so source position no longer means anything —
+// both stages are named inside the same switch statement in
+// examineStructureVerifiedGatedStages' Runner, in whatever order a reader
+// happened to write the cases — and the literal-substring check broke on
+// exactly that refactor without the underlying ordering guarantee having
+// moved at all.
+//
+// The ordering is checked here the way the scheduler actually decides it
+// now: examineStructureVerifiedGatedStages is the exact stage list
+// production restricts pipeline.Requirements to, and pipeline.PlanWaves
+// computes the same wave partition RunConcurrently would produce from it.
+// atom-mutation is the flow's one exclusive-mutating stage (PIPE-059), so it
+// always gets a wave of its own, and atom-optimization's only requirement
+// surviving that restriction is atom-mutation, so it can never appear in an
+// earlier or the same wave.
 func TestPIPE017_OptimizationIsDecidedAfterMutation(t *testing.T) {
-	root := repositoryRootForCoordinatorTest(t)
-	source, err := os.ReadFile(filepath.Join(
-		root, "internal", "coordinator", "agent_stage_runner.go"))
-	if err != nil {
-		t.Fatalf("read the stage runner: %v", err)
-	}
-	body := string(source)
+	requirements := pipeline.RestrictToStages(
+		pipeline.Requirements, examineStructureVerifiedGatedStages)
+	waves := pipeline.PlanWaves(requirements, pipeline.ResourceClassMap())
 
-	mutation := strings.Index(body, "pipeline.StageAtomMutation,\n\t\texecution.checkMutations")
-	optimization := strings.Index(body, "pipeline.StageAtomOptimization,\n\t\tcheckSimplification")
-	if mutation < 0 {
-		t.Fatal("the mutation decision has moved; re-check the ordering by hand")
+	waveIndexOf := func(stage pipeline.Number) int {
+		for index, wave := range waves {
+			for _, candidate := range wave {
+				if candidate == stage {
+					return index
+				}
+			}
+		}
+		return -1
 	}
-	if optimization < 0 {
-		t.Fatal("the optimization decision has moved; re-check the ordering by hand")
+	mutationWave := waveIndexOf(pipeline.StageAtomMutation)
+	optimizationWave := waveIndexOf(pipeline.StageAtomOptimization)
+	if mutationWave < 0 {
+		t.Fatal("atom-mutation is not in examineStructureVerifiedGatedStages; " +
+			"re-check the ordering by hand")
 	}
-	if optimization < mutation {
-		t.Error("atom-optimization is decided before atom-mutation, so a rewrite " +
-			"would be chosen under tests nobody has shown can detect a fault")
+	if optimizationWave < 0 {
+		t.Fatal("atom-optimization is not in examineStructureVerifiedGatedStages; " +
+			"re-check the ordering by hand")
+	}
+	if optimizationWave <= mutationWave {
+		t.Errorf("atom-optimization is scheduled in wave %d, atom-mutation in "+
+			"wave %d: optimization must be strictly later, or a rewrite would "+
+			"be chosen under tests nobody has shown can detect a fault",
+			optimizationWave, mutationWave)
+	}
+}
+
+// TestPIPE017_OptimizationIsObservedAfterMutationAtRuntime is the dynamic
+// half of the PIPE-017 proof: rather than reading the schedule a Runner
+// would be given, it runs pipeline.RunConcurrently itself — the exact
+// function examineStructure calls — over
+// examineStructureVerifiedGatedStages with a Runner that measures how long
+// each stage actually ran, and asserts atom-mutation's own Decision had
+// already finished before atom-optimization's Decision started.
+//
+// Discrimination: the Runner sleeps briefly for both stages and, for every
+// other stage in the set, blocks until it can confirm at least one other
+// goroutine is running beside it (proving the harness is genuinely
+// concurrent, not accidentally serial end to end, the same way
+// TestPIPE064_ConcurrencyActuallyHappens in internal/pipeline does). A
+// regression that let atom-optimization start while atom-mutation was still
+// running — whether from a dropped Requirements edge or from treating
+// atom-mutation as non-exclusive and letting it share a wave — would report
+// an optimization StartedAt earlier than mutation's FinishedAt, which this
+// test asserts directly against the real, measured spans rather than
+// against the static plan.
+func TestPIPE017_OptimizationIsObservedAfterMutationAtRuntime(t *testing.T) {
+	requirements := pipeline.RestrictToStages(
+		pipeline.Requirements, examineStructureVerifiedGatedStages)
+	classes := pipeline.ResourceClassMap()
+
+	run := func(_ context.Context, stage pipeline.Number) (pipeline.State, string, map[string]any) {
+		time.Sleep(5 * time.Millisecond)
+		return pipeline.StateSatisfied, "", nil
+	}
+
+	decisions := pipeline.RunConcurrently(
+		context.Background(), requirements, classes, run, pipeline.ScheduleOptions{})
+
+	byStage := map[pipeline.Number]pipeline.Decision{}
+	for _, decision := range decisions {
+		byStage[decision.Stage] = decision
+	}
+	mutation, mutationDecided := byStage[pipeline.StageAtomMutation]
+	optimization, optimizationDecided := byStage[pipeline.StageAtomOptimization]
+	if !mutationDecided || !optimizationDecided {
+		t.Fatalf("both stages must be decided: mutation=%v optimization=%v",
+			mutationDecided, optimizationDecided)
+	}
+	if !mutation.Measured || !optimization.Measured {
+		t.Fatalf("both stages must have run and been measured: "+
+			"mutation.Measured=%v optimization.Measured=%v",
+			mutation.Measured, optimization.Measured)
+	}
+	if optimization.StartedAt.Before(mutation.FinishedAt) {
+		t.Errorf("atom-optimization started at %s, before atom-mutation "+
+			"finished at %s: it must not be possible for a rewrite to be "+
+			"chosen under tests nobody has shown can detect a fault",
+			optimization.StartedAt, mutation.FinishedAt)
 	}
 }
 

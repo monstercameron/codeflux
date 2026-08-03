@@ -2,9 +2,49 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 
 	"codeflux.dev/codeflux/internal/pipeline"
 )
+
+// examineStructureUnconditionalStages is decided regardless of whether the
+// module's suite passes, restricted against pipeline.Requirements to compute
+// the concurrent schedule examineStructure actually runs (PIPE-058a).
+//
+// Declared at package level, rather than as a literal inside
+// examineStructure, so a test can schedule against the exact list production
+// uses instead of a hand-copied duplicate that could silently drift from it
+// (TestPIPE017_OptimizationIsDecidedAfterMutation does exactly this for
+// examineStructureVerifiedGatedStages below).
+var examineStructureUnconditionalStages = []pipeline.Number{
+	pipeline.StageContracts, pipeline.StageAtomCaseSynthesis,
+	pipeline.StageAtomExampleTests, pipeline.StageAtomPropertyTests,
+	pipeline.StageAtoms, pipeline.StageAtomVerification,
+	pipeline.StageAntiPatterns, pipeline.StageAtomComplexity,
+	pipeline.StageAtomDocumentation, pipeline.StageCompositionObligations,
+	pipeline.StageMoleculeTests, pipeline.StageMolecules,
+	pipeline.StageMoleculeVerification, pipeline.StageControlObligations,
+	pipeline.StageControlTests, pipeline.StageControlFlow,
+	pipeline.StagePathCoverage, pipeline.StageGlobalInvariants,
+	pipeline.StagePlatformMatrix,
+}
+
+// examineStructureVerifiedGatedStages is decided only once the module's
+// suite is known to pass, restricted against pipeline.Requirements the same
+// way examineStructureUnconditionalStages is (PIPE-058a).
+//
+// atom-mutation is the flow's one exclusive-mutating stage (PIPE-059), so
+// the scheduler always gives it a wave of its own; atom-optimization is the
+// one stage in this set whose real Requirements edge (atom-mutation)
+// survives RestrictToStages, so it never becomes ready until mutation's
+// wave finishes, which is the ordering
+// TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake and PIPE-017 require
+// (see TestPIPE017_OptimizationIsDecidedAfterMutation).
+var examineStructureVerifiedGatedStages = []pipeline.Number{
+	pipeline.StageAtomFuzz, pipeline.StageAtomMutation,
+	pipeline.StageRepetition, pipeline.StageNonFunctional,
+	pipeline.StageAtomOptimization,
+}
 
 // examineStructure performs every stage that can be decided from what the run
 // actually produced.
@@ -62,27 +102,12 @@ func (execution *AgentExecution) examineStructure(
 	// git-status view names, so checkAtoms, checkAtomTests, checkMolecules,
 	// and checkAtomDocumentation shell out to `git status` and parse the
 	// produced source once between them rather than once each (PIPE-057).
-	// Safe because nothing in this run of consecutive checks writes to the
-	// worktree — see producedFunctionCache's own doc for the lifetime rule
-	// that makes it unsafe anywhere else.
+	// Safe because nothing in this pass writes to the worktree — see
+	// producedFunctionCache's own doc for the lifetime rule that makes it
+	// unsafe anywhere else, and for how it stays safe now that several of
+	// its callers can run concurrently (PIPE-058a).
 	cache := newProducedFunctionCache(worktree)
 
-	// Structure, from the source itself. These hold whether or not the tests
-	// pass, because they are statements about what was written rather than
-	// about what it does.
-	ledger.decide(ctx, pipeline.StageAtoms, checkAtoms(worktree, cache))
-	ledger.decide(ctx, pipeline.StageAtomCaseSynthesis, checkCaseCoverage(worktree))
-	ledger.decide(ctx, pipeline.StageAtomExampleTests, checkAtomTests(worktree, cache))
-	ledger.decide(ctx, pipeline.StageMolecules, checkMolecules(worktree, cache))
-	// control-flow is decided after the obligations exist, so it discharges
-	// them rather than answering before they were raised.
-	ledger.decide(ctx, pipeline.StageAntiPatterns, checkAntiPatterns(worktree, attribution))
-	ledger.decide(ctx, pipeline.StageAtomComplexity,
-		checkComplexity(worktree, attribution))
-	ledger.decide(ctx, pipeline.StageContracts, describeContracts(worktree))
-	ledger.decide(ctx, pipeline.StageAtomDocumentation,
-		checkAtomDocumentation(worktree, cache))
-	ledger.decide(ctx, pipeline.StageAtomPropertyTests, checkPropertyTests(worktree))
 	// Obligations are raised durably so a later stage can discharge them by
 	// name, rather than being stated in prose and reported satisfied for
 	// having been stated (PIPE-016).
@@ -91,31 +116,82 @@ func (execution *AgentExecution) examineStructure(
 		TaskID:  scope.taskID,
 		Attempt: ledger.currentAttempt(),
 	}
-	ledger.decide(ctx, pipeline.StageCompositionObligations,
-		composeCompositionObligations(ctx, worktree, obligations))
-	ledger.decide(ctx, pipeline.StageMoleculeTests, checkMoleculeTests(worktree))
-	ledger.decide(ctx, pipeline.StageControlObligations,
-		composeControlObligations(ctx, worktree, obligations))
-	ledger.decide(ctx, pipeline.StageControlTests, checkControlTests(worktree))
-	ledger.decide(ctx, pipeline.StageControlFlow,
-		dischargeControlFlow(ctx, worktree, obligations))
-	ledger.decide(ctx, pipeline.StageGlobalInvariants,
-		checkGlobalInvariants(worktree, execution.settings.ForbiddenCapabilities))
-	ledger.decide(ctx, pipeline.StagePlatformMatrix,
-		checkPlatformMatrix(ctx, worktree, execution.platformTargets()))
 
-	// Each unit is proven on its own terms, whether or not the suite as a
-	// whole passes. These used to be a single verdict over "go test ./...",
-	// which meant one broken test anywhere blocked every one of them and none
-	// of them ever said which unit was at fault. Nine working atoms and one
-	// broken one is a materially different situation from ten broken ones, and
-	// the old shape could not tell them apart.
-	ledger.decide(ctx, pipeline.StageAtomVerification,
-		checkAtomVerification(ctx, worktree))
-	ledger.decide(ctx, pipeline.StageMoleculeVerification,
-		dischargeMoleculeVerification(ctx, worktree, obligations))
-	ledger.decide(ctx, pipeline.StagePathCoverage,
-		checkFunctionCoverage(ctx, worktree, attribution))
+	// Structure, from the source itself. These hold whether or not the tests
+	// pass, because they are statements about what was written rather than
+	// about what it does.
+	//
+	// They used to be a straight line of ledger.decide calls in flow order.
+	// PIPE-058a runs them instead through pipeline.RunConcurrently, restricted
+	// to exactly this set (PIPE-058's Requirements table, minus every edge
+	// that points at a stage outside it — StageAtomDocumentation's real
+	// entry, for one, also names atom-fuzz and atom-mutation, which belong to
+	// the suite-gated set below and are treated as already resolved outside
+	// this call). None of these checks reads another one's ledger verdict —
+	// each is a pure function of the worktree, the shared cache, attribution,
+	// and (for the two obligation-discharging stages) the obligation store —
+	// so restricting the real graph to this set and running its waves
+	// concurrently reports the same verdicts a serial pass would, in less
+	// wall-clock time (PIPE-064 proves the scheduler underneath this has that
+	// property; TestPIPE057_ExamineStructureSharesOneCacheAcrossItsChecks and
+	// the mutation-guarded cache above are what keep the shared state itself
+	// safe to reach from more than one goroutine).
+	unconditionalRun := func(
+		runCtx context.Context, stage pipeline.Number,
+	) (pipeline.State, string, map[string]any) {
+		switch stage {
+		case pipeline.StageAtoms:
+			return outcomeParts(checkAtoms(worktree, cache))
+		case pipeline.StageAtomCaseSynthesis:
+			return outcomeParts(checkCaseCoverage(worktree))
+		case pipeline.StageAtomExampleTests:
+			return outcomeParts(checkAtomTests(worktree, cache))
+		case pipeline.StageMolecules:
+			return outcomeParts(checkMolecules(worktree, cache))
+		case pipeline.StageAntiPatterns:
+			return outcomeParts(checkAntiPatterns(worktree, attribution))
+		case pipeline.StageAtomComplexity:
+			return outcomeParts(checkComplexity(worktree, attribution))
+		case pipeline.StageContracts:
+			return outcomeParts(describeContracts(worktree))
+		case pipeline.StageAtomDocumentation:
+			return outcomeParts(checkAtomDocumentation(worktree, cache))
+		case pipeline.StageAtomPropertyTests:
+			return outcomeParts(checkPropertyTests(worktree))
+		case pipeline.StageCompositionObligations:
+			return outcomeParts(composeCompositionObligations(runCtx, worktree, obligations))
+		case pipeline.StageMoleculeTests:
+			return outcomeParts(checkMoleculeTests(worktree))
+		case pipeline.StageControlObligations:
+			return outcomeParts(composeControlObligations(runCtx, worktree, obligations))
+		case pipeline.StageControlTests:
+			return outcomeParts(checkControlTests(worktree))
+		case pipeline.StageControlFlow:
+			return outcomeParts(dischargeControlFlow(runCtx, worktree, obligations))
+		case pipeline.StageGlobalInvariants:
+			return outcomeParts(checkGlobalInvariants(
+				worktree, execution.settings.ForbiddenCapabilities))
+		case pipeline.StagePlatformMatrix:
+			return outcomeParts(checkPlatformMatrix(
+				runCtx, worktree, execution.platformTargets()))
+		case pipeline.StageAtomVerification:
+			return outcomeParts(checkAtomVerification(runCtx, worktree))
+		case pipeline.StageMoleculeVerification:
+			return outcomeParts(dischargeMoleculeVerification(runCtx, worktree, obligations))
+		case pipeline.StagePathCoverage:
+			return outcomeParts(checkFunctionCoverage(runCtx, worktree, attribution))
+		default:
+			return pipeline.StateFailed, fmt.Sprintf(
+				"stage %d has no check wired into examineStructure's "+
+					"unconditional wave", stage), nil
+		}
+	}
+	for _, decision := range pipeline.RunConcurrently(
+		ctx, pipeline.RestrictToStages(pipeline.Requirements, examineStructureUnconditionalStages),
+		pipeline.ResourceClassMap(), unconditionalRun, pipeline.ScheduleOptions{},
+	) {
+		ledger.recordDecision(ctx, decision)
+	}
 
 	if !verified {
 		// What is left genuinely does need a passing suite: a mutation score
@@ -126,11 +202,7 @@ func (execution *AgentExecution) examineStructure(
 		// (PIPE-017): deciding what is worth rewriting without a mutation
 		// score is deciding it under tests nobody has shown can detect a
 		// fault, which is the thing the ordering exists to prevent.
-		for _, stage := range []pipeline.Number{
-			pipeline.StageAtomFuzz, pipeline.StageAtomMutation,
-			pipeline.StageRepetition, pipeline.StageNonFunctional,
-			pipeline.StageAtomOptimization,
-		} {
+		for _, stage := range examineStructureVerifiedGatedStages {
 			ledger.blocked(ctx, stage,
 				"the suite does not pass, so nothing measured from running it "+
 					"would mean anything")
@@ -138,30 +210,67 @@ func (execution *AgentExecution) examineStructure(
 		return
 	}
 
-	ledger.decide(ctx, pipeline.StageAtomFuzz, checkFuzzing(ctx, worktree))
-	ledger.decide(ctx, pipeline.StageRepetition, checkRepetition(ctx, worktree))
-	ledger.decide(ctx, pipeline.StageNonFunctional,
-		checkNonFunctional(ctx, worktree, nonFunctionalScope{
-			Baselines:          execution.repositories,
-			ProjectID:          scope.projectID,
-			RepositoryID:       scope.repositoryID,
-			RepositoryRevision: scope.revision,
-		}))
-	// Mutation runs last of these: it is the most expensive, and it is the one
-	// whose answer decides how much the others were worth.
-	ledger.decide(ctx, pipeline.StageAtomMutation,
-		execution.checkMutations(ctx, worktree, attribution))
-
-	// Optimization comes after mutation, which is the ordering
+	// These five run through the same scheduler, restricted to this smaller
+	// set. atom-mutation is the flow's one exclusive-mutating stage
+	// (PIPE-059): it writes and restores a produced source file in place, so
+	// RunConcurrently gives it a wave of its own before anything else in this
+	// set is allowed to start, and atom-optimization — the ordering
 	// TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake exists to enforce
-	// and which the execution order contradicted (PIPE-017). Rewriting code is
-	// only as safe as the tests guarding it, so deciding what is worth
-	// simplifying before the mutation score is known is deciding it under
-	// tests nobody has shown can detect a fault.
-	//
-	// It is inert today because no rewrite is performed (PIPE-010), which is
-	// exactly why the ordering is worth fixing now: the day a rewrite lands,
-	// the sequence is already right rather than being discovered to be wrong.
-	ledger.decide(ctx, pipeline.StageAtomOptimization,
-		checkSimplification(worktree, attribution))
+	// (PIPE-017) — only becomes ready once that wave finishes, because it is
+	// the one stage here whose real Requirements edge (atom-mutation) survives
+	// RestrictToStages. Rewriting code is only as safe as the tests guarding
+	// it, so deciding what is worth simplifying before the mutation score is
+	// known would be deciding it under tests nobody has shown can detect a
+	// fault. It is inert today because no rewrite is performed (PIPE-010),
+	// which is exactly why the ordering is worth keeping correct now: the day
+	// a rewrite lands, the sequence is already right rather than being
+	// discovered to be wrong.
+	verifiedGatedRun := func(
+		runCtx context.Context, stage pipeline.Number,
+	) (pipeline.State, string, map[string]any) {
+		switch stage {
+		case pipeline.StageAtomFuzz:
+			return outcomeParts(checkFuzzing(runCtx, worktree))
+		case pipeline.StageRepetition:
+			return outcomeParts(checkRepetition(runCtx, worktree))
+		case pipeline.StageNonFunctional:
+			return outcomeParts(checkNonFunctional(runCtx, worktree, nonFunctionalScope{
+				Baselines:          execution.repositories,
+				ProjectID:          scope.projectID,
+				RepositoryID:       scope.repositoryID,
+				RepositoryRevision: scope.revision,
+			}))
+		case pipeline.StageAtomMutation:
+			return outcomeParts(execution.checkMutations(runCtx, worktree, attribution))
+		case pipeline.StageAtomOptimization:
+			return outcomeParts(checkSimplification(worktree, attribution))
+		default:
+			return pipeline.StateFailed, fmt.Sprintf(
+				"stage %d has no check wired into examineStructure's "+
+					"suite-verified wave", stage), nil
+		}
+	}
+	for _, decision := range pipeline.RunConcurrently(
+		ctx, pipeline.RestrictToStages(pipeline.Requirements, examineStructureVerifiedGatedStages),
+		pipeline.ResourceClassMap(), verifiedGatedRun, pipeline.ScheduleOptions{},
+	) {
+		ledger.recordDecision(ctx, decision)
+	}
+}
+
+// outcomeParts renders a stageOutcome in pipeline.RunConcurrently's Runner
+// vocabulary, following exactly the state mapping pipelineLedger.decide
+// already uses — skipped stays skipped, held becomes satisfied, anything
+// else becomes failed — so routing a check through the concurrent scheduler
+// instead of straight into ledger.decide records the same state it always
+// did.
+func outcomeParts(outcome stageOutcome) (pipeline.State, string, map[string]any) {
+	switch {
+	case outcome.Skipped:
+		return pipeline.StateSkipped, outcome.Detail, outcome.Evidence
+	case outcome.Held:
+		return pipeline.StateSatisfied, outcome.Detail, outcome.Evidence
+	default:
+		return pipeline.StateFailed, outcome.Detail, outcome.Evidence
+	}
 }

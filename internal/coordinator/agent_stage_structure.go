@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // producedFunction is one function a run wrote, and what is known about it.
@@ -17,7 +18,6 @@ type producedFunction struct {
 	File string
 	// Pure is true when nothing in the body reaches outside its arguments.
 	Pure bool
-	// Calls are the other produced functions this one uses. A function that
 	// Effects names what the body reaches for outside its own arguments,
 	// resolved by observedEffects (PIPE-139): the file's own imports, not a
 	// bare identifier, decide what package a selector call reaches, and only
@@ -25,6 +25,7 @@ type producedFunction struct {
 	// type conversion sharing a package with an effect (time.Duration versus
 	// time.Now) is not confused with one. Pure is exactly len(Effects)==0.
 	Effects []string
+	// Calls are the other produced functions this one uses. A function that
 	// calls none is an atom; one that calls others composes them.
 	Calls []string
 	// Branches counts the decision points in the body, which is what makes a
@@ -87,13 +88,13 @@ func parseProducedFunctions(
 	fileSet := token.NewFileSet()
 	var functions []producedFunction
 	declared := map[string]bool{}
-
 	// fileImports resolves, per file, the package each import name actually
 	// binds to (PIPE-139), so a purity determination is checked against what
 	// the file imported rather than trusted from a bare identifier that a
 	// renamed import or a shadowing local name would make wrong in either
 	// direction.
 	fileImports := map[string]map[string]string{}
+
 	type pending struct {
 		function producedFunction
 		body     *ast.FuncDecl
@@ -112,8 +113,8 @@ func parseProducedFunctions(
 		if parseErr != nil {
 			return nil, fmt.Errorf("%s: %w", file, parseErr)
 		}
-		// Purity is decided per function, from what its own body calls. It
 		fileImports[file] = importMap(tree)
+		// Purity is decided per function, from what its own body calls. It
 		// used to be decided per file, from what the file imported: in a
 		// single-file program that marked every function impure because one of
 		// them printed, and reported "0 pure atoms" for code that was almost
@@ -216,7 +217,6 @@ func callsAnythingImpure(function *ast.FuncDecl) bool {
 	return impure
 }
 
-// describeBody reports what one function calls, how much it branches, and how
 // importMap resolves each name a file's own import declarations bind to the
 // import path it names (PIPE-139).
 //
@@ -333,6 +333,7 @@ func observedEffects(function *ast.FuncDecl, imports map[string]string) []string
 	return effects
 }
 
+// describeBody reports what one function calls, how much it branches, and how
 // deeply it loops.
 func describeBody(
 	function *ast.FuncDecl,
@@ -507,8 +508,26 @@ func testedNamesInFiles(worktree string, files []string) (map[string]bool, error
 // legitimately disagree once a run has committed to its own worktree
 // (PIPE-111's design caution), and a cache keyed only on the worktree would
 // answer one question with the other's cached result.
+//
+// It is safe for concurrent use by every check that shares one instance
+// (PIPE-058a/PIPE-059): checkAtoms, checkAtomTests, checkMolecules, and
+// checkAtomDocumentation are all classified pure-ast, which is exactly the
+// resource class the scheduler is free to run side by side within one wave,
+// and every one of them reaches this cache. Before PIPE-058a this was safe
+// by construction — the four calls that share one cache ran one after
+// another, so nothing here needed a lock — but a plain map read racing a
+// plain map write is a Go runtime crash, not merely a wrong answer, the
+// moment two of those goroutines reach functionsFor (or either haveTested-
+// Names/haveDocumentedNames path) for the same cache at once. mutex is a
+// single, coarse lock over every field rather than one per map: the work
+// this cache does per call is a `git status` shell-out and one parse of
+// already-read source, so serializing the whole cache costs nothing next to
+// that, and a coarse lock cannot deadlock the way per-field locking
+// acquired in different orders could.
 type producedFunctionCache struct {
 	worktree string
+
+	mutex sync.Mutex
 
 	haveProducedFiles bool
 	producedFiles     []string
@@ -535,6 +554,8 @@ func newProducedFunctionCache(worktree string) *producedFunctionCache {
 // producedFilesList is producedGoFiles' `git status` view, shelled out at
 // most once for this cache's lifetime.
 func (cache *producedFunctionCache) producedFilesList() ([]string, error) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
 	if !cache.haveProducedFiles {
 		cache.producedFiles, cache.producedFilesErr = producedGoFiles(cache.worktree)
 		cache.haveProducedFiles = true
@@ -550,16 +571,29 @@ func (cache *producedFunctionCache) functionsFor(
 	files []string,
 ) ([]producedFunction, error) {
 	key := producedFunctionCacheKey(files)
+	cache.mutex.Lock()
 	if cache.parsed == nil {
 		cache.parsed = map[string][]producedFunction{}
 		cache.parseErr = map[string]error{}
 	}
 	if functions, cached := cache.parsed[key]; cached {
-		return functions, cache.parseErr[key]
+		err := cache.parseErr[key]
+		cache.mutex.Unlock()
+		return functions, err
 	}
+	cache.mutex.Unlock()
+	// Parsing runs outside the lock: it only reads the worktree's files, not
+	// this cache's own state, so two goroutines racing to fill different
+	// (or even the same) key parse concurrently rather than queuing behind
+	// one another. The lock retaken below to store the result is what keeps
+	// the eventual map write itself safe; a duplicate parse on a same-key
+	// race is wasted work, not a correctness problem, and it is the losing
+	// goroutine's own answer that gets discarded, never a caller's.
 	functions, err := parseProducedFunctions(cache.worktree, files)
+	cache.mutex.Lock()
 	cache.parsed[key] = functions
 	cache.parseErr[key] = err
+	cache.mutex.Unlock()
 	return functions, err
 }
 
@@ -577,15 +611,29 @@ func (cache *producedFunctionCache) readProducedFunctions() ([]producedFunction,
 
 // testedNamesCached is testedNames, memoized for this cache's lifetime.
 func (cache *producedFunctionCache) testedNamesCached() (map[string]bool, error) {
+	files, err := cache.producedFilesList()
+	if err != nil {
+		return nil, err
+	}
+	cache.mutex.Lock()
+	if cache.haveTestedNames {
+		names, namesErr := cache.testedNames, cache.testedNamesErr
+		cache.mutex.Unlock()
+		return names, namesErr
+	}
+	cache.mutex.Unlock()
+	// Computed outside the lock, the same as functionsFor: a same-key race
+	// costs a duplicate computation, never a wrong answer, and the loser's
+	// result is simply discarded below.
+	names, namesErr := testedNamesInFiles(cache.worktree, files)
+	cache.mutex.Lock()
 	if !cache.haveTestedNames {
-		files, err := cache.producedFilesList()
-		if err != nil {
-			return nil, err
-		}
-		cache.testedNames, cache.testedNamesErr = testedNamesInFiles(cache.worktree, files)
+		cache.testedNames, cache.testedNamesErr = names, namesErr
 		cache.haveTestedNames = true
 	}
-	return cache.testedNames, cache.testedNamesErr
+	names, namesErr = cache.testedNames, cache.testedNamesErr
+	cache.mutex.Unlock()
+	return names, namesErr
 }
 
 // documentedNamesCached is documentedNames, memoized for this cache's
@@ -593,16 +641,26 @@ func (cache *producedFunctionCache) testedNamesCached() (map[string]bool, error)
 // `git status` again to get the same list documentedNames would have asked
 // for itself.
 func (cache *producedFunctionCache) documentedNamesCached() (map[string]bool, error) {
+	files, err := cache.producedFilesList()
+	if err != nil {
+		return nil, err
+	}
+	cache.mutex.Lock()
+	if cache.haveDocumentedNames {
+		names, namesErr := cache.documentedNames, cache.documentedNamesErr
+		cache.mutex.Unlock()
+		return names, namesErr
+	}
+	cache.mutex.Unlock()
+	names, namesErr := documentedNamesInFiles(cache.worktree, files)
+	cache.mutex.Lock()
 	if !cache.haveDocumentedNames {
-		files, err := cache.producedFilesList()
-		if err != nil {
-			return nil, err
-		}
-		cache.documentedNames, cache.documentedNamesErr =
-			documentedNamesInFiles(cache.worktree, files)
+		cache.documentedNames, cache.documentedNamesErr = names, namesErr
 		cache.haveDocumentedNames = true
 	}
-	return cache.documentedNames, cache.documentedNamesErr
+	names, namesErr = cache.documentedNames, cache.documentedNamesErr
+	cache.mutex.Unlock()
+	return names, namesErr
 }
 
 // producedFunctionCacheKey canonicalizes a file list into a cache key. The
@@ -645,6 +703,38 @@ func checkAtoms(worktree string, cache *producedFunctionCache) stageOutcome {
 		return broke("the run produced no atomic function: every piece of work "+
 			"is entangled with another, so none can be tested or reused alone",
 			evidence)
+	}
+
+	files, err := cache.producedFilesList()
+	if err != nil {
+		return broke("the produced source could not be read: "+err.Error(), nil)
+	}
+	declared, err := declaredContracts(worktree, files)
+	if err != nil {
+		return broke("the declared atom documentation could not be read: "+
+			err.Error(), nil)
+	}
+	var violations []string
+	declaredPureCount := 0
+	for _, atom := range atoms {
+		document, hasDeclaration := declared[atom.Name]
+		if !hasDeclaration || !declaredPurity(document) {
+			continue
+		}
+		declaredPureCount++
+		if !atom.Pure {
+			violations = append(violations, fmt.Sprintf(
+				"%s declares \"Effects: None: pure atom\" but reaches outside "+
+					"its arguments: %s", atom.Name, strings.Join(atom.Effects, ", ")))
+		}
+	}
+	sort.Strings(violations)
+	evidence["declared_pure_atoms"] = declaredPureCount
+	if len(violations) > 0 {
+		evidence["purity_violations"] = violations
+		return broke(fmt.Sprintf(
+			"%d atom(s) declare purity their own body contradicts: %s",
+			len(violations), strings.Join(violations, "; ")), evidence)
 	}
 	return held(fmt.Sprintf(
 		"%d atomic function(s), %d of them pure, and %d composing function(s); "+
@@ -705,38 +795,6 @@ func checkMolecules(worktree string, cache *producedFunctionCache) stageOutcome 
 	_, molecules := atomsAndMolecules(functions)
 	if len(molecules) == 0 {
 		return skipped("the run composed nothing, so there is no composition to check")
-
-	files, err := cache.producedFilesList()
-	if err != nil {
-		return broke("the produced source could not be read: "+err.Error(), nil)
-	}
-	declared, err := declaredContracts(worktree, files)
-	if err != nil {
-		return broke("the declared atom documentation could not be read: "+
-			err.Error(), nil)
-	}
-	var violations []string
-	declaredPureCount := 0
-	for _, atom := range atoms {
-		document, hasDeclaration := declared[atom.Name]
-		if !hasDeclaration || !declaredPurity(document) {
-			continue
-		}
-		declaredPureCount++
-		if !atom.Pure {
-			violations = append(violations, fmt.Sprintf(
-				"%s declares \"Effects: None: pure atom\" but reaches outside "+
-					"its arguments: %s", atom.Name, strings.Join(atom.Effects, ", ")))
-		}
-	}
-	sort.Strings(violations)
-	evidence["declared_pure_atoms"] = declaredPureCount
-	if len(violations) > 0 {
-		evidence["purity_violations"] = violations
-		return broke(fmt.Sprintf(
-			"%d atom(s) declare purity their own body contradicts: %s",
-			len(violations), strings.Join(violations, "; ")), evidence)
-	}
 	}
 	var undischarged []string
 	for _, molecule := range molecules {

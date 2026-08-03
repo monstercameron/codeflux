@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -54,6 +55,21 @@ type pipelineLedger struct {
 	// and a reader can see, without failing a user's run over a defect in the
 	// recording rather than in the work.
 	duplicates []duplicateStageWrite
+	// mutex guards recorded, duplicates, and stageStarted against concurrent
+	// writes (PIPE-058a).
+	//
+	// A pipelineLedger was never called from more than one goroutine before
+	// PIPE-058a: agent_execution.go's own calls are all sequential, and
+	// examineStructure's were a straight line of ledger.decide calls. Once
+	// examineStructure's own scheduler runs a wave of stages concurrently,
+	// every one of those goroutines calls back into this same ledger, and
+	// without this mutex two goroutines racing on ledger.recorded — a plain
+	// map — would corrupt it rather than merely disagree about a duplicate.
+	// The mutex is unconditional rather than only taken by the concurrent
+	// path: guarding the sequential path too costs nothing when it is never
+	// contended, and a caller does not have to know or prove which path it
+	// is on to be safe.
+	mutex sync.Mutex
 }
 
 // duplicateStageWrite is one refused second write.
@@ -112,7 +128,12 @@ func (ledger *pipelineLedger) currentAttempt() uint64 {
 	return ledger.attempt
 }
 
-// record writes one stage outcome.
+// record writes one stage outcome, stamping its start as the moment the
+// previous stage was recorded — correct only for a sequential caller, which
+// is what every call site through this method is (PIPE-006's documented
+// limitation). A caller that measures its own stage's start individually,
+// because more than one stage can be "the previous one" at once, uses
+// recordMeasured instead (PIPE-058a).
 func (ledger *pipelineLedger) record(
 	ctx context.Context,
 	stage pipeline.Number,
@@ -123,18 +144,60 @@ func (ledger *pipelineLedger) record(
 	if ledger == nil {
 		return
 	}
+	ledger.mutex.Lock()
+	started := ledger.stageStarted
+	ledger.mutex.Unlock()
+	// The next sequential stage begins when this one was recorded, whether or
+	// not the write succeeded: a failed write must not make the following
+	// stage look as though it started before this one. This only ever
+	// advances the shared cursor a purely sequential caller reads; a
+	// concurrent caller does not touch it at all (see recordMeasured).
+	defer func() {
+		ledger.mutex.Lock()
+		ledger.stageStarted = ledger.clock()
+		ledger.mutex.Unlock()
+	}()
+	ledger.recordMeasured(ctx, stage, state, detail, evidence, started)
+}
+
+// recordMeasured writes one stage outcome using a start time the caller
+// already measured itself, rather than inferring one from the ledger's
+// shared, sequential-only stageStarted cursor (PIPE-006/PIPE-058a).
+//
+// A zero started reports the stage unmeasured, the same honest default
+// storage.RecordPipelineStage.StartedAt already documents: ElapsedMeasured
+// comes out false and the duration reads as "not measured" rather than a
+// fabricated instant.
+func (ledger *pipelineLedger) recordMeasured(
+	ctx context.Context,
+	stage pipeline.Number,
+	state pipeline.State,
+	detail string,
+	evidence map[string]any,
+	started time.Time,
+) {
+	if ledger == nil {
+		return
+	}
 	// A stage speaks once per attempt. A second write is a programming error
 	// in the caller, not a state change, and is refused here rather than sent
 	// to storage to be silently dropped.
 	//
 	// The check precedes the storage guard deliberately: whether a caller
 	// wrote twice is a fact about the caller, not about whether a database
-	// happened to be attached.
+	// happened to be attached. It is also what makes concurrent writers safe
+	// to have racing at all: two goroutines deciding the same stage at once
+	// — which should never happen given a correct scheduler, but this is the
+	// backstop if it did — cannot both win, because the check-and-mark below
+	// happens under the same lock as every other caller's.
+	ledger.mutex.Lock()
 	if ledger.recorded[stage] {
 		ledger.duplicates = append(ledger.duplicates,
 			duplicateStageWrite{Stage: stage, State: state})
+		ledger.mutex.Unlock()
 		return
 	}
+	ledger.mutex.Unlock()
 	if ledger.repositories == nil {
 		return
 	}
@@ -148,11 +211,6 @@ func (ledger *pipelineLedger) record(
 		owned := ledger.runID
 		runID = &owned
 	}
-	started := ledger.stageStarted
-	// The next stage begins when this one was recorded, whether or not the
-	// write succeeded: a failed write must not make the following stage look
-	// as though it started before this one.
-	defer func() { ledger.stageStarted = ledger.clock() }()
 	if _, err := ledger.repositories.RecordPipelineStageResult(
 		ctx, storage.RecordPipelineStage{
 			TaskID: ledger.taskID, RunID: runID, Attempt: ledger.attempt,
@@ -165,7 +223,30 @@ func (ledger *pipelineLedger) record(
 		// readable as "this run's record is incomplete".
 		return
 	}
+	ledger.mutex.Lock()
 	ledger.recorded[stage] = true
+	ledger.mutex.Unlock()
+}
+
+// recordDecision writes one stage outcome computed by
+// pipeline.RunConcurrently, using the scheduler's own per-check measured
+// span rather than the sequential stageStarted cursor (PIPE-058a).
+//
+// A stage RunConcurrently marked Blocked without ever calling its check
+// (PIPE-063) carries Measured==false, which this passes through as a zero
+// started time — an honestly unmeasured span, not a fabricated instant, for
+// work that never ran.
+func (ledger *pipelineLedger) recordDecision(
+	ctx context.Context,
+	decision pipeline.Decision,
+) {
+	started := decision.StartedAt
+	if !decision.Measured {
+		started = time.Time{}
+	}
+	ledger.recordMeasured(
+		ctx, decision.Stage, decision.State, decision.Detail, decision.Evidence,
+		started)
 }
 
 // satisfied records a stage that held, with what it produced.
@@ -280,5 +361,7 @@ func (ledger *pipelineLedger) duplicateWrites() []duplicateStageWrite {
 	if ledger == nil {
 		return nil
 	}
+	ledger.mutex.Lock()
+	defer ledger.mutex.Unlock()
 	return append([]duplicateStageWrite(nil), ledger.duplicates...)
 }

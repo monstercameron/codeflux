@@ -50,6 +50,46 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-083
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- the structure frontier runs concurrently
+Request-or-TODO: PIPE-058a, PIPE-059, PIPE-064
+Outcome: examineStructure decided nineteen unconditional stages and five
+  suite-verified ones one after another, so the dependency graph PIPE-058
+  declared described an execution nothing performed. It now schedules through
+  pipeline.RunConcurrently against that graph, restricted to its own stage list.
+  The measured frontier is four wide across fourteen waves, against a
+  theoretical whole-graph five; the three stages accounting for the difference
+  are decided in agent_execution.go, which this change does not own.
+  PIPE-064 landed first, before anything ran in parallel, because it is the
+  property the section is written against. Its companion test deadlocks if the
+  scheduler silently serialises a wave, so identical-either-way is a claim
+  against real concurrency rather than against accidental seriality.
+  Resource classes are assigned by reading each check's own exec.Command and
+  os.WriteFile calls rather than inferred from stage names. Exactly one check
+  writes a produced source file in place and restores it, and it never shares a
+  wave with anything
+Affected-behavior: A stage's recorded start is now measured at its own check
+  rather than inferred from when the previous stage was recorded, which stops
+  meaning anything once stages overlap. A blocked stage reports that its span
+  was not measured instead of a fabricated near-zero one. State, detail and
+  evidence are byte-identical
+Compatibility-or-migration: producedFunctionCache's four memoised fields are
+  guarded by a mutex, because the four pure-AST checks sharing it now run in one
+  wave. The sequential record path is untouched for agent_execution.go's callers
+Verification: Verdicts are identical at one worker and at unbounded workers; the
+  exclusive stage is alone in its wave over twenty-five repetitions; the
+  ordering PIPE-017 requires is asserted twice, once against the planned waves
+  and once against measured decision timestamps from a real scheduler run
+Known-limitations: -race is unavailable on this windows/arm64 host, so the new
+  mutex is not race-detector-verified. That is a gap in the evidence rather than
+  a formality. The engine canary reads 5.2-5.4s against a 3.8s baseline and the
+  measurement cannot be separated from five other agents contending for this
+  machine, so concurrency is not yet demonstrated to be faster. PIPE-060,
+  PIPE-061, PIPE-062 and PIPE-065 are untouched
+Dev-Log: DL-20260802-093
+
 Change-ID: CL-20260802-082
 Commit: pending
 Date: 2026-08-02

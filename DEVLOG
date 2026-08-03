@@ -25,6 +25,46 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-093
+Date: 2026-08-02
+Status: Three closed; four left for a quieter tree
+Change-ID: CL-20260802-083
+Commit: pending
+Request-or-TODO: PIPE-058a, PIPE-059, PIPE-064
+Goal: Make the declared dependency graph describe what actually runs
+Assumptions: The graph is right and only the execution was sequential --
+  checked by measuring the frontier against the real tables, not asserted
+Decisions: Shipped PIPE-064 first. A concurrency change that cannot be shown to
+  leave verdicts unchanged is not reviewable, and the check has to exist before
+  the first parallel stage rather than after it.
+  Wrote the invariance test so that a scheduler which secretly serialises would
+  deadlock it. Without that, identical-either-way is trivially true of a
+  scheduler that never ran anything in parallel, which is the failure mode the
+  test exists to exclude.
+  Assigned resource classes by reading each check's own subprocess and file
+  writes. Naming is a guess; the worktree is the thing that actually forces
+  serialisation.
+  Replaced PIPE-017's ordering test rather than re-pointing it. It compared byte
+  offsets of two literal call-site substrings, which the rewrite deleted;
+  pointing it at new literals would have reproduced the same brittleness and
+  proved nothing. It now observes the planned waves and, separately, measured
+  timestamps from a real RunConcurrently call.
+  Traced where the ordering guarantee comes from rather than assuming the new
+  code supplied it: it is requirements.go's pre-existing optimization-requires-
+  mutation edge, not mutation's exclusivity. Exclusivity keeps mutation away
+  from the stages that read the worktree while it is rewriting it
+Files-or-schemas: new internal/pipeline/scheduler.go and resource_classes.go
+  with their tests, agent_stage_runner.go, agent_pipeline_ledger.go,
+  agent_stage_structure.go's cache mutex, tested_names_test.go
+Validation: Invariance at one and at unbounded workers; exclusivity over
+  twenty-five repetitions; the ordering property twice, statically and at
+  runtime, at count=10 with no flakes
+Failures-or-discarded-approaches: None discarded. One casualty found and fixed
+  at the right level rather than patched at the assertion
+Known-limitations: No race detector on this host; no clean speed measurement
+Next-safe-step: PIPE-061's parallel mutation worktrees, once agent_stage_mutation
+  .go is free, then PIPE-063's dependent cancellation
+
 Dev-Log: DL-20260802-092
 Date: 2026-08-02
 Status: One closed, two partial and left open on purpose
