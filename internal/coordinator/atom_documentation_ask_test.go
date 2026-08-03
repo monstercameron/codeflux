@@ -103,11 +103,11 @@ func TestATaskLocalProcedureIsNotWorthRegistering(t *testing.T) {
 		}
 	}
 	parser := producedFunction{
-		Name:       "parseArguments",
-		Parameters: []string{"[]string"},
-		Results:    []string{"[]int", "error"},
+		Name:         "parseArguments",
+		Parameters:   []string{"[]string"},
+		Results:      []string{"[]int", "error"},
 		ReturnsError: true,
-		Pure:       true,
+		Pure:         true,
 	}
 	if !worthAdmitting(parser) {
 		t.Error("a pure parser returning a value was refused registration")
