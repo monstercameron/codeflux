@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-111
+Date: 2026-08-03
+Status: Rung 10 reached; its own program does not terminate
+Change-ID: CL-20260803-101
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Climb, and fix what the climb exposes
+Decisions: Used go test's own -timeout rather than only a context deadline. A
+  deadline kills the process; the flag kills the binary and prints where it
+  hung, and where it hung is the whole value of catching it.
+  Made an unset budget fall back rather than disable the bound. A settings
+  value nobody filled in is the most likely way this bound would quietly
+  disappear again, which is how it came to be unread in the first place.
+  Keyed the stall on the reason rather than the instruction. The instruction is
+  prose assembled from whichever gates are outstanding, so it varies for
+  reasons that have nothing to do with whether the run is stuck
+Files-or-schemas: a new suite_budget.go and its test, four stage files,
+  agent_execution.go
+Validation: The recheck against rung 10's worktree completes rather than
+  hanging; rung 2 reached seventeen attempts where it had been capped at six
+Failures-or-discarded-approaches: I killed a rung 2 run myself while launching
+  rung 10 and briefly read its truncated log as a result
+Known-limitations: Per-run budgets are not threaded to the checks
+Next-safe-step: Rungs 3 and 4, which are untouched
+
 Dev-Log: DL-20260803-110
 Date: 2026-08-03
 Status: Rung 1 green in two attempts; rung 5's worktree passes every

@@ -397,6 +397,9 @@ func (execution *AgentExecution) Run(
 	// never once asked about. A stage that can only accuse is worse than no
 	// stage: a reader cannot tell an unfixed defect from an unaskable one.
 	caseRounds := 0
+	// unfinished is what the run still owed when it ran out of attempts, so
+	// the completion message can say so instead of claiming to be done.
+	unfinished := ""
 	sentBackBecause := "the tests did not pass"
 	failure := ""
 	attempts := 0
@@ -418,7 +421,24 @@ func (execution *AgentExecution) Run(
 		// (MEM-002: the transition records what happened to the attempt
 		// that just ran, not what the next one will run on).
 		rung := progress.currentModel()
-		decision := progress.record(gate, instruction)
+		// The stall is judged on why the work came back, not on the prose
+		// telling the model about it.
+		//
+		// This recorded the whole combined instruction, which opens with
+		// "There are N things still outstanding" and then lists whichever
+		// gates are outstanding now. Its first four hundred characters — the
+		// part the fingerprint keeps — therefore changed whenever the set of
+		// gates changed, which is exactly what happens while a run fixes some
+		// and not others. A failure that repeated every other attempt never
+		// looked repeated, so the stall never reached its threshold and the
+		// ladder never escalated. Ladder rung 2 asked for the same doc comment
+		// six times on the lowest rung with three better ones available.
+		//
+		// The reason is short, stable, and is what a person would call the
+		// failure: "it did not compile", "the work was not finished". Two
+		// attempts that came back for the same reason are a repeat even when
+		// the surrounding list has moved on.
+		decision := progress.record(gate, because)
 		// A gate a project has pinned to a particular rung selects it for the
 		// attempt it is sending back, whatever the ladder has reached. It only
 		// ever moves upward, so a pin cannot undo an escalation a run earned.
@@ -630,9 +650,16 @@ func (execution *AgentExecution) Run(
 		// adversarial review already learned: a run shown a third of the
 		// picture fixes a third of it, and the part it is not shown is the part
 		// it is free to break.
-		if outstanding := execution.outstandingWork(
-			ctx, scope, caseRounds,
-		); outstanding.any() && !progress.lastAttempt() {
+		outstanding := execution.outstandingWork(ctx, scope, caseRounds)
+		if outstanding.any() && progress.lastAttempt() {
+			// Out of attempts with work still owed. Saying so is the whole
+			// point: the run used to fall through here and report
+			// implementation-complete while its own ledger recorded the gate
+			// it had just named as failed, which is the run and the record
+			// disagreeing about the same fact.
+			unfinished = outstanding.summary
+		}
+		if outstanding.any() && !progress.lastAttempt() {
 			if outstanding.askedForCases {
 				caseRounds++
 			}
@@ -859,10 +886,14 @@ func (execution *AgentExecution) Run(
 	// flow and conclude stages were missing when they were merely late.
 	ledger.close(ctx)
 	execution.publishValidation(ctx, scope, outcome)
+	finishedNote := completionCaveat(verified)
+	if unfinished != "" {
+		finishedNote = "It ran out of attempts with work still owed: " +
+			unfinished + ". " + finishedNote
+	}
 	execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 		"Finished: %s after %d round(s) and %d tool call(s). %s",
-		outcome.Kind, outcome.Rounds, outcome.ToolCalls,
-		completionCaveat(verified)))
+		outcome.Kind, outcome.Rounds, outcome.ToolCalls, finishedNote))
 	// AUDIT-020: the completion call site. Everything above this line already
 	// existed; what did not was anything that moved a finished run out of
 	// "running". This records the evidence PrepareCompletion requires from the
@@ -1535,7 +1566,7 @@ func acceptanceDetail(count int) string {
 // run outright — which fails it for something a single command would settle —
 // the command is run here and the real answer recorded.
 func revalidateAfterWrite(ctx context.Context, worktree string) (bool, string) {
-	command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+	command := exec.CommandContext(ctx, "go", "test", suiteTimeout, "-count=1", "./...")
 	command.Dir = worktree
 	output, err := command.CombinedOutput()
 	if err == nil {

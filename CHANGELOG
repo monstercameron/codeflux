@@ -50,6 +50,47 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-101
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- generated code can no longer hang the pipeline forever
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: SuiteBudgetSeconds was declared, defaulted to sixty, and listed in the
+  settings a person can read, and no code read it. Every run of the produced
+  suite went out unbounded, so a generated program that loops forever hung
+  whichever stage reached it, indefinitely and without a word.
+  Ladder rung 10 asks for a shortest path through a grid. The first program it
+  produced looped forever on the example the requirement itself supplies: go
+  test in that worktree ran for five minutes without returning, and the stage
+  that reached it did not fail, did not time out, and did not report. It
+  stopped, and so did the run.
+  All seven places the flow runs the produced suite now carry go test's own
+  -timeout. That flag rather than a context deadline alone, because it kills
+  the test binary and prints the goroutine dump saying where it hung, which is
+  what a person or the next attempt needs; a deadline kills the process and
+  leaves nothing to read.
+  A run that ends with work still owed now says so instead of reporting
+  implementation-complete, and the stall that decides escalation is keyed on
+  why the work came back rather than on the prose telling the model about it.
+  The old key was the whole combined instruction, whose first four hundred
+  characters change whenever the set of outstanding gates changes -- so a
+  failure repeating every other attempt never looked repeated, and rung 2 asked
+  for the same doc comment six times on the lowest rung with three better ones
+  available
+Affected-behavior: A looping program fails its stage instead of stopping the
+  run. A stalling run escalates. A run out of attempts reports what it owes
+Compatibility-or-migration: An unset or negative budget falls back to the
+  default rather than removing the bound, because zero must not mean "no
+  timeout"
+Verification: The recheck completes against rung 10's looping worktree, where
+  it previously hung. Three tests on the budget including the fallback control
+Known-limitations: The bound comes from default settings rather than the run's
+  own. The checks that run the suite are free functions that were never given
+  the settings, and threading them through all seven is wider than closing the
+  hang. A run configuring a different budget still gets the default; the point
+  of the value is that a bound exists at all
+Dev-Log: DL-20260803-111
+
 Change-ID: CL-20260803-100
 Commit: pending
 Date: 2026-08-03

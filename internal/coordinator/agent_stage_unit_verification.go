@@ -168,7 +168,7 @@ func runNamedTests(
 	// TestParseRejectsGarbage and report its failure against the wrong unit.
 	pattern := "^(" + strings.Join(tests, "|") + ")$"
 	command := exec.CommandContext(ctx,
-		"go", "test", "-count=1", "-run", pattern, "./...")
+		"go", "test", suiteTimeout, "-count=1", "-run", pattern, "./...")
 	command.Dir = worktree
 	output, err := command.CombinedOutput()
 	if err == nil {
@@ -271,7 +271,7 @@ func checkFunctionCoverage(
 ) stageOutcome {
 	profile := filepath.Join(worktree, ".codeflux-coverage.out")
 	command := exec.CommandContext(ctx,
-		"go", "test", "-count=1", "-coverprofile="+profile, "./...")
+		"go", "test", suiteTimeout, "-count=1", "-coverprofile="+profile, "./...")
 	command.Dir = worktree
 	if output, err := command.CombinedOutput(); err != nil {
 		return broke("coverage could not be measured because the suite did "+

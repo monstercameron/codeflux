@@ -404,7 +404,7 @@ func (execution *AgentExecution) suiteRejects(
 ) bool {
 	result, err := execution.runMediatedVerificationCommand(
 		ctx, worktree, worktree, "mutation-suite",
-		[]string{"go", "test", "-count=1", "./..."}, "",
+		[]string{"go", "test", suiteTimeout, "-count=1", "./..."}, "",
 		mutationSuiteTimeout, goToolchainEnvironmentNames)
 	return err != nil || !result.Succeeded
 }

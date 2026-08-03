@@ -585,7 +585,19 @@ func (loop *ExecutionLoop) Run(
 					return LoopOutcome{}, err
 				}
 			}
-			if succeeded {
+			// A step already implemented is not completed a second time.
+			//
+			// A write bound to a closed step is the model rewriting a file the
+			// plan named, which stepOwningPath deliberately allows rather than
+			// discarding the attempt over. Completing the step again asks for
+			// an implemented-to-implemented transition, which the state machine
+			// rightly refuses — and refusing it ended the whole run, trading
+			// one wasted attempt for a dead one.
+			//
+			// The write itself has already happened and is not undone. What is
+			// skipped is only the bookkeeping that says the step is done, which
+			// it already was.
+			if succeeded && plan.Steps[stepIndex].State != StepImplemented {
 				if err := loop.transitionStep(
 					context.WithoutCancel(ctx),
 					input,

@@ -127,7 +127,7 @@ func checkPlatformMatrix(
 	for _, target := range targets {
 		if isHostPlatform(target) {
 			// The host can do better than compile: it can run the suite.
-			command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+			command := exec.CommandContext(ctx, "go", "test", suiteTimeout, "-count=1", "./...")
 			command.Dir = worktree
 			output, err := command.CombinedOutput()
 			if err != nil {
@@ -208,7 +208,7 @@ func checkRepetition(ctx context.Context, worktree string) stageOutcome {
 	const runs = 3
 	outcomes := make([]bool, 0, runs)
 	for attempt := range runs {
-		command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+		command := exec.CommandContext(ctx, "go", "test", suiteTimeout, "-count=1", "./...")
 		command.Dir = worktree
 		// Each repetition is forced to actually run rather than be served from
 		// the build cache, which would make every repeat after the first a
@@ -384,7 +384,7 @@ func checkNonFunctional(
 	scope nonFunctionalScope,
 ) stageOutcome {
 	started := time.Now()
-	command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+	command := exec.CommandContext(ctx, "go", "test", suiteTimeout, "-count=1", "./...")
 	command.Dir = worktree
 	_, err := command.CombinedOutput()
 	elapsed := time.Since(started)
