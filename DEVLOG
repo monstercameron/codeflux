@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-095
+Date: 2026-08-02
+Status: Logic complete and tested; deliberately not marked closed
+Change-ID: CL-20260802-085
+Commit: pending
+Request-or-TODO: MEM-012, MEM-013, MEM-013a, MEM-016
+Goal: Decide what may become memory, and from what
+Assumptions: That some of this already existed -- checked, and it did not.
+  internal/domain's maturity machine already excludes agent self-report from
+  promoting an artifact to an authority-bearing state, but nothing gated
+  candidacy itself: NewMemoryArtifactRevision mints a candidate from any content
+  regardless of source
+Decisions: Kept the layer pure and storage-independent so the tier decision can
+  be tested without a database and so the eventual call site chooses where it
+  belongs.
+  Refused the inadmissible sources before any tier logic runs rather than as a
+  per-tier condition, because the ticket's point is that they must not enter
+  through an extractor at all, not that they should be admitted at a weaker tier.
+  Built no approval-granting path for repository text. This is the second time
+  this session that the safe answer was to leave a gate uncalled rather than
+  invent the approval it is gated on.
+  Left the three tickets open. The logic is right and the tests discriminate,
+  but nothing calls it, and this session has already found three subsystems that
+  were fully implemented and never invoked. Marking them closed would add a
+  fourth and make it harder to find
+Files-or-schemas: two new files, memory_candidacy_funnel.go and its test
+Validation: The real anti-patterns check over a real swallowed-error fixture,
+  then the funnel's refusal; plus a bypass-and-restore pass over all three
+  refusal points
+Failures-or-discarded-approaches: None
+Known-limitations: No caller. Three of five tiers have no domain payload
+Next-safe-step: MEM-015's mechanical-rule content type, which is the first tier
+  that both needs a payload and has governance already described
+
 Dev-Log: DL-20260802-094
 Date: 2026-08-02
 Status: Five closed, one blocked, two unstarted, one gap named

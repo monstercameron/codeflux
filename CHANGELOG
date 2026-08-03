@@ -50,6 +50,44 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-085
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- the memory candidacy funnel, built but not yet in the path
+Request-or-TODO: MEM-012, MEM-013, MEM-013a, MEM-016
+Outcome: Section 31 names five candidacy tiers and three inadmissible sources,
+  and nothing anywhere decided either. A pure decision layer now selects the
+  strongest tier that can express an observation, refuses a weaker one without a
+  recorded reason the stronger could not carry it, refuses agent self-report,
+  unattributed produced work and unapproved repository text outright before any
+  tier logic runs, and refuses a first-attempt success only for the tiers that
+  require something to have been contested.
+  That last distinction is the point rather than a detail: refusing an
+  uncontested run outright would forbid the deterministic tier on the runs that
+  go well, which are most of them, and so would forbid the extraction wired up
+  in CL-20260802-079.
+  The three tickets stay open, because nothing calls any of it. A gate with no
+  caller does not gate anything, which is the standard applied to PIPE-132 and
+  PIPE-133 in the same session
+Affected-behavior: None yet. Two new files, no call sites
+Compatibility-or-migration: None; no schema change and no domain type added
+Verification: The discrimination is the MEM-016 case: the repository's real
+  findAntiPatterns runs over a fixture with a genuine swallowed error, the real
+  mechanical check is confirmed to fire on it, and only then is the funnel shown
+  refusing an advisory-pattern request for that same observation. Separately,
+  all three refusal points were temporarily bypassed to simulate the absence of
+  the funnel; five tests fail, including that one, and pass again once restored
+Known-limitations: It cannot be wired yet, for a reason established by reading.
+  domain.MemoryArtifactKind covers only two of the five tiers -- workspace fact
+  and regression case. Mechanical rule, routing evidence and advisory pattern
+  have no domain payload at all, so the funnel returns an abstract tier because
+  there is nothing concrete to mint for three of five. That is MEM-015 and
+  MEM-017 onward. Filed as MEM-012a.
+  No approval-granting path for repository text was built, following MEM-009's
+  precedent: inventing one would open a prompt-injection route into every later
+  run
+Dev-Log: DL-20260802-095
+
 Change-ID: CL-20260802-084
 Commit: pending
 Date: 2026-08-02
