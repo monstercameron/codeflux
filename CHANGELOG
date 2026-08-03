@@ -42,6 +42,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-060
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- CI enforces the coverage ratchet
+Request-or-TODO: REPO-027a
+Outcome: ci.yml's coverage step reads coverageFloorPercent out of
+  cmd/codeflux-dev/coverage_floor.go at run time and passes it to
+  --min-coverage. Previously it invoked test-coverage bare, which writes a
+  profile and asserts nothing, so the ratchet was enforced only by the pre-push
+  hook and only for people who had set core.hooksPath
+Affected-behavior: A CI run below the floor now fails. A value must be passed:
+  resolveCoverageThreshold reads only the flag or CODEFLUX_MIN_COVERAGE and
+  leaves the floor disabled when neither is set
+Compatibility-or-migration: None
+Verification: The extraction was exercised against the real file and resolves to
+  the constant's value; the workflow was parsed to confirm it is valid YAML
+Known-limitations: It is a regex over Go source, so a rewrite such as adding an
+  explicit type to the constant would stop matching. The step throws when the
+  constant cannot be found, so that fails CI loudly rather than silently passing
+  an empty floor and disabling the gate -- the acceptable version of the risk. A
+  codeflux-dev subcommand printing the floor would remove it entirely
+Dev-Log: DL-20260802-070
+
 Change-ID: CL-20260802-059
 Commit: pending
 Date: 2026-08-02

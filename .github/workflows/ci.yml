@@ -60,7 +60,24 @@ jobs:
         if: always()
         run: go run ./cmd/codeflux-dev artifact-check
       - name: Run unit tests with coverage
-        run: go run ./cmd/codeflux-dev test-coverage
+        # test-coverage has no built-in floor of its own -- called bare it
+        # only writes a profile and asserts nothing, which is REPO-027a: the
+        # ratchet built under REPO-027 was enforced solely by
+        # .githooks/pre-push, and only for whoever had run
+        # `git config core.hooksPath .githooks`. The floor value itself lives
+        # in cmd/codeflux-dev/coverage_floor.go's coverageFloorPercent
+        # constant (owned by another lane, not restated here) and is read
+        # from source rather than duplicated as a second literal in this
+        # file, which is exactly the drift TestPrePushDefaultFloorMatchesRatchetConstant
+        # already guards against for .githooks/pre-push's own copy.
+        run: |
+          $match = Select-String -Path cmd/codeflux-dev/coverage_floor.go -Pattern 'const coverageFloorPercent = ([0-9]+(?:\.[0-9]+)?)'
+          if (-not $match) {
+            throw "could not find coverageFloorPercent in cmd/codeflux-dev/coverage_floor.go"
+          }
+          $floor = $match.Matches[0].Groups[1].Value
+          Write-Host "Enforcing coverage floor $floor% (from coverage_floor.go)"
+          go run ./cmd/codeflux-dev test-coverage --min-coverage $floor
       - name: Check artifact boundary after tests
         if: always()
         run: go run ./cmd/codeflux-dev artifact-check

@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-070
+Date: 2026-08-02
+Status: CI gate enforcing
+Change-ID: CL-20260802-060
+Commit: pending
+Request-or-TODO: REPO-027a
+Goal: Make the coverage ratchet apply to everyone, not only to developers who
+  configured the hooks
+Assumptions: A floor enforced in one place out of two is a floor people can
+  route around without noticing they have
+Decisions: Read the constant from source rather than restating it in YAML. There
+  were already two copies of this number -- the Go constant and the shell
+  default -- kept in step by a test; a third copy in a workflow file with
+  nothing guarding it is how the value silently diverges.
+  Made a missing constant throw. The dangerous failure here is not a broken CI
+  step, it is a step that passes an empty floor and quietly disables the gate
+  while still printing that it ran
+Files-or-schemas: .github/workflows/ci.yml
+Validation: Extraction exercised against the real file; workflow parsed as YAML
+Failures-or-discarded-approaches: Hardcoding the value in YAML, rejected above
+Known-limitations: A regex over Go source is brittle to the constant's
+  formatting. It breaks loudly rather than silently, which is the trade taken; a
+  codeflux-dev subcommand printing the floor would end it
+Next-safe-step: None for this ticket
+
 Dev-Log: DL-20260802-069
 Date: 2026-08-02
 Status: Upgraded and verified
