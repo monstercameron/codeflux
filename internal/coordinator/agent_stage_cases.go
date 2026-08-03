@@ -622,7 +622,20 @@ func cardinalityOf(elements []string) string {
 	}
 }
 
-// elementsRepeat reports whether every element is the same text.
+// elementsRepeat reports whether any element appears more than once.
+//
+// Any, not all. The synthesised shape is written as three identical elements,
+// but what it is asking about is stated in its own rationale: "the same element
+// repeated, so ties must be broken somehow". A tie takes two equal values, and
+// []string{"4", "4", "-2"} breaks one exactly as []string{"4", "4", "4"} does.
+// Requiring every element to match asked for the literal rather than the
+// property, and refused a test written under the heading "repeated elements"
+// for holding a third value that was not a duplicate.
+//
+// This blocked twelve later stages on a rung whose tests were correct. The
+// check downstream of this is shallow on purpose — it looks for the shape of a
+// case, not proof the path ran — and a shallow check that reads a literal
+// letter by letter is not shallow, it is brittle.
 //
 // False for fewer than two elements: a single value cannot repeat, and
 // reporting that it does would make the one-element case indistinguishable
@@ -631,12 +644,14 @@ func elementsRepeat(elements []string) bool {
 	if len(elements) < 2 {
 		return false
 	}
-	for _, element := range elements[1:] {
-		if element != elements[0] {
-			return false
+	seen := make(map[string]bool, len(elements))
+	for _, element := range elements {
+		if seen[element] {
+			return true
 		}
+		seen[element] = true
 	}
-	return true
+	return false
 }
 
 // describesRatherThanQuotes reports whether a shape is prose rather than code.

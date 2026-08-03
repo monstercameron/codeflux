@@ -50,8 +50,83 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-103
+Change-ID: CL-20260803-107
 Commit: pending
+Date: 2026-08-03
+Type: Fix -- a synthesised case matched its literal instead of its property
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: The repeated-element case is written as three identical elements, and
+  the matcher required every element to be equal. Its own rationale says what
+  it is asking about -- "the same element repeated, so ties must be broken
+  somehow" -- and a tie takes two equal values, not three. Ladder rung 2 wrote
+  []string{"4", "4", "-2"} under the heading "repeated elements" and
+  []string{"8", "-3", "8"}, and both were refused for holding a third value
+  that was not a duplicate.
+  Two untried cases out of twenty-eight failed stage 7, which blocked stages 8,
+  10, 11, 14, 17, 19, 20, 23, 24, 25 and 32 behind it. Re-deciding that same
+  worktree with the matcher fixed satisfies all of them; the tests were correct
+  the whole time. The downstream check is shallow on purpose -- it looks for
+  the shape of a case, not proof the path ran -- and a shallow check that reads
+  a literal letter by letter is not shallow, it is brittle.
+Verification: Build, the coordinator case tests, and a re-decision of rung 2's
+  recorded worktree: 15 worktree-only stages, 1 failing where 13 had been
+  blocked
+Dev-Log: DL-20260803-117
+
+Change-ID: CL-20260803-106
+Commit: bdb6ad3
+Date: 2026-08-03
+Type: Fix -- the shared ladder could never run a second rung
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: Every rung appended its request under the constant idempotency key
+  "engine-request", so the second rung of a shared ladder collided with the
+  first and was refused before it began: "idempotency key belongs to different
+  message content". Shared mode is the only mode in which atoms and lessons
+  accumulate across tasks, so the compounding-effort thesis could not be
+  exercised at all. The recall stage's report that the project held no earlier
+  work was true, and true for a reason nobody had looked at.
+  Hashing the body restores what idempotency means here: the same request twice
+  is one message, two different requests are two.
+Verification: Rungs 1 and 2 in one shared root; the second is admitted and
+  reaches the stage flow
+Dev-Log: DL-20260803-116
+
+Change-ID: CL-20260803-105
+Commit: 1746eca
+Date: 2026-08-03
+Type: Feature -- ask for the documentation that makes an atom findable
+Request-or-TODO: The compounding-effort thesis
+Outcome: Registration skips a declaration carrying no //codeflux:atom schema
+  comment, and nothing asked for one, so atom_names held zero rows and every
+  recall stage searched an empty project. Only leaf functions are asked, and
+  main is not asked at all: a composing function is not registered and main is
+  not an atom, so nineteen fields of documentation would be spent on something
+  registration refuses anyway.
+Verification: Build and the coordinator suite
+Dev-Log: DL-20260803-115
+
+Change-ID: CL-20260803-104
+Commit: 7bf9d1a
+Date: 2026-08-03
+Type: Feature -- rank a project's lessons against what this run was asked to do
+Request-or-TODO: Direct instruction, 2026-08-03: check memories before starting
+  the work, in a fuzzy way
+Outcome: Newest-first alone puts whatever failed most recently in front of a
+  run it may have nothing to do with, and a list a run learns to skip costs
+  context on every attempt. Lessons are now ordered by meaningful-word overlap
+  with the requirement, recency breaking ties. Lessons sharing no words are
+  kept at the back rather than dropped: several are general enough to apply to
+  anything, and those are exactly the ones scoring zero would lose.
+  The instruction asked for semantic ranking. That is deliberately not done
+  here: docs/plan.md 0 holds the vector branch closed until a measured recall
+  failure justifies it, and TestAUDIT026 fails the build if production code
+  reaches a vector writer before then. Word overlap is what is available under
+  that gate.
+Verification: Build and four ranking tests
+Dev-Log: DL-20260803-114
+
+Change-ID: CL-20260803-103
+Commit: 5c3043b
 Date: 2026-08-03
 Type: Feature -- a run learns from the last one's failures
 Request-or-TODO: Direct instruction, 2026-08-03: the memory system is meant to
@@ -90,7 +165,7 @@ Known-limitations: Overlap collapses only where it is exact. The lesson is
 Dev-Log: DL-20260803-113
 
 Change-ID: CL-20260803-102
-Commit: pending
+Commit: e1bacdb
 Date: 2026-08-03
 Type: Fix -- the ledger decides readiness, and instructions stop asserting what
   nobody checked
@@ -128,7 +203,7 @@ Known-limitations: The review's wider proposal -- one typed attempt verdict
 Dev-Log: DL-20260803-112
 
 Change-ID: CL-20260803-101
-Commit: pending
+Commit: 73d9c5b
 Date: 2026-08-03
 Type: Fix -- generated code can no longer hang the pipeline forever
 Request-or-TODO: The ladder-ascent instruction, 2026-08-03

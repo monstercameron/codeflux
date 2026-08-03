@@ -25,11 +25,100 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-117
+Date: 2026-08-03
+Status: Rung 2's recorded worktree now passes every stage but one
+Change-ID: CL-20260803-107
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Stop a correct test being refused by a case matcher
+Decisions: Loosened elementsRepeat from "every element is equal" to "some
+  element appears twice". The property the case asks about is duplication, and
+  the all-equal literal is one instance of it, not its definition.
+  Did not weaken the case itself. Duplicates are a real input class, and the
+  temptation on seeing one gate block twelve stages is to delete the gate; what
+  was wrong was the reading, not the demand.
+  Did not exempt main from the doc-comment stage. That stage is the only thing
+  in the flow that asks for a doc comment at all, so exempting main would mean
+  nothing ever asks
+Files-or-schemas: internal/coordinator/agent_stage_cases.go
+Validation: Build, the coordinator case tests, and a re-decision of the
+  recorded rung 2 worktree: stages 7, 8, 10, 11, 14, 19, 20, 23, 24 and 32 move
+  from blocked to satisfied
+Failures-or-discarded-approaches: Making the repeated case conditional on the
+  function being able to observe duplication -- a fold cannot -- was the first
+  idea. It needs the body, and casesForType derives cases from the signature on
+  purpose: a case derived from the signature checks what the signature
+  promised, which is the point of deriving it separately from the code
+Known-limitations: main still carries no doc comment on rung 2, and stage 17
+  was blocked behind stage 7 every time, so the run was never once told
+Next-safe-step: Re-run rungs 1 and 2 in one shared root with the matcher fixed
+
+Dev-Log: DL-20260803-116
+Date: 2026-08-03
+Status: Shared mode admits more than one rung for the first time
+Change-ID: CL-20260803-106
+Commit: bdb6ad3
+Request-or-TODO: The ladder-ascent instruction
+Goal: Let a shared ladder accumulate work across rungs
+Decisions: Keyed the request message on a digest of its own body. A constant
+  key made every rung after the first a content conflict with the first
+Files-or-schemas: internal/coordinator/engine_end_to_end_test.go
+Validation: Rungs 1 and 2 in one shared root; memory_artifacts held four rows,
+  the first non-empty memory table of the session
+Failures-or-discarded-approaches: None
+Known-limitations: None known
+Next-safe-step: Run the pair to completion
+
+Dev-Log: DL-20260803-115
+Date: 2026-08-03
+Status: Atoms are asked for the documentation registration requires
+Change-ID: CL-20260803-105
+Commit: 1746eca
+Request-or-TODO: The compounding-effort thesis
+Goal: Make a produced atom findable by a later task
+Decisions: Asked only leaf functions, and asked last. It is the most expensive
+  instruction in the set, and a run still failing to compile has more urgent
+  problems than being findable.
+  Gave the field list in full and in order, because the schema requires both
+  and a run told "write the atom documentation" writes something close and is
+  refused for a reason it cannot see
+Files-or-schemas: new internal/coordinator/atom_documentation_ask.go,
+  agent_outstanding.go
+Validation: Build and the coordinator suite
+Failures-or-discarded-approaches: None
+Known-limitations: Nothing yet confirms a later run retrieves what this
+  registers
+Next-safe-step: Watch a second rung's recall stage in a shared project
+
+Dev-Log: DL-20260803-114
+Date: 2026-08-03
+Status: Lessons are ranked before they are shown
+Change-ID: CL-20260803-104
+Commit: 7bf9d1a
+Request-or-TODO: Check memories before starting the work, in a fuzzy way
+Goal: Put the lessons most likely to matter in front of a run first
+Decisions: Ranked on meaningful-word overlap, recency breaking ties rather than
+  driving the order.
+  Kept zero-scoring lessons at the back instead of dropping them. Build before
+  you claim to be finished, and never discard an error, apply to anything and
+  score zero against everything
+Files-or-schemas: internal/coordinator/run_lessons.go
+Validation: Build and four ranking tests
+Failures-or-discarded-approaches: Semantic ranking, which was what was asked
+  for. docs/plan.md 0 holds the vector branch closed until a measured recall
+  failure justifies opening it, and TestAUDIT026 fails the build if production
+  code reaches a vector writer first. Raised rather than done silently
+Known-limitations: Word overlap misses a lesson phrased in different words from
+  the requirement, which is exactly what the vector branch would fix
+Next-safe-step: Record whether ranking changes what a run is shown, as the
+  measured evidence that gate wants
+
 Dev-Log: DL-20260803-113
 Date: 2026-08-03
 Status: The loop is closed end to end for the observation tier
 Change-ID: CL-20260803-103
-Commit: pending
+Commit: 5c3043b
 Request-or-TODO: The memory-loop instruction
 Goal: Stop every run repeating the last one's mistake
 Decisions: Keyed the lesson on the gate rather than on the failure text. The
@@ -59,7 +148,7 @@ Dev-Log: DL-20260803-112
 Date: 2026-08-03
 Status: Two phases of the review landed; the verdict type is not yet built
 Change-ID: CL-20260803-102
-Commit: pending
+Commit: e1bacdb
 Request-or-TODO: Architectural review of the rung 5 and rung 10 traces
 Goal: Stop several places each deriving readiness and getting different answers
 Decisions: Passed the ledger's own clean answer into completion rather than
@@ -84,7 +173,7 @@ Dev-Log: DL-20260803-111
 Date: 2026-08-03
 Status: Rung 10 reached; its own program does not terminate
 Change-ID: CL-20260803-101
-Commit: pending
+Commit: 73d9c5b
 Request-or-TODO: The ladder-ascent instruction
 Goal: Climb, and fix what the climb exposes
 Decisions: Used go test's own -timeout rather than only a context deadline. A
