@@ -93,23 +93,12 @@ func (narrator *narratingExecutor) ExecuteTool(
 		events.KindToolStarted, executionID, name,
 		string(domain.CommandExecutionStateRunning), detail)
 
-	// A test run against files that have not moved since the last one is
-	// refused rather than performed. The model is told what changed — nothing —
-	// which is the fact that makes the next step obvious, and is a fact it
-	// cannot see for itself.
+	// Whether the produced work has moved since the last test run, read before
+	// the tool runs so the answer is about the tree the tool is about to see.
+	unchanged := false
 	if executor.ToolName(name) == executor.ToolTest && narrator.worktree != "" {
-		if fingerprint := producedTreeDigest(narrator.worktree); fingerprint != "" &&
-			fingerprint == narrator.lastTestFingerprint {
-			tracef("tool", "%-12s %-10s %s", name, "unchanged",
-				"same command, same files as the last run")
-			narrator.execution.publishTool(narrator.ctx, narrator.scope,
-				events.KindToolCompleted, executionID, name,
-				string(domain.CommandExecutionStateSucceeded),
-				detail+" — not run: nothing has changed since the last run")
-			return executor.ToolResult{
-				State:          unchangedTestState(narrator.lastTestFailed),
-				StdoutRedacted: unchangedTestReport(narrator.lastTestOutput),
-			}, nil
+		if fingerprint := producedTreeDigest(narrator.worktree); fingerprint != "" {
+			unchanged = fingerprint == narrator.lastTestFingerprint
 		}
 	}
 
@@ -148,6 +137,16 @@ func (narrator *narratingExecutor) ExecuteTool(
 	completed := domain.CommandExecutionState(result.State)
 	if !completed.IsValid() {
 		completed = domain.CommandExecutionStateOutcomeUnknown
+	}
+	// A second identical run of the same suite against byte-identical files
+	// answers a question already answered, and the model cannot see that for
+	// itself. Ladder rung 3 ran the same failing test three times in a row with
+	// no edit between them.
+	if unchanged {
+		tracef("tool", "%-12s %-10s %s", name, "unchanged",
+			"same command, same files as the last run")
+		result.StdoutRedacted = strings.TrimSpace(result.StdoutRedacted) +
+			unchangedTestNote()
 	}
 	if completed != domain.CommandExecutionStateSucceeded {
 		narrator.lastFailure = strings.TrimSpace(
@@ -824,28 +823,21 @@ func succeedingLineOf(text string) string {
 	return strings.TrimSpace(firstLineOf(text))
 }
 
-// unchangedTestState keeps a refused re-run honest.
+// unchangedTestNote tells a run that its last edit changed nothing.
 //
-// A suite that failed and was not re-run has still failed, and reporting the
-// refusal as a success would tell the run its tests pass — which is the exact
-// false green the whole reconciliation layer exists to prevent. A suite that
-// passed and was not re-run has still passed.
-// unchangedTestReport is what a run is told instead of a second identical run.
+// It is a fact the model cannot observe: it wrote a file, or believes it did,
+// and the suite it just ran saw exactly the bytes the previous run saw. Without
+// this the only signal is an identical failure, which reads as bad luck rather
+// than as a write that did not land.
 //
-// It gives the earlier output rather than a summary of it, because the model
-// needs the failure to act on and would otherwise run the suite again to get
-// it — which is the loop this exists to break. The last line is the only
-// instruction: nothing here is worth reading twice except what to do next.
-func unchangedTestReport(earlier string) string {
-	return "This was not run. Not one byte of the produced files has changed " +
-		"since the last time these tests ran, so the result is the same " +
-		"result:\n\n" + earlier +
-		"\n\nEdit a file before running them again."
-}
-
-func unchangedTestState(failedLastTime bool) string {
-	if failedLastTime {
-		return "failed"
-	}
-	return "succeeded"
+// Said in the output rather than by refusing to run the tool. An earlier
+// version short-circuited the call entirely, which skipped the executor that
+// records the tool in the run's journal; the loop then refused the turn and
+// ended the run, and ladder rung 3 lost all thirty-seven of its remaining
+// stages to a saving of one test run.
+func unchangedTestNote() string {
+	return "\n\n[codeflux] Not one byte of the produced files changed since " +
+		"the last time these tests ran, so this result is that result. If you " +
+		"meant to change something, the write did not land — check the path " +
+		"and the content, and do not run the tests again until a file differs."
 }

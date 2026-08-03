@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-129
+Date: 2026-08-03
+Status: Rungs 1 and 2 pass in a shared root; rung 3 aborted on a defect of mine
+Change-ID: CL-20260803-119
+Commit: pending
+Request-or-TODO: The shared rungs 1-3 run
+Goal: Keep the unchanged-run observation and drop the mechanism that broke runs
+Decisions: Annotated the output instead of refusing the call. Refusing meant
+  bypassing the executor, and the executor is not an optimisation -- it is what
+  makes the tool exist as far as the loop is concerned.
+  Kept the note even when the run passed. "Nothing changed" is as useful before
+  a green result as before a red one, because it says the last write did not
+  land
+Files-or-schemas: agent_narration.go
+Validation: Build, vet, gofmt, coordinator finalization tests
+Failures-or-discarded-approaches: The short-circuit itself, which is now
+  recorded in the function's own comment so it is not reinvented
+Known-limitations: Rung 3's own defect is still unfixed by the model within its
+  budget: it wrote osArgs, standardOutput and standardError helpers that use os
+  and left out the import
+Next-safe-step: Rerun rungs 1-3 shared and see whether rung 3 recovers on its
+  second attempt now that the run survives the first
+
 Dev-Log: DL-20260803-128
 Date: 2026-08-03
 Status: The terminal-state invariant is enforced at the one place that returns

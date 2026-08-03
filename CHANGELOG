@@ -50,6 +50,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-119
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a saving of one test run cost a whole rung
+Request-or-TODO: Observed in the shared rungs 1-3 run, 2026-08-03
+Outcome: CL-20260803-114 refused a test run against files that had not moved
+  since the last one, by returning a result without calling the executor. The
+  executor is what records a tool in the run's journal, so the loop saw a turn
+  whose tool never happened, refused it, and ended the run. Ladder rung 3 lost
+  all thirty-seven of its remaining stages -- every one recorded
+  "not-implemented" -- to a saving of one test run.
+  The observation was right and the mechanism was wrong. The tool runs, and the
+  output carries the note: not one byte of the produced files changed since the
+  last time these tests ran, so this result is that result, and if you meant to
+  change something the write did not land. That is a fact the model cannot see
+  for itself, and it is the one that makes the next step obvious.
+  Also recorded for the ladder: rungs 1 and 2 passed in the same shared root,
+  and the memory preflight found 0, then 1, then 2 candidates across the three
+  rungs -- the first time work has accumulated across tasks in this project.
+Verification: Build, vet, gofmt, the coordinator finalization tests
+Dev-Log: DL-20260803-129
+
 Change-ID: CL-20260803-118
 Commit: pending
 Date: 2026-08-03
