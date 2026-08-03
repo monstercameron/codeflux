@@ -384,6 +384,13 @@ type TaskControlDependencies struct {
 	Facts       TaskControlFacts
 	Resume      ResumeVerifier
 	NewEventID  func() (domain.EventID, error)
+	// NotifyDispatch asks the dispatch pump to look for startable work once a
+	// pause is durably lifted (AUDIT-018a). It is optional: a service without
+	// one behaves exactly as before, relying on the pump's fallback tick.
+	// Every call this service makes to it must stay non-blocking, matching
+	// the pump's buffer-of-one signal channel, so a resume is never delayed
+	// by it.
+	NotifyDispatch func()
 }
 
 // TaskControlService owns pause, cancel, resume, and the agent control reader.
@@ -402,6 +409,9 @@ func NewTaskControlService(
 	}
 	if dependencies.NewEventID == nil {
 		dependencies.NewEventID = domain.NewEventID
+	}
+	if dependencies.NotifyDispatch == nil {
+		dependencies.NotifyDispatch = func() {}
 	}
 	return &TaskControlService{dependencies: dependencies}, nil
 }
@@ -563,6 +573,13 @@ func (service *TaskControlService) ResumeTask(
 	if err != nil {
 		return ResumeTaskResult{}, err
 	}
+	// The pause is lifted the instant this commits, so the pump is signalled
+	// here rather than after the worker/action reacquisition below: waiting
+	// would mean a slow or failed reacquisition delays a signal that is
+	// already true, and reacquisition failure below still leaves the pump
+	// worth asking to look, exactly as a completed task signals it even when
+	// releasing its slot partially failed (AUDIT-018a).
+	service.dependencies.NotifyDispatch()
 	if err := service.dependencies.Workers.ResumeRun(
 		input.RunID, "compatibility-checked task resume",
 	); err != nil {

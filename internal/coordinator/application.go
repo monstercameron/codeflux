@@ -386,6 +386,10 @@ func StartApplication(
 		if err != nil {
 			return nil, err
 		}
+		// A restored run becomes eligible the moment it is registered, and
+		// registration is not a start. Without this the pump learns about it on
+		// the fallback tick (AUDIT-018a).
+		application.runtime.SetDispatchNotifier(application.notifyDispatch)
 		// Releasing the slot and asking for the next task are two steps, and
 		// only the first was wired. A run finishing freed capacity and nothing
 		// looked at the queue, so a task queued beyond the limit waited until
@@ -417,6 +421,7 @@ func StartApplication(
 				repositories,
 				application.supervisor,
 				checkpointing,
+				application.notifyDispatch,
 			)
 			if err != nil {
 				return nil, err
@@ -439,6 +444,9 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	// Granting an approval unblocks the task it was blocking, which is a
+	// transition the pump cannot observe for itself (AUDIT-018a).
+	application.taskLifecycle.SetDispatchNotifier(application.notifyDispatch)
 	// The settings surface hands a changed run configuration to the engine that
 	// enforces it, so a run started after a change does what the change said
 	// rather than what the process was started with. It stays nil on a

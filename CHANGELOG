@@ -66,6 +66,31 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-039
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- dispatch scheduling
+Request-or-TODO: AUDIT-018a
+Outcome: Lifting a pause, granting an approval, and registering a restored run
+  each signal the dispatch pump, so work those transitions unblock starts on the
+  transition rather than waiting up to two seconds for the fallback tick. Each
+  signal is sent after its durable commit and is non-blocking, so no transition
+  is delayed. The application wires all three, which is the half AUDIT-018 left
+  undone
+Affected-behavior: A task unblocked by a resume or an approval starts promptly
+  instead of on the next tick
+Compatibility-or-migration: None. newApplicationTaskControls takes the notifier
+  as a parameter and accepts nil, meaning nothing is signalled
+Verification: The tests set the pump's fallback interval to one hour against a
+  500ms window, so a start inside that window cannot be attributed to the tick,
+  and each re-reads durable state from inside the signal callback to prove
+  ordering. 15/15 over -count=5. A separate test reads the three construction
+  sites, because with the wiring absent every behavioural test still passes --
+  which is exactly how AUDIT-018 shipped incomplete
+Known-limitations: The wiring test reads source rather than observing a signal,
+  and says so at the test
+Dev-Log: DL-20260802-049
+
 Change-ID: CL-20260802-038
 Commit: pending
 Date: 2026-08-02

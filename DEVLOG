@@ -51,6 +51,43 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-049
+Date: 2026-08-02
+Status: Three transitions signalling; application wiring in place
+Change-ID: CL-20260802-039
+Commit: pending
+Request-or-TODO: AUDIT-018a
+Goal: Start work on the transition that unblocks it rather than on the pump's
+  two-second fallback tick
+Assumptions: A pause lift and an approval grant are the two transitions the pump
+  cannot observe for itself, since neither frees a worker slot
+Decisions: Signalled after each durable commit, never before -- ResumeTask after
+  ResumeControlledTask returns, ApproveTaskPlan after advanceToReady returns,
+  RegisterRecoveryStart after registration with runtime.mu released first.
+  Signalling first lets a drain observe the state the transition was about to
+  change, which converts a constant two-second delay into an intermittent one,
+  and an intermittent bug is worse.
+  Threaded the notifier into newApplicationTaskControls as a parameter rather
+  than reaching for a package-level value, and accepted nil as "signal nothing",
+  which is right for a control surface built without a pump
+Files-or-schemas: dispatch_pump.go, runtime.go, task_control.go,
+  task_lifecycle_adapter.go, task_plan_approval.go, application.go,
+  application_checkpointing.go, dispatch_pump_test.go, dispatch_wiring_test.go
+Validation: The three behavioural tests set the fallback interval to one hour
+  against a ~500ms window, so a start inside it cannot have come from the tick;
+  each also re-reads durable state from inside the injected callback to prove
+  the signal follows the commit. 15/15 at -count=5
+Failures-or-discarded-approaches: The behavioural tests inject the callback
+  directly, so they pass whether or not the application wires anything -- which
+  is precisely how AUDIT-018 shipped with the completion observer wired and
+  these two transitions not: nothing failed. Added a test that reads the three
+  construction sites in application.go, and recorded at the test that reading a
+  construction site is weaker evidence than observing a signal
+Known-limitations: The wiring assertion is a source read. Constructing a real
+  Application would need a database, a supervisor and a scheduler, and would
+  test startup rather than this binding
+Next-safe-step: None; the ticket is closed
+
 Dev-Log: DL-20260802-048
 Date: 2026-08-02
 Status: Deletion policy removed; guard test proven to discriminate

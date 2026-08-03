@@ -28,6 +28,12 @@ type WorkerRuntime struct {
 	runOwners  map[domain.RunID]domain.TaskID
 	active     map[domain.TaskID]StartWorker
 	closed     bool
+	// notify asks the dispatch pump to look for startable work as soon as a
+	// restored queue row becomes eligible, rather than leaving it to the
+	// pump's fallback tick (AUDIT-018a). It is nil until SetDispatchNotifier
+	// installs it, and every call site treats a nil notify as "no pump to
+	// signal" rather than an error.
+	notify func()
 }
 
 func NewWorkerRuntime(
@@ -72,24 +78,54 @@ func (runtime *WorkerRuntime) Submit(
 }
 
 // RegisterRecoveryStart makes one restored queue row eligible after recovery
-// code has rebuilt and approved fresh process metadata. It never starts work.
+// code has rebuilt and approved fresh process metadata. It does not start
+// work itself, but it does ask the dispatch pump to look: a row restored
+// across a coordinator restart is exactly the case the pump's fallback tick
+// exists for, and without a signal here it would sit for up to that whole
+// interval even though it became startable the instant registration
+// succeeded (AUDIT-018a).
 func (runtime *WorkerRuntime) RegisterRecoveryStart(start StartWorker) error {
 	if err := validateRuntimeStart(start.TaskID, start); err != nil {
 		return err
 	}
 	runtime.mu.Lock()
-	defer runtime.mu.Unlock()
 	if runtime.closed {
+		runtime.mu.Unlock()
 		return errors.New("worker runtime is shutting down")
 	}
 	if position := runtime.scheduler.Position(start.TaskID); position.Position == 0 {
+		runtime.mu.Unlock()
 		return errors.New("recovery worker has no durable queued task")
 	}
 	if err := runtime.canRegister(start); err != nil {
+		runtime.mu.Unlock()
 		return err
 	}
 	runtime.register(start)
+	notify := runtime.notify
+	runtime.mu.Unlock()
+	// The signal is raised only after registration is durably visible to the
+	// scheduler (registration itself is in-memory but guarded by the same
+	// lock a drain takes), so a drain the pump runs because of this signal
+	// never observes the row as still ineligible. The notify reference is
+	// read and released before calling it, so a pump signal can never be
+	// sent while this runtime's own lock is held.
+	if notify != nil {
+		notify()
+	}
 	return nil
+}
+
+// SetDispatchNotifier installs the dispatch pump signal this runtime raises
+// after a restored queue row becomes eligible (AUDIT-018a). It is optional:
+// a runtime without one behaves exactly as before, relying on the pump's
+// fallback tick. The send notify performs must be non-blocking, matching
+// notifyDispatch's buffer-of-one channel, so recovery registration is never
+// delayed by it.
+func (runtime *WorkerRuntime) SetDispatchNotifier(notify func()) {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	runtime.notify = notify
 }
 
 // StartNext grants one durable worker/provider slot before starting a process.

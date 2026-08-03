@@ -59,6 +59,13 @@ func (adapter *TaskLifecycleAdapter) ApproveTaskPlan(
 	if err != nil {
 		return transport.ApprovedPlanView{}, err
 	}
+	// The approval is granted the instant advanceToReady's last transition
+	// commits, so the pump is signalled here rather than after binding the
+	// preflight below: binding can still fail, but the grant itself is
+	// already durable and worth a look regardless (AUDIT-018a).
+	if adapter.notifyDispatch != nil {
+		adapter.notifyDispatch()
+	}
 
 	preflight, err := adapter.preflight.BindExecution(
 		ctx, command.TaskID, revision,

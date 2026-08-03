@@ -21,10 +21,26 @@ const dispatchPumpFallbackInterval = 2 * time.Second
 // released correctly when a task completed and nothing ever asked for the next
 // task, so a queued task stayed queued until a test called StartNext by hand.
 // Queue position was computed and shown, and the queue did not move.
-func (application *Application) startDispatchPump(ctx context.Context) {
+//
+// The variadic fallbackInterval overrides the default fallback tick when
+// supplied, and exists for AUDIT-018a's own tests: they must prove a start
+// came from a signal rather than the fallback tick, and a test that merely
+// finishes inside the 2s window is a probabilistic argument, not a
+// structural one. A test that passes a fallback interval far longer than its
+// own deadline makes the tick unable to fire before the test observes its
+// assertion, which rules the tick out rather than making it merely
+// unlikely. Production never supplies an override, so its behavior is
+// unchanged.
+func (application *Application) startDispatchPump(
+	ctx context.Context, fallbackInterval ...time.Duration,
+) {
 	defer close(application.dispatchDone)
 
-	ticker := time.NewTicker(dispatchPumpFallbackInterval)
+	interval := dispatchPumpFallbackInterval
+	if len(fallbackInterval) > 0 && fallbackInterval[0] > 0 {
+		interval = fallbackInterval[0]
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

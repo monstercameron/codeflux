@@ -35,6 +35,12 @@ type TaskLifecycleAdapter struct {
 	// provider key is configured, and then a task still starts and still gets a
 	// worktree — it simply has nobody to act in it, which is the honest state.
 	agent TaskAgent
+	// notifyDispatch asks the dispatch pump to look for startable work once a
+	// plan approval is durably granted (AUDIT-018a). It is nil until
+	// SetDispatchNotifier installs it, and every call this adapter makes to
+	// it must stay non-blocking, matching the pump's buffer-of-one signal
+	// channel, so an approval is never delayed by it.
+	notifyDispatch func()
 }
 
 // TaskAgent performs the work one started task asks for.
@@ -53,6 +59,14 @@ func (adapter *TaskLifecycleAdapter) SetEnvironmentObserver(
 	observer *TaskEnvironmentObserver,
 ) {
 	adapter.environment = observer
+}
+
+// SetDispatchNotifier installs the dispatch pump signal this adapter raises
+// after a plan approval is durably granted (AUDIT-018a). It is optional: an
+// adapter without one behaves exactly as before, relying on the pump's
+// fallback tick.
+func (adapter *TaskLifecycleAdapter) SetDispatchNotifier(notify func()) {
+	adapter.notifyDispatch = notify
 }
 
 // RunLauncher starts the subprocess that executes one prepared run.

@@ -110,10 +110,19 @@ func newApplicationCheckpointing(
 	}, nil
 }
 
+// newApplicationTaskControls builds the task control surface.
+//
+// notifyDispatch is called when lifting a pause makes work startable again.
+// Resuming and starting the next task are two steps, and the pump cannot
+// observe the first for itself, so without this a resumed task waits for the
+// fallback tick rather than for the transition (AUDIT-018a). A nil value is
+// accepted and means nothing is signalled, which is the right default for a
+// control surface built without a pump behind it.
 func newApplicationTaskControls(
 	repositories *storage.Repositories,
 	supervisor *Supervisor,
 	checkpointing applicationCheckpointing,
+	notifyDispatch func(),
 ) (*TaskControlService, error) {
 	if checkpointing.checkpoints == nil ||
 		checkpointing.worktrees == nil {
@@ -159,12 +168,13 @@ func newApplicationTaskControls(
 	}
 	return NewTaskControlService(
 		TaskControlDependencies{
-			Store:       repositories,
-			Actions:     NewActiveActionRegistry(),
-			Workers:     workers,
-			Checkpoints: checkpointing.checkpoints,
-			Facts:       facts,
-			Resume:      resume,
+			Store:          repositories,
+			Actions:        NewActiveActionRegistry(),
+			Workers:        workers,
+			Checkpoints:    checkpointing.checkpoints,
+			Facts:          facts,
+			Resume:         resume,
+			NotifyDispatch: notifyDispatch,
 		},
 	)
 }
