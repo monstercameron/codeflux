@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-148
+Date: 2026-08-03
+Status: Items 1 to 6 of the pipeline analysis are in
+Change-ID: CL-20260803-138
+Commit: pending
+Request-or-TODO: Pipeline analysis items 4, 5 and 6
+Goal: Bound a refinement round and make its progress observable
+Decisions: Classified findings by the finder that raised them rather than by
+  their prose. The prose is written for a person; the lineage is what the code
+  decided.
+  Grouped the selected pair by subject. Two fixes in one function verify
+  together; two in different files do not.
+  Left the unselected findings open rather than carrying them. They have not
+  been tried, and an advisory is a decision not to fix something
+Files-or-schemas: new internal/coordinator/refinement_round.go and its test,
+  agent_execution.go
+Validation: Build, vet, gofmt, four new tests
+Failures-or-discarded-approaches: The fingerprint-only dedup this replaces. It
+  stopped a criticism being sent twice and said nothing about whether the last
+  attempt had addressed it
+Known-limitations: The ledger lives for one run. Nothing carries a finding's
+  history into the next run over the same project, which is what would let a
+  second run skip what the first proved unfixable
+Next-safe-step: Rung 8
+
 Dev-Log: DL-20260803-147
 Date: 2026-08-03
 Status: The patch tool has what it needs to be usable

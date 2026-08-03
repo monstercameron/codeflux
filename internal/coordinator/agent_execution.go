@@ -420,12 +420,14 @@ func (execution *AgentExecution) Run(
 	propertyRounds := 0
 	// The circuit breaker's state: how many identical infrastructure failures
 	// have happened in a row, against what, and whether it has opened.
-	// attemptedFindings remembers which criticisms this run has already been
-	// sent back for, and carriedAdvisories the ones it will finish with rather
-	// than keep spending attempts on.
-	attemptedFindings := map[string]bool{}
+	// carriedAdvisories are the criticisms this run will finish with rather
+	// than keep spending attempts on. Which ones those are is decided by the
+	// finding ledger below, from what has already been tried.
 	var carriedAdvisories []adversarialFinding
 	reviewRounds := 0
+	// What has been asked for and what came of it, across attempts. Without it
+	// a run resends the same prose and hopes.
+	reviewLedger := newFindingLedger()
 	unrecognisedLoopErrors := 0
 	// The machinery's own allowance, separate from the work's and never
 	// refunded, and the ruling that ends the run when it is spent.
@@ -463,6 +465,9 @@ func (execution *AgentExecution) Run(
 	// Whether the review that is sending work back found only blind spots,
 	// which decides whether the next attempt is a tests-only round.
 	blindSpotsOnlyThisRound := false
+	// The findings this send-back is about, so the scope can be derived from
+	// them rather than from the gate's one word.
+	var roundFindings []adversarialFinding
 
 	// The acceptance examples every instruction carries, so a run correcting
 	// one thing cannot quietly break the one thing that defines done.
@@ -512,7 +517,15 @@ func (execution *AgentExecution) Run(
 		// What the next attempt may touch, decided from the gate rather than
 		// from the prose. The prose is what the model reads; the gate is what
 		// the coordinator decided, and the two can drift.
+		// What the next attempt may touch, derived from what it is being asked
+		// to fix. The gate is one word about a whole review: rung 6's review
+		// found a real defect in main and the next attempt was restricted to
+		// test files, because the rule keyed on the gate and the finding knew
+		// better.
 		narrator.permitted = scopeOfNextAttempt(gate, blindSpotsOnlyThisRound)
+		if len(roundFindings) > 0 {
+			narrator.permitted = scopeForFindings(roundFindings)
+		}
 		if narrator.permitted != editAnything {
 			tracef("sendback", "  next attempt may edit: %s",
 				narrator.permitted)
@@ -957,38 +970,31 @@ func (execution *AgentExecution) Run(
 			if reviewErr != nil {
 				findings = nil
 			}
-			// A criticism already made and already attempted is not made again.
-			// Fingerprinted with the identifiers removed, so renaming the
-			// function a finding is about cannot present the same objection as
-			// a new one — rung 3 was sent back three times for what a reader
-			// would call one criticism.
-			var fresh []adversarialFinding
-			for _, finding := range findings {
-				print := findingFingerprint(finding)
-				if attemptedFindings[print] {
-					carriedAdvisories = append(carriedAdvisories, finding)
-					continue
-				}
-				attemptedFindings[print] = true
-				fresh = append(fresh, finding)
-			}
-			// What is left after the repeats are removed may be only opinions.
-			// A run that builds, passes its tests and matches its acceptance
-			// examples has crossed the completion floor, and spending its
-			// remaining budget on a rule's opinion it has already tried once to
-			// satisfy is what left rung 3 stalling past 447 seconds with a
-			// verified result in hand.
+			// The working set: what is still worth an attempt, bounded to a
+			// small related group, with the rest left open for the next
+			// round.
 			//
-			// A measured defect is never advisory: the tests were actually run
-			// against it and did not catch it, which is a fact about the suite
-			// rather than an opinion about the code.
-			blindSpotsOnlyThisRound = len(blockingFindings(fresh)) == 0
-			if reviewRounds > 0 && len(blockingFindings(fresh)) == 0 {
-				carriedAdvisories = append(
-					carriedAdvisories, advisoryFindings(fresh)...)
-				fresh = nil
+			// A round given ten findings makes ten changes and verifies once,
+			// so a failure afterwards says only that one of ten was wrong. Two
+			// changes and a verification is a bisection. Rung 6 was handed a
+			// full review and rewrote its files ten and thirteen times inside
+			// single attempts.
+			workable, exhausted := reviewLedger.reconcile(findings)
+			carriedAdvisories = append(carriedAdvisories, exhausted...)
+			selected, deferred := selectRoundFindings(workable)
+			tracef("review", "%s; asking for %d this round",
+				reviewLedger.summary(len(workable), len(exhausted)),
+				len(selected))
+			// Anything not selected stays open rather than becoming an
+			// advisory: it has not been tried, and calling it carried would be
+			// deciding not to fix something nobody looked at.
+			_ = deferred
+			if reviewRounds > 0 && len(blockingFindings(selected)) == 0 &&
+				len(selected) == 0 {
+				carriedAdvisories = append(carriedAdvisories, workable...)
 			}
-			findings = fresh
+			reviewLedger.record(selected)
+			findings = selected
 			if len(findings) > 0 {
 				reviewRounds++
 				defects := 0

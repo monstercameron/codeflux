@@ -50,6 +50,38 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-138
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- refinement takes two related findings and knows what it tried
+Request-or-TODO: Pipeline analysis, items 4, 5 and 6
+Outcome: A round given ten findings makes ten changes and verifies once, so a
+  failure afterwards says only that one of ten was wrong. Two changes and a
+  verification is a bisection; ten is a guess. Rung 6 was handed a full review
+  and rewrote its files ten and thirteen times inside single attempts.
+  A round now takes at most two findings, and related ones rather than the
+  first two: fixing two things in one function is one edit, and fixing one in
+  the parser and one in the printer is two, with the second undoing the
+  verification the first earned. The measured defect leads, because that is
+  what the review already decided matters. What is not selected stays open
+  rather than becoming an advisory — it has not been tried, and calling it
+  carried would be deciding not to fix something nobody looked at.
+  Scope is derived from the findings rather than from the gate. A gate is one
+  word about a whole review: rung 6's review found a real defect in main and
+  the next attempt was restricted to test files, because the rule keyed on the
+  gate and the finding knew better. A round holding any production defect may
+  change production code; a round holding only missing tests may not, because
+  the program is usually already right and rewriting it is how that run broke a
+  working evaluator while adding two tests.
+  Progress is tracked rather than assumed. A finding that stops being raised is
+  verified; one addressed twice and still raised is exhausted and carried,
+  because it is not going to be fixed by a fourth attempt and saying so is more
+  useful than sending the same prose again.
+Verification: Build, vet, gofmt, four new tests covering scope from findings,
+  the two-related-findings rule, exhaustion after two attempts, and
+  verification when a finding stops being raised
+Dev-Log: DL-20260803-148
+
 Change-ID: CL-20260803-137
 Commit: pending
 Date: 2026-08-03
