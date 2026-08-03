@@ -16,8 +16,17 @@ import (
 
 type ReviewMutationService struct {
 	repositories reviewMutationRepositories
-	worktrees    *gitwork.Service
-	repairs      *AcceptanceRepairService
+	// store is the same repositories value, kept concretely because
+	// deterministic fact extraction (MEM-006, MEM-008) needs more of the
+	// repository surface than this file's narrow interface declares, and
+	// widening that interface would break every test fixture implementing it
+	// for reasons unrelated to extraction.
+	//
+	// It is nil only when a test constructs the service with a fake, which is
+	// also the case where extraction has nothing real to read.
+	store     *storage.Repositories
+	worktrees *gitwork.Service
+	repairs   *AcceptanceRepairService
 }
 
 type reviewMutationRepositories interface {
@@ -46,7 +55,10 @@ func NewReviewMutationService(repositories *storage.Repositories, worktrees *git
 	if err != nil {
 		return nil, err
 	}
-	return &ReviewMutationService{repositories: repositories, worktrees: worktrees, repairs: repairs}, nil
+	return &ReviewMutationService{
+		repositories: repositories, store: repositories,
+		worktrees: worktrees, repairs: repairs,
+	}, nil
 }
 
 func (service *ReviewMutationService) OpenReview(ctx context.Context, taskID domain.TaskID, reportID, diff string) (acceptance.Review, error) {
@@ -214,7 +226,15 @@ func (service *ReviewMutationService) finalizeReviewDecisionWithStorageErrors(ct
 	// RecordTaskReviewDecision has already succeeded, and its own errors are
 	// swallowed (closeReviewDecisionEpisode is itself best-effort).
 	if outcome, ok := episodeOutcomeForReviewDecision(decision); ok {
-		closeReviewDecisionEpisode(ctx, service.repositories, taskID, episodeRevision, outcome)
+		closed := closeReviewDecisionEpisode(
+			ctx, service.repositories, taskID, episodeRevision, outcome)
+		// MEM-006 and MEM-008: the deterministic facts are extracted from the
+		// episode once it is closed and its outcome is known, because the
+		// extractors are gated on acceptance -- §31's rule that a run nobody
+		// accepted has established nothing. Best-effort for the same reason the
+		// close above is: a failure to learn from a decision must not make the
+		// decision itself look like it did not happen.
+		ExtractDeterministicFactsAtEpisodeClose(ctx, service.store, closed)
 	}
 	return service.repositories.GetTask(ctx, taskID)
 }

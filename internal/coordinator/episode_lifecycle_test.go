@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/storage"
+	"codeflux.dev/codeflux/internal/validation"
 )
 
 // mustOpenRunEpisodeFixture builds a real project/repository/task and an
@@ -90,6 +93,36 @@ func mustSetTaskState(t *testing.T, path string, taskID domain.TaskID, state dom
 	}()
 	if _, err := raw.ExecContext(context.Background(),
 		`UPDATE tasks SET state = ? WHERE id = ?`, string(state), taskID.String(),
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// mustCreateRunRow inserts a minimal runs row over the same raw connection
+// pattern mustSetTaskState uses, so mustCreateAttributableValidationRun's
+// validation_run_intents insert satisfies the validation_run_intents_task_
+// consistency trigger (migration 000022), which requires runs.id/task_id to
+// already agree with the intent it is about to accept. Mirrors internal/
+// storage/tool_repository_test.go's createToolTestRun, built from raw SQL
+// here because that helper is an unexported test-only symbol in a
+// different package.
+func mustCreateRunRow(t *testing.T, path string, taskID domain.TaskID, runID domain.RunID) {
+	t.Helper()
+	raw, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := raw.Close(); err != nil {
+			t.Errorf("close raw run-row connection: %v", err)
+		}
+	}()
+	if _, err := raw.ExecContext(context.Background(),
+		`INSERT INTO runs (
+			id, task_id, state, attempt, task_revision, idempotency_key,
+			created_at_unix_micros, updated_at_unix_micros
+		) VALUES (?, ?, 'pending', 1, 0, ?, 1, 1)`,
+		runID.String(), taskID.String(), "extraction-fixture-run-"+runID.String(),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -345,4 +378,296 @@ func TestMEM002_RecordAttemptTransitionIsBestEffortForAZeroEpisode(t *testing.T)
 	execution, _, _, _ := mustOpenRunEpisodeFixture(t)
 	execution.recordAttemptTransition(context.Background(), storage.Episode{}, 1,
 		"assembly", "it did not compile", "gpt-5.6-luna/standard", storage.EpisodeAttemptOutcomeSentBack)
+}
+
+// -----------------------------------------------------------------------
+// MEM-006/MEM-008/MEM-011a: ExtractDeterministicFactsAtEpisodeClose.
+// -----------------------------------------------------------------------
+
+// mustCreateAttributableValidationRun builds and commits one real
+// validation_run_intents/validation_run_results pair (argv baked into
+// command_definition_json, exactly like internal/storage's own
+// memory_fact_extraction_repository_test.go fixture) and records the
+// episode fact reference an Extract*FromEpisode function requires to ever
+// see it -- built from exported storage/validation API only, since
+// internal/storage's equivalent helpers are unexported test-only symbols in
+// a different package.
+func mustCreateAttributableValidationRun(
+	t *testing.T,
+	repositories *storage.Repositories,
+	episode storage.Episode,
+	taskID domain.TaskID,
+	runID domain.RunID,
+	number int,
+	checkClass validation.CheckClass,
+	argv []string,
+	diffIdentity string,
+) validation.RunIntent {
+	t.Helper()
+	ctx := context.Background()
+
+	validationID, err := domain.NewValidationID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	argvJSON := `{"arguments":[`
+	for index, argument := range argv {
+		if index > 0 {
+			argvJSON += ","
+		}
+		argvJSON += `"` + argument + `"`
+	}
+	argvJSON += `]}`
+
+	intent, err := validation.SealRunIntent(validation.RunIntent{
+		ID: validationID, TaskID: taskID, RunID: runID,
+		ProfileName: validation.ProfileProtected, ProfileVersion: validation.ProfileVersionV1,
+		ProfileDigest: strings.Repeat("d", 64), CheckID: fmt.Sprintf("extraction-fixture-%d", number),
+		CheckClass: checkClass, Required: true,
+		WorktreeRevision: strings.Repeat("e", 40), DiffIdentity: diffIdentity,
+		CommandDefinitionJSON: argvJSON,
+		CommandFingerprint:    strings.Repeat("f", 64),
+		Executable:            validation.ExecutableIdentity{Path: "C:/tool/go.exe", SHA256: strings.Repeat("1", 64)},
+		Timeout:               5 * time.Minute,
+		IdempotencyKey:        fmt.Sprintf("extraction-fixture-intent-%d", number),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repositories.CreateValidationRunIntent(ctx, intent); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := validation.SealRunResult(validation.RunResult{
+		ValidationRunID: intent.ID, State: domain.ValidationStatePassed, ExitCode: 0,
+		Duration: time.Second, ParserName: "go-test-v1", ParseSucceeded: true,
+		ParsedResultJSON:     `{}`,
+		RawRedactedSummary:   "extraction fixture",
+		ObservedDiffIdentity: diffIdentity,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repositories.CommitValidationRunResult(ctx, result); err != nil {
+		t.Fatal(err)
+	}
+
+	factID := fmt.Sprintf("fact-%d-%s", number, episode.ID.String())
+	if _, err := repositories.RecordEpisodeFactReference(ctx, storage.RecordEpisodeFactReference{
+		ID: factID, EpisodeID: episode.ID, FactTaskID: taskID,
+		Kind: domain.EpisodeFactKindValidationResult, ReferenceID: intent.ID.String(),
+		IdempotencyKey: factID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return intent
+}
+
+// TestMEM006_ExtractDeterministicFactsAtEpisodeCloseExtractsBuildAndTestCommandsWhenAccepted
+// proves the positive case end to end against a real SQLite fixture: an
+// episode closed Accepted, carrying one attributable passing CheckBuild and
+// one attributable passing CheckBroadTest, yields exactly one reviewed-
+// command memory fact for each purpose, each promoted to Validated by its
+// own corroborated evidence (never inherited).
+func TestMEM006_ExtractDeterministicFactsAtEpisodeCloseExtractsBuildAndTestCommandsWhenAccepted(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, path := mustOpenRunEpisodeFixture(t)
+	hash := strings.Repeat("a", 64)
+	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := domain.NewRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustCreateRunRow(t, path, taskID, runID)
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, 1)
+	if episode.ID.IsZero() {
+		t.Fatal("expected a real episode for this fixture")
+	}
+
+	diffIdentity := strings.Repeat("1", 64)
+	mustCreateAttributableValidationRun(t, execution.repositories, episode, taskID, runID, 1,
+		validation.CheckBuild, []string{"go", "build", "./..."}, diffIdentity)
+	mustCreateAttributableValidationRun(t, execution.repositories, episode, taskID, runID, 2,
+		validation.CheckBroadTest, []string{"go", "test", "./..."}, diffIdentity)
+
+	closed, err := execution.repositories.CloseEpisode(ctx, storage.CloseEpisode{
+		EpisodeID: episode.ID, EndingRevision: diffIdentity, Outcome: domain.EpisodeOutcomeAccepted,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ExtractDeterministicFactsAtEpisodeClose(ctx, execution.repositories, closed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.BuildCommands) != 1 {
+		t.Fatalf("build commands = %#v, want exactly one", summary.BuildCommands)
+	}
+	if summary.BuildCommands[0].Upsert.Maturity != domain.MaturityStateValidated {
+		t.Fatalf("build command maturity = %s, want validated from its own corroborated evidence", summary.BuildCommands[0].Upsert.Maturity)
+	}
+	if len(summary.TestCommands) != 1 {
+		t.Fatalf("test commands = %#v, want exactly one", summary.TestCommands)
+	}
+	if len(summary.RepositoryConventions) != 0 {
+		t.Fatalf("repository conventions = %#v, want none: no formatter/static-analysis check was recorded", summary.RepositoryConventions)
+	}
+	// MEM-011a: the call ran three real extractors against a real database,
+	// so the measured cost must not be negative (a wall-clock bug would show
+	// up as exactly that); it is not asserted strictly positive because a
+	// fast machine can legitimately complete inside the clock's resolution.
+	if summary.Duration < 0 {
+		t.Fatalf("duration = %s, want a non-negative measured cost (MEM-011a)", summary.Duration)
+	}
+}
+
+// TestMEM008_ExtractDeterministicFactsAtEpisodeCloseExtractsRepositoryConventionsWhenAccepted
+// proves MEM-008: an attributable passing CheckFormatter check on an
+// Accepted episode yields a repository-convention memory fact.
+func TestMEM008_ExtractDeterministicFactsAtEpisodeCloseExtractsRepositoryConventionsWhenAccepted(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, path := mustOpenRunEpisodeFixture(t)
+	hash := strings.Repeat("b", 64)
+	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := domain.NewRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustCreateRunRow(t, path, taskID, runID)
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, 1)
+	if episode.ID.IsZero() {
+		t.Fatal("expected a real episode for this fixture")
+	}
+
+	diffIdentity := strings.Repeat("2", 64)
+	mustCreateAttributableValidationRun(t, execution.repositories, episode, taskID, runID, 1,
+		validation.CheckFormatter, []string{"gofmt", "-l", "."}, diffIdentity)
+
+	closed, err := execution.repositories.CloseEpisode(ctx, storage.CloseEpisode{
+		EpisodeID: episode.ID, EndingRevision: diffIdentity, Outcome: domain.EpisodeOutcomeAccepted,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ExtractDeterministicFactsAtEpisodeClose(ctx, execution.repositories, closed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.RepositoryConventions) != 1 {
+		t.Fatalf("repository conventions = %#v, want exactly one", summary.RepositoryConventions)
+	}
+	if len(summary.BuildCommands) != 0 || len(summary.TestCommands) != 0 {
+		t.Fatalf("build/test commands = %#v/%#v, want none: no build/test check was recorded", summary.BuildCommands, summary.TestCommands)
+	}
+}
+
+// TestMEM006_ExtractDeterministicFactsAtEpisodeCloseRefusesAnUnacceptedEpisode
+// is the discriminating half of the Accepted-only gate: the SAME
+// attributable, passing CheckBuild check as the positive test above, but
+// the episode closes Rejected. The storage-layer extractor itself does not
+// filter by outcome (only by domain.EpisodeStatusClosed -- proven by
+// TestExtractAttributableBuildCommandsFromEpisodeExtractsPassingCheckBuildOnly
+// in internal/storage, which closes its fixture Accepted only incidentally),
+// so this failing without the coordinator-level Outcome check, and passing
+// with it, is what proves the guard in ExtractDeterministicFactsAtEpisode
+// Close -- not the extractor -- is what refuses a rejected episode's work.
+func TestMEM006_ExtractDeterministicFactsAtEpisodeCloseRefusesAnUnacceptedEpisode(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, path := mustOpenRunEpisodeFixture(t)
+	hash := strings.Repeat("c", 64)
+	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := domain.NewRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustCreateRunRow(t, path, taskID, runID)
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, 1)
+	if episode.ID.IsZero() {
+		t.Fatal("expected a real episode for this fixture")
+	}
+
+	diffIdentity := strings.Repeat("3", 64)
+	mustCreateAttributableValidationRun(t, execution.repositories, episode, taskID, runID, 1,
+		validation.CheckBuild, []string{"go", "build", "./..."}, diffIdentity)
+
+	closed, err := execution.repositories.CloseEpisode(ctx, storage.CloseEpisode{
+		EpisodeID: episode.ID, EndingRevision: diffIdentity, Outcome: domain.EpisodeOutcomeRejected,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := ExtractDeterministicFactsAtEpisodeClose(ctx, execution.repositories, closed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.BuildCommands) != 0 || len(summary.TestCommands) != 0 || len(summary.RepositoryConventions) != 0 {
+		t.Fatalf("summary = %#v, want a no-op: the episode was Rejected, not Accepted", summary)
+	}
+	if summary.Duration != 0 {
+		t.Fatalf("duration = %s, want zero: no extractor ran, so no cost was spent", summary.Duration)
+	}
+}
+
+// TestMEM006_ExtractDeterministicFactsAtEpisodeCloseIsANoOpForAnOpenEpisode
+// proves the second guard: an episode that is still Open (never closed)
+// is refused before any extractor runs, rather than relying on the
+// extractors' own domain.EpisodeStatusClosed check to surface as an error.
+func TestMEM006_ExtractDeterministicFactsAtEpisodeCloseIsANoOpForAnOpenEpisode(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, _ := mustOpenRunEpisodeFixture(t)
+	hash := strings.Repeat("9", 64)
+	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := domain.NewRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, 1)
+	if episode.ID.IsZero() {
+		t.Fatal("expected a real episode for this fixture")
+	}
+	if episode.Status != domain.EpisodeStatusOpen {
+		t.Fatalf("episode status = %s, want open (never closed in this test)", episode.Status)
+	}
+
+	summary, err := ExtractDeterministicFactsAtEpisodeClose(ctx, execution.repositories, episode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.BuildCommands) != 0 || len(summary.TestCommands) != 0 || len(summary.RepositoryConventions) != 0 {
+		t.Fatalf("summary = %#v, want a no-op for a still-open episode", summary)
+	}
+}
+
+// TestMEM006_ExtractDeterministicFactsAtEpisodeCloseIsANoOpForAZeroEpisode
+// proves the nil/zero-value safety every other best-effort function in this
+// file has: called with a zero storage.Episode (what openRunEpisode returns
+// when it could not open one), this must not panic or attempt a write.
+func TestMEM006_ExtractDeterministicFactsAtEpisodeCloseIsANoOpForAZeroEpisode(t *testing.T) {
+	execution, _, _, _ := mustOpenRunEpisodeFixture(t)
+	summary, err := ExtractDeterministicFactsAtEpisodeClose(context.Background(), execution.repositories, storage.Episode{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.BuildCommands) != 0 {
+		t.Fatalf("summary = %#v, want a no-op for a zero episode", summary)
+	}
 }

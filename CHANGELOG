@@ -50,6 +50,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-079
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- deterministic facts extracted at episode close
+Request-or-TODO: MEM-006, MEM-008
+Outcome: Build commands, test commands and repository conventions are extracted
+  when a review decision closes an episode, gated on acceptance -- 31's rule
+  that a run nobody accepted has established nothing.
+  All five extractors already existed and had no production caller; what was
+  missing was the orchestrator and the call site. That was verified by reading
+  rather than assumed, after three tickets this session named things that did
+  not exist as described
+Affected-behavior: An accepted run now deposits deterministic facts. Nothing
+  reads them yet
+Compatibility-or-migration: None; no schema change
+Verification: The discriminating test is the same fixture with a rejected
+  outcome yielding zero facts. The storage extractor gates only on the episode
+  being closed, so that case isolates the new coordinator-level outcome check as
+  the thing refusing it -- without it a passing run would prove nothing about
+  the new code
+Known-limitations: MEM-007 needs an observed changed-file set nothing passes
+  into the close. MEM-009 is deliberately uncalled: it is correctly gated on a
+  granted approval and no call site anywhere creates one, so inventing a path
+  would open a prompt-injection route into every later run. MEM-010 waits on
+  PIPE-136. MEM-011's revision trigger is re-armed by this change; its toolchain
+  and dependency triggers have no schema support at all
+Dev-Log: DL-20260802-089
+
 Change-ID: CL-20260802-078
 Commit: pending
 Date: 2026-08-02

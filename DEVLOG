@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-089
+Date: 2026-08-02
+Status: Wired and called
+Change-ID: CL-20260802-079
+Commit: pending
+Request-or-TODO: MEM-006, MEM-008
+Goal: Make the deterministic tier actually deposit something
+Assumptions: The extractors exist -- checked, not taken on faith
+Decisions: Gated the orchestrator on acceptance rather than on the episode
+  merely being closed. 31 quarantine is terminal, so a fact minted from work
+  nobody accepted could only ever be retired.
+  Left MEM-009 uncalled. It is correctly gated and there is no approval-creation
+  path anywhere; building one would be inventing an admission route for
+  untrusted repository text, which is a prompt-injection path into every later
+  run. Uncalled is strictly safer than approximately gated.
+  Called it best-effort after the close, so a failure to learn from a decision
+  cannot make the decision look like it did not happen
+Files-or-schemas: episode_lifecycle.go and its test, review_mutations.go
+Validation: The rejected-outcome case yields zero facts, which is what isolates
+  the new gate from the storage extractor's own closed-status check
+Failures-or-discarded-approaches: An earlier round of this work went missing
+  from the tree; I reported it as clobbered by another lane, which was not
+  established. The lane re-read and found its code present and an incomplete
+  signature change of mine breaking the build instead
+Known-limitations: MEM-007, MEM-009, MEM-010 and MEM-011's toolchain and
+  dependency triggers all remain blocked, each for a reason recorded in TODOS.md
+Next-safe-step: PIPE-136, which unblocks MEM-010
+
 Dev-Log: DL-20260802-088
 Date: 2026-08-02
 Status: Closed; a run reaches awaiting-review
