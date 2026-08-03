@@ -66,6 +66,33 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-047
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- declared stage dependency graph
+Request-or-TODO: PIPE-058
+Outcome: internal/pipeline/requirements.go declares, for every stage, the stages
+  it genuinely requires, with the reason recorded per entry. Validation refuses a
+  stage with no entry, an entry for an unknown stage, a requirement naming an
+  unknown stage, an edge pointing forward in the flow, a cycle, and an
+  unreachable stage, returning every finding rather than the first.
+  The widest frontier the graph permits is five: integration-tests,
+  end-to-end-tests, global-invariants, adversarial, and platform-matrix all
+  unblock the instant program is satisfied
+Affected-behavior: None yet. This is the declaration; PIPE-058a executes against
+  it
+Compatibility-or-migration: A separate table rather than a Stage field, because
+  Flow's entries are positional composite literals
+Verification: Each of the five validations proven to discriminate against a
+  hand-broken table, including a real injected three-stage cycle whose report
+  names all three. A test asserts the widest frontier by name and fails if the
+  graph degenerates to a chain. The coverage check proved itself in practice
+  when PIPE-020 added a stage and the table refused it until an entry existed
+Known-limitations: The author flagged one reading for review: "the suite" in the
+  repetition and non-functional gates was taken as the executable-level suite
+  rather than every test stage
+Dev-Log: DL-20260802-057
+
 Change-ID: CL-20260802-046
 Commit: pending
 Date: 2026-08-02
@@ -114,21 +141,6 @@ Known-limitations: Two of the ticket's assumptions did not survive measurement.
   since 42 of ~80 files use one helper; filed as REPO-030a, and it remains the
   largest cost in test-fast at ~135s
 Dev-Log: DL-20260802-055
-
-Change-ID: CL-20260802-044
-Commit: pending
-Date: 2026-08-02
-Type: Fix -- stage dependency entry for the new stage
-Request-or-TODO: PIPE-058, PIPE-020
-Outcome: The acceptance-oracle stage gains its entry in the requirements table,
-  requiring the instructions stage alone. Two lanes landing together left the
-  table without an entry for stage 38, which its own coverage validation
-  refused -- the failure mode it was designed to produce
-Affected-behavior: None. Declaration only
-Compatibility-or-migration: None
-Verification: go test ./internal/pipeline/ green
-Known-limitations: None
-Dev-Log: DL-20260802-054
 
 Change-ID: CL-20260802-043
 Commit: pending
