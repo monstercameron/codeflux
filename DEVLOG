@@ -51,6 +51,38 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-055
+Date: 2026-08-02
+Status: Six files tagged; the two commands now differ
+Change-ID: CL-20260802-045
+Commit: pending
+Request-or-TODO: REPO-030
+Goal: Make test-fast and test-integration select different sets, which they
+  never have
+Assumptions: A test that cannot be shown to be slow does not get tagged
+Decisions: Measured every candidate before tagging anything, and let the
+  measurements overrule the ticket. Two of its assumptions failed:
+  internal/retrieval is 5.5s for the whole package and was left alone, and
+  internal/storage cannot be tagged at all until its fixtures are extracted,
+  because 42 of roughly 80 test files use one helper and the heaviest file
+  defines an identifier three fast files need.
+  Cross-referenced every unexported symbol against every other test file in each
+  package before tagging, since a build tag is file-granular and a shared helper
+  disappearing breaks the untagged build silently.
+  Left engine_end_to_end_test.go untagged despite its cost because it defines
+  the fixture scaffolding eight other files use, and left
+  pipeline_ledger_integrity_test.go untagged because it mixes one 27s test with
+  five sub-second ones and the tag cannot split them
+Files-or-schemas: six _test.go files under internal/coordinator,
+  internal/testharness, internal/testfixtures
+Validation: 2554 tests selected untagged against 2587 tagged, a difference of
+  exactly the 33 functions moved. test-fast and test-integration both pass
+Failures-or-discarded-approaches: None; the two rejected packages are recorded
+  above rather than attempted
+Known-limitations: internal/storage remains ~135s and the largest cost in
+  test-fast. Filed as REPO-030a
+Next-safe-step: REPO-030a
+
 Dev-Log: DL-20260802-053
 Date: 2026-08-02
 Status: Rule registered; lint green

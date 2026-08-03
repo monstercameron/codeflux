@@ -66,6 +66,30 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-045
+Commit: pending
+Date: 2026-08-02
+Type: Change -- test suite separation
+Request-or-TODO: REPO-030
+Outcome: Six heavy test files move behind //go:build integration, so test-fast
+  and test-integration finally select different sets: 2554 tests untagged and
+  2587 tagged, a difference of exactly the 33 functions moved. internal/
+  testharness drops from 11.6s to 0.6s, internal/testfixtures from 7.4s to 0.4s,
+  and internal/coordinator from 128.9s to 77.4s on a warm cache
+Affected-behavior: test-fast runs fewer tests and is faster. test-integration
+  runs everything it did before
+Compatibility-or-migration: None
+Verification: Test-selection counts before and after, plus test-fast and
+  test-integration both passing. Before tagging, every unexported symbol was
+  cross-referenced against every other test file in each package to prove no
+  untagged file would stop compiling
+Known-limitations: Two of the ticket's assumptions did not survive measurement.
+  internal/retrieval is not heavy -- 5.5s for the package -- and was left alone.
+  internal/storage cannot be tagged until its shared fixtures are extracted,
+  since 42 of ~80 files use one helper; filed as REPO-030a, and it remains the
+  largest cost in test-fast at ~135s
+Dev-Log: DL-20260802-055
+
 Change-ID: CL-20260802-043
 Commit: pending
 Date: 2026-08-02
