@@ -50,6 +50,44 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-134
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- every prompt is a declared JSON document, and the fences are
+  gone
+Request-or-TODO: Direct instruction, 2026-08-03: structured outputs, a JSON
+  message shape per prompt, no Markdown fences
+Outcome: The round handed to the model was prose assembled by string
+  concatenation, with repository files and tool output wrapped in triple
+  backticks to separate untrusted content from the instruction. That separation
+  is closable by the content it separates: a file holding three backticks ends
+  the block, and everything after it reads as instruction.
+  The round is now one JSON object with declared fields — round,
+  repository_context, plan, what_has_happened,
+  results_of_your_last_tool_calls, tools_you_may_call, what_to_do_now — and the
+  system message describes that shape so the model knows what it is reading. A
+  string is a string however many backticks are in it, and the escaping is the
+  language's rather than ours. A test carries a hostile file containing a fence
+  and an injected instruction through the encoder and proves it arrives as
+  data.
+  It also stops the prompt teaching a habit the tools refuse. A model shown
+  fenced code every round writes fenced code back, and the write tool rejects
+  it: ladder rung 6 spent four turns on exactly that, and the prompt was the
+  thing demonstrating the format. The system message now says outright that a
+  tool argument is literal content and a fence costs the round.
+  Every model call in this build is now structured: planning answers a JSON
+  schema, the working turns are tool calls whose arguments are JSON against the
+  tool's own schema, the observation going out is JSON, and the tool results
+  coming back are typed fields rather than a blob.
+  Patch size is bound to the obligation. A patch tool removes the accidental
+  rewrite and not the deliberate one — a model can rewrite a file hunk by hunk
+  as thoroughly as in one write — so a documentation round may move forty lines
+  across six hunks and a test round a hundred and twenty across eight, measured
+  after applying the patch in memory and refused before anything is written.
+Verification: Build, vet, gofmt, three observation tests, the openaimodel and
+  executor suites
+Dev-Log: DL-20260803-144
+
 Change-ID: CL-20260803-133
 Commit: pending
 Date: 2026-08-03

@@ -258,3 +258,70 @@ func ReadFileForPatch(target string) (string, error) {
 	}
 	return string(content), nil
 }
+
+// PatchLimits bound how much one patch may change.
+//
+// A patch tool removes the accidental rewrite; it does not remove the
+// deliberate one. A model can rewrite a file hunk by hunk just as thoroughly as
+// it can in one write, and the reasons not to are the same: every line it
+// touches is a chance to drop a function, drift a signature, or reword an
+// acceptance-sensitive literal.
+//
+// So the size is bounded by what is being asked for. A comment repair that
+// rewrites forty lines has not understood the request, and the refusal says so
+// while the working program is still there.
+type PatchLimits struct {
+	// MaximumChangedLines is added plus removed, across every hunk.
+	MaximumChangedLines int
+	// MaximumHunks bounds how scattered one change may be. A repair touching
+	// eight places is usually several repairs, and several repairs made at once
+	// are several chances to be wrong with one verification between them.
+	MaximumHunks int
+	// MaximumFileShare is how much of the file may change, from 0 to 1.
+	//
+	// A patch that replaces most of a file is a rewrite wearing a patch's
+	// clothes, and it should be sent as one so that it reads as one.
+	MaximumFileShare float64
+}
+
+// UnboundedPatch is the default for ordinary work: a run building something is
+// entitled to write as much of it as it needs.
+var UnboundedPatch = PatchLimits{}
+
+// WithinLimits reports whether an applied patch stayed inside its allowance.
+//
+// Checked after application rather than before, because the interesting numbers
+// — how many lines actually moved, how much of the file that is — are not
+// knowable from the patch text alone.
+func (limits PatchLimits) WithinLimits(
+	outcome PatchOutcome, fileLines int,
+) error {
+	changed := outcome.LinesAdded + outcome.LinesRemove
+	if limits.MaximumChangedLines > 0 && changed > limits.MaximumChangedLines {
+		return fmt.Errorf(
+			"this patch changes %d lines and what was asked for allows %d. "+
+				"Make the smallest change that satisfies it: if the work "+
+				"genuinely needs more than that, say so in your reply rather "+
+				"than doing it here",
+			changed, limits.MaximumChangedLines)
+	}
+	if limits.MaximumHunks > 0 && outcome.Hunks > limits.MaximumHunks {
+		return fmt.Errorf(
+			"this patch changes %d separate places and what was asked for "+
+				"allows %d. Several repairs at once are several chances to be "+
+				"wrong with one verification between them",
+			outcome.Hunks, limits.MaximumHunks)
+	}
+	if limits.MaximumFileShare > 0 && fileLines > 0 {
+		share := float64(changed) / float64(fileLines)
+		if share > limits.MaximumFileShare {
+			return fmt.Errorf(
+				"this patch changes %.0f%% of %s, past the %.0f%% a change of "+
+					"this kind allows. A patch that replaces most of a file is "+
+					"a rewrite, and should be sent as one so that it reads as "+
+					"one",
+				share*100, outcome.Path, limits.MaximumFileShare*100)
+		}
+	}
+	return nil
+}

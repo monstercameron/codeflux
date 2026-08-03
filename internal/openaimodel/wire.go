@@ -2,7 +2,6 @@ package openaimodel
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"codeflux.dev/codeflux/internal/agent"
@@ -126,7 +125,17 @@ Rules:
 - Write complete, working code. No placeholders, no TODOs, no elided bodies.
 - Match the conventions already in the repository: its naming, its error handling, its comment density.
 - When the work is finished, stop calling tools and reply with one short paragraph saying what you changed.
-- If you cannot proceed without a decision only a person can make, stop calling tools and reply beginning with "Needs direction:".`
+- If you cannot proceed without a decision only a person can make, stop calling tools and reply beginning with "Needs direction:".
+
+Each round you are given one JSON object describing where the work stands. Its fields are:
+- round: which round this is.
+- repository_context: files you have been shown, each {path, content}. The content is exactly what is in the file.
+- plan: the steps, each {state, summary, files}. Work them in order.
+- what_has_happened: durable facts recorded so far.
+- results_of_your_last_tool_calls: each {tool, state, exit_code, summary, stdout, stderr}.
+- tools_you_may_call: the only tools available this round.
+
+Never wrap code in backticks or a Markdown fence when you send it to a tool. A tool argument is the literal content: source goes to the write tool exactly as it should appear in the file, and a patch goes to the patch tool exactly as its format describes. Fences are refused, and they cost you the round.`
 
 // buildRequest turns one observation into one request.
 func (model *Model) buildRequest(input agent.ModelInput) responsesRequest {
@@ -134,7 +143,7 @@ func (model *Model) buildRequest(input agent.ModelInput) responsesRequest {
 		Model: model.options.Model,
 		Input: []responsesTurn{
 			{Role: "system", Content: model.instruction()},
-			{Role: "user", Content: observationText(input)},
+			{Role: "user", Content: observationJSON(input)},
 		},
 		// The model must not be forced to call a tool: a round where the right
 		// answer is "this is finished" has to be expressible, or the run can
@@ -193,118 +202,6 @@ func toolIsCurrentlyUsable(input agent.ModelInput, tool string) bool {
 		}
 	}
 	return false
-}
-
-// observationText renders the round's observation.
-//
-// It is assembled here rather than accumulated across rounds because the loop
-// hands over a complete bounded observation each time: what the task is, what
-// the plan is, what has happened, and what the last tools returned. A client
-// keeping its own running transcript would drift from the record the
-// coordinator is keeping, and the coordinator's is the one people read.
-func observationText(input agent.ModelInput) string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "Round %d.\n\n", input.Round)
-
-	if len(input.RepositoryContext) > 0 {
-		builder.WriteString("Repository context:\n")
-		for _, item := range input.RepositoryContext {
-			fmt.Fprintf(&builder, "- %s\n", describeContext(item))
-		}
-		builder.WriteString("\n")
-	}
-	if len(input.Plan.Steps) > 0 {
-		builder.WriteString("Plan:\n")
-		for _, step := range input.Plan.Steps {
-			fmt.Fprintf(&builder, "- %s\n", describeStep(step))
-		}
-		builder.WriteString("\n")
-	}
-	if len(input.FactualEvents) > 0 {
-		builder.WriteString("What has happened:\n")
-		for _, event := range input.FactualEvents {
-			fmt.Fprintf(&builder, "- %s\n", describeEvent(event))
-		}
-		builder.WriteString("\n")
-	}
-	if len(input.PreviousResults) > 0 {
-		builder.WriteString("Results of your last tool calls:\n")
-		for _, result := range input.PreviousResults {
-			fmt.Fprintf(&builder, "%s\n", describeFeedback(result))
-		}
-		builder.WriteString("\n")
-	}
-	builder.WriteString(
-		"Work through the plan in order. Only the tools the next open step can " +
-			"accept are available to you. Call them, or reply that the work is " +
-			"finished.")
-	return builder.String()
-}
-
-// describeContext renders one repository file the loop selected.
-func describeContext(item agent.RepositoryContextItem) string {
-	content := strings.TrimSpace(item.ContentRedacted)
-	if content == "" {
-		return item.Path
-	}
-	return item.Path + "\n```\n" + content + "\n```"
-}
-
-// describeStep renders one plan step.
-//
-// The state leads the line and the files follow on their own. It used to be
-// appended as "(pending)" straight after the summary, and a step summary ends
-// with the requirement's own words: a request to print "Hello" was rendered as
-// "...print Hello (pending)" and the model printed exactly that, parenthetical
-// included. Nothing may abut the free text on the right, because free text is
-// the one field whose ending cannot be predicted.
-func describeStep(step agent.PlanStep) string {
-	summary := strings.TrimSpace(step.SummaryRedacted)
-	if summary == "" {
-		summary = string(step.Kind)
-	}
-	line := fmt.Sprintf("[%s] %s", step.State, summary)
-	if len(step.ExpectedFiles) > 0 {
-		line += "\n  files: " + strings.Join(step.ExpectedFiles, ", ")
-	}
-	return line
-}
-
-// describeEvent renders one durable fact.
-func describeEvent(event agent.FactualEvent) string {
-	summary := strings.TrimSpace(event.SummaryRedacted)
-	if summary == "" {
-		return event.Type
-	}
-	return event.Type + ": " + summary
-}
-
-// describeFeedback renders what one tool actually did.
-//
-// Output and error text are both included when present, because a model told
-// only that a command failed will guess at why, and the guess is usually a
-// second failing command.
-func describeFeedback(result agent.ToolFeedback) string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "- %s (%s", result.Tool, result.State)
-	if result.IsError || result.ExitCode != 0 {
-		fmt.Fprintf(&builder, ", exit %d", result.ExitCode)
-	}
-	builder.WriteString(")")
-	if summary := strings.TrimSpace(result.SummaryRedacted); summary != "" {
-		builder.WriteString(": " + summary)
-	}
-	for label, text := range map[string]string{
-		"stdout": result.StdoutRedacted, "stderr": result.StderrRedacted,
-	} {
-		if trimmed := strings.TrimSpace(text); trimmed != "" {
-			fmt.Fprintf(&builder, "\n  %s:\n```\n%s\n```", label, trimmed)
-		}
-	}
-	if result.Truncated {
-		builder.WriteString("\n  (output truncated)")
-	}
-	return builder.String()
 }
 
 // instruction is the whole system message for one run.

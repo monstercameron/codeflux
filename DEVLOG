@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-144
+Date: 2026-08-03
+Status: The prompt path is structured end to end
+Change-ID: CL-20260803-134
+Commit: pending
+Request-or-TODO: The structured-prompt instruction
+Goal: Remove the fences by construction rather than by patching them out
+Decisions: Replaced the prose observation with a JSON document rather than
+  swapping fences for another delimiter. Any delimiter made of characters can
+  appear in the content; a JSON string cannot be ended by what is inside it.
+  Named the fields for a model rather than for this package.
+  "results_of_your_last_tool_calls" says what it is; the storage layer's own
+  vocabulary would not.
+  Split stdout and stderr into separate fields. They mean different things, and
+  a model reading one stream has to guess which it is looking at.
+  Measured patch size after applying in memory. How many lines actually moved,
+  and how much of the file that is, are not knowable from the patch text
+Files-or-schemas: new internal/openaimodel/observation.go and its test,
+  wire.go, internal/executor/patch_tool.go,
+  internal/coordinator/edit_scope.go, agent_narration.go
+Validation: Build, vet, gofmt, the openaimodel and executor suites
+Failures-or-discarded-approaches: Prefixing every line of fenced content with a
+  bar, written and replaced within the hour. It fixes the closability and still
+  shows the model a hand-rolled block format to imitate
+Known-limitations: Post-application minimality is bounded by line counts, not
+  by what changed: a patch that rewrites one function entirely within the line
+  budget is allowed. Symbol-level minimality — signatures changed, tests
+  deleted — is not measured
+Next-safe-step: Rung 6 with JSON prompts and patch editing
+
 Dev-Log: DL-20260803-143
 Date: 2026-08-03
 Status: Refinement can change ten lines without rewriting two thousand

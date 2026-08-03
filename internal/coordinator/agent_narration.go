@@ -120,10 +120,25 @@ func (narrator *narratingExecutor) ExecuteTool(
 	// semantics, breaking a program that had been correct. Refusing at the
 	// write tells the run immediately, with the working program still intact,
 	// instead of three gates later with it gone.
-	if executor.ToolName(name) == executor.ToolApplyEdit &&
+	if (executor.ToolName(name) == executor.ToolApplyEdit ||
+		executor.ToolName(name) == executor.ToolApplyPatch) &&
 		narrator.permitted != editAnything && narrator.worktree != "" {
 		path := toolArgument(request.Request, "path")
 		content := []byte(toolArgument(request.Request, "content"))
+		if executor.ToolName(name) == executor.ToolApplyPatch {
+			content = []byte(toolArgument(request.Request, "patch"))
+			if why := narrator.patchStaysSmall(request.Request, path); why != "" {
+				tracef("tool", "%-12s %-10s %s", name, "too-broad",
+					traceOneLine(why, 110))
+				narrator.execution.publishTool(narrator.ctx, narrator.scope,
+					events.KindToolCompleted, executionID, name,
+					string(domain.CommandExecutionStateFailed),
+					detail+" — refused: broader than this round allows")
+				narrator.lastFailure = why
+				return executor.ToolResult{
+					State: "failed", StdoutRedacted: why}, nil
+			}
+		}
 		if allowed, why := narrator.permitted.permits(
 			narrator.worktree, path, content,
 		); !allowed {

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"codeflux.dev/codeflux/internal/executor"
 )
 
 // editScope is what an attempt is allowed to change.
@@ -58,6 +60,14 @@ func (scope editScope) permits(
 			"anything to change in " + path + ". Add the test to a _test.go " +
 			"file and run the suite."
 	case editCommentsOnly:
+		// A patch is judged by the file it would produce, not by its own text.
+		// Applying it here rather than reasoning about hunks means the same
+		// syntax-tree comparison decides both tools, and a patch that sneaks a
+		// statement past a comment round is caught by the same check that
+		// catches a whole-file write doing it.
+		if patched, ok := patchResultFor(worktree, path, content); ok {
+			content = []byte(patched)
+		}
 		if isProducedTestFile(path) {
 			return false, "This round is for documentation. " + path +
 				" is a test file, and the request was for comments on " +
@@ -163,4 +173,99 @@ func (scope editScope) String() string {
 	default:
 		return "anything"
 	}
+}
+
+// patchLimits is how much a round of this kind may change.
+//
+// A patch tool removes the accidental rewrite and not the deliberate one: a
+// model can rewrite a file hunk by hunk as thoroughly as in one write. What
+// bounds it is what was asked for. A comment repair that moves forty lines has
+// not understood the request, and refusing it while the working program is
+// still there costs one turn instead of an attempt.
+//
+// Ordinary rounds are unbounded. A run building something is entitled to write
+// as much of it as it needs, and a limit there would be a limit on the work
+// rather than on the drift.
+func (scope editScope) patchLimits() executor.PatchLimits {
+	switch scope {
+	case editCommentsOnly:
+		// A doc comment is a handful of lines above one declaration. Two
+		// declarations documented at once is still one round's work; six is a
+		// rewrite with comments as the excuse.
+		return executor.PatchLimits{
+			MaximumChangedLines: 40,
+			MaximumHunks:        6,
+			MaximumFileShare:    0.5,
+		}
+	case editTestsOnly:
+		// A test round adds cases. It is legitimately larger than a comment
+		// round — a table-driven test for four inputs is thirty lines — and it
+		// still has no business replacing the file.
+		return executor.PatchLimits{
+			MaximumChangedLines: 120,
+			MaximumHunks:        8,
+			MaximumFileShare:    0.75,
+		}
+	default:
+		return executor.UnboundedPatch
+	}
+}
+
+// patchResultFor renders what a patch would leave on disk, so a scope rule can
+// judge the result rather than the diff.
+//
+// Reports false when the argument is not a patch or cannot be applied. Both are
+// somebody else's complaint with a better message than this could give, and a
+// scope check is not the place to raise them.
+func patchResultFor(worktree, path string, argument []byte) (string, bool) {
+	request, err := executor.ParsePatch(string(argument))
+	if err != nil {
+		return "", false
+	}
+	existing, err := os.ReadFile(filepath.Join(worktree, filepath.FromSlash(path)))
+	if err != nil {
+		return "", false
+	}
+	patched, _, err := executor.ApplyPatch(string(existing), request)
+	if err != nil {
+		return "", false
+	}
+	return patched, true
+}
+
+// patchStaysSmall reports why a patch is broader than this round allows, or
+// nothing when it is not.
+//
+// Measured after applying it in memory, because the interesting numbers — how
+// many lines actually moved, how much of the file that is — are not knowable
+// from the patch text. Nothing is written either way; this only decides whether
+// the real write is allowed to happen.
+func (narrator *narratingExecutor) patchStaysSmall(
+	request executor.ToolRequest, path string,
+) string {
+	limits := narrator.permitted.patchLimits()
+	if limits == executor.UnboundedPatch {
+		return ""
+	}
+	parsed, err := executor.ParsePatch(toolArgument(request, "patch"))
+	if err != nil {
+		// Malformed patches are refused by the tool itself, with a better
+		// message than this could give.
+		return ""
+	}
+	existing, err := os.ReadFile(
+		filepath.Join(narrator.worktree, filepath.FromSlash(path)))
+	if err != nil {
+		return ""
+	}
+	_, outcome, err := executor.ApplyPatch(string(existing), parsed)
+	if err != nil {
+		return ""
+	}
+	if err := limits.WithinLimits(
+		outcome, strings.Count(string(existing), "\n")+1,
+	); err != nil {
+		return err.Error()
+	}
+	return ""
 }
