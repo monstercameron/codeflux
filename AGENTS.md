@@ -283,22 +283,23 @@ Every command accepts `--root`. A repository-local root must be a child of
 implicitly. Use `--json` only when command help declares machine-readable
 output.
 
-### One Lane, One Worktree
+### Everyone Works in `dev`, Nobody Clobbers
 
-**When more than one agent works on this repository at once, each takes its own Git worktree.** A shared checkout does not work here, and the reason is specific rather than aesthetic: `codeflux-dev lint` is repository-wide, so the pre-commit hook fails on *any* file in the tree, including one another lane is halfway through writing. In a single session this blocked four commits, three of them for files the committing lane had never touched.
+**Do not create a Git worktree for your own work.** Every agent works directly in the `dev` checkout, and several will be in it at once. Do not `git worktree add`, and do not clone a second copy to escape the others.
 
-```
-git worktree add ../codeflux-<lane> dev
-cd ../codeflux-<lane>
-git config core.hooksPath .githooks
-```
+*(This says nothing about the per-task worktrees the product itself creates in `internal/gitwork`. Those are a product feature and are unaffected.)*
 
-- Branch from `dev`, work in the worktree, open the pull request from there.
-- `.artifacts/` is per-worktree, so build and test output cannot collide.
-- **The dev server cannot be shared.** It binds the fixed port `127.0.0.1:47311`, so only one lane runs it at a time; another lane needing one passes `--address 127.0.0.1:PORT` and stops it afterwards.
-- `git worktree remove ../codeflux-<lane>` when the lane is finished. A worktree left behind is the same defect as a server left running.
+Working alongside other agents is therefore a skill the repository requires, not an edge case. The whole discipline reduces to one thing: **touch only what your task changed, and leave everything else exactly as you found it.**
 
-**In a shared checkout, the rules do not relax — they get harder.** Stage explicit paths only, never `git add -A`. If a gate names a file you did not touch, that is another lane's work in progress: say so and coordinate. Do not fix it, do not reformat it, and do not commit it to get your own change through. The one exception is a purely mechanical `gofmt` that the repository would demand anyway, which stays unstaged so it remains that lane's to commit.
+- **Stage explicit paths. Never `git add -A` or `git commit -a`.** Before staging, list what changed and account for every path. A path you cannot explain belongs to someone else.
+- **One file can hold two lanes' work.** `CHANGELOG`, `DEVLOG`, and `TODOS.md` are edited by everyone. When a shared file carries someone else's uncommitted work alongside yours, stage only your hunk — build the blob by hand if you must — and leave theirs in the working tree.
+- **Re-read before you write.** Sequential identifiers, file tails, and section anchors move under you. Read the current state of `CHANGELOG` and `DEVLOG` immediately before writing an entry, not at the start of the task; identifiers have collided this way already.
+- **Never revert, reformat, or "fix" a file you did not change.** If a gate names a file you did not touch, that is another lane mid-edit. Say so and coordinate. The single exception is a mechanical `gofmt` the repository would demand anyway — apply it, leave it unstaged, and it remains theirs to commit.
+- **Expect a broken tree that is not your fault.** A file may be syntactically incomplete because someone is writing it right now. Wait, or work elsewhere. Do not repair it to get your own commit through.
+- **Never rewrite shared history.** No rebase, amend, squash, or force-push of anything another agent may have. `main` and `dev` both refuse force-pushes regardless.
+- **The dev server is shared too.** It binds the fixed port `127.0.0.1:47311`, so only one agent runs it at a time. Check whether one is already up and reuse it; if you genuinely need a second, pass `--address 127.0.0.1:PORT` and stop it afterwards.
+
+The cost of this is real and accepted: a repository-wide gate can be red for reasons that have nothing to do with you, and a push carries whatever else is unpushed. That is the trade for a single shared branch. It is not a reason to route around a gate.
 
 ### Stop What You Start
 

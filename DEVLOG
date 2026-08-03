@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-065
+Date: 2026-08-02
+Status: Worktree rule reversed; co-tenancy rules written in its place
+Change-ID: CL-20260802-055
+Commit: pending
+Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
+  inside of dev and be careful to not clobber other agents changes"
+Goal: One shared checkout, with the care that requires spelled out
+Assumptions: "Never use worktrees" governs agent working copies. It cannot mean
+  the product's per-task worktrees, which are a shipped feature with their own
+  package, so the section says which one it means rather than leaving a heading
+  that reads like a blanket ban
+Decisions: The replacement is longer than a simple prohibition would be, because
+  removing the isolation makes the co-tenancy rules load-bearing rather than
+  advisory. Each one is written from a failure that actually occurred today: the
+  ledger identifier collision, the four commits blocked by other lanes' files,
+  the syntactically incomplete test file, and the shared file needing hunk-level
+  staging. The accepted cost is stated rather than hidden, so the next agent to
+  hit a red gate it did not cause recognises it as the known trade instead of
+  treating it as a bug or a reason to bypass
+Files-or-schemas: AGENTS.md, TODOS.md. No schema change
+Validation: Prose only. CONTRIBUTING and CLAUDE.md were checked and mention no
+  worktrees, so nothing else needed reconciling
+Failures-or-discarded-approaches: The worktree rule lasted a few hours. It was
+  the right diagnosis of a real deadlock and the wrong remedy for how this
+  repository is actually worked
+Known-limitations: Unenforced. Nothing prevents git add -A, and nothing detects
+  one lane clobbering another; the co-tenancy rules are habits. Worktrees also
+  genuinely did solve the cross-lane gate failures, so those return in full: a
+  red gate you did not cause, and a push that carries other lanes' commits, are
+  now permanent conditions rather than problems to be fixed
+Next-safe-step: None required
+
 Dev-Log: DL-20260802-066
 Date: 2026-08-02
 Status: Constant regenerated

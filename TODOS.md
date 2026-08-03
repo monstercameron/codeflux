@@ -4937,6 +4937,11 @@ Server-side GitHub configuration is included because it exists nowhere in Git:
   - `CL-20260802-021`, commit `e3d72fe`. `core.hooksPath` was also set; the hook had existed since `M01-050` and had never run, which is why two lint regressions reached the remote.
 - [x] `REPO-013` Require a separate worktree per concurrent agent lane.
   - `CL-20260802-022`, commit `a476144`. Repository-wide lint means any lane's unfinished file blocks every other lane's commit.
+  - **Superseded by `REPO-031` (2026-08-02).** Worktrees are now prohibited for agent working copies; everyone works in the `dev` checkout.
+- [x] `REPO-031` Prohibit agent worktrees and require every agent to work in the `dev` checkout, carefully.
+  - `CL-20260802-055`. Supersedes `REPO-013`, which required the opposite.
+  - AGENTS.md "Everyone Works in dev, Nobody Clobbers" carries the co-tenancy rules that isolation used to make unnecessary: explicit-path staging, hunk-level staging of shared ledger files, re-reading identifiers immediately before writing, never repairing another lane's file, and treating the fixed-port dev server as shared.
+  - Scoped to agent working copies. The per-task worktrees the product creates in `internal/gitwork` are a product feature and are unaffected.
 - [x] `REPO-014` Report drift between the vendored skills and upstream without updating them.
   - `CL-20260802-023`, commit `8a1886c`. Weekly, report-only; a failed fetch is reported as unknown rather than passed as a match.
 - [x] `REPO-015` Stop the user guide instructing readers to verify a release that does not exist, and state the tracker roles.
