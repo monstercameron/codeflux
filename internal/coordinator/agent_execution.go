@@ -991,18 +991,19 @@ func (execution *AgentExecution) Run(
 	// actually achieved from a trace, and the one fact they most need — is
 	// there a verified revision, and is it the one on disk — was never stated
 	// anywhere.
-	execution.say(ctx, scope, events.KindMessageFinal,
-		terminalReport(terminalFacts{
-			status:           terminalStatus(providerCircuitOpen, checkpoint, unfinished),
-			verifiedRevision: checkpoint.digest,
-			verifiedBecause:  checkpoint.reason,
-			currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
-				producedTreeDigest(scope.worktree) == checkpoint.digest),
-			advisories:            carriedAdvisories,
-			attempts:              attempts,
-			infrastructureRetries: repeatedInfrastructureFailures,
-			unresolved:            unfinished,
-		}))
+	report := terminalReport(terminalFacts{
+		status:           terminalStatus(providerCircuitOpen, checkpoint, unfinished),
+		verifiedRevision: checkpoint.digest,
+		verifiedBecause:  checkpoint.reason,
+		currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
+			producedTreeDigest(scope.worktree) == checkpoint.digest),
+		advisories:            carriedAdvisories,
+		attempts:              attempts,
+		infrastructureRetries: repeatedInfrastructureFailures,
+		unresolved:            unfinished,
+	})
+	traceBlock("final", "how this run ended:", report)
+	execution.say(ctx, scope, events.KindMessageFinal, report)
 
 	// The assembly gate. A run that cannot produce something that builds has
 	// not produced a program, whatever else it did, and everything downstream
@@ -1123,13 +1124,36 @@ func (execution *AgentExecution) Run(
 	// is no while anything is still failing.
 	bundle, clean := execution.assembleEvidence(ctx, taskID, ledger.currentAttempt())
 	ledger.decide(ctx, pipeline.StageEvidenceBundle, bundle)
-	if clean && verified {
+	// The completion floor and the refinement ceiling, kept apart.
+	//
+	// The floor is: it builds, its tests pass, and it does what was asked. A run
+	// that has crossed it has produced something a person can review, and
+	// telling them "the work is not ready to be looked at" because branch
+	// coverage came to 84% rather than the threshold, or because an atom
+	// carries no registry documentation, is untrue in the way that matters: it
+	// sends a reviewable program back into the queue.
+	//
+	// The ceiling is everything above that — coverage thresholds, registry
+	// metadata, a critic's remaining opinions. Missing it is worth saying and
+	// is not worth withholding the work for.
+	//
+	// Delivery is unchanged either way. Nothing is handed over before a person
+	// accepts it, and that is not a judgement this run is entitled to make.
+	switch {
+	case clean && verified:
 		ledger.record(ctx, pipeline.StageHumanAcceptance, pipeline.StateBlocked,
 			"the work is ready and nobody has looked at it yet: acceptance is "+
 				"a person's decision and this run cannot make it", nil)
 		ledger.record(ctx, pipeline.StageDeliver, pipeline.StateBlocked,
 			"nothing is delivered before a person accepts it", nil)
-	} else {
+	case checkpoint.taken:
+		ledger.record(ctx, pipeline.StageHumanAcceptance, pipeline.StateBlocked,
+			"the work is ready to be looked at with advisories: revision "+
+				checkpoint.digest+" "+checkpoint.reason+", and what is still "+
+				"outstanding is refinement rather than correctness", nil)
+		ledger.record(ctx, pipeline.StageDeliver, pipeline.StateBlocked,
+			"nothing is delivered before a person accepts it", nil)
+	default:
 		ledger.record(ctx, pipeline.StageHumanAcceptance, pipeline.StateBlocked,
 			"the work is not ready to be looked at: something it was checked "+
 				"against did not hold", nil)

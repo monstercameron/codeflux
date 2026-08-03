@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-127
+Date: 2026-08-03
+Status: Rung 3 reaches 29 of 37 stages in 71 seconds, from 447+ and stalling
+Change-ID: CL-20260803-117
+Commit: pending
+Request-or-TODO: Trace analysis item 8
+Goal: Stop a reviewable program being described as unreviewable
+Decisions: Keyed the middle case on the checkpoint rather than on a new
+  boolean. The checkpoint is only ever taken where build, tests and acceptance
+  all held, so it already is the completion floor -- adding a second
+  representation of the same fact is how two records come to disagree.
+  Left delivery blocked in all three cases. Whether work is handed over is a
+  person's decision, and the floor changes what they are shown, not who decides
+Files-or-schemas: agent_execution.go
+Validation: Build, vet, gofmt
+Failures-or-discarded-approaches: None
+Known-limitations: Registration still fails on rung 3 because the atom-schema
+  ask now sits behind delivery readiness and the run finishes before reaching
+  it. That is the intended ordering and the wrong outcome: enrichment needs to
+  run after the floor is crossed rather than never
+Next-safe-step: Run atom documentation as a post-verification phase against the
+  checkpoint, then rungs 1-3 in a shared root
+
 Dev-Log: DL-20260803-126
 Date: 2026-08-03
 Status: The highest-leverage orchestration fix is in

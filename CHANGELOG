@@ -50,6 +50,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-117
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a reviewable program is not sent back for its coverage percentage
+Request-or-TODO: Trace analysis item 8, confirmed by the rung 3 run at
+  CL-20260803-116
+Outcome: With the circuit breaker in, rung 3 finished in 71 seconds with 29 of
+  37 stages satisfied -- and then reported "the work is not ready to be looked
+  at", because branch coverage came to 84% and one atom carried no registry
+  documentation. Both are true and neither is a reason to withhold a program
+  that builds, passes its tests and does what was asked.
+  The completion floor and the refinement ceiling are now separate. A run that
+  crossed the floor is ready to be looked at with advisories, and the record
+  names the verified revision and says what remains is refinement rather than
+  correctness. A run that did not cross it reads exactly as before. Delivery is
+  unchanged in every case: nothing is handed over before a person accepts it,
+  and that is not a judgement a run is entitled to make.
+  The terminal record now also reaches the trace. It was published as an event
+  only, so the one summary a person most needs was absent from the terminal
+  they were watching.
+Verification: Build, vet, gofmt
+Dev-Log: DL-20260803-127
+
 Change-ID: CL-20260803-116
 Commit: pending
 Date: 2026-08-03
