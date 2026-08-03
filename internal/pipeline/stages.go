@@ -137,6 +137,20 @@ const (
 	// by name, not by its place in the printed order, until that renumbering
 	// lands.
 	StageAcceptanceOracle Number = 38
+
+	// StageSkipAudit challenges every stage this run itself recorded skipped
+	// or not-implemented and reports what fraction of the flow established
+	// nothing, so a run cannot read as thorough while having declined most of
+	// its checks (PIPE-042).
+	//
+	// It belongs, conceptually, immediately before delivery: it is the last
+	// thing a reader wants answered before deciding whether to trust the
+	// evidence bundle. It is numbered and positioned last instead, additively
+	// after StageAcceptanceOracle, for the same reason PIPE-020 gave for that
+	// stage — renumbering the flow is PIPE-045's, not this ticket's, to do.
+	// Read this stage by name, not by its place in the printed order, until
+	// that renumbering lands.
+	StageSkipAudit Number = 39
 )
 
 // State is what became of one stage in one attempt.
@@ -263,6 +277,11 @@ var Flow = []Stage{
 	// beside instructions where it conceptually belongs; see StageAcceptanceOracle.
 	{StageAcceptanceOracle, "acceptance-oracle",
 		"every declared acceptance example fails when run against the repository before this run's own work, so the examples are shown to discriminate rather than being satisfiable by anything"},
+
+	// PIPE-042, appended additively at the numeric end of the flow rather than
+	// beside delivery where it conceptually belongs; see StageSkipAudit.
+	{StageSkipAudit, "skip-audit",
+		"every stage this run recorded skipped or not-implemented is classified as a principled decline, a decision with no check by design, or an unimplemented gap, and the resulting ratio is reported as this run's headline figure"},
 }
 
 // StageByNumber returns one stage of the flow.

@@ -63,6 +63,12 @@ var refinementGates = map[string]string{
 	"human-acceptance":        "", // a person's decision
 	"deliver":                 "", // the consequence of everything above
 	"acceptance-oracle":       "", // decided before any code exists, from the request and the untouched worktree alone
+	// Report-only for a reason worth stating rather than assuming. Every row it
+	// audits is either a check that legitimately declined or a stage nobody has
+	// built, and neither is something the run can repair by trying again. A
+	// send-back here would ask the work to fix the flow's own gaps, and a run
+	// could raise its ratio only by declining less honestly.
+	"skip-audit": "",
 }
 
 // TestEveryStageThatCanFailIsEitherRefinableOrDeclaredReportOnly is the guard
@@ -151,7 +157,8 @@ func TestTheGateAndTheLedgerAgreeOnWhatIsTested(t *testing.T) {
 			"{\n\t\tt.Fatal(\"no\")\n\t}\n}\n",
 	})
 
-	gaps, err := findCompletenessGaps(worktree, pipeline.DefaultSettings())
+	gaps, err := findCompletenessGaps(
+		worktree, pipeline.DefaultSettings(), changeAttribution{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +198,8 @@ func TestAnUndocumentedMainIsAskedForRatherThanOnlyReported(t *testing.T) {
 		"cmd/thing/main.go": "package main\n\n" +
 			"func main() {\n\tprintln(\"hi\")\n}\n",
 	})
-	gaps, err := findCompletenessGaps(worktree, pipeline.DefaultSettings())
+	gaps, err := findCompletenessGaps(
+		worktree, pipeline.DefaultSettings(), changeAttribution{})
 	if err != nil {
 		t.Fatal(err)
 	}

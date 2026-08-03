@@ -354,6 +354,25 @@ var Requirements = []Requirement{
 		// to express.
 		StageInstructions,
 	}},
+
+	{StageSkipAudit, []Number{
+		// The audit classifies every stage this run's own ledger recorded
+		// skipped or not-implemented, so it needs the run's ledger to be as
+		// complete as this run is ever going to make it, not merely the
+		// examples the oracle needs. Human-acceptance and deliver are the
+		// run's last two decisions -- both always recorded, blocked, skipped,
+		// or not-implemented (PIPE-004) -- and each already transitively
+		// requires evidence-bundle and everything Phase F requires in turn, so
+		// naming both here is the shortest declaration that nothing this run
+		// could still decide is left unrecorded when the audit runs.
+		//
+		// Like the oracle, this stage's number is the flow's highest rather
+		// than its conceptually correct position immediately before delivery,
+		// because PIPE-042 appended it rather than renumbering, which
+		// PIPE-045 owns.
+		StageHumanAcceptance,
+		StageDeliver,
+	}},
 }
 
 // RequirementFor returns the declared dependency entry for one stage.

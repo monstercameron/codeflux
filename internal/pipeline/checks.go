@@ -56,7 +56,18 @@ var Checks = []StageCheck{
 	{StageControlObligations, "composeControlObligations", true, ""},
 	{StageControlTests, "checkControlTests", true, ""},
 	{StageControlFlow, "dischargeControlFlow", true, ""},
-	{StagePathCoverage, "checkFunctionCoverage", true, "PIPE-115"},
+	// PIPE-115: checkFunctionCoverage used to report the least-covered
+	// function reachable from `go test ./...` across the whole module, which
+	// on any repository with pre-existing code named a function this run
+	// never touched as the reason the gate failed. It now measures coverage
+	// restricted to the changed line ranges PIPE-111/PIPE-111a attribute to
+	// this run, falling back to the prior whole-module measurement only when
+	// that attribution could not be established. The gate's own claim — that
+	// coverage is measured rather than assumed — is what this establishes;
+	// nothing here changes the check's statement-level granularity into the
+	// flow's phrase "branch coverage", which remains a wording gap, not a
+	// scoping one.
+	{StagePathCoverage, "checkFunctionCoverage", true, ""},
 	{StageProgram, "AgentExecution.Run", true, ""},
 	{StageAssembly, "AgentExecution.Run", true, ""},
 	{StageGlobalInvariants, "checkGlobalInvariants", true, "PIPE-134"},
@@ -76,6 +87,8 @@ var Checks = []StageCheck{
 	{StageDeliver, "AgentExecution.Run", false, ""},
 	// PIPE-020.
 	{StageAcceptanceOracle, "AgentExecution.checkAcceptanceOracle", true, ""},
+	// PIPE-042.
+	{StageSkipAudit, "checkSkipAudit", true, ""},
 }
 
 // ValidateChecks reports every disagreement between Flow and Checks.

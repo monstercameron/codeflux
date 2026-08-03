@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-067
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- skip-audit stage
+Request-or-TODO: PIPE-042
+Outcome: A new stage 39 audits every stage this run recorded as skipped or
+  not-implemented and reports the ratio, so a run cannot read as thorough while
+  having declined most of its checks.
+  The classification is the substance. A stage that can never satisfy and is
+  named in Section33Resolved is a principled decline carrying its governing
+  ticket; one that can never satisfy and is not named is no-check-by-design; a
+  stage that could satisfy and recorded skipped declined after examining this
+  run's own facts; the same stage recording not-implemented is unimplemented.
+  Satisfied, failed and blocked are counted but not classified, because a failed
+  check ran and a blocked stage was never given a fair chance
+Affected-behavior: One further stage in the flow. Declared report-only in the
+  refinement gates, because every row it audits is either an honest decline or a
+  gap nobody has built, and a send-back would ask the work to repair the flow's
+  own gaps -- a run could raise its ratio only by declining less honestly
+Compatibility-or-migration: Appended as stage 39 rather than renumbered;
+  PIPE-045 owns renumbering
+Verification: Three discrimination proofs, each by breaking the guarded code:
+  the Section33Resolved lookup, the empty-ledger guard, and the nil-store
+  branch. Computed from the rows this run wrote, never from the flow
+  declaration, and an unreadable ledger records skipped rather than a zero-value
+  pass
+Known-limitations: Not yet called from the run. The one-line wiring in
+  agent_execution.go is held back because that file was contended, so stage 39
+  currently records not-implemented -- honest, if incomplete
+Dev-Log: DL-20260802-077
+
 Change-ID: CL-20260802-066
 Commit: pending
 Date: 2026-08-02

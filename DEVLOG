@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-077
+Date: 2026-08-02
+Status: Implemented; one line of wiring outstanding
+Change-ID: CL-20260802-067
+Commit: pending
+Request-or-TODO: PIPE-042
+Goal: Report what a run declined, without making an honest decline look evasive
+Assumptions: A ratio that lumps correct declines together with unbuilt stages is
+  a worse number than none
+Decisions: Reused the vocabulary checks.go already carries -- MaySatisfy,
+  Unestablished, Section33Resolved -- rather than inventing a second
+  classification that would have to be kept in step with the first.
+  Carried the classification per entry rather than folding it into the ratio, so
+  a reader sees the headline and which declines were honest.
+  Excluded failed and blocked from the decline classes: a failed check ran, and
+  a blocked stage was never given a fair chance, so calling either a decline
+  would overstate what the run chose.
+  Declared it report-only in the refinement gates. Every row it audits is an
+  honest decline or an unbuilt stage, so a send-back would ask the work to fix
+  the flow's own gaps, and a run could raise its ratio only by declining less
+  honestly
+Files-or-schemas: internal/coordinator/skip_audit.go and its test; additive
+  entries in stages.go, checks.go, requirements.go and phases.go
+Validation: Three discrimination proofs by breaking the guarded code in turn
+Failures-or-discarded-approaches: None
+Known-limitations: Not called from the run yet; the wiring is one line in a file
+  that was contended at the time
+Next-safe-step: Wire it, then PIPE-044 can render the ratio
+
 Dev-Log: DL-20260802-076
 Date: 2026-08-02
 Status: Four decisions recorded
