@@ -14,10 +14,10 @@ func TestToolCatalogDefinesEveryRequiredVersionedTool(t *testing.T) {
 
 	catalog := ToolCatalog()
 	expected := []ToolName{
-		ToolApplyEdit, ToolBuild, ToolFormat, ToolGitHistory, ToolGitStatus,
-		ToolInspectDiff, ToolListDirectory, ToolPluginRPC, ToolReadFile,
-		ToolRunCommand, ToolSearchSymbol, ToolSearchText, ToolStaticAnalysis,
-		ToolTest,
+		ToolApplyEdit, ToolApplyPatch, ToolBuild, ToolFormat, ToolGitHistory,
+		ToolGitStatus, ToolInspectDiff, ToolListDirectory, ToolPluginRPC,
+		ToolReadFile, ToolRunCommand, ToolSearchSymbol, ToolSearchText,
+		ToolStaticAnalysis, ToolTest,
 	}
 	if len(catalog) != len(expected) {
 		t.Fatalf("tool catalog length = %d, want %d", len(catalog), len(expected))

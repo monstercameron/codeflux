@@ -530,6 +530,23 @@ func agentApprovedTools() []agentloop.ApprovedTool {
 			CreatesCheckpoint: true,
 		},
 		{
+			// The default way to change an existing file.
+			//
+			// A whole-file write to move ten lines replaces two or three
+			// thousand bytes, and every byte it replaces is a chance to drop a
+			// function, drift a signature, or reword an acceptance-sensitive
+			// literal by accident. Ladder rungs 5 and 6 spent most of their
+			// attempts undoing exactly that.
+			Descriptor: catalog[executor.ToolApplyPatch],
+			Arguments: []agentloop.ToolArgumentDefinition{
+				{Name: "path", Required: true},
+				{Name: "patch", Required: true},
+			},
+			DefaultTimeout:    30 * time.Second,
+			MaterialEdit:      true,
+			CreatesCheckpoint: true,
+		},
+		{
 			Descriptor: catalog[executor.ToolTest],
 			Arguments: []agentloop.ToolArgumentDefinition{
 				{Name: "executable", Required: true},

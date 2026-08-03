@@ -50,6 +50,45 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-133
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- refinement edits by patch, and stops echoing files into prompts
+Request-or-TODO: Direct instruction, 2026-08-03: diff-based edits, structured
+  and targeted, and stop echoing whole files
+Outcome: Two changes, and the second was the more expensive defect.
+  UserReadableToolSummary rendered every argument in full, and that summary
+  travels back into the next prompt as the record of what the last round did.
+  So a written file's entire contents were echoed into every subsequent request
+  for the rest of the run — two or three thousand bytes per edit, repeated,
+  paid for by the token and crowding out the instruction. Large values are now
+  a bounded excerpt with their length and digest. What the next round needs is
+  that the write happened, to what, and how big it was; if it needs the
+  contents it can read them, which costs the same tokens once instead of every
+  round.
+  apply-patch is a real tool now, taking the format the models already reach
+  for: a "*** Update File" header, "@@" before each hunk, lines to remove
+  prefixed "-", lines to add prefixed "+", and unprefixed context around them.
+  A hunk is located by its whole before-text rather than by line numbers,
+  because a line number goes stale the moment anything above it moves and a
+  mis-numbered hunk either fails obscurely or applies in the wrong place.
+  Context does not go stale: it either still reads that way or it does not.
+  Every hunk must match exactly once. Matching twice is not a near miss to
+  resolve by guessing — it is the patch failing to say which place is meant,
+  and guessing is how an edit lands in the wrong function. Every hunk applies
+  or none does, and the result must still parse as Go before anything is
+  written, because a half-patched file is a state neither the model nor the
+  coordinator asked for.
+  The whole-file tool now routes patch syntax rather than refusing it: the
+  content was right and the tool was wrong, and saying which tool takes it is
+  worth more than explaining what a Go file looks like. Its summary says it is
+  for creating a file or replacing one wholesale, and the house style says to
+  patch an existing file rather than rewrite it.
+Verification: Build, vet, gofmt, seven new patch tests covering ambiguity,
+  staleness, all-or-nothing application, missing context, the frame, and
+  git-style headers
+Dev-Log: DL-20260803-143
+
 Change-ID: CL-20260803-132
 Commit: pending
 Date: 2026-08-03

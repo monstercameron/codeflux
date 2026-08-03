@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path"
@@ -17,11 +19,22 @@ const ToolSchemaVersion = 1
 type ToolName string
 
 const (
-	ToolReadFile       ToolName = "read-file"
-	ToolListDirectory  ToolName = "list-directory"
-	ToolSearchText     ToolName = "search-text"
-	ToolSearchSymbol   ToolName = "search-symbol"
-	ToolApplyEdit      ToolName = "apply-edit"
+	ToolReadFile      ToolName = "read-file"
+	ToolListDirectory ToolName = "list-directory"
+	ToolSearchText    ToolName = "search-text"
+	ToolSearchSymbol  ToolName = "search-symbol"
+	// ToolApplyEdit writes a whole file. Named apply-edit for compatibility
+	// with every record already written; what it does is described by its
+	// summary, which is what a model actually reads.
+	ToolApplyEdit ToolName = "apply-edit"
+	// ToolApplyPatch changes part of an existing file.
+	//
+	// The default for refinement. A whole-file write to change one error
+	// message replaces two or three thousand bytes to move ten, and every byte
+	// it replaces is a chance to drop a function, drift a signature, or reword
+	// an acceptance-sensitive literal by accident — which is what ladder rungs
+	// 5 and 6 spent most of their attempts undoing.
+	ToolApplyPatch     ToolName = "apply-patch"
 	ToolInspectDiff    ToolName = "inspect-diff"
 	ToolRunCommand     ToolName = "run-command"
 	ToolGitStatus      ToolName = "git-status"
@@ -127,7 +140,8 @@ func ToolCatalog() []ToolDescriptor {
 		// what it asked for: ladder rung 6 sent "*** Begin Patch" three times
 		// and "@@" once across four turns, each refused, each a wasted turn.
 		// The tool takes a whole file, so the summary says a whole file.
-		{Name: ToolApplyEdit, SchemaVersion: ToolSchemaVersion, Summary: "Write one file's complete new contents (not a patch or diff)", DefaultAuthority: AuthorityTaskWrite, Effects: []SideEffect{EffectTaskWorktreeWrite}},
+		{Name: ToolApplyEdit, SchemaVersion: ToolSchemaVersion, Summary: "Create a file, or replace one wholesale: takes the complete new contents, not a patch. Prefer apply-patch to change an existing file", DefaultAuthority: AuthorityTaskWrite, Effects: []SideEffect{EffectTaskWorktreeWrite}},
+		{Name: ToolApplyPatch, SchemaVersion: ToolSchemaVersion, Summary: "Change part of an existing file. Takes a diff: \"*** Update File: <path>\", then \"@@\", then lines to remove prefixed \"-\", lines to add prefixed \"+\", and unprefixed context lines around them", DefaultAuthority: AuthorityTaskWrite, Effects: []SideEffect{EffectTaskWorktreeWrite}},
 		{Name: ToolInspectDiff, SchemaVersion: ToolSchemaVersion, Summary: "Inspect the exact task diff", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
 		{Name: ToolRunCommand, SchemaVersion: ToolSchemaVersion, Summary: "Run one mediated argument-array command", DefaultAuthority: AuthorityPrivileged, Effects: []SideEffect{EffectSubprocess}},
 		{Name: ToolGitStatus, SchemaVersion: ToolSchemaVersion, Summary: "Inspect task Git status", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
@@ -191,7 +205,8 @@ func UserReadableToolSummary(request ToolRequest) string {
 		if argument.Sensitive {
 			value = "[REDACTED]"
 		}
-		arguments = append(arguments, argument.Name+"="+fmt.Sprintf("%q", value))
+		arguments = append(arguments,
+			argument.Name+"="+summarizeArgumentValue(value))
 	}
 	purpose := strings.ReplaceAll(strings.ReplaceAll(request.PurposeUntrusted, "\r", " "), "\n", " ")
 	if len(purpose) > 256 {
@@ -236,4 +251,33 @@ func validSideEffect(effect SideEffect) bool {
 	default:
 		return false
 	}
+}
+
+// maximumSummarizedArgumentBytes is how much of one argument value appears in a
+// tool summary.
+//
+// This summary is not only for a person. It travels back into the next prompt
+// as the record of what the last round did, so a written file's entire contents
+// were being echoed into every subsequent request — two or three thousand bytes
+// per edit, repeated for the rest of the run, paid for by the token and
+// crowding out the instruction.
+//
+// What the next round needs is that the write happened, to what, and how big it
+// was. If it needs the contents it can read the file, which is what the read
+// tool is for and costs the same tokens once instead of every round.
+const maximumSummarizedArgumentBytes = 160
+
+// summarizeArgumentValue renders one argument, shortened when it is large.
+//
+// The digest is included so two rounds can be compared: a run that wrote the
+// same bytes twice shows the same digest, which is a fact worth having and one
+// the truncated text alone would hide.
+func summarizeArgumentValue(value string) string {
+	if len(value) <= maximumSummarizedArgumentBytes {
+		return fmt.Sprintf("%q", value)
+	}
+	digest := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("%q… (%d bytes, sha256 %s)",
+		value[:maximumSummarizedArgumentBytes], len(value),
+		hex.EncodeToString(digest[:])[:12])
 }

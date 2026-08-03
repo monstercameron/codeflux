@@ -30,7 +30,7 @@ const maximumFileToolBytes = 512 << 10
 // could not write one. Nothing could be built.
 func IsFileTool(name ToolName) bool {
 	switch name {
-	case ToolReadFile, ToolListDirectory, ToolApplyEdit:
+	case ToolReadFile, ToolListDirectory, ToolApplyEdit, ToolApplyPatch:
 		return true
 	default:
 		return false
@@ -85,6 +85,8 @@ func ExecuteFileTool(
 		output, err = listWorktreeDirectory(target)
 	case ToolApplyEdit:
 		output, err = writeWorktreeFile(target, arguments["content"])
+	case ToolApplyPatch:
+		output, err = patchWorktreeFile(target, arguments["patch"])
 	}
 	if err != nil {
 		return fileToolFailure(request, started, err), nil
@@ -218,17 +220,17 @@ func goSourceIsWellFormed(path, content string) error {
 	// attempts and got a column number each time.
 	if opening := firstMeaningfulSourceLine(content); opening != "" &&
 		!strings.HasPrefix(opening, "package ") {
-		// A patch is named as a patch, because that is the mistake being made
-		// and "not source at all" does not tell a model which of its habits to
-		// drop. Rung 6 sent "*** Begin Patch" three times in a row.
+		// A patch sent here is not a malformed file, it is the right content
+		// at the wrong tool, and saying so is worth more than any amount of
+		// explaining what a Go file looks like.
 		if looksLikeAPatch(opening) {
 			return fmt.Errorf(
-				"this tool has no patch mode: it takes one file's complete "+
-					"new contents, and what arrived begins %q. Send the whole "+
-					"file, from its package clause to its last line, as it "+
-					"should be after the change. Read the file first if you "+
-					"need the parts you are not changing",
-				traceableOpening(opening))
+				"this is patch syntax, and it arrived at the whole-file tool. " +
+					"Send it to apply-patch, which takes exactly this: a " +
+					"\"*** Update File\" header, \"@@\" before each hunk, " +
+					"lines to remove prefixed \"-\", lines to add prefixed " +
+					"\"+\", and unprefixed context around them. Use this tool " +
+					"only to create a file or replace one wholesale")
 		}
 		return fmt.Errorf(
 			"this is a .go file and its first line is %q. A Go file begins "+
@@ -366,4 +368,37 @@ func looksLikeAPatch(opening string) bool {
 		}
 	}
 	return false
+}
+
+// patchWorktreeFile applies a textual patch to one existing file.
+//
+// The whole sequence commits or nothing does: parse, read, apply every hunk,
+// check the result still parses as Go, then write. A file left half-patched is
+// a state neither the model nor the coordinator asked for, and the run's next
+// decision would be made about it.
+func patchWorktreeFile(target, raw string) (string, error) {
+	request, err := ParsePatch(raw)
+	if err != nil {
+		return "", err
+	}
+	existing, err := ReadFileForPatch(target)
+	if err != nil {
+		return "", err
+	}
+	patched, outcome, err := ApplyPatch(existing, request)
+	if err != nil {
+		return "", err
+	}
+	if len(patched) > maximumFileToolBytes {
+		return "", fmt.Errorf(
+			"the patched file would be %d bytes, past the %d-byte limit",
+			len(patched), maximumFileToolBytes)
+	}
+	if err := goSourceIsWellFormed(target, patched); err != nil {
+		return "", fmt.Errorf("the patch applies but the result is broken: %w", err)
+	}
+	if err := os.WriteFile(target, []byte(patched), 0o600); err != nil {
+		return "", errors.New("the patched file could not be written")
+	}
+	return outcome.Summary(), nil
 }

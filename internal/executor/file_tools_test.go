@@ -45,12 +45,12 @@ func TestRealSourceIsNotRefusedByTheShapeCheck(t *testing.T) {
 	}
 }
 
-// TestAPatchIsRefusedAsAPatch covers what rung 6 sent four times.
+// TestAPatchIsRoutedToTheToolThatTakesIt covers what rung 6 sent four times.
 //
 // "Not source at all" does not tell a model which of its habits to drop. The
 // tool's own summary read "Apply an expected-hash edit batch", which is a patch
 // API described in words, and the model sent patches.
-func TestAPatchIsRefusedAsAPatch(t *testing.T) {
+func TestAPatchIsRoutedToTheToolThatTakesIt(t *testing.T) {
 	for _, patch := range []string{
 		"*** Begin Patch\n*** Update File: main.go\n@@\n-old\n+new\n",
 		"@@ -1,4 +1,6 @@\n package main\n",
@@ -62,8 +62,9 @@ func TestAPatchIsRefusedAsAPatch(t *testing.T) {
 			t.Errorf("a patch was accepted as a file: %q", patch)
 			continue
 		}
-		if !strings.Contains(err.Error(), "no patch mode") {
-			t.Errorf("a patch was refused without being named as one: %v", err)
+		if !strings.Contains(err.Error(), "Send it to apply-patch") {
+			t.Errorf("a patch was refused without being routed to the tool "+
+				"that takes it: %v", err)
 		}
 	}
 }

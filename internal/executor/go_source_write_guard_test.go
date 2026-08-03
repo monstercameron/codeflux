@@ -43,12 +43,12 @@ func TestWritingNonGoIntoAGoFileIsRefused(t *testing.T) {
 			message := err.Error()
 			if !strings.Contains(message, "does not parse as Go") &&
 				!strings.Contains(message, "begins with a package clause") &&
-				!strings.Contains(message, "no patch mode") {
+				!strings.Contains(message, "patch syntax") {
 				t.Errorf("the refusal should say what is wrong, got %q", err)
 			}
 			if !strings.Contains(message, "no surrounding prose") &&
 				!strings.Contains(message, "complete text") &&
-				!strings.Contains(message, "complete new contents") {
+				!strings.Contains(message, "Send it to apply-patch") {
 				t.Errorf("the refusal should say what to write instead, got %q", err)
 			}
 		})

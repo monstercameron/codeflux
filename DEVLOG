@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-143
+Date: 2026-08-03
+Status: Refinement can change ten lines without rewriting two thousand
+Change-ID: CL-20260803-133
+Commit: pending
+Request-or-TODO: The diff-based-editing instruction
+Goal: Make a small change small, in the prompt as well as on disk
+Decisions: Took the textual diff format rather than a JSON replacement object.
+  It is what the models already produce unprompted — rung 6 sent it four times
+  at a tool that could not take it — and a format the writer already knows is
+  worth more than one that is marginally easier to parse.
+  Matched hunks by context rather than by line number. Numbers go stale; the
+  surrounding lines do not.
+  Refused an ambiguous hunk instead of taking the first match. The patch has
+  not said which place is meant, and the fix is more context, which the refusal
+  asks for.
+  Kept the whole-file tool for creation. A new file has no context to patch
+  against, and forcing a patch there would be ceremony
+Files-or-schemas: new internal/executor/patch_tool.go and its test,
+  protocol.go, file_tools.go, protocol_test.go, go_source_write_guard_test.go,
+  internal/coordinator/agent_narration.go, agent_execution.go
+Validation: Build, vet, gofmt, the full executor suite and the coordinator tool
+  tests
+Failures-or-discarded-approaches: A JSON edits array with base_sha256, written
+  first and replaced. It is less ambiguous on paper and is not what any model
+  reaches for, and the format the writer already knows is the one that gets
+  written correctly
+Known-limitations: No patch-size limits yet — a patch may still rewrite most of
+  a file hunk by hunk — and no obligation-specific binding of which files a
+  patch may touch beyond the edit-scope rules already in place. Minimality is
+  not measured after application
+Next-safe-step: Rung 6 with patches available, watching the prompt sizes
+
 Dev-Log: DL-20260803-142
 Date: 2026-08-03
 Status: The largest remaining source of churn in rung 6 is closed
