@@ -208,6 +208,21 @@ func checkControlTests(worktree string) stageOutcome {
 		if isTestScaffolding(function) || function.Branches == 0 {
 			continue
 		}
+		// main is exercised by running the built program, not by naming it in
+		// a unit test, because no Go test can call it.
+		//
+		// Demanding one put this gate in direct conflict with the style the
+		// flow itself asks for: "push every effect to the edge — input,
+		// output, and failure reporting belong in main or in a thin shell
+		// around the core". A run that followed that instruction exactly was
+		// then failed for having done so, and it was the last blocker on
+		// ladder rung 5. The paths main declares are error handling around the
+		// core, and end-to-end-tests already runs the built executable against
+		// every acceptance example, which is the only way those paths can be
+		// reached at all.
+		if function.Name == "main" {
+			continue
+		}
 		branches += function.Branches
 		declaring = append(declaring, function.Name)
 		if referenced[function.Name] {

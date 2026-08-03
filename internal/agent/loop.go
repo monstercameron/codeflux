@@ -1537,13 +1537,41 @@ func stepOwningPath(plan PlanProjection, request executor.ToolRequest) (int, boo
 	if !found {
 		return 0, false
 	}
+	// Two passes, and the order is the point. An open step that owns the path
+	// is always preferred; a step already closed is considered only when no
+	// open one owns it.
+	//
+	// The closed pass exists because a model that writes one file twice in a
+	// turn closed the owning step with its first call, and the second was then
+	// owned by nothing and refused — discarding the whole attempt, including
+	// the first write. That cost an attempt on rung 1 and on rung 5.
+	//
+	// The contract that matters is "only write files the plan named", and a
+	// second write to a named file does not breach it: it is the model
+	// correcting itself, and the file that survives is the one it meant. What
+	// stays refused is a path no step names, and a path several name — the
+	// first reaches outside the plan, and the second would attribute work by
+	// luck.
+	if index, ok := stepOwningPathInState(plan, path, false); ok {
+		return index, true
+	}
+	return stepOwningPathInState(plan, path, true)
+}
+
+// stepOwningPathInState finds the one step owning a path, either among the
+// steps still open or among those already closed.
+func stepOwningPathInState(
+	plan PlanProjection, path string, closed bool,
+) (int, bool) {
 	matched, count := 0, 0
 	for index, step := range plan.Steps {
 		if !stepKindRequiresExpectedFiles(step.Kind) {
 			continue
 		}
-		if step.State == StepImplemented || step.State == StepValidated ||
-			step.State == StepFailed || step.State == StepSkipped {
+		isClosed := step.State == StepImplemented ||
+			step.State == StepValidated ||
+			step.State == StepFailed || step.State == StepSkipped
+		if isClosed != closed {
 			continue
 		}
 		for _, expected := range step.ExpectedFiles {

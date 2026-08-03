@@ -50,6 +50,39 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-100
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a repeat write and an untestable main no longer cost a run
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: Two more gates that no correct output could satisfy, both found by
+  climbing and both fixed against the flow's own stated intent.
+  control-tests demanded that a unit test reach every function taking a
+  decision, including main. No Go test can call main, and the style directive
+  the flow hands the model says to put input, output and failure reporting
+  there. A run that followed that instruction exactly was failed for it, and it
+  was the single remaining failing stage of forty-one on ladder rung 5.
+  end-to-end-tests already runs the built executable against every acceptance
+  example, which is the only way main's paths can be reached at all.
+  A model that wrote one file twice in a turn closed the owning step with its
+  first call; the second write was then owned by no open step and the whole
+  turn was refused, discarding the first write with it. That cost an attempt on
+  rung 1 and on rung 5. A second write to a file the plan named is the model
+  correcting itself, not a breach: the contract is that only named files are
+  written, and the file that survives is the one it meant. An open step that
+  owns the path is still preferred; a path no step names and a path several
+  name are still refused
+Affected-behavior: Rung 1 now passes in two attempts and forty-one seconds,
+  where it previously took six attempts and a hundred and twenty-one
+Compatibility-or-migration: None
+Verification: Both fixes carry a control. An ordinary branching function with
+  no test still fails control-tests and is still named. An open step is still
+  preferred over a closed one, so the plan does not look unfinished
+Known-limitations: main is exempt from control-tests only. It is still expected
+  to carry a doc comment, because documenting it is possible where testing it
+  is not
+Dev-Log: DL-20260803-110
+
 Change-ID: CL-20260803-099
 Commit: pending
 Date: 2026-08-03

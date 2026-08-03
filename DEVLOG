@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-110
+Date: 2026-08-03
+Status: Rung 1 green in two attempts; rung 5's worktree passes every
+  worktree-only stage
+Change-ID: CL-20260803-100
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Stop the platform refusing work it asked for
+Decisions: Exempted main from control-tests rather than relaxing the gate. The
+  exemption is for the one function the language makes uncallable, and an
+  ordinary branching function with no test still fails.
+  Allowed a repeat write to bind to the step that owns the file, preferring an
+  open step and falling back to a closed one. Kept both refusals that matter:
+  a path no step names reaches outside the plan, and a path several name would
+  attribute work by luck
+Files-or-schemas: agent_stage_obligations.go, internal/agent/loop.go, and two
+  new test files
+Validation: Rung 1 end to end at 41.28s, two attempts, zero failing stages.
+  The recheck reports rung 5's worktree at zero failing stages
+Failures-or-discarded-approaches: The first version of the step fix considered
+  only open steps, which left the repeat-write case still refusing an attempt.
+  Found by running rung 1 again rather than by reasoning about it
+Known-limitations: Rung 2's own run is not re-verified since these landed
+Next-safe-step: Rung 2, then 3 and 4
+
 Dev-Log: DL-20260803-109
 Date: 2026-08-03
 Status: Rung 5 traced end to end; two of its six wasted attempts explained
