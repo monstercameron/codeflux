@@ -25,6 +25,26 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-068
+Date: 2026-08-02
+Status: Filed, not fixed
+Change-ID: CL-20260802-058
+Commit: pending
+Request-or-TODO: REPO-043
+Goal: Keep an open HIGH advisory from living only in a push-time message
+Assumptions: A finding surfaced by tooling is not recorded until it is in the
+  tracker this repository treats as authoritative
+Decisions: Filed rather than upgraded. A dependency bump changes the build for
+  every lane and belongs in its own change with its own verification, not
+  appended to a push. Recorded which half of the advisory actually applies, so
+  the next reader does not dismiss it wholesale on the xDS half being irrelevant
+Files-or-schemas: TODOS.md
+Validation: go.mod pins v1.81.0; the advisory's patched version is v1.82.1
+Failures-or-discarded-approaches: None
+Known-limitations: Nothing in the repository catches this class automatically.
+  PIPE-033's dependency-audit stage is where that belongs
+Next-safe-step: REPO-043
+
 Dev-Log: DL-20260802-067
 Date: 2026-08-02
 Status: Completion record written

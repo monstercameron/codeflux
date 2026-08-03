@@ -42,6 +42,27 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-058
+Commit: pending
+Date: 2026-08-02
+Type: Record -- open security advisory
+Request-or-TODO: REPO-043
+Outcome: Files REPO-043 for the one open Dependabot alert, reported by GitHub
+  when dev was pushed on 2026-08-02: gRPC-Go xDS RBAC and HTTP/2
+  vulnerabilities, HIGH, vulnerable below v1.82.1, and go.mod pins v1.81.0. It
+  predates this session and nothing here touched go.mod
+Affected-behavior: None. The dependency is unchanged; this records the finding
+  so it is not carried only by a push-time notice nobody reads twice
+Compatibility-or-migration: None yet. The upgrade is the ticket
+Verification: Version read from go.mod; range and patched version read from the
+  Dependabot API
+Known-limitations: The advisory has two halves and only one is on a live path
+  here -- the coordinator serves the worker protocol over gRPC and the frontend
+  server carries the browser bridge, so HTTP/2 applies even loopback-bound,
+  while nothing uses xDS. That distinction is recorded so the ticket is not
+  triaged as entirely inapplicable
+Dev-Log: DL-20260802-068
+
 Change-ID: CL-20260802-057
 Commit: pending
 Date: 2026-08-02
