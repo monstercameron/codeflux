@@ -27,6 +27,32 @@ type CodeCollectionApplication interface {
 	ListCodeFiles(context.Context, CodeCollectionQuery) (CodeFilePage, error)
 	// ReadCodeFile returns one file's text and what it declares.
 	ReadCodeFile(context.Context, CodeFileRead) (CodeFileContent, error)
+	// ListRegisteredAtoms returns the atoms the repository's project has
+	// registered, which is the persisted collection rather than the one parsed
+	// out of the working tree.
+	ListRegisteredAtoms(context.Context, CodeCollectionQuery) (RegisteredAtomPage, error)
+}
+
+// RegisteredAtomRecord is one persisted atom-documentation revision.
+type RegisteredAtomRecord struct {
+	AtomID string
+	// Name is empty when the atom has documentation but no naming revision.
+	// The empty string is carried through rather than substituted, because a
+	// surface that prints an identity where a name belongs reads as though the
+	// atom were named that.
+	Name                     string
+	Purpose                  string
+	Authoring                string
+	SchemaVersion            uint32
+	SourceRepositoryRevision string
+	RevisionID               string
+}
+
+// RegisteredAtomPage is one bounded page of registered atoms.
+type RegisteredAtomPage struct {
+	Atoms           []RegisteredAtomRecord
+	Truncated       bool
+	TotalRegistered uint32
 }
 
 // CodeFileRecord is one file in the collection.

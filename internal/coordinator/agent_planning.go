@@ -2,10 +2,12 @@ package coordinator
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/executor"
+	"codeflux.dev/codeflux/internal/providers"
 )
 
 // planFromRequirement decides how a request is broken into steps.
@@ -47,12 +49,18 @@ func (execution *AgentExecution) planFromRequirement(
 		RepositoryContext: []agentloop.RepositoryContextItem{
 			agentContextItem("planning-request", planningInstruction(requirement)),
 		},
+		StructuredOutput: behaviourSchema(),
 	})
 	if err != nil {
 		return parsed, "parsed from the request, because the planning model " +
 			"did not answer: " + err.Error()
 	}
-	behaviours := parseBehaviours(turn.MessageRedacted)
+	// The schema first, the line parser as the fallback for a model that could
+	// not honour it.
+	behaviours, structured := decodedBehaviours(turn.MessageRedacted)
+	if !structured {
+		behaviours = parseBehaviours(turn.MessageRedacted)
+	}
 	if len(behaviours) == 0 {
 		return parsed, "parsed from the request, because the planning model " +
 			"named no distinct behaviours"
@@ -202,4 +210,67 @@ func itoaPlan(value int) string {
 		return string(rune('0' + value))
 	}
 	return string(rune('0'+value/10)) + string(rune('0'+value%10))
+}
+
+// behaviourSchema is the shape a planning answer must have.
+//
+// The prose instruction asked for "one behaviour per line and nothing else"
+// and got numbered lines, bullet characters and headings often enough that
+// parseBehaviours has a branch for each of them. Those branches are guesses
+// about what a model meant, and the one that costs most is silent: a paragraph
+// that survives the length check counts as a single behaviour, producing a plan
+// that claims the work is one unit when nothing established that.
+//
+// A schema is not a stricter instruction. It is the difference between asking
+// and constraining, and it is the reason the branches can eventually go.
+//
+// additionalProperties is false and every property is required, because the
+// Responses API refuses a strict schema that leaves either open — and because
+// a schema that permits extra fields permits the model to answer a different
+// question in them.
+func behaviourSchema() *providers.StructuredOutputRequirement {
+	return &providers.StructuredOutputRequirement{
+		Name: "decomposition",
+		Description: "the distinct behaviours a request asks for, each one " +
+			"something that could be got right while another is got wrong",
+		Strict: true,
+		Schema: json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "behaviours": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "description": "a short imperative phrase naming what the program must do, not a file and not a step"
+      }
+    }
+  },
+  "required": ["behaviours"],
+  "additionalProperties": false
+}`),
+	}
+}
+
+// decodedBehaviours reads a schema-constrained planning answer.
+//
+// Reported separately from the line parser rather than replacing it outright.
+// Not every model configured here advertises structured output, and a run whose
+// planner cannot honour a schema should get a worse decomposition rather than
+// no plan — which is the same reasoning that makes the whole planning call a
+// fallback rather than an error path.
+func decodedBehaviours(answer string) ([]string, bool) {
+	var decoded struct {
+		Behaviours []string `json:"behaviours"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(answer)), &decoded); err != nil {
+		return nil, false
+	}
+	var behaviours []string
+	for _, behaviour := range decoded.Behaviours {
+		if trimmed := strings.TrimSpace(behaviour); trimmed != "" {
+			behaviours = append(behaviours, trimmed)
+		}
+	}
+	return behaviours, len(behaviours) > 0
 }

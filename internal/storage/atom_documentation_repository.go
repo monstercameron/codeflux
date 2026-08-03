@@ -500,6 +500,58 @@ type atomDocumentationFieldRow struct {
 	Field atomdoc.Field
 }
 
+// atomDocumentationPurposeLabel is the schema's first field label.
+//
+// It is written here rather than derived from atomdoc's field specs because
+// this is a SQL literal: the query has to name the label the rows were written
+// with, and a label that drifted from the schema must fail loudly as a query
+// returning nothing rather than silently reshape the statement.
+const atomDocumentationPurposeLabel = "Purpose"
+
+// ListAtomDocumentationPurposesByProject returns the documented purpose of
+// every admitted revision in one project, keyed by revision identity.
+//
+// This exists because listing revisions does not hydrate their documents: the
+// fields live in their own table and only a single-revision read joins them.
+// A directory of atoms needs one line of prose per row and nothing else, so
+// reading whole documents to render it — or reading them one revision at a
+// time — would cost far more than the surface uses.
+func (repositories *Repositories) ListAtomDocumentationPurposesByProject(
+	ctx context.Context,
+	projectID domain.ProjectID,
+) (map[string]string, error) {
+	if projectID.IsZero() {
+		return nil, errors.New("atom documentation project ID must not be empty")
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		`SELECT fields.revision_id, fields.field_text
+		   FROM atom_documentation_fields AS fields
+		   JOIN atom_documentation_revisions AS revisions
+		     ON revisions.id = fields.revision_id
+		  WHERE revisions.project_id = ?
+		    AND revisions.validation_status = 'admitted'
+		    AND fields.field_label = ?`,
+		projectID, atomDocumentationPurposeLabel,
+	)
+	if err != nil {
+		return nil, classify("list atom documentation purposes by project", err)
+	}
+	defer rows.Close()
+	purposes := map[string]string{}
+	for rows.Next() {
+		var revisionID, text string
+		if err := rows.Scan(&revisionID, &text); err != nil {
+			return nil, classify("scan atom documentation purpose", err)
+		}
+		purposes[revisionID] = text
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("list atom documentation purposes by project", err)
+	}
+	return purposes, nil
+}
+
 func listAtomDocumentationFields(
 	ctx context.Context,
 	queries queryContexter,

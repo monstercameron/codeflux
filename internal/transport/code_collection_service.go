@@ -318,6 +318,44 @@ func (service *CodeCollectionService) ReadCodeFile(
 	}, nil
 }
 
+// ListRegisteredAtoms returns the atoms the project has registered.
+func (service *CodeCollectionService) ListRegisteredAtoms(
+	ctx context.Context,
+	request *codefluxv1.ListRegisteredAtomsRequest,
+) (*codefluxv1.ListRegisteredAtomsResponse, error) {
+	repositoryID, err := RepositoryIDFromProto(request.GetRepositoryId())
+	if err != nil {
+		return nil, &RequestValidationError{
+			Field: "repository_id", Reason: "must be a repository identity",
+		}
+	}
+	page, err := service.application.ListRegisteredAtoms(ctx, CodeCollectionQuery{
+		RepositoryID: repositoryID,
+		Search:       request.GetSearch(),
+		Limit:        int(request.GetPage().GetLimit()),
+	})
+	if err != nil {
+		return nil, mapCodeCollectionError(err, "the registered atoms could not be read")
+	}
+	views := make([]*codefluxv1.RegisteredAtomView, 0, len(page.Atoms))
+	for _, record := range page.Atoms {
+		views = append(views, &codefluxv1.RegisteredAtomView{
+			AtomId:                   record.AtomID,
+			Name:                     record.Name,
+			Purpose:                  record.Purpose,
+			Authoring:                record.Authoring,
+			SchemaVersion:            record.SchemaVersion,
+			SourceRepositoryRevision: record.SourceRepositoryRevision,
+			RevisionId:               record.RevisionID,
+		})
+	}
+	return &codefluxv1.ListRegisteredAtomsResponse{
+		Atoms:           views,
+		Page:            &codefluxv1.PageInfo{HasMore: page.Truncated},
+		TotalRegistered: page.TotalRegistered,
+	}, nil
+}
+
 // codeFileToProto converts one file record.
 func codeFileToProto(file CodeFileRecord) *codefluxv1.CodeFileView {
 	return &codefluxv1.CodeFileView{

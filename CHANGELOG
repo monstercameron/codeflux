@@ -50,6 +50,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-114
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- structured output, and a test that is not run twice against
+  the same files
+Request-or-TODO: Direct instruction, 2026-08-03: all model output must be patch
+  formatted or structured; refinement analysis item 10
+Outcome: StructuredOutputRequirement had been built in the provider layer, with
+  a name, a description, a schema and a strict flag, and validation for all of
+  them. Nothing in the repository ever set it. The same shape as the memory
+  system: implemented, never called.
+  Planning is now schema-constrained. It had asked in prose for "one behaviour
+  per line and nothing else" and got numbered lines, bullet characters and
+  headings often enough that the parser reading it back has a branch for each
+  -- and the branch that costs most is silent, because a paragraph surviving
+  the length check counts as one behaviour and produces a plan claiming the
+  work is a single unit when nothing established that. The line parser stays as
+  the fallback for a model that cannot honour a schema, which is the same
+  reasoning that makes the whole planning call a fallback rather than an error
+  path.
+  A schema-constrained request declares no tools and makes no tool choice. The
+  two are alternatives: an answer constrained to a JSON object cannot also be a
+  function call, and a provider handed both has to pick, which is a decision
+  this code should make rather than discover.
+  Separately, a test run against files that have not moved since the last one
+  is now refused rather than performed, and the run is told what changed --
+  nothing -- which is a fact it cannot see for itself. Ladder rung 3 ran the
+  same failing test three times in a row without an edit between them. The
+  refusal keeps the earlier verdict: a suite that failed and was not re-run has
+  still failed, and reporting the refusal as a success would be the exact false
+  green the reconciliation layer exists to prevent.
+Verification: Build, vet, gofmt, three planning-schema tests, the openaimodel
+  and agent suites
+Dev-Log: DL-20260803-124
+
 Change-ID: CL-20260803-113
 Commit: pending
 Date: 2026-08-03

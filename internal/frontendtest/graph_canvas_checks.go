@@ -67,7 +67,9 @@ func runMountedGraphCanvasContractCheck(
 	artifactDir string,
 	result *Result,
 ) {
-	route, _, err := loadInteractionThread(page, base, 1600, 1000, "wide")
+	// The canvas no longer inlines on /tasks at wide viewport (REPO-041a); it
+	// lives on the dedicated /graphs route. See loadInteractionGraphRoute.
+	route, _, err := loadInteractionGraphRoute(page, base, 1600, 1000, "wide")
 	canvas := page.Locator(
 		`[data-component="graph-canvas"][data-renderer="canvas-2d"][data-high-dpi="true"]`,
 	)
@@ -142,7 +144,9 @@ func runGraphCanvasInteractionCheck(
 	artifactDir string,
 	result *Result,
 ) {
-	route, _, err := loadInteractionThread(page, base, 1600, 1000, "wide")
+	// The canvas no longer inlines on /tasks at wide viewport (REPO-041a); it
+	// lives on the dedicated /graphs route. See loadInteractionGraphRoute.
+	route, _, err := loadInteractionGraphRoute(page, base, 1600, 1000, "wide")
 	canvas := page.Locator(`[data-component="graph-canvas"]`)
 	surface := canvas.Locator(`canvas[data-component="graph-render-surface"]`)
 	zoomIn := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
@@ -358,9 +362,20 @@ func runGraphCanvasResponsiveBoundsCheck(
 		if checkErr != nil {
 			break
 		}
-		_, _, checkErr = loadInteractionThread(
-			page, base, viewport.Width, viewport.Height, viewport.Mode,
-		)
+		var viewportRoute string
+		if viewport.Mode == "wide" {
+			// At wide viewport /tasks no longer inlines the canvas -- it
+			// moved to the observation rail's summary (REPO-041a). The only
+			// route that still draws `[data-component="graph-canvas"]` at
+			// wide is the dedicated /graphs workspace.
+			viewportRoute, _, checkErr = loadInteractionGraphRoute(
+				page, base, viewport.Width, viewport.Height, viewport.Mode,
+			)
+		} else {
+			viewportRoute, _, checkErr = loadInteractionThread(
+				page, base, viewport.Width, viewport.Height, viewport.Mode,
+			)
+		}
 		if checkErr != nil {
 			break
 		}
@@ -386,7 +401,7 @@ func runGraphCanvasResponsiveBoundsCheck(
 			box.Y+box.Height > float64(viewport.Height)+1) {
 			checkErr = fmt.Errorf("%s graph bounds %v exceed %dx%d", viewport.Name, box, viewport.Width, viewport.Height)
 		}
-		details = append(details, fmt.Sprintf("%s=%v", viewport.Name, box))
+		details = append(details, fmt.Sprintf("%s@%s=%v", viewport.Name, viewportRoute, box))
 	}
 	appendInteractionResult(page, artifactDir, result, CheckResult{
 		ID: "graph-canvas-responsive-visible-bounds", Route: route,

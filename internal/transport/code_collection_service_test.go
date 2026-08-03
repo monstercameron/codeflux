@@ -28,6 +28,10 @@ type codeCollectionFake struct {
 	content      CodeFileContent
 	contentErr   error
 	lastRead     CodeFileRead
+
+	registered     RegisteredAtomPage
+	registeredErr  error
+	lastRegistered CodeCollectionQuery
 }
 
 func (fake *codeCollectionFake) ListCodeFiles(
@@ -44,6 +48,13 @@ func (fake *codeCollectionFake) ReadCodeFile(
 ) (CodeFileContent, error) {
 	fake.lastRead = read
 	return fake.content, fake.contentErr
+}
+
+func (fake *codeCollectionFake) ListRegisteredAtoms(
+	_ context.Context, query CodeCollectionQuery,
+) (RegisteredAtomPage, error) {
+	fake.lastRegistered = query
+	return fake.registered, fake.registeredErr
 }
 
 func (fake *codeCollectionFake) ListCodePackages(

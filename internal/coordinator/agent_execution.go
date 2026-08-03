@@ -328,7 +328,7 @@ func (execution *AgentExecution) Run(
 		registration, execution.model.Identity())
 	narrator := &narratingExecutor{
 		inner: tools, execution: execution, scope: scope, ctx: ctx,
-		journal: journal,
+		journal: journal, worktree: scope.worktree,
 	}
 	// The loop is rebuilt rather than mutated when the run escalates: the model
 	// is a dependency it is constructed with, and reaching in to swap it would

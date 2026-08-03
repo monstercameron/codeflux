@@ -52,6 +52,18 @@ type narratingExecutor struct {
 	// run", and two later stages that re-ran the suite themselves contradicted
 	// it in the same ledger.
 	filesChangedSinceValidation bool
+	// lastTestFingerprint identifies the produced work as it stood the last
+	// time the suite was run, and lastTestOutcome what that run said.
+	//
+	// Running the same command against byte-identical files asks a question
+	// already answered, and the answer costs whatever the suite costs plus a
+	// turn of the model's attention. Ladder rung 3 ran the same failing test
+	// three times in a row without an edit between them.
+	lastTestFingerprint string
+	lastTestOutput      string
+	lastTestFailed      bool
+	// worktree is where the produced work lives, needed to fingerprint it.
+	worktree string
 	// lastFailure is the output of the most recent tool that did not succeed.
 	// It is what the next attempt is shown: an agent told only that its tests
 	// failed will guess at why, and the guess is usually a second failure.
@@ -80,6 +92,26 @@ func (narrator *narratingExecutor) ExecuteTool(
 	narrator.execution.publishTool(narrator.ctx, narrator.scope,
 		events.KindToolStarted, executionID, name,
 		string(domain.CommandExecutionStateRunning), detail)
+
+	// A test run against files that have not moved since the last one is
+	// refused rather than performed. The model is told what changed — nothing —
+	// which is the fact that makes the next step obvious, and is a fact it
+	// cannot see for itself.
+	if executor.ToolName(name) == executor.ToolTest && narrator.worktree != "" {
+		if fingerprint := producedTreeDigest(narrator.worktree); fingerprint != "" &&
+			fingerprint == narrator.lastTestFingerprint {
+			tracef("tool", "%-12s %-10s %s", name, "unchanged",
+				"same command, same files as the last run")
+			narrator.execution.publishTool(narrator.ctx, narrator.scope,
+				events.KindToolCompleted, executionID, name,
+				string(domain.CommandExecutionStateSucceeded),
+				detail+" — not run: nothing has changed since the last run")
+			return executor.ToolResult{
+				State:          unchangedTestState(narrator.lastTestFailed),
+				StdoutRedacted: unchangedTestReport(narrator.lastTestOutput),
+			}, nil
+		}
+	}
 
 	result, err := narrator.inner.ExecuteTool(ctx, request)
 	if err != nil {
@@ -140,6 +172,11 @@ func (narrator *narratingExecutor) ExecuteTool(
 		narrator.validationFailed =
 			completed != domain.CommandExecutionStateSucceeded
 		narrator.filesChangedSinceValidation = false
+		narrator.lastTestFingerprint = producedTreeDigest(narrator.worktree)
+		narrator.lastTestOutput = strings.TrimSpace(
+			result.StdoutRedacted + "\n" + result.StderrRedacted)
+		narrator.lastTestFailed =
+			completed != domain.CommandExecutionStateSucceeded
 	}
 	if executor.ToolName(name) == executor.ToolApplyEdit &&
 		completed == domain.CommandExecutionStateSucceeded {
@@ -785,4 +822,30 @@ func succeedingLineOf(text string) string {
 		return firstOther
 	}
 	return strings.TrimSpace(firstLineOf(text))
+}
+
+// unchangedTestState keeps a refused re-run honest.
+//
+// A suite that failed and was not re-run has still failed, and reporting the
+// refusal as a success would tell the run its tests pass — which is the exact
+// false green the whole reconciliation layer exists to prevent. A suite that
+// passed and was not re-run has still passed.
+// unchangedTestReport is what a run is told instead of a second identical run.
+//
+// It gives the earlier output rather than a summary of it, because the model
+// needs the failure to act on and would otherwise run the suite again to get
+// it — which is the loop this exists to break. The last line is the only
+// instruction: nothing here is worth reading twice except what to do next.
+func unchangedTestReport(earlier string) string {
+	return "This was not run. Not one byte of the produced files has changed " +
+		"since the last time these tests ran, so the result is the same " +
+		"result:\n\n" + earlier +
+		"\n\nEdit a file before running them again."
+}
+
+func unchangedTestState(failedLastTime bool) string {
+	if failedLastTime {
+		return "failed"
+	}
+	return "succeeded"
 }

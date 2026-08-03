@@ -534,6 +534,63 @@ func loadInteractionThread(
 	return route, root, nil
 }
 
+// loadInteractionGraphRoute reaches the mounted graph canvas the way a person
+// actually does: select a durable thread from the /tasks picker (via
+// loadInteractionThread) and then follow it to the dedicated /graphs route.
+//
+// This exists because /tasks stopped inlining the interactive canvas at wide
+// viewport (REPO-041a). TaskWorkspaceShell now shows the observation rail's
+// RailGraphSummary there instead -- a plain div, not the
+// `[data-component="graph-canvas"]` surface -- and RailGraphSummary's own
+// comment says why: "the graph itself has a page". /graphs auto-adopts the
+// coordinator's SelectedThreadID once a thread has been picked (see the route
+// note on selectDurableThreadRow), so navigating there after
+// loadInteractionThread reaches the same real, coordinator-backed thread the
+// canvas checks need, at the route that actually draws the canvas.
+func loadInteractionGraphRoute(
+	page playwright.Page,
+	base *url.URL,
+	width int,
+	height int,
+	mode string,
+) (string, playwright.Locator, error) {
+	root := page.GetByTestId("app-root")
+	if _, _, err := loadInteractionThread(page, base, width, height, mode); err != nil {
+		return "/graphs", root, err
+	}
+	// The click that selects a thread on /tasks is not synchronous with the
+	// coordinator durably recording SelectedThreadID: selectDurableSessionForComposer's
+	// own comment says mutations stay disabled until the session is selected,
+	// and the composer becoming enabled is the observable signal that this
+	// happened. Navigating straight to /graphs after the click races that --
+	// /graphs boots a fresh page load, which reads whatever SelectedThreadID
+	// the coordinator has durably recorded *at that instant*, and a load that
+	// wins the race against a still-in-flight selection reads none at all: an
+	// empty graph canvas that never appears, not a missing one.
+	composer := page.GetByRole(*playwright.AriaRoleTextbox, playwright.PageGetByRoleOptions{
+		Name: "Message", Exact: playwright.Bool(true),
+	})
+	if err := browserAssertions().Locator(composer).ToBeEnabled(); err != nil {
+		return "/graphs", root, fmt.Errorf(
+			"wait for thread selection to settle before leaving /tasks for /graphs: %w", err)
+	}
+	target := base.ResolveReference(&url.URL{Path: "/graphs"}).String()
+	if _, err := page.Goto(target, playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+	}); err != nil {
+		return "/graphs", root, err
+	}
+	if err := root.WaitFor(playwright.LocatorWaitForOptions{
+		State: playwright.WaitForSelectorStateVisible,
+	}); err != nil {
+		return "/graphs", root, err
+	}
+	if err := browserAssertions().Locator(root).ToHaveAttribute("data-responsive-mode", mode); err != nil {
+		return "/graphs", root, err
+	}
+	return "/graphs", root, nil
+}
+
 // selectDurableSessionForComposer establishes the authority required for an
 // editable mounted composer. M18 deliberately disables mutations before a
 // session is selected, so browser checks select a coordinator-backed thread

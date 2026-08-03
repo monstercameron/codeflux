@@ -166,6 +166,59 @@ func (repositories *Repositories) GetRepository(
 	return repository, nil
 }
 
+// UpdateRepositoryGitIdentity resynchronises the stored Git identity to a
+// revision actually observed for this repository (AUDIT-011b).
+//
+// EnsureLocalBootstrap binds git_identity once, at first open, and nothing
+// updated it after that: a task's worktree is created from whatever HEAD is
+// current at launch time, which drifts from the bootstrap-time value the
+// moment the canonical repository gains a single commit. Context selection
+// later insists the two match exactly, so every launch after the first
+// degraded to the worktree-listing fallback. The caller that actually
+// resolves a live revision — task_run_launcher.go's resolveWorktree — is
+// expected to call this immediately after, so the column reflects the
+// revision the run's own worktree was created from rather than a value from
+// whenever the repository happened to be opened.
+func (repositories *Repositories) UpdateRepositoryGitIdentity(
+	ctx context.Context,
+	id domain.RepositoryID,
+	gitIdentity string,
+) error {
+	if id.IsZero() {
+		return errors.New("repository ID must not be empty")
+	}
+	if err := validateBounded("Git identity", gitIdentity, 512); err != nil {
+		return err
+	}
+	_, micros := repositories.timestamp()
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		result, err := transaction.sql.ExecContext(ctx,
+			`UPDATE repositories
+			 SET git_identity = ?, updated_at_unix_micros = ?, revision = revision + 1
+			 WHERE id = ? AND deleted_at_unix_micros IS NULL`,
+			gitIdentity, micros, id,
+		)
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return sql.ErrNoRows
+		}
+		return nil
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return typedError(ErrNotFound, "update repository git identity", err)
+	}
+	if err != nil {
+		return repositoryWriteError("update repository git identity", err)
+	}
+	return nil
+}
+
 func repositoryWriteError(operation string, err error) error {
 	switch repositoryConstraintKind(err) {
 	case ErrConflict:

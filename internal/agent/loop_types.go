@@ -113,6 +113,21 @@ type ModelInput struct {
 	FactualEvents     []FactualEvent
 	ApprovedTools     []providers.ToolDeclaration
 	PreviousResults   []ToolFeedback
+	// StructuredOutput pins the answer to a schema, for the calls whose result
+	// is data rather than work.
+	//
+	// A model asked in prose for "one behaviour per line and nothing else"
+	// returns numbered lines, bullets and headings often enough that the parser
+	// reading it back has a case for each, and the cases it does not have are
+	// silent: a paragraph counted as one behaviour produced a plan claiming the
+	// work was a single unit when nothing established that. A schema removes
+	// the guessing rather than adding another case to it.
+	//
+	// Nil for the ordinary working turns, which answer with tool calls. Those
+	// are already structured -- the arguments arrive as JSON against the tool's
+	// own schema -- and constraining the whole answer would leave the model no
+	// way to call anything.
+	StructuredOutput *providers.StructuredOutputRequirement
 }
 
 // CompletionSignal separates source implementation from validation evidence.

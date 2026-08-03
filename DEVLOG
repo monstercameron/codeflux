@@ -25,6 +25,44 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-124
+Date: 2026-08-03
+Status: The first structured-output call site exists; the working turns are
+  still tool calls
+Change-ID: CL-20260803-114
+Commit: pending
+Request-or-TODO: All model output structured; analysis item 10
+Goal: Stop reverse-engineering prose, and stop asking a question already
+  answered
+Decisions: Threaded the requirement through ModelInput rather than a new port.
+  The provider layer already had the type and the validation; what was missing
+  was a way for a caller to ask.
+  Left the ordinary working turns unconstrained. Those answer with tool calls,
+  whose arguments already arrive as JSON against the tool's own schema, and
+  constraining the whole answer would leave the model no way to call anything.
+  Kept parseBehaviours as a fallback rather than deleting it. Not every
+  configured model advertises structured output, and a planner that cannot
+  honour a schema should cost a worse decomposition, not the run.
+  Fingerprinted the produced tree with the same walk and exclusions the
+  checkpoint uses, so a digest and a capture always agree about what the
+  produced work is.
+  Returned no digest at all for an unreadable tree. A wrong digest would make
+  two different states look identical, which would suppress a test run that
+  needed to happen -- the one mistake this must not make
+Files-or-schemas: internal/agent/loop_types.go, internal/openaimodel/wire.go,
+  internal/coordinator/agent_planning.go and its test, agent_narration.go,
+  verified_checkpoint.go
+Validation: Build, vet, gofmt, planning-schema tests, openaimodel and agent
+  suites
+Failures-or-discarded-approaches: Constraining every call including the working
+  turns, which would have removed tool calling entirely
+Known-limitations: Only planning is schema-constrained. The adversarial review
+  and the clarification call still return prose. File writes are still whole-
+  file content rather than patches: the envelope is structured, the content
+  field is not, which is where a markdown fence still gets in -- refused by the
+  write guard rather than made impossible
+Next-safe-step: The adversarial review, which parses prose into findings
+
 Dev-Log: DL-20260803-123
 Date: 2026-08-03
 Status: Items 1 to 3 of the refinement analysis are in

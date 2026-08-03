@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"codeflux.dev/codeflux/internal/atomdoc"
+	"codeflux.dev/codeflux/internal/atomname"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -36,6 +38,111 @@ type AtomDocumentationWriter interface {
 		ctx context.Context,
 		input storage.CreateAtomDocumentationRevision,
 	) (storage.AtomDocumentationRevision, error)
+}
+
+// AtomNameWriter is the storage capability naming needs, declared narrowly
+// here for the same reason AtomDocumentationWriter is.
+type AtomNameWriter interface {
+	CreateAtomNameRevision(
+		ctx context.Context,
+		record atomname.AtomNameRecord,
+	) (storage.AtomNameRevision, error)
+}
+
+// ControlFlowNamingScope is the semantic scope every catalog name is claimed
+// in. The names are one coherent vocabulary rather than per-package
+// identifiers, so they share one scope and the collision trigger is what keeps
+// two entries from claiming the same phrase.
+const ControlFlowNamingScope = "control-flow"
+
+// SeedControlFlowNames gives every catalog entry its canonical name.
+//
+// A documentation revision records what an atom promises but not what it is
+// called: the schema's nineteen fields hold no name, and the naming lane is a
+// separate table. Seeding documentation alone therefore produces a catalog
+// that can be searched by promise and rendered by nothing, because every
+// surface that lists atoms lists them by name. The two are seeded together so
+// that a project which has the catalog has a usable catalog.
+//
+// Naming is idempotent for the same reason documentation is: a revision
+// identity is derived from the atom, its version, the sequence and the
+// canonical name, so re-seeding an unchanged entry resolves to the identity
+// already stored and the repository accepts it as a no-op.
+func SeedControlFlowNames(
+	ctx context.Context,
+	writer AtomNameWriter,
+	projectID domain.ProjectID,
+	createdAt time.Time,
+) (SeedResult, error) {
+	if writer == nil {
+		return SeedResult{}, fmt.Errorf("atomcatalog: an atom name writer is required")
+	}
+	if projectID.IsZero() {
+		return SeedResult{}, fmt.Errorf("atomcatalog: a project identity is required")
+	}
+	if createdAt.IsZero() || createdAt.Location() != time.UTC {
+		return SeedResult{}, fmt.Errorf("atomcatalog: created-at must be a non-zero UTC timestamp")
+	}
+	scope, err := atomname.NewNamingScope(projectID, ControlFlowNamingScope)
+	if err != nil {
+		return SeedResult{}, fmt.Errorf("atomcatalog: naming scope: %w", err)
+	}
+
+	result := SeedResult{}
+	for _, entry := range controlFlowEntries {
+		record, err := entry.NameRecord(scope, createdAt)
+		if err != nil {
+			return SeedResult{}, fmt.Errorf("atomcatalog: entry %d %q: %w", entry.Ordinal, entry.Name, err)
+		}
+		stored, err := writer.CreateAtomNameRevision(ctx, record)
+		if err != nil {
+			return SeedResult{}, fmt.Errorf("atomcatalog: name entry %d %q: %w", entry.Ordinal, entry.Name, err)
+		}
+		if !stored.CreatedAt.Before(createdAt) {
+			result.Written = append(result.Written, entry.Name)
+		} else {
+			result.Unchanged = append(result.Unchanged, entry.Name)
+		}
+	}
+	return result, nil
+}
+
+// NameRecord derives one entry's canonical naming revision.
+func (entry ControlFlowEntry) NameRecord(
+	scope atomname.NamingScope,
+	createdAt time.Time,
+) (atomname.AtomNameRecord, error) {
+	atomID, err := entry.AtomID()
+	if err != nil {
+		return atomname.AtomNameRecord{}, err
+	}
+	atomVersion, err := atomdoc.NewAtomVersionID(atomID, 1)
+	if err != nil {
+		return atomname.AtomNameRecord{}, err
+	}
+	canonical, err := atomname.NewCanonicalName(entry.Name)
+	if err != nil {
+		return atomname.AtomNameRecord{}, err
+	}
+	// The rationale names something real rather than filling the field. An
+	// entry's surveyed precedent is the thing its name is most likely to be
+	// confused with, and its purpose is what tells the two apart. The
+	// precedent is only used when it is substantive: four entries record
+	// "none", which the rationale rules correctly refuse as not saying
+	// anything, and for those the catalog's own neighbours are the honest
+	// answer.
+	nearest := entry.Precedent
+	if len(strings.Fields(nearest)) < 2 {
+		nearest = "the other " + string(entry.Kind) + " constructs in the control-flow catalog"
+	}
+	rationale, err := atomname.NewNamingRationale(nearest, entry.Purpose)
+	if err != nil {
+		return atomname.AtomNameRecord{}, err
+	}
+	return atomname.NewAtomNameRecord(
+		atomID, atomVersion, scope, canonical, rationale,
+		1, atomname.AtomNameRevisionID{}, createdAt,
+	)
 }
 
 // SeedControlFlowCatalog writes every control-flow entry as an admitted
@@ -88,7 +195,13 @@ func SeedControlFlowCatalog(
 		// A repository accepting an identical revision returns the stored row
 		// unchanged, so comparing creation times distinguishes a fresh write
 		// from an accepted repeat without a second query.
-		if stored.CreatedAt.Equal(createdAt) {
+		//
+		// The comparison is "not older than this run" rather than equality:
+		// the storage lane stamps its own timestamp on insert and does not
+		// carry the caller's through, so an equality test called every fresh
+		// write a repeat and reported a seeding run that wrote the whole
+		// catalog as having written almost none of it.
+		if !stored.CreatedAt.Before(createdAt) {
 			result.Written = append(result.Written, entry.Name)
 		} else {
 			result.Unchanged = append(result.Unchanged, entry.Name)

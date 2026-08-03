@@ -93,6 +93,53 @@ func (checkpoint *verifiedCheckpoint) restore(worktree string) bool {
 	return true
 }
 
+// producedTreeDigest identifies the produced work without copying it.
+//
+// The same walk and the same exclusions as the checkpoint, so a digest and a
+// capture always agree about what "the produced work" is. Two digests being
+// equal means every source and test file is byte for byte identical, which is
+// exactly the question "has anything changed since the last test run" asks.
+func producedTreeDigest(worktree string) string {
+	var paths []string
+	err := filepath.Walk(worktree, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, relErr := filepath.Rel(worktree, path)
+		if relErr != nil {
+			return relErr
+		}
+		if skipFromCheckpoint(relative) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Mode().IsRegular() {
+			paths = append(paths, relative)
+		}
+		return nil
+	})
+	if err != nil {
+		// An unreadable tree has no digest rather than a wrong one. A wrong
+		// digest would make two different states look identical, which is the
+		// one mistake this must not make: it would suppress a test run that
+		// needed to happen.
+		return ""
+	}
+	sort.Strings(paths)
+	sum := sha256.New()
+	for _, relative := range paths {
+		body, readErr := os.ReadFile(filepath.Join(worktree, relative))
+		if readErr != nil {
+			return ""
+		}
+		sum.Write([]byte(relative))
+		sum.Write(body)
+	}
+	return hex.EncodeToString(sum.Sum(nil))[:12]
+}
+
 // copyProducedTree copies every file that is part of the produced work and
 // returns a digest of what it copied.
 //

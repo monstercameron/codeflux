@@ -11,10 +11,11 @@ package openaimodel
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"path"
 	"strings"
@@ -30,12 +31,6 @@ const DefaultEndpoint = "https://api.openai.com/v1/responses"
 
 // DefaultModel is the model a run uses unless told otherwise.
 const DefaultModel = "gpt-5.6-luna"
-
-// maximumResponseBytes bounds what is read back.
-//
-// A response is parsed into memory, so an unbounded read is an unbounded
-// allocation driven by a remote party.
-const maximumResponseBytes = 8 << 20
 
 // Options configure one model client.
 type Options struct {
@@ -66,13 +61,35 @@ type Options struct {
 	// model multiplies the rate on every token. Empty sends no level and lets
 	// the provider decide.
 	Effort string
+	// RetryPolicy bounds physical attempts, backoff, and concurrency for every
+	// request this client makes (PIPE-066a). The zero value is not "no retry":
+	// providers.NewRetryExecutor fills every unset field with the same
+	// defaults every other provider caller gets (three attempts, jittered
+	// exponential backoff, a concurrency ceiling of four), so a caller that
+	// says nothing about retries still gets bounded, backed-off, admission
+	// controlled requests rather than a bare, unmediated HTTP call.
+	RetryPolicy providers.RetryPolicy
 }
 
 // Model implements agent.FixedModel.
+//
+// Every physical request this client makes to the provider passes through
+// transport (a providers.HTTPTransport, for bounded, non-redirecting HTTP
+// I/O and Retry-After parsing) and retries (a providers.RetryExecutor, for
+// bounded attempts, jittered exponential backoff, and the one admission point
+// that bounds this client's concurrent requests). Before PIPE-066a this
+// client issued a bare options.Client.Do(request) with none of that: no
+// retry, no backoff, no Retry-After handling, no concurrency ceiling. That
+// port was the only production implementation of agent.FixedModel, so a real
+// run had no rate-limit handling of any kind regardless of how completely
+// internal/providers and internal/coordinator's budgeted execution service
+// implemented it elsewhere — nothing in the real path ever called them.
 type Model struct {
-	options  Options
-	identity providers.ModelIdentity
-	price    providers.PriceSnapshot
+	options   Options
+	identity  providers.ModelIdentity
+	price     providers.PriceSnapshot
+	transport *providers.HTTPTransport
+	retries   *providers.RetryExecutor
 }
 
 // New builds a model client.
@@ -92,16 +109,25 @@ func New(options Options) (*Model, error) {
 		// exists so a hung connection ends the round rather than the run.
 		options.Timeout = 5 * time.Minute
 	}
-	if options.Client == nil {
-		options.Client = &http.Client{Timeout: options.Timeout}
-	}
 	if !options.Price.Input.Known || !options.Price.Output.Known {
 		return nil, errors.New(
 			"input and output token prices are required; a run cannot enforce a " +
 				"budget it cannot price")
 	}
+	transport, err := providers.NewHTTPTransport(providers.TransportOptions{
+		HTTPClient: options.Client, RequestTimeout: options.Timeout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build the model's HTTP transport: %w", err)
+	}
+	retries, err := providers.NewRetryExecutor(
+		options.RetryPolicy, noDurableAttemptRecorder{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("build the model's retry executor: %w", err)
+	}
 	model := &Model{
-		options: options,
+		options: options, transport: transport, retries: retries,
 		identity: providers.ModelIdentity{
 			Provider: providers.ProviderIdentity{
 				Adapter: "openai-responses", AdapterVersion: "1",
@@ -120,8 +146,44 @@ func New(options Options) (*Model, error) {
 // Identity reports what this client speaks to.
 func (model *Model) Identity() providers.ModelIdentity { return model.identity }
 
+// noDurableAttemptRecorder satisfies providers.AttemptRecorder without
+// persisting anything.
+//
+// A durable per-attempt ledger belongs to the storage-backed execution path
+// (providerExecutionService / BudgetedProviderExecutionService in
+// internal/coordinator), which owns a *storage.Repositories and a
+// domain.TaskID-scoped logical request row neither of which this port has:
+// agent.FixedModel.ObserveThink receives only a context and a ModelInput. Not
+// recording here does not lose the retry and backoff behaviour those attempts
+// still get — the admission ceiling, the backoff schedule, and the
+// Retry-After handling are all enforced by providers.RetryExecutor regardless
+// of what its recorder does — it only means this client's individual physical
+// attempts are not separately queryable after the fact, the same gap that
+// existed before this port had any retry executor to call.
+type noDurableAttemptRecorder struct{}
+
+func (noDurableAttemptRecorder) PrepareProviderAttempt(
+	context.Context, providers.PhysicalAttempt,
+) error {
+	return nil
+}
+
+func (noDurableAttemptRecorder) CompleteProviderAttempt(
+	context.Context, providers.AttemptRecord,
+) error {
+	return nil
+}
+
 // ObserveThink runs one round: it sends the observation and returns the tool
 // calls the model chose and whether it considers the work done.
+//
+// Every physical attempt is bounded, backed off, and admitted through
+// model.retries (PIPE-066a) rather than issued directly: a 429 or overload
+// response is retried with jittered exponential backoff or the provider's own
+// Retry-After, and the shared admission point bounds how many requests this
+// client has in flight at once and narrows under sustained backpressure,
+// exactly as internal/providers.RetryExecutor is tested to do for every other
+// caller that already went through it.
 func (model *Model) ObserveThink(
 	ctx context.Context,
 	input agent.ModelInput,
@@ -130,30 +192,122 @@ func (model *Model) ObserveThink(
 	if err != nil {
 		return agent.ModelTurn{}, fmt.Errorf("encode the model request: %w", err)
 	}
-	request, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, model.options.Endpoint, bytes.NewReader(body))
+	requestID, err := domain.NewModelRequestID()
 	if err != nil {
 		return agent.ModelTurn{}, err
 	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+model.options.APIKey)
+	hash := sha256.Sum256(body)
+	identity := providers.RequestIdentity{
+		ModelRequestID: requestID,
+		Provider:       model.identity.Provider,
+		Model:          model.identity,
+		// The Responses API call this client makes is not declared against any
+		// provider-native idempotency scope, so Idempotency stays the
+		// unsupported zero value and the logical key below is this client's
+		// own, used only to satisfy RetryExecutor's identity validation, not
+		// to deduplicate against the provider.
+		IdempotencyKey: requestID.String(),
+		RequestHash:    hex.EncodeToString(hash[:]),
+	}
 
-	response, err := model.options.Client.Do(request)
-	if err != nil {
-		// The URL is included but the key is in a header, so it cannot reach a
-		// log through this error.
-		return agent.ModelTurn{}, fmt.Errorf("call the model: %w", err)
+	var reply responsesReply
+	_, executeErr := model.retries.Execute(
+		ctx, identity,
+		func(attemptCtx context.Context, _ providers.PhysicalAttempt) providers.AttemptOutcome {
+			var decoded responsesReply
+			_, requestErr := model.transport.DoJSON(attemptCtx, providers.HTTPRequest{
+				Method:   http.MethodPost,
+				Endpoint: model.options.Endpoint,
+				Header: http.Header{
+					"Content-Type":  []string{"application/json"},
+					"Authorization": []string{"Bearer " + model.options.APIKey},
+				},
+				Body: body,
+				// This is the fixed, operator-configured provider endpoint every
+				// run has always called; requiring explicit remote approval here
+				// would be a new gate this ticket does not add, not a preserved
+				// one. See ValidateProviderEndpoint: without this, the transport
+				// would refuse the request outright, which is not what any
+				// existing run does today.
+				EndpointPolicy: providers.EndpointPolicy{AllowRemote: true},
+			}, &decoded)
+			if requestErr != nil {
+				return providers.AttemptOutcome{Err: classifyModelAttemptError(requestErr)}
+			}
+			reply = decoded
+			return providers.AttemptOutcome{}
+		},
+	)
+	if executeErr != nil {
+		return agent.ModelTurn{}, executeErr
 	}
-	defer func() { _ = response.Body.Close() }()
+	return model.decodeTurn(input, requestID, reply)
+}
 
-	payload, err := io.ReadAll(io.LimitReader(response.Body, maximumResponseBytes))
-	if err != nil {
-		return agent.ModelTurn{}, fmt.Errorf("read the model response: %w", err)
+// classifyModelAttemptError turns one physical attempt's transport failure
+// into the Failure vocabulary providers.RetryExecutor's decide function reads
+// to choose retry, backoff and admission-narrowing behaviour (PIPE-066a;
+// PIPE-067's jitter and Retry-After handling; PIPE-069's narrowing on
+// backpressure).
+//
+// A rate limit or server overload is retryable and carries whatever
+// Retry-After the provider sent, which the executor honours exactly rather
+// than computing its own backoff. An authentication failure and an otherwise
+// unrecognised status are not retried: retrying an expired key or a malformed
+// request produces the same refusal every time, so spending attempts on it
+// only delays reporting the failure that was already final. A transport-level
+// error below the HTTP status line — a dropped connection, a timeout, a
+// context cancellation reaching the wire — is retried the same way any other
+// provider transport hiccup is.
+//
+// Cause is always the joined pair of the descriptive provider message and
+// the package sentinel for the chosen Kind, never the message alone. Failure
+// itself only prioritises Cause over synthesising a sentinel from Kind when
+// Cause is non-nil (see Failure.Unwrap), so a Cause carrying just the prose
+// message would silently break every errors.Is(err, providers.ErrRateLimited)
+// check the retry executor and its caller make — RetryExecutor's own
+// decide() decides "retry or not" that way, not by Kind.
+func classifyModelAttemptError(err error) error {
+	var status *providers.HTTPStatusError
+	if errors.As(err, &status) {
+		cause := modelStatusError(status)
+		switch {
+		case status.StatusCode == http.StatusTooManyRequests:
+			return &providers.Failure{
+				Kind: providers.FailureRateLimited, Operation: "call the model",
+				Retryable: true, RetryAfter: status.RetryAfter,
+				Cause: errors.Join(cause, providers.ErrRateLimited),
+			}
+		case status.StatusCode >= http.StatusInternalServerError:
+			return &providers.Failure{
+				Kind: providers.FailureUnavailable, Operation: "call the model",
+				Retryable: true, RetryAfter: status.RetryAfter,
+				Cause: errors.Join(cause, providers.ErrUnavailable),
+			}
+		case status.StatusCode == http.StatusUnauthorized ||
+			status.StatusCode == http.StatusForbidden:
+			return &providers.Failure{
+				Kind: providers.FailureAuthentication, Operation: "call the model",
+				Retryable: false, Cause: errors.Join(cause, providers.ErrAuthentication),
+			}
+		default:
+			return &providers.Failure{
+				Kind: providers.FailureInvalidRequest, Operation: "call the model",
+				Retryable: false, Cause: errors.Join(cause, providers.ErrInvalidRequest),
+			}
+		}
 	}
-	if response.StatusCode != http.StatusOK {
-		return agent.ModelTurn{}, modelStatusError(response.StatusCode, payload)
+	// Not a status the provider sent back at all: a dial failure, a timeout, a
+	// canceled context. RetryExecutor's own decide() checks ctx.Err() and
+	// context.Canceled ahead of consulting Retryable, so a canceled or
+	// deadline-exceeded run still ends as AttemptCanceled regardless of this
+	// classification — this only governs genuine transport hiccups. err is
+	// joined rather than substituted so a wrapped context.Canceled or
+	// context.DeadlineExceeded inside it still satisfies errors.Is downstream.
+	return &providers.Failure{
+		Kind: providers.FailureTransport, Operation: "call the model",
+		Retryable: true, Cause: errors.Join(err, providers.ErrTransport),
 	}
-	return model.decodeTurn(input, payload)
 }
 
 // modelStatusError reports a refusal in the provider's own words.
@@ -161,7 +315,7 @@ func (model *Model) ObserveThink(
 // The message is what the provider said, bounded, because "the model call
 // failed" is the same sentence for an expired key, a rate limit, and a model
 // name that does not exist — three different things to do about it.
-func modelStatusError(status int, payload []byte) error {
+func modelStatusError(status *providers.HTTPStatusError) error {
 	var envelope struct {
 		Error struct {
 			Message string `json:"message"`
@@ -169,34 +323,35 @@ func modelStatusError(status int, payload []byte) error {
 			Code    string `json:"code"`
 		} `json:"error"`
 	}
-	_ = json.Unmarshal(payload, &envelope)
+	_ = status.DecodeBody(&envelope)
 	message := strings.TrimSpace(envelope.Error.Message)
 	if message == "" {
-		message = strings.TrimSpace(string(payload))
+		// No structured error field, or a non-JSON body: fall back to the raw
+		// text exactly as the pre-PIPE-066a version did, passed through
+		// unchanged rather than through a real redaction policy, since it is
+		// the provider's own error text about this request, not user content.
+		if raw, summaryErr := status.RedactedBodySummary(
+			func(value string) string { return value },
+		); summaryErr == nil {
+			message = strings.TrimSpace(raw)
+		}
 	}
 	const bound = 512
 	if len(message) > bound {
 		message = message[:bound] + "…"
 	}
 	if message == "" {
-		return fmt.Errorf("the model refused the request with status %d", status)
+		return fmt.Errorf("the model refused the request with status %d", status.StatusCode)
 	}
-	return fmt.Errorf("the model refused the request (%d): %s", status, message)
+	return fmt.Errorf("the model refused the request (%d): %s", status.StatusCode, message)
 }
 
 // decodeTurn reads the provider's answer into the loop's vocabulary.
 func (model *Model) decodeTurn(
 	input agent.ModelInput,
-	payload []byte,
+	requestID domain.ModelRequestID,
+	response responsesReply,
 ) (agent.ModelTurn, error) {
-	var response responsesReply
-	if err := json.Unmarshal(payload, &response); err != nil {
-		return agent.ModelTurn{}, fmt.Errorf("decode the model response: %w", err)
-	}
-	requestID, err := domain.NewModelRequestID()
-	if err != nil {
-		return agent.ModelTurn{}, err
-	}
 	turn := agent.ModelTurn{
 		ModelRequestID: requestID,
 		Model:          model.identity,

@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -158,4 +159,48 @@ func fileNamesOf(steps []agentloop.PlanStep) []string {
 		files = append(files, step.ExpectedFiles...)
 	}
 	return files
+}
+
+// TestAPlanningAnswerIsReadFromItsSchema covers the structured path.
+func TestAPlanningAnswerIsReadFromItsSchema(t *testing.T) {
+	behaviours, ok := decodedBehaviours(
+		`{"behaviours":["print the greeting","refuse an empty name"]}`)
+	if !ok || len(behaviours) != 2 {
+		t.Fatalf("a schema-shaped answer decoded to %v (ok=%t)", behaviours, ok)
+	}
+	if behaviours[0] != "print the greeting" {
+		t.Errorf("the first behaviour reads %q", behaviours[0])
+	}
+}
+
+// TestAProseAnswerFallsBackToTheLineParser keeps a model that cannot honour a
+// schema working, which is why the line parser stays.
+func TestAProseAnswerFallsBackToTheLineParser(t *testing.T) {
+	if _, ok := decodedBehaviours("- print the greeting\n- refuse an empty name"); ok {
+		t.Error("prose was read as a schema answer")
+	}
+	if got := parseBehaviours("- print the greeting\n- refuse an empty name"); len(got) != 2 {
+		t.Errorf("the fallback parser found %d behaviour(s), wanted 2", len(got))
+	}
+}
+
+// TestTheBehaviourSchemaIsStrictAndClosed guards the two properties the
+// Responses API requires of a strict schema, and which a schema permitting
+// extra fields would lose: the model could answer a different question in them.
+func TestTheBehaviourSchemaIsStrictAndClosed(t *testing.T) {
+	schema := behaviourSchema()
+	if !schema.Strict {
+		t.Error("the planning schema is not strict, so it is a suggestion")
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(schema.Schema, &decoded); err != nil {
+		t.Fatalf("the planning schema is not valid JSON: %v", err)
+	}
+	if extra, ok := decoded["additionalProperties"].(bool); !ok || extra {
+		t.Error("the planning schema permits properties nobody asked for")
+	}
+	required, ok := decoded["required"].([]any)
+	if !ok || len(required) != 1 || required[0] != "behaviours" {
+		t.Errorf("the planning schema requires %v", decoded["required"])
+	}
 }

@@ -316,6 +316,7 @@ type ProjectOperations interface {
 	GetProject(context.Context, domain.ProjectID) (Project, error)
 	CreateRepository(context.Context, CreateRepository) (Repository, error)
 	GetRepository(context.Context, domain.RepositoryID) (Repository, error)
+	UpdateRepositoryGitIdentity(context.Context, domain.RepositoryID, string) error
 }
 
 // ConversationOperations groups thread and immutable message operations.

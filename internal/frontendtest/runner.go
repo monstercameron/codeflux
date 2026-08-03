@@ -700,7 +700,7 @@ func runRouteContractChecks(
 			// whole route sweep, matching how a missing heading is handled
 			// two checks up.
 			_ = selectDurableThreadRow(page, viewport.Mode)
-			runThreadRouteChecks(page, route, viewport, result)
+			runThreadRouteChecks(page, base, route, viewport, result)
 		}
 	}
 	return true
@@ -708,6 +708,7 @@ func runRouteContractChecks(
 
 func runThreadRouteChecks(
 	page playwright.Page,
+	base *url.URL,
 	route string,
 	viewport Viewport,
 	result *Result,
@@ -754,7 +755,30 @@ func runThreadRouteChecks(
 	switch viewport.Mode {
 	case "wide":
 		appendVisible(result, "wide-thread-rail-visible", route, viewport.Name, threadRail)
-		appendVisible(result, "wide-graph-visible", route, viewport.Name, graph)
+		// At wide viewport TaskWorkspaceShell drops its inline graph pane in
+		// favor of the observation rail's RailGraphSummary -- a plain div
+		// with no complementary landmark ("the graph itself has a page",
+		// reference_chrome.go's comment on RailGraphSummary). The canvas
+		// itself lives on the dedicated /graphs route (GraphWorkspaceShell)
+		// instead, so that is where this check has to look (REPO-041a).
+		//
+		// Thread selection lands through a mutation the coordinator has to
+		// durably record before /graphs's fresh page load can adopt it as
+		// SelectedThreadID; navigating before that settles races it. The
+		// composer becoming enabled is the observable signal that selection
+		// committed (see selectDurableSessionForComposer), so wait for it,
+		// best-effort, before leaving -- a failed wait here is not fatal, it
+		// just means the navigation below proceeds on whatever state exists,
+		// same as it did before this wait was added.
+		_ = browserAssertions().Locator(composer).ToBeEnabled()
+		graphRoute := route
+		graphTarget := base.ResolveReference(&url.URL{Path: "/graphs"}).String()
+		if _, navErr := page.Goto(graphTarget, playwright.PageGotoOptions{
+			WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+		}); navErr == nil {
+			graphRoute = "/graphs"
+		}
+		appendVisible(result, "wide-graph-visible", graphRoute, viewport.Name, graph)
 	case "standard":
 		appendHidden(result, "standard-thread-rail-overlay-closed", route, viewport.Name, threadRail)
 		appendVisible(result, "standard-graph-visible", route, viewport.Name, graph)

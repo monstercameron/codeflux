@@ -20,6 +20,28 @@ type responsesRequest struct {
 	// sending a level the caller did not choose would silently change what
 	// every request costs.
 	Reasoning *responsesReasoning `json:"reasoning,omitempty"`
+	// Text carries a schema the answer must satisfy, when the caller asked for
+	// one. Omitted otherwise, because a request that names a format the caller
+	// never chose would change what the model is allowed to say.
+	Text *responsesText `json:"text,omitempty"`
+}
+
+// responsesText is the Responses API's output-format field.
+type responsesText struct {
+	Format responsesFormat `json:"format"`
+}
+
+// responsesFormat pins the answer to a JSON schema.
+//
+// Strict, always. A non-strict schema is a suggestion, and a suggestion is
+// what the prose instructions already were: "answer with one behaviour per
+// line and nothing else" produced numbered lines, headings and bullets often
+// enough that the parser that reads it back has a case for each.
+type responsesFormat struct {
+	Type   string          `json:"type"`
+	Name   string          `json:"name"`
+	Schema json.RawMessage `json:"schema"`
+	Strict bool            `json:"strict"`
 }
 
 // responsesReasoning carries the effort level for one request.
@@ -123,6 +145,21 @@ func (model *Model) buildRequest(input agent.ModelInput) responsesRequest {
 		// run is the local journal, and a second copy off the machine is
 		// exactly what this product promises not to make.
 		Store: false,
+	}
+	// A request that must answer in a schema declares no tools and makes no
+	// tool choice. The two are alternatives, not companions: an answer
+	// constrained to a JSON object cannot also be a function call, and a
+	// provider handed both has to pick one, which is a decision this code
+	// should be making rather than discovering.
+	if schema := input.StructuredOutput; schema != nil {
+		request.ToolChoice = ""
+		request.Text = &responsesText{Format: responsesFormat{
+			Type:   "json_schema",
+			Name:   schema.Name,
+			Schema: schema.Schema,
+			Strict: true,
+		}}
+		return request
 	}
 	// Only tools an open plan step can accept are declared. A tool offered
 	// while no step can receive its result is a round the loop will reject: it
