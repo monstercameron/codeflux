@@ -25,6 +25,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-101
+Date: 2026-08-02
+Status: Seven closed or capability-complete; the rest blocked on one file
+Change-ID: CL-20260802-091
+Commit: pending
+Request-or-TODO: PIPE-093 through PIPE-108
+Goal: Make the critic's findings mean something before making it smarter
+Assumptions: That the finders were approximately right and needed tuning --
+  wrong. One could not see its own target case at all
+Decisions: Repaired the two finders before touching anything about a
+  model-backed critic. A critic whose evidence is near-random gets worse, not
+  better, when something more expensive is built on top of it.
+  Measured both finders against fixture populations before promoting either,
+  and recorded the rates beside the rules, because the ticket makes retirement
+  conditional on the measurement and a rule promoted without one is exactly
+  what the governance section forbids.
+  Extracted the sort so the ranking test compares through production's own
+  comparator. A test with its own copy of the ordering proves the copy.
+  Capped the instruction per kind and disclosed the omission rather than
+  truncating quietly, so a reader can tell a short list from a complete one.
+  Did not attempt a model-backed critic. The honest path needs the budgeted
+  request path; the dishonest one is a new unauthorised provider call
+Files-or-schemas: agent_adversarial_review.go, new
+  pipe095_risk_selected_checks.go, six new test files
+Validation: Eighteen targeted tests; the engine canary at 5.03s and 5.12s
+Failures-or-discarded-approaches: None
+Known-limitations: Findings do not survive an attempt. Risk selection is built
+  and not called
+Next-safe-step: PIPE-098 and PIPE-095's call site, both one edit in
+  agent_execution.go, once that file is free
+
 Dev-Log: DL-20260802-100
 Date: 2026-08-02
 Status: Three closed, three open on a caller gap, one out of scope

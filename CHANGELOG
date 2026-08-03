@@ -50,6 +50,50 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-091
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- the critic's two finders were near-random, and now are not
+Request-or-TODO: PIPE-095, PIPE-096, PIPE-097, PIPE-103, PIPE-104, PIPE-105,
+  PIPE-106
+Outcome: Both static finders were broken in ways that made their output close to
+  noise, and the plan said so.
+  The swallowed-error finder skipped every impure function outright and could
+  only detect a swallow of another produced function's error, so the case it
+  exists to catch -- a standard-library call whose error goes nowhere -- was
+  structurally invisible. It now examines impure functions and resolves a
+  curated set of fallible standard-library calls through the effects the
+  contracts work already computes.
+  The boundary finder matched substrings over concatenated test source, so "0"
+  matched inside a file mode and "Error" matched inside t.Errorf: one finding was
+  unreachable and the rest were near-random. It now reads literal arguments from
+  the test syntax tree, so a token has to be an actual literal node.
+  Findings gained a stable identity derived from kind, location and content, an
+  evidence level and a lineage, tagged at each producer rather than stamped
+  uniformly afterwards. They are ranked by expected defect cost and capped per
+  kind in the instruction, with the omitted count disclosed rather than
+  truncated silently
+Affected-behavior: The critic reports different findings. Both finders were
+  measured before promotion and both measured clean, so neither is retired
+Compatibility-or-migration: reviewAdversarially's signature and behaviour are
+  unchanged; risk-selected review is a new function beside it
+Verification: Each repair's discriminating test is the named bug as a fixture --
+  an impure function swallowing a standard-library error, a file mode
+  suppressing the zero-edge finding, a t.Errorf suppressing the error-assertion
+  finding -- each failing against the old code, each with a control proving the
+  fix did not simply widen the finder into flagging everything. The ranking test
+  sorts through the production comparison rather than a copy of it
+Known-limitations: A finding still does not outlive its attempt, so a stable
+  identity is a property nothing yet uses; that is PIPE-098 and it lives in a
+  file this change does not own, as do PIPE-099, PIPE-100, PIPE-102, PIPE-107,
+  PIPE-108 and PIPE-095's one-line call site. The false-positive measurement is
+  a test-time population rather than a persisted cross-run metric. A model-backed
+  critic was not attempted because reaching a provider from here needs the
+  budgeted and authorised path, and building an unbudgeted one to get there
+  would be inventing the credential route this session has twice refused to
+  invent
+Dev-Log: DL-20260802-101
+
 Change-ID: CL-20260802-090
 Commit: pending
 Date: 2026-08-02
