@@ -31,6 +31,11 @@ type reviewMutationRepositories interface {
 	GetLatestCompletionCandidateForTask(context.Context, domain.TaskID) (storage.CompletionCandidate, error)
 	GetRunRevision(context.Context, domain.TaskID, domain.RunID) (uint64, error)
 	RecordTaskReviewDecision(context.Context, storage.RecordTaskReviewDecision) (storage.TaskReviewDecision, error)
+	// GetEpisodeByTask and CloseEpisode are what closeReviewDecisionEpisode
+	// (episode_lifecycle.go, MEM-001a) needs to close the run episode a
+	// review decision just resolved.
+	GetEpisodeByTask(context.Context, domain.TaskID) (storage.Episode, error)
+	CloseEpisode(context.Context, storage.CloseEpisode) (storage.Episode, error)
 }
 
 func NewReviewMutationService(repositories *storage.Repositories, worktrees *gitwork.Service) (*ReviewMutationService, error) {
@@ -76,7 +81,11 @@ func (service *ReviewMutationService) AcceptChange(ctx context.Context, command 
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
-	task, err = service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewAccept, command.Reason, command.IdempotencyKey)
+	episodeRevision := effect.CommitRevision
+	if episodeRevision == "" {
+		episodeRevision = command.DiffIdentity
+	}
+	task, err = service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewAccept, episodeRevision, command.Reason, command.IdempotencyKey)
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
@@ -98,7 +107,7 @@ func (service *ReviewMutationService) RequestRepair(ctx context.Context, command
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
-	task, err = service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewRequestRepair, command.Feedback, command.IdempotencyKey)
+	task, err = service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewRequestRepair, command.DiffIdentity, command.Feedback, command.IdempotencyKey)
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
@@ -110,7 +119,7 @@ func (service *ReviewMutationService) RejectChange(ctx context.Context, command 
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
-	task, err := service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewAbandon, command.Reason, command.IdempotencyKey)
+	task, err := service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewAbandon, command.DiffIdentity, command.Reason, command.IdempotencyKey)
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
@@ -122,7 +131,7 @@ func (service *ReviewMutationService) RollbackTask(ctx context.Context, command 
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
-	task, err := service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewRollback, command.Reason, command.IdempotencyKey)
+	task, err := service.finalizeReviewDecision(ctx, command.TaskID, storage.TaskReviewRollback, outcome.ObservedDiffIdentity, command.Reason, command.IdempotencyKey)
 	if err != nil {
 		return transport.ReviewMutationResult{}, err
 	}
@@ -153,8 +162,14 @@ func reviewDigest(parts ...string) string {
 // is where that translation belongs: the application knows a stale task
 // revision means the review binding changed, and says so in terms the port
 // already defines.
-func (service *ReviewMutationService) finalizeReviewDecision(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, reason, key string) (storage.Task, error) {
-	task, err := service.finalizeReviewDecisionWithStorageErrors(ctx, taskID, decision, reason, key)
+//
+// episodeRevision is the diff-identity-shaped string closeReviewDecisionEpisode
+// (MEM-001a) records as the closing episode's EndingRevision -- each call
+// site passes whatever revision identity it already has to hand (a commit
+// revision on accept, a diff identity on repair/reject, an observed diff
+// identity on rollback).
+func (service *ReviewMutationService) finalizeReviewDecision(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, episodeRevision, reason, key string) (storage.Task, error) {
+	task, err := service.finalizeReviewDecisionWithStorageErrors(ctx, taskID, decision, episodeRevision, reason, key)
 	if err != nil {
 		if errors.Is(err, storage.ErrStaleRevision) {
 			return storage.Task{}, fmt.Errorf("%w: %w", acceptance.ErrStaleReview, err)
@@ -164,7 +179,7 @@ func (service *ReviewMutationService) finalizeReviewDecision(ctx context.Context
 	return task, nil
 }
 
-func (service *ReviewMutationService) finalizeReviewDecisionWithStorageErrors(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, reason, key string) (storage.Task, error) {
+func (service *ReviewMutationService) finalizeReviewDecisionWithStorageErrors(ctx context.Context, taskID domain.TaskID, decision storage.TaskReviewDecisionKind, episodeRevision, reason, key string) (storage.Task, error) {
 	task, err := service.repositories.GetTask(ctx, taskID)
 	if err != nil {
 		return storage.Task{}, err
@@ -191,6 +206,15 @@ func (service *ReviewMutationService) finalizeReviewDecisionWithStorageErrors(ct
 	_, err = service.repositories.RecordTaskReviewDecision(ctx, storage.RecordTaskReviewDecision{TaskID: taskID, RunID: candidate.RunID, PlanRevision: candidate.PlanRevision, CompletionRevision: candidate.Revision, ExpectedTaskRevision: task.Revision, ExpectedRunRevision: runRevision, Decision: decision, ActorReference: "authenticated-local-user", AuthorityReference: "ReviewService." + string(decision), ReasonRedacted: reason, EventID: eventID, EventIdempotencyKey: key + ":task-state-event", IdempotencyKey: key + ":task-review-decision"})
 	if err != nil {
 		return storage.Task{}, err
+	}
+	// MEM-001a: the terminal user decision is now durably recorded above;
+	// this is the moment domain.NewEpisode's own doc comment names as an
+	// episode's close. A failure here must never make the just-recorded
+	// decision look like it did not happen, so it is called after
+	// RecordTaskReviewDecision has already succeeded, and its own errors are
+	// swallowed (closeReviewDecisionEpisode is itself best-effort).
+	if outcome, ok := episodeOutcomeForReviewDecision(decision); ok {
+		closeReviewDecisionEpisode(ctx, service.repositories, taskID, episodeRevision, outcome)
 	}
 	return service.repositories.GetTask(ctx, taskID)
 }

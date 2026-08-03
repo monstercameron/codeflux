@@ -2,7 +2,9 @@ package coordinator
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,10 +17,13 @@ import (
 // openRunEpisode/closeRunEpisode/recordAttemptTransition can be exercised
 // directly without constructing the rest of AgentExecution.Run's
 // dependencies (a provider, a worktree, a graph service) that these three
-// functions never touch.
-func mustOpenRunEpisodeFixture(t *testing.T) (*AgentExecution, agentScope, domain.TaskID) {
+// functions never touch. The returned path is the fixture's own SQLite
+// file, for tests (MEM-001a) that need to move the task to a state no
+// storage-layer method reachable from this package can produce directly --
+// see mustSetTaskState.
+func mustOpenRunEpisodeFixture(t *testing.T) (*AgentExecution, agentScope, domain.TaskID, string) {
 	t.Helper()
-	repositories, _ := mustOpenRetrievalRepositories(t)
+	repositories, path := mustOpenEpisodeLifecycleRepositories(t)
 	projectID, repositoryID := mustCreateForecastFixtureProjectAndRepository(t, repositories)
 	taskID, err := domain.NewTaskID()
 	if err != nil {
@@ -30,19 +35,82 @@ func mustOpenRunEpisodeFixture(t *testing.T) (*AgentExecution, agentScope, domai
 		projectID: projectID, repositoryID: repositoryID, taskID: taskID,
 		revision: "deadbeefcafefeed",
 	}
-	return execution, scope, taskID
+	return execution, scope, taskID, path
 }
 
-// TestMEM001_OpenRunEpisodeBindsFingerprintAndCloseFreezesItUnresolved
-// proves the MEM-001 run-boundary wiring end to end: a task whose exact
-// fingerprint was bound at forecast time (RecordTaskExactFingerprintBinding,
-// the same call ForecastTask now makes) gets a real, open episode carrying
-// that exact fingerprint when its run starts, and a real, closed episode
-// with Unresolved outcome when its run ends -- the append-only record §31
-// assumes exists, actually existing.
-func TestMEM001_OpenRunEpisodeBindsFingerprintAndCloseFreezesItUnresolved(t *testing.T) {
+// mustOpenEpisodeLifecycleRepositories opens a real, temporary, file-backed
+// SQLite database with every migration applied, mirroring task_preflight_
+// test.go's mustOpenRetrievalRepositories but also returning the database's
+// own path, which mustSetTaskState (MEM-001a) needs and the shared helper
+// does not expose.
+func mustOpenEpisodeLifecycleRepositories(t *testing.T) (*storage.Repositories, string) {
+	t.Helper()
 	ctx := context.Background()
-	execution, scope, taskID := mustOpenRunEpisodeFixture(t)
+	path := filepath.Join(t.TempDir(), "episode-lifecycle.sqlite")
+	database, err := storage.Open(ctx, storage.OpenOptions{Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := database.Close(context.Background()); err != nil {
+			t.Errorf("close episode lifecycle fixture database: %v", err)
+		}
+	})
+	if _, err := database.Migrate(ctx, storage.MigrationOptions{
+		ApplicationVersion: "episode-lifecycle-test",
+		BackupDirectory:    filepath.Join(t.TempDir(), "backups"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	repositories, err := storage.NewRepositories(database, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return repositories, path
+}
+
+// mustSetTaskState pokes a task's state directly through a second raw
+// connection to the same on-disk SQLite database mustOpenRunEpisodeFixture
+// built (WAL mode, so a second connection to the same file is safe). This
+// is the same "raw SQL fixture setup" pattern internal/storage's own tests
+// use to reach a state no exported repository method can produce with this
+// little scaffolding (e.g. worktree_repository_test.go, startup_recovery_
+// test.go), done from outside package storage because *storage.Repositories
+// keeps its *sql.DB unexported.
+func mustSetTaskState(t *testing.T, path string, taskID domain.TaskID, state domain.TaskState) {
+	t.Helper()
+	raw, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := raw.Close(); err != nil {
+			t.Errorf("close raw task-state connection: %v", err)
+		}
+	}()
+	if _, err := raw.ExecContext(context.Background(),
+		`UPDATE tasks SET state = ? WHERE id = ?`, string(state), taskID.String(),
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestMEM001a_OpenRunEpisodeBindsFingerprintAndCloseAbandonsItWhenTheTaskNeverReachesReview
+// proves the MEM-001 run-boundary wiring end to end, updated for MEM-001a's
+// closing rule: a task whose exact fingerprint was bound at forecast time
+// (RecordTaskExactFingerprintBinding, the same call ForecastTask now makes)
+// gets a real, open episode carrying that exact fingerprint when its run
+// starts, and -- because this fixture's task never reaches
+// TaskStateAwaitingReview -- a real, closed episode with Abandoned outcome
+// when its run ends: nobody ever had the chance to accept, reject, or
+// request a repair, so MEM-001a's home for "the run stopped without a
+// decision" applies. If closeRunEpisode still closed unconditionally
+// (MEM-001's rule), this would still pass with Abandoned; the discriminating
+// half of the rule -- that AwaitingReview leaves the episode OPEN instead --
+// is TestMEM001a_CloseRunEpisodeLeavesTheEpisodeOpenWhileAwaitingReview.
+func TestMEM001a_OpenRunEpisodeBindsFingerprintAndCloseAbandonsItWhenTheTaskNeverReachesReview(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, _ := mustOpenRunEpisodeFixture(t)
 
 	hash := strings.Repeat("c", 64)
 	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
@@ -69,6 +137,9 @@ func TestMEM001_OpenRunEpisodeBindsFingerprintAndCloseFreezesItUnresolved(t *tes
 		t.Fatalf("episode status = %s, want open", episode.Status)
 	}
 
+	// mustCreateForecastFixtureTask leaves the task in TaskStateDraft; it is
+	// never moved to AwaitingReview in this test, so closeRunEpisode must
+	// close it rather than leave it open.
 	execution.closeRunEpisode(ctx, episode, scope)
 
 	closed, err := execution.repositories.GetEpisode(ctx, episode.ID)
@@ -78,11 +149,53 @@ func TestMEM001_OpenRunEpisodeBindsFingerprintAndCloseFreezesItUnresolved(t *tes
 	if closed.Status != domain.EpisodeStatusClosed {
 		t.Fatalf("episode status after closeRunEpisode = %s, want closed", closed.Status)
 	}
-	if closed.Outcome == nil || *closed.Outcome != domain.EpisodeOutcomeUnresolved {
-		t.Fatalf("episode outcome = %#v, want Unresolved (no user decision is made inside a run)", closed.Outcome)
+	if closed.Outcome == nil || *closed.Outcome != domain.EpisodeOutcomeAbandoned {
+		t.Fatalf("episode outcome = %#v, want Abandoned (the run ended without ever reaching a review decision)", closed.Outcome)
 	}
 	if closed.EndingRevision == nil || *closed.EndingRevision != scope.revision {
 		t.Fatalf("episode ending revision = %#v, want %s", closed.EndingRevision, scope.revision)
+	}
+}
+
+// TestMEM001a_CloseRunEpisodeLeavesTheEpisodeOpenWhileAwaitingReview proves
+// the half of MEM-001a that actually fixes the "outcome column is always
+// the same value" defect: a run whose task reached TaskStateAwaitingReview
+// has a human decision still pending, so closeRunEpisode must leave that
+// episode open rather than closing it (Unresolved or Abandoned) and putting
+// it beyond episodes_immutable_after_close's reach forever. If the
+// AwaitingReview guard in closeRunEpisode were removed, this test's episode
+// would come back Closed/Abandoned instead of Open, and it would fail.
+func TestMEM001a_CloseRunEpisodeLeavesTheEpisodeOpenWhileAwaitingReview(t *testing.T) {
+	ctx := context.Background()
+	execution, scope, taskID, path := mustOpenRunEpisodeFixture(t)
+	hash := strings.Repeat("f", 64)
+	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
+		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := domain.NewRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, 1)
+	if episode.ID.IsZero() {
+		t.Fatal("expected a real episode for this fixture")
+	}
+
+	mustSetTaskState(t, path, taskID, domain.TaskStateAwaitingReview)
+
+	execution.closeRunEpisode(ctx, episode, scope)
+
+	stillOpen, err := execution.repositories.GetEpisode(ctx, episode.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stillOpen.Status != domain.EpisodeStatusOpen {
+		t.Fatalf("episode status after closeRunEpisode while AwaitingReview = %s, want open", stillOpen.Status)
+	}
+	if stillOpen.Outcome != nil {
+		t.Fatalf("episode outcome = %#v, want nil (still open)", stillOpen.Outcome)
 	}
 }
 
@@ -95,7 +208,7 @@ func TestMEM001_OpenRunEpisodeBindsFingerprintAndCloseFreezesItUnresolved(t *tes
 // -- that no episode row exists for the task at all -- would fail.
 func TestMEM001_OpenRunEpisodeIsBestEffortWithoutAFingerprintBinding(t *testing.T) {
 	ctx := context.Background()
-	execution, scope, taskID := mustOpenRunEpisodeFixture(t)
+	execution, scope, taskID, _ := mustOpenRunEpisodeFixture(t)
 
 	runID, err := domain.NewRunID()
 	if err != nil {
@@ -123,7 +236,7 @@ func TestMEM001_OpenRunEpisodeIsBestEffortWithoutAFingerprintBinding(t *testing.
 // separately reachable episodes.
 func TestMEM003_OpenRunEpisodeBindsThePipelineAttemptNumberItIsGiven(t *testing.T) {
 	ctx := context.Background()
-	execution, scope, taskID := mustOpenRunEpisodeFixture(t)
+	execution, scope, taskID, _ := mustOpenRunEpisodeFixture(t)
 	hash := strings.Repeat("d", 64)
 	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
 		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
@@ -178,7 +291,7 @@ func TestMEM003_OpenRunEpisodeBindsThePipelineAttemptNumberItIsGiven(t *testing.
 // converged one (failure absent).
 func TestMEM002_RecordAttemptTransitionPersistsGateFailureRungAndOutcome(t *testing.T) {
 	ctx := context.Background()
-	execution, scope, taskID := mustOpenRunEpisodeFixture(t)
+	execution, scope, taskID, _ := mustOpenRunEpisodeFixture(t)
 	hash := "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	if _, err := execution.repositories.RecordTaskExactFingerprintBinding(ctx, storage.RecordTaskExactFingerprintBinding{
 		TaskID: taskID, FingerprintSchemaVersion: 1, FingerprintHash: hash,
@@ -229,7 +342,7 @@ func TestMEM002_RecordAttemptTransitionPersistsGateFailureRungAndOutcome(t *test
 // against a zero-value episode (the shape openRunEpisode returns when it
 // could not open one), it must not panic and must not attempt a write.
 func TestMEM002_RecordAttemptTransitionIsBestEffortForAZeroEpisode(t *testing.T) {
-	execution, _, _ := mustOpenRunEpisodeFixture(t)
+	execution, _, _, _ := mustOpenRunEpisodeFixture(t)
 	execution.recordAttemptTransition(context.Background(), storage.Episode{}, 1,
 		"assembly", "it did not compile", "gpt-5.6-luna/standard", storage.EpisodeAttemptOutcomeSentBack)
 }

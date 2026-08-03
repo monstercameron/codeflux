@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-073
+Date: 2026-08-02
+Status: Closing at the decision site
+Change-ID: CL-20260802-063
+Commit: pending
+Request-or-TODO: MEM-001a
+Goal: Make an episode's outcome carry what actually happened
+Assumptions: An outcome column that always reads the same value is not a column
+Decisions: Moved closure to the acceptance-decision site rather than recording
+  the decision as a separate transition. The second option preserves the
+  append-only shape trivially and leaves the outcome permanently unresolved,
+  which is the defect restated rather than repaired.
+  Ordered the close after RecordTaskReviewDecision commits, so failing to close
+  an episode can never make a durably-recorded decision look like it did not
+  happen.
+  Left a task in awaiting-review open at run end instead of closing it
+  unresolved, since a decision is genuinely still pending. On a read error the
+  episode is left open rather than guessed at -- a wrong-but-present outcome is
+  worse than one a later build can still close.
+  Made re-closing a no-op rather than an error, because the immutability trigger
+  would otherwise turn a harmless double call into a failure. The trigger itself
+  is untouched
+Files-or-schemas: internal/coordinator/episode_lifecycle.go and its test,
+  review_mutations.go and its test. No migration
+Validation: Four invariants each proven by removing its guard and watching the
+  matching test fail, then restoring it. A compile-only pass over every package
+  confirmed no other implementer of the repositories interface broke
+Failures-or-discarded-approaches: The separate-transition option, above
+Known-limitations: An abandoned review is indistinguishable from a pending one
+  while nobody acts on it
+Next-safe-step: MEM-006 onward can now read outcomes
+
 Dev-Log: DL-20260802-072
 Date: 2026-08-02
 Status: Verified offline; paid path untouched

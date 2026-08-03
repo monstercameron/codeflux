@@ -42,6 +42,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-063
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- episodes close with a real outcome
+Request-or-TODO: MEM-001a
+Outcome: An episode now closes at the acceptance decision with the outcome that
+  decision made -- accepted, rejected, or abandoned -- instead of always closing
+  unresolved at the end of the agent run. Every episode previously reported
+  unresolved regardless of what happened, which made the outcome column useless
+  to every extractor the learning layer is specified against.
+  finalizeReviewDecision closes the task's open episode immediately after
+  RecordTaskReviewDecision succeeds. closeRunEpisode leaves a task in
+  awaiting-review open, because a real decision is still pending, and closes
+  anything else abandoned so a failed or cancelled run no longer sits open
+Affected-behavior: Episode outcomes carry the decision. No user-visible change
+Compatibility-or-migration: None. The outcome vocabulary and both repository
+  methods already existed from migration 000035; migration-check unchanged
+Verification: Every new invariant proven to discriminate by removing its guard,
+  watching the specific test fail, and restoring it -- the awaiting-review skip,
+  the abandoned outcome, the decision-site close, and the already-closed guard.
+  go test with an empty run pattern over ./... confirms no other implementer of
+  reviewMutationRepositories was broken by the interface change
+Known-limitations: A task reaching awaiting-review and never decided on keeps
+  its episode open. That is honest rather than a regression -- nobody has
+  decided -- but an abandoned review is indistinguishable from a pending one
+Dev-Log: DL-20260802-073
+
 Change-ID: CL-20260802-062
 Commit: pending
 Date: 2026-08-02
