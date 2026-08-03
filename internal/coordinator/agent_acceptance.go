@@ -24,6 +24,10 @@ type acceptanceExample struct {
 	Arguments []string
 	Stdin     string
 	Expected  string
+	// Tags is the go build -tags value the produced program needs to build or
+	// run under, when the requirement states one (PIPE-123). Empty means the
+	// default build constraints.
+	Tags string
 }
 
 // Acceptance markers. They are unmistakable rather than pretty because the
@@ -72,13 +76,21 @@ func parseOneExample(body string) (acceptanceExample, bool) {
 		case strings.HasPrefix(line, "args:"):
 			trimmed := strings.TrimSpace(strings.TrimPrefix(line, "args:"))
 			if trimmed != "" {
-				example.Arguments = strings.Split(trimmed, " ")
+				example.Arguments = splitAcceptanceArguments(trimmed)
 			}
 		case strings.HasPrefix(line, "stdin:"):
 			// Escaped rather than literal, so a multi-line input stays on one
 			// line and cannot be confused with the fields around it.
 			example.Stdin = unescapeExample(
 				strings.TrimSpace(strings.TrimPrefix(line, "stdin:")))
+		case strings.HasPrefix(line, "tags:"):
+			// The build constraint the produced program needs (PIPE-123). A
+			// repository whose acceptance-checked program only compiles under
+			// a tag -- an integration build, a platform variant -- could not
+			// otherwise state that, and "the program does not build on its
+			// own" is the wrong verdict for a program that builds exactly as
+			// asked.
+			example.Tags = strings.TrimSpace(strings.TrimPrefix(line, "tags:"))
 		case strings.HasPrefix(line, "expected:"):
 			collecting = true
 			if inline := strings.TrimSpace(
@@ -96,6 +108,61 @@ func unescapeExample(value string) string {
 	value = strings.ReplaceAll(value, `\n`, "\n")
 	value = strings.ReplaceAll(value, `\t`, "\t")
 	return value
+}
+
+// splitAcceptanceArguments splits an args: line into arguments the way a
+// shell would, so a single argument may contain a space (PIPE-121).
+//
+// Before this, an args: line split on every space unconditionally, so a
+// requirement could not express "greet Jane Doe" as one argument — it could
+// only ever be expressed as three, which silently narrowed what an
+// acceptance example could state about a command's real interface. A single-
+// or double-quoted span is now read as one argument with its quotes removed;
+// a backslash immediately before the quote character that opened the current
+// span is read as that literal character rather than as the close, so a
+// quote can appear inside an argument. Unquoted text still splits on
+// whitespace exactly as before, so every existing args: line parses
+// identically to how it always has.
+func splitAcceptanceArguments(text string) []string {
+	var arguments []string
+	var current strings.Builder
+	inToken := false
+	var quote rune
+	runes := []rune(text)
+	for index := 0; index < len(runes); index++ {
+		letter := runes[index]
+		if quote != 0 {
+			if letter == '\\' && index+1 < len(runes) && runes[index+1] == quote {
+				current.WriteRune(quote)
+				index++
+				continue
+			}
+			if letter == quote {
+				quote = 0
+				continue
+			}
+			current.WriteRune(letter)
+			continue
+		}
+		switch {
+		case letter == '"' || letter == '\'':
+			quote = letter
+			inToken = true
+		case letter == ' ' || letter == '\t':
+			if inToken {
+				arguments = append(arguments, current.String())
+				current.Reset()
+				inToken = false
+			}
+		default:
+			current.WriteRune(letter)
+			inToken = true
+		}
+	}
+	if inToken {
+		arguments = append(arguments, current.String())
+	}
+	return arguments
 }
 
 // acceptanceCommand decides which produced program the examples describe.
@@ -237,6 +304,73 @@ func (execution *AgentExecution) checkAcceptanceOracle(
 	}
 }
 
+// acceptanceBuildTags reads the build constraint the examples agree on
+// (PIPE-123).
+//
+// One built program is checked against every example in the set, so there is
+// exactly one build to constrain rather than one per example. The first
+// example that names a tags value wins; a requirement stating one on every
+// example it writes and none on the rest is the ordinary case, not a
+// conflict this needs to arbitrate.
+func acceptanceBuildTags(examples []acceptanceExample) string {
+	for _, example := range examples {
+		if example.Tags != "" {
+			return example.Tags
+		}
+	}
+	return ""
+}
+
+// moduleRootIn finds the Go module a worktree actually belongs to, which is
+// not always the worktree's own root (PIPE-123).
+//
+// Every acceptance-checking build and test invocation used to run with its
+// working directory fixed at the worktree root, which is right for the
+// ordinary layout and wrong for a repository that keeps its module at a
+// subdirectory go.mod -- a real, buildable repository that this reported as
+// "the run produced no runnable command" or "the program does not build on
+// its own" for a reason that had nothing to do with the run's own work.
+//
+// The worktree root is checked first, since it is the overwhelmingly common
+// case and needs no directory walk. When it holds no go.mod, the tree below
+// it is searched breadth-first for the shallowest go.mod, so a repository
+// nesting an unrelated, deeper module -- a vendored tool, an example -- does
+// not shadow the module the run's own commands actually belong to. The walk
+// does not descend into a directory beginning with ".", which excludes .git
+// and this pipeline's own .codeflux-* scratch directories without having to
+// name each one.
+func moduleRootIn(worktree string) (string, error) {
+	if _, err := os.Stat(filepath.Join(worktree, "go.mod")); err == nil {
+		return worktree, nil
+	}
+	queue := []string{worktree}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		entries, err := os.ReadDir(current)
+		if err != nil {
+			continue
+		}
+		var subdirectories []string
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			subdirectory := filepath.Join(current, entry.Name())
+			if _, err := os.Stat(filepath.Join(subdirectory, "go.mod")); err == nil {
+				return subdirectory, nil
+			}
+			subdirectories = append(subdirectories, subdirectory)
+		}
+		queue = append(queue, subdirectories...)
+	}
+	return "", fmt.Errorf(
+		"no go.mod was found at %s or in any directory beneath it", worktree)
+}
+
 // checkAcceptance runs the built program against everything it was promised to
 // do.
 //
@@ -273,7 +407,7 @@ func (execution *AgentExecution) checkAcceptance(
 		return skipped("no executable acceptance example was supplied, so " +
 			"there is nothing for the built program to reproduce"), nil
 	}
-	commands, err := producedCommands(ctx, worktree)
+	commands, err := producedCommands(ctx, worktree, acceptanceBuildTags(examples))
 	if err != nil || len(commands) == 0 {
 		return broke("the run produced no runnable command to check against "+
 			"its examples", nil), nil
@@ -303,8 +437,23 @@ func (execution *AgentExecution) checkAcceptance(
 		name = "program"
 	}
 	binary := filepath.Join(binaries, builtBinaryName(name))
-	build := exec.CommandContext(ctx, "go", "build", "-o", binary, command)
-	build.Dir = worktree
+	// The module a produced command builds from is not always the worktree
+	// root (PIPE-123): a repository can carry its module at a subdirectory
+	// go.mod without that being any less a repository that builds correctly.
+	// producedCommands already resolves commands relative to that module, so
+	// the build is run from the same place rather than from the worktree.
+	moduleRoot, moduleErr := moduleRootIn(worktree)
+	if moduleErr != nil {
+		return broke("the module this run's commands build from could not "+
+			"be found: "+moduleErr.Error(), nil), nil
+	}
+	buildArguments := []string{"build"}
+	if tags := acceptanceBuildTags(examples); tags != "" {
+		buildArguments = append(buildArguments, "-tags", tags)
+	}
+	buildArguments = append(buildArguments, "-o", binary, command)
+	build := exec.CommandContext(ctx, "go", buildArguments...)
+	build.Dir = moduleRoot
 	if output, buildErr := build.CombinedOutput(); buildErr != nil {
 		return broke("the program does not build on its own: "+
 			failingLineOf(string(output)), nil), nil

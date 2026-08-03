@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-090
+Date: 2026-08-02
+Status: Three closed, one diagnosed and blocked
+Change-ID: CL-20260802-080
+Commit: pending
+Request-or-TODO: PIPE-019b, PIPE-121, PIPE-123, PIPE-124
+Goal: Stop a mandatory acceptance block making a plan unbuildable, and let the
+  flow work on a repository that is not shaped like the fixture
+Assumptions: The whitespace was the symptom, not the defect
+Decisions: Bounded the summary rather than trimming the requirement. A step's
+  detail is a label; a forty-line acceptance block would produce an unreadable
+  step even if it trimmed cleanly, so trimming would have left the defect.
+  Stripped the acceptance block from the summary rather than including it,
+  because it is machine-checked metadata and not what the step is for.
+  Stopped at PIPE-124 rather than editing held files, and recorded the exact
+  fix: give checkAtoms an attribution parameter and return skipped when the
+  attribution is established and empty, reusing PIPE-111a's flag rather than
+  inventing a second one
+Files-or-schemas: agent_narration.go, agent_acceptance.go,
+  agent_acceptance_named_test_form.go, agent_adversarial.go, three new tests
+Validation: A full-Run test reaching a bound plan revision; discrimination by
+  reverting and reproducing the exact refusal
+Failures-or-discarded-approaches: None
+Known-limitations: The primary validation gate still assumes worktree root
+Next-safe-step: PIPE-124, then the rest of PIPE-123 once its files are free
+
 Dev-Log: DL-20260802-089
 Date: 2026-08-02
 Status: Wired and called

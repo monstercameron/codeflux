@@ -24,6 +24,10 @@ type namedTestExample struct {
 	// requester naming TestParse must not be satisfied by TestParseRejects
 	// passing while TestParse itself fails.
 	Name string
+	// Tags is the go test -tags value the named test needs to build or run
+	// under, when the requirement states one (PIPE-123). Empty means the
+	// default build constraints.
+	Tags string
 }
 
 // parseNamedTestExamples reads the named-test examples a requirement carries.
@@ -61,6 +65,8 @@ func parseOneNamedTest(body string) (namedTestExample, bool) {
 			example.Name = strings.TrimSpace(strings.TrimPrefix(line, "test:"))
 		case strings.HasPrefix(line, "package:"):
 			example.Package = strings.TrimSpace(strings.TrimPrefix(line, "package:"))
+		case strings.HasPrefix(line, "tags:"):
+			example.Tags = strings.TrimSpace(strings.TrimPrefix(line, "tags:"))
 		}
 	}
 	if example.Name == "" {
@@ -88,6 +94,22 @@ func runNamedTestExamples(
 	worktree string,
 	examples []namedTestExample,
 ) (passed []string, failures []string) {
+	if len(examples) == 0 {
+		return nil, nil
+	}
+	// The module a named test belongs to is not always the worktree root
+	// (PIPE-123); see moduleRootIn. A repository failing this lookup fails
+	// every example the same way, which is the honest single explanation
+	// rather than a per-example "did not pass" that hides the real cause.
+	moduleRoot, err := moduleRootIn(worktree)
+	if err != nil {
+		for _, example := range examples {
+			failures = append(failures, fmt.Sprintf(
+				"%s could not be run: the module it belongs to could not be "+
+					"found: %v", example.Name, err))
+		}
+		return nil, failures
+	}
 	for _, example := range examples {
 		label := example.Name
 		if example.Package != "./..." {
@@ -96,9 +118,13 @@ func runNamedTestExamples(
 		// Anchored on both sides. An unanchored pattern would let
 		// TestParseRejects satisfy a requirement that named TestParse.
 		pattern := "^" + example.Name + "$"
-		command := exec.CommandContext(ctx,
-			"go", "test", "-count=1", "-run", pattern, example.Package)
-		command.Dir = worktree
+		arguments := []string{"test", "-count=1"}
+		if example.Tags != "" {
+			arguments = append(arguments, "-tags", example.Tags)
+		}
+		arguments = append(arguments, "-run", pattern, example.Package)
+		command := exec.CommandContext(ctx, "go", arguments...)
+		command.Dir = moduleRoot
 		output, err := command.CombinedOutput()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s did not pass: %s",

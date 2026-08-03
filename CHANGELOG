@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-080
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- bounded plan-step detail, and quoted acceptance arguments
+Request-or-TODO: PIPE-019b, PIPE-121, PIPE-123
+Outcome: agentPlanSteps embedded the raw requirement verbatim in a plan step's
+  redacted detail, which Validate refuses for trailing whitespace -- and the
+  acceptance blocks PIPE-019 makes mandatory produce exactly that, so the full
+  Run path could not reach a bound plan at all. requirementSummary strips the
+  acceptance block, takes the first line of what remains, and caps it, which
+  addresses the real defect: a step's detail is a label, and an arbitrarily long
+  user block does not belong in one whatever it ends with.
+  Acceptance argument lines are tokenised with quote handling instead of split
+  on spaces, so an example can pass an argument containing one.
+  The acceptance oracle and adversarial probe now resolve the module root rather
+  than assuming the worktree root, and both acceptance forms accept build tags
+Affected-behavior: A multi-line acceptance requirement now reaches a bound plan
+  through the real run. Unquoted argument lines parse identically to before
+Compatibility-or-migration: None
+Verification: A test drives the full Run and confirms a real bound plan
+  revision, which was previously unreachable. Discrimination confirmed by
+  reverting and reproducing "agent plan step 1 is invalid". The quoting
+  discriminator was verified to fail against the old code
+Known-limitations: The primary validation gate still assumes the worktree root
+  in agent_execution.go and the agent_stage_* files, so regression, mutation,
+  coverage and control-flow stages are unfixed for a non-root module. PIPE-124
+  is diagnosed and not implemented: checkAtoms hard-fails on zero atoms and
+  takes no attribution parameter, so it cannot use PIPE-111a's established flag;
+  the exact fix is recorded in TODOS.md
+Dev-Log: DL-20260802-090
+
 Change-ID: CL-20260802-079
 Commit: pending
 Date: 2026-08-02

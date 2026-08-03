@@ -48,7 +48,16 @@ func (execution *AgentExecution) probeProducedCommands(
 	ctx context.Context,
 	worktree string,
 ) (findings []string, probed int, err error) {
-	commands, err := producedCommands(ctx, worktree)
+	// The adversarial probe has no example set to read a tags: value from, so
+	// it probes only what builds under the default constraints.
+	commands, err := producedCommands(ctx, worktree, "")
+	if err != nil {
+		return nil, 0, err
+	}
+	// producedCommands reports commands relative to the module they actually
+	// build from, which is not always the worktree root (PIPE-123); the build
+	// below has to run from the same place.
+	moduleRoot, err := moduleRootIn(worktree)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -61,7 +70,7 @@ func (execution *AgentExecution) probeProducedCommands(
 	for _, command := range commands {
 		binary := filepath.Join(binaries, builtBinaryName(filepath.Base(command)))
 		build := exec.CommandContext(ctx, "go", "build", "-o", binary, command)
-		build.Dir = worktree
+		build.Dir = moduleRoot
 		if output, buildErr := build.CombinedOutput(); buildErr != nil {
 			findings = append(findings, fmt.Sprintf(
 				"%s: does not build on its own: %s", command,
@@ -128,7 +137,7 @@ func probeOneCommand(
 // internal/, so every check built on this list quietly probed nothing and
 // reported that there was nothing to probe. It also counted a cmd/
 // subdirectory holding a library as a command, which then failed to build.
-func producedCommands(ctx context.Context, worktree string) ([]string, error) {
+func producedCommands(ctx context.Context, worktree string, tags string) ([]string, error) {
 	// Which directories this run actually wrote in. Asking the toolchain for
 	// every main package in the module finds the ones that were already there,
 	// and a repository that ships a placeholder main is the ordinary case
@@ -148,9 +157,27 @@ func producedCommands(ctx context.Context, worktree string) ([]string, error) {
 		touched[path.Dir(file)] = true
 	}
 
-	listing := exec.CommandContext(ctx, "go", "list",
-		"-f", "{{if eq .Name \"main\"}}{{.Dir}}{{end}}", "./...")
-	listing.Dir = worktree
+	// The module a run's commands belong to is not always the worktree root
+	// (PIPE-123): a repository can carry its module at a subdirectory go.mod.
+	// `go list ./...` has to run from that module, not from the worktree, or
+	// it refuses outright with "go.mod file not found" for a repository that
+	// builds correctly.
+	moduleRoot, err := moduleRootIn(worktree)
+	if err != nil {
+		return nil, err
+	}
+	listArguments := []string{"list", "-f", "{{if eq .Name \"main\"}}{{.Dir}}{{end}}"}
+	if tags != "" {
+		// A command guarded by a build tag (PIPE-123) is not a main package
+		// under the default constraints at all, so it would otherwise never
+		// appear in this listing -- not "found but broken", simply absent,
+		// which is a worse failure than "does not build on its own" because
+		// it names no reason.
+		listArguments = append(listArguments, "-tags", tags)
+	}
+	listArguments = append(listArguments, "./...")
+	listing := exec.CommandContext(ctx, "go", listArguments...)
+	listing.Dir = moduleRoot
 	output, err := listing.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("the runnable packages could not be listed: %s",
@@ -162,25 +189,35 @@ func producedCommands(ctx context.Context, worktree string) ([]string, error) {
 		if directory == "" {
 			continue
 		}
-		// Reported relative to the worktree, because that is what every caller
-		// passes back to go build and what a person reads in a finding.
-		relative, relErr := filepath.Rel(worktree, directory)
+		// The touched check is keyed against the worktree, because that is
+		// what producedGoFiles reports paths relative to regardless of where
+		// the module sits within it.
+		worktreeRelative, relErr := filepath.Rel(worktree, directory)
 		if relErr != nil {
 			continue
 		}
-		relative = filepath.ToSlash(relative)
-		if !touched[relative] {
+		worktreeRelative = filepath.ToSlash(worktreeRelative)
+		if !touched[worktreeRelative] {
 			// A command in a directory this run wrote nothing in. It may be
 			// perfectly good or perfectly broken; either way it is not this
 			// run's work and not this run's verdict to carry.
 			continue
 		}
-		if relative == "." {
-			relative = "./"
-		} else {
-			relative = "./" + relative
+		// The command itself is reported relative to the module root, because
+		// that is where every caller must set Dir to build or run it -- which
+		// is the worktree root in the ordinary case and only differs from it
+		// for the repository layout this ticket exists to support.
+		moduleRelative, relErr := filepath.Rel(moduleRoot, directory)
+		if relErr != nil {
+			continue
 		}
-		commands = append(commands, relative)
+		moduleRelative = filepath.ToSlash(moduleRelative)
+		if moduleRelative == "." {
+			moduleRelative = "./"
+		} else {
+			moduleRelative = "./" + moduleRelative
+		}
+		commands = append(commands, moduleRelative)
 	}
 	sort.Strings(commands)
 	return commands, nil

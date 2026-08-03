@@ -299,11 +299,18 @@ func agentPlanSteps(requirement string) []agentloop.PlanStep {
 		steps = append(steps, agentloop.PlanStep{
 			ID: fmt.Sprintf("edit-%d", index+1), Kind: agentloop.StepKindEdit,
 			State: agentloop.StepPending,
-			// The requirement travels with every step. A step summarised as
-			// "Write cmd/greet/main.go" tells the model the path and nothing
-			// about the program, and what came back was a hello-world stub that
-			// satisfied the plan exactly as written.
-			SummaryRedacted: "Write " + file + " — " + requirement,
+			// A bounded summary of the requirement travels with every step, not
+			// the requirement itself (PIPE-019b). "Write cmd/greet/main.go" alone
+			// tells the model the path and nothing about the program — that
+			// produced a hello-world stub that satisfied the plan exactly as
+			// written — so the requirement's own point still needs to travel.
+			// requirementSummary is what makes that safe: a plan step's detail is
+			// a label read by a person and validated as one (storage.AgentPlan.
+			// Validate refuses leading/trailing whitespace and caps it at 4096
+			// bytes), not a copy of an arbitrarily long, model-authored acceptance
+			// block, which is mandatory on every requirement since PIPE-019 and
+			// reliably ends in a trailing newline.
+			SummaryRedacted: "Write " + file + " — " + requirementSummary(requirement),
 			MaterialEdit:    true, ValidationRequired: true,
 			ExpectedFiles:   []string{file},
 			CompletionTools: []executor.ToolName{executor.ToolApplyEdit},
@@ -316,6 +323,45 @@ func agentPlanSteps(requirement string) []agentloop.PlanStep {
 		ValidationRequired: true,
 		CompletionTools:    []executor.ToolName{executor.ToolTest},
 	})
+}
+
+// requirementSummary bounds a requirement to a short label for a plan step's
+// detail (PIPE-019b).
+//
+// Embedding the requirement verbatim was wrong independent of whitespace: a
+// plan step's detail is a label, and a requirement carrying a forty-line
+// acceptance block would produce an unreadable step even if it happened to
+// trim cleanly. Trimming the symptom — the trailing whitespace an appended
+// <<<ACCEPTANCE ... >>> block leaves behind — would satisfy
+// storage.AgentPlan.Validate and still leave the underlying defect in place.
+//
+// So this drops the acceptance block first, since it is a machine-checked
+// example for the acceptance-oracle and end-to-end stages rather than part of
+// what the step is *for*, and then takes the first line of what remains,
+// capped the same way toolDetail's own output is bounded for a timeline row
+// elsewhere in this file: a fixed character bound with an ellipsis when it
+// was cut. A requirement's first line is normally its own summary — the
+// acceptance block and any elaboration follow it — so this rarely drops
+// anything a person reading the step actually needs; when a requirement is
+// nothing but an acceptance block, a fixed fallback label is used instead of
+// an empty one, which the validator refuses on its own.
+func requirementSummary(requirement string) string {
+	body := requirement
+	if index := strings.Index(body, acceptanceOpen); index >= 0 {
+		body = body[:index]
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return "as specified in the task requirement"
+	}
+	if index := strings.IndexByte(body, '\n'); index >= 0 {
+		body = strings.TrimSpace(body[:index])
+	}
+	const bound = 200
+	if len(body) > bound {
+		body = strings.TrimSpace(body[:bound]) + "…"
+	}
+	return body
 }
 
 // filesNamedIn reads the paths a requirement mentions.
