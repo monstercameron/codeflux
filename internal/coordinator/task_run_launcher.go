@@ -37,6 +37,11 @@ type TaskRunLauncher struct {
 	executable string
 	endpoint   func() string
 	random     func([]byte) (int, error)
+	// containerCommand is the operator-authorized command every worker this
+	// launcher starts is launched inside, or nil for the native path
+	// (M11-033, AUDIT-017). It was validated once, at construction, by
+	// validateContainerCommand.
+	containerCommand []string
 }
 
 // taskRunLauncherStore is the narrow read surface launching a run needs.
@@ -59,6 +64,7 @@ func NewTaskRunLauncher(
 	executable string,
 	endpoint func() string,
 	random func([]byte) (int, error),
+	containerCommand []string,
 ) (*TaskRunLauncher, error) {
 	switch {
 	case store == nil:
@@ -77,9 +83,13 @@ func NewTaskRunLauncher(
 	if random == nil {
 		random = rand.Read
 	}
+	if err := validateContainerCommand(containerCommand); err != nil {
+		return nil, fmt.Errorf("container command: %w", err)
+	}
 	return &TaskRunLauncher{
 		store: store, worktrees: worktrees, runtime: runtime, sequences: sequences,
 		executable: executable, endpoint: endpoint, random: random,
+		containerCommand: containerCommand,
 	}, nil
 }
 
@@ -146,6 +156,7 @@ func (launcher *TaskRunLauncher) Launch(
 		ToolSchemaVersion:   ToolSchemaVersion,
 		CoordinatorEndpoint: endpoint,
 		Executable:          launcher.executable,
+		ContainerCommand:    launcher.containerCommand,
 	}
 	// The queue row is keyed by the run rather than the task: a retried start
 	// mints a new run, and keying by task would make the second attempt look

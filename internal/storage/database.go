@@ -42,6 +42,9 @@ type Database struct {
 	busyTimeout time.Duration
 	closeOnce   sync.Once
 	closeErr    error
+	// faults is the SQLite storage boundary's fault injector (AUDIT-027). Nil
+	// in production; set only by SetFaultInjector.
+	faults FaultInjector
 }
 
 // OpenDefault opens the database at DefaultDatabasePath.

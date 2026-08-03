@@ -25,6 +25,45 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-104
+Date: 2026-08-02
+Status: Two closed, one partial, three blocked with reasons, one new defect
+Change-ID: CL-20260802-094
+Commit: pending
+Request-or-TODO: AUDIT-010a, AUDIT-011a, AUDIT-016a, AUDIT-017, AUDIT-019,
+  AUDIT-027, AUDIT-011b
+Goal: Finish subsystems that exist but are not reached
+Assumptions: That each ticket described what was missing -- two did not.
+  AUDIT-011a's wiring already existed, and AUDIT-010a is a whole presentation
+  layer rather than one browser check
+Decisions: Wrote the container test against an executed marker rather than an
+  assigned field. The bug was that nothing populated the field, so a test
+  asserting the field is populated would have passed against a launcher that
+  never used it.
+  Reported AUDIT-011a's stale premise instead of quietly building around it, and
+  filed the defect the proof exposed rather than absorbing it. The context
+  selector's success branch is unreachable through a full run in the engine
+  fixture family because the bootstrap's recorded revision is never resynced to
+  the worktree's actual HEAD; that is worth more than the ticket that found it.
+  Declined AUDIT-016a rather than building its storage half. A migration and a
+  repository with no caller is precisely the pattern this session has now found
+  six times, and adding a seventh deliberately would be worse than an open
+  ticket.
+  Left AUDIT-019 alone. Its blocker is whether a configured ladder rung counts
+  as explicit user authority for a provider switch, which is a plan decision
+Files-or-schemas: application.go, run_launcher_wiring.go, task_run_launcher.go
+  and its test, internal/storage transaction.go, database.go,
+  task_repository.go, and three new test files
+Validation: Container wiring PASS at 2.77s; approval proof PASS at count=3;
+  full storage package PASS at 204s; engine canary 3.84s, at baseline
+Failures-or-discarded-approaches: None. Two orphaned worker processes were found
+  during cleanup, inspected by command line, identified as another lane's
+  adversarial-escalation test, and left alone
+Known-limitations: Five fault boundaries, two grant surfaces, one presentation
+  layer, one plan decision
+Next-safe-step: AUDIT-011b, which is small and unblocks honest end-to-end
+  evidence for anything that depends on context selection succeeding
+
 Dev-Log: DL-20260802-103
 Date: 2026-08-02
 Status: Three closed; one partly-fixed bug reported rather than smoothed over

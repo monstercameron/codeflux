@@ -543,6 +543,9 @@ func appendTaskEventTransaction(
 	).Scan(&sequence); err != nil {
 		return TaskEvent{}, classify("allocate task event sequence", err)
 	}
+	if err := checkFault(transaction.faults, FaultPointDiskFullOnEventAppend); err != nil {
+		return TaskEvent{}, err
+	}
 	_, err = transaction.sql.ExecContext(
 		ctx,
 		`INSERT INTO task_events (

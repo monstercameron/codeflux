@@ -59,21 +59,21 @@ func TestTaskRunLauncherRequiresEveryCollaborator(t *testing.T) {
 	// survived: everything looked constructed.
 	for name, build := range map[string]func() (*TaskRunLauncher, error){
 		"no store": func() (*TaskRunLauncher, error) {
-			return NewTaskRunLauncher(nil, nil, nil, nil, "worker", func() string { return "x" }, nil)
+			return NewTaskRunLauncher(nil, nil, nil, nil, "worker", func() string { return "x" }, nil, nil)
 		},
 		"no worktree service": func() (*TaskRunLauncher, error) {
 			return NewTaskRunLauncher(
 				stubLauncherStore{}, nil, &WorkerRuntime{}, fixedSequences{}, "worker",
-				func() string { return "x" }, nil)
+				func() string { return "x" }, nil, nil)
 		},
 		"no executable": func() (*TaskRunLauncher, error) {
 			return NewTaskRunLauncher(
 				stubLauncherStore{}, nil, &WorkerRuntime{}, fixedSequences{}, "  ",
-				func() string { return "x" }, nil)
+				func() string { return "x" }, nil, nil)
 		},
 		"no endpoint": func() (*TaskRunLauncher, error) {
 			return NewTaskRunLauncher(
-				stubLauncherStore{}, nil, &WorkerRuntime{}, fixedSequences{}, "worker", nil, nil)
+				stubLauncherStore{}, nil, &WorkerRuntime{}, fixedSequences{}, "worker", nil, nil, nil)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

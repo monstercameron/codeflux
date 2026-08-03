@@ -50,6 +50,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-094
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- a configured container command finally reaches the worker
+Request-or-TODO: AUDIT-017, AUDIT-011a, AUDIT-027
+Outcome: The worker already knew how to launch inside a container wrapper and
+  had its own tests for it. Nothing between configuration and the coordinator
+  ever populated the field, so every task ran natively regardless of intent --
+  not because the container path was broken, but because there was nowhere to
+  ask for it. A validated command now threads from application options through
+  the launcher into the supervisor's start request.
+  The storage layer gained a fault-injection boundary at two real choke-points
+  every mutation passes through, which is one of the six boundaries that ticket
+  names and the only one this change claims.
+  AUDIT-011a's premise turned out to be stale: the resolver was already wired
+  into context selection before this session. What was missing was proof, and
+  building it surfaced a separate defect worth more than the ticket
+Affected-behavior: A container command can now be configured and is executed.
+  Nothing changes for a run that does not set one
+Compatibility-or-migration: NewTaskRunLauncher gains a parameter; four test call
+  sites updated. No schema change
+Verification: The container test proves execution rather than assignment: the
+  configured wrapper is a compiled marker program that writes a file naming its
+  own argv, driven through a real application start and a real task start. The
+  fault-boundary test asserts the arm is consumed rather than merely accepted
+Known-limitations: Five of AUDIT-027's six boundaries are untouched. AUDIT-011a
+  keeps its grant surface open, deliberately: every caller of the grant function
+  is still a test, and building a creation endpoint for admitting repository
+  text into a run is the shape MEM-009 was left uncalled to avoid. AUDIT-016a is
+  the same shape and is left blocked rather than half-built as a table with no
+  caller. AUDIT-010a is larger than its text says -- the entire presentation
+  layer it assumes is absent. AUDIT-019 is blocked on a plan decision rather
+  than an implementation. AUDIT-011b is filed and is the real find here
+Dev-Log: DL-20260802-104
+
 Change-ID: CL-20260802-093
 Commit: pending
 Date: 2026-08-02

@@ -68,6 +68,18 @@ type ApplicationOptions struct {
 	// defaults to codeflux-worker beside the running executable, never a PATH
 	// lookup: that process receives the worktree and the coordinator endpoint.
 	WorkerExecutable string
+	// ContainerCommand, when set, is the user-provided command every started
+	// worker is launched inside instead of launched natively (M11-033,
+	// AUDIT-017). It exists for stronger isolation than the mediated
+	// workspace confinement this coordinator runs under by default.
+	//
+	// It is off by default and takes effect only when a caller sets it here
+	// explicitly; nothing infers or silently enables it. StartApplication
+	// validates it before any worker can be launched, so a malformed command
+	// fails at startup rather than being silently dropped, which would leave
+	// every task running natively while the operator believed it was
+	// contained.
+	ContainerCommand []string
 	// AgentModel is the model a started task's agent thinks with. When it is
 	// nil the coordinator looks for a key itself; when no key is found, tasks
 	// still start and reach a worktree but nothing acts in it, which is the
