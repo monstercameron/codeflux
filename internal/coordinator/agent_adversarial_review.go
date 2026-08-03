@@ -688,6 +688,30 @@ func adversarialInstruction(findings []adversarialFinding, testsPassed bool) str
 	for _, finding := range findings {
 		grouped[finding.Kind] = append(grouped[finding.Kind], finding)
 	}
+	// A review that found only blind spots is asking for tests, not for edits.
+	//
+	// A blind spot is behaviour nothing checks. That is not the same as
+	// behaviour that is wrong, and the program is usually already correct about
+	// it: a parser asked for an empty-input test very often rejects empty input
+	// perfectly well and has simply never been asked. Ladder rung 5 was given
+	// two blind spots — empty input and malformed JSON — rewrote its production
+	// code to address them, changed its output in the process, and spent four
+	// attempts getting back to a program it already had.
+	//
+	// So the order is stated. Write the test, run it, and change the program
+	// only if the test actually fails. A test that passes immediately has
+	// closed the blind spot, which is what was asked for.
+	if len(grouped[findingDefect]) == 0 && len(grouped[findingBlindSpot]) > 0 {
+		report.WriteString(
+			"\nNothing here is a defect. Every item is behaviour nothing " +
+				"checks, which is not the same as behaviour that is wrong.\n\n" +
+				"Add the missing test first and run it. If it passes, the gap " +
+				"is closed and there is nothing else to do — the program was " +
+				"already right about that input and had simply never been " +
+				"asked. Change the program only for a test that actually " +
+				"fails, and then change as little as possible.\n\n" +
+				"Do not rewrite working code to make room for a test.\n")
+	}
 	for _, kind := range []findingKind{findingDefect, findingBlindSpot} {
 		items := grouped[kind]
 		if len(items) == 0 {

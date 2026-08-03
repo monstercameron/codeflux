@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-135
+Date: 2026-08-03
+Status: Every item of the rung 5 regression analysis is implemented
+Change-ID: CL-20260803-125
+Commit: pending
+Request-or-TODO: The rung 5 regression-stall analysis, items 3 and 5
+Goal: Stop optional hostile-input work destroying verified behaviour, and stop
+  a run running out of time mid-call
+Decisions: Gated the test-first wording on there being no defects at all. A
+  demonstrated defect is not closed by a test that passes, and telling a run
+  otherwise would turn the strongest finding the critic has into a formality.
+  Reserved a minute rather than scaling to the suite's measured duration. The
+  reserve protects against total loss, the cost of being generous is one
+  attempt, and the cost of being tight is the whole run.
+  Finished from the checkpoint as completed-with-advisories rather than
+  provider-unavailable when the deadline is what stopped it. The provider was
+  fine; the clock ran out, and those are different things for a reader
+Files-or-schemas: new internal/coordinator/deadline_reserve.go,
+  agent_adversarial_review.go and its test, agent_execution.go
+Validation: Build, vet, gofmt, the adversarial suite
+Failures-or-discarded-approaches: None
+Known-limitations: The reserve only fires where the caller set a context
+  deadline. The ladder harness sets a test timeout rather than a context
+  deadline, so this will not fire there -- it protects the product path, not
+  the path being watched, and proving it needs a caller that sets one
+Next-safe-step: Read rung 5's result and continue up the ladder
+
 Dev-Log: DL-20260803-134
 Date: 2026-08-03
 Status: Refinement is transactional; the provider circuit opens on the first

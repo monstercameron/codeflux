@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-125
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a blind spot asks for a test, and a run keeps time to finish
+Request-or-TODO: Rung 5 regression-stall analysis, items 3 and 5
+Outcome: A review that found only blind spots is asking for tests, not for
+  edits. A blind spot is behaviour nothing checks, which is not the same as
+  behaviour that is wrong, and the program is usually already correct about it:
+  a parser asked for an empty-input test very often rejects empty input
+  perfectly well and has simply never been asked. Ladder rung 5 was given two
+  blind spots, rewrote its production code to address them, changed its output
+  in the process, and spent four attempts getting back to a program it already
+  had. The order is now stated: write the test, run it, change the program only
+  for a test that actually fails, and do not rewrite working code to make room
+  for a test. A review holding a real defect is told none of this, because a
+  demonstrated defect is not closed by a test that passes.
+  A run also now keeps a minute of wall clock back to finish with. What
+  finishing costs is knowable -- restore the checkpoint, rebuild, re-run the
+  suite, check acceptance, write the terminal state -- and a run that spends
+  its last minute on a model call it cannot complete has no result, no terminal
+  state, and a record that says nothing, while a verified revision sits on
+  disk. Only when the caller set a deadline: a run without one has nothing to
+  reserve against, and inventing a limit would end runs entitled to continue.
+Verification: Build, vet, gofmt, one new test that a blind-spot-only review
+  asks for tests first and a defect-bearing one does not
+Dev-Log: DL-20260803-135
+
 Change-ID: CL-20260803-124
 Commit: pending
 Date: 2026-08-03

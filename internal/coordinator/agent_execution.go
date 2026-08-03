@@ -623,6 +623,25 @@ func (execution *AgentExecution) Run(
 	ledger.sealPreAttemptStages()
 	for attempt := 1; progress.moreAttempts() && awaitingApproval == "" &&
 		providerCircuitOpen == ""; attempt++ {
+		// Time enough to finish, or do not start.
+		//
+		// A model call takes as long as it takes, and finishing takes a known
+		// amount: restore the checkpoint, rebuild, re-run the suite, check the
+		// acceptance examples, write the terminal state. Starting a call that
+		// cannot leave room for that trades a result the run already has for a
+		// chance at a better one, and loses both when the deadline arrives
+		// mid-call — the work is unfinalised and the record says nothing.
+		//
+		// Only when the caller set a deadline. A run with no deadline has
+		// nothing to reserve against, and inventing one would end runs that
+		// were entitled to continue.
+		if short, remaining := tooLateToStartAnAttempt(ctx); short {
+			providerCircuitOpen = "deadline-reserved-for-finalisation"
+			tracef("deadline", "%s left, less than the %s reserved to finish; "+
+				"not starting attempt %d",
+				remaining.Round(time.Second), finalisationReserve, attempt)
+			break
+		}
 		progress.beginAttempt()
 		tracef("attempt", "%d begins on rung %s", attempt, progress.currentRung())
 		if attempt > 1 {
@@ -2070,6 +2089,8 @@ func terminalStatus(
 	circuitOpen string, checkpoint *verifiedCheckpoint, unfinished string,
 ) string {
 	switch {
+	case circuitOpen == "deadline-reserved-for-finalisation" && checkpoint.taken:
+		return "completed-with-advisories"
 	case circuitOpen != "" && checkpoint.taken:
 		return "provider-unavailable-after-verified-result"
 	case circuitOpen != "":

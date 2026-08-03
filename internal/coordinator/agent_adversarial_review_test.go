@@ -140,3 +140,39 @@ func TestATerminalReportNamesTheVerifiedRevision(t *testing.T) {
 		}
 	}
 }
+
+// TestABlindSpotOnlyReviewAsksForTestsFirst covers the order rung 5 got wrong.
+//
+// It was given two blind spots — empty input and malformed JSON — rewrote its
+// production code to address them, changed its output in the process, and spent
+// four attempts getting back to a program it already had.
+func TestABlindSpotOnlyReviewAsksForTestsFirst(t *testing.T) {
+	blindSpotsOnly := []adversarialFinding{
+		{Kind: findingBlindSpot, Where: "process",
+			What: "is never given empty input"},
+		{Kind: findingBlindSpot, Where: "process",
+			What: "is never given malformed JSON"},
+	}
+	instruction := adversarialInstruction(blindSpotsOnly, true)
+	for _, wanted := range []string{
+		"Nothing here is a defect",
+		"Add the missing test first",
+		"Do not rewrite working code",
+	} {
+		if !strings.Contains(instruction, wanted) {
+			t.Errorf("a blind-spot-only review never says %q:\n%s",
+				wanted, instruction)
+		}
+	}
+
+	// A review holding a real defect must not get the same advice: a
+	// demonstrated defect is not closed by a test that passes.
+	withDefect := append([]adversarialFinding{{
+		Kind: findingDefect, Where: "process",
+		What: "discards the error strconv.Atoi returns",
+	}}, blindSpotsOnly...)
+	if strings.Contains(adversarialInstruction(withDefect, true),
+		"Nothing here is a defect") {
+		t.Error("a review holding a defect was told there were none")
+	}
+}
