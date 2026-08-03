@@ -207,6 +207,24 @@ func goSourceIsWellFormed(path, content string) error {
 		strings.Contains(slashed, "/testdata/") {
 		return nil
 	}
+	// The cheap check first, with the message the shape actually calls for.
+	//
+	// A Go file begins with a package clause, optionally after comments and
+	// blank lines. Content beginning with anything else is not a near miss the
+	// parser should explain — it is a fenced block, a diff, a bare operator, a
+	// placeholder — and the parser's answer ("expected 'package', found '*'")
+	// describes the symptom while the run needs to be told the category.
+	// Ladder rung 6 sent "<<", "*", "noop" and "#" as Go source across two
+	// attempts and got a column number each time.
+	if opening := firstMeaningfulSourceLine(content); opening != "" &&
+		!strings.HasPrefix(opening, "package ") {
+		return fmt.Errorf(
+			"this is a .go file and its first line is %q. A Go file begins "+
+				"with a package clause. What arrived is not source at all — a "+
+				"fence, a diff, a marker, or a placeholder — so write the "+
+				"file's complete text, starting at \"package\", with nothing "+
+				"around it", traceableOpening(opening))
+	}
 	if _, err := parser.ParseFile(
 		token.NewFileSet(), path, content, parser.SkipObjectResolution,
 	); err != nil {
@@ -216,6 +234,35 @@ func goSourceIsWellFormed(path, content string) error {
 				"markdown fence, diff marker or heading", err)
 	}
 	return nil
+}
+
+// firstMeaningfulSourceLine is the first line that is neither blank nor a
+// comment, which in a Go file is the package clause.
+func firstMeaningfulSourceLine(content string) string {
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		switch {
+		case line == "":
+			continue
+		case strings.HasPrefix(line, "//"):
+			continue
+		case strings.HasPrefix(line, "/*"):
+			// A block comment can open the file; finding its end is the
+			// parser's job, and the package clause is what follows it.
+			return ""
+		}
+		return line
+	}
+	return ""
+}
+
+// traceableOpening keeps the refused line short enough to read in a message.
+func traceableOpening(line string) string {
+	const limit = 60
+	if len(line) <= limit {
+		return line
+	}
+	return line[:limit] + "…"
 }
 
 // writeWorktreeFile writes one file, creating the directories it needs.

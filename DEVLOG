@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-138
+Date: 2026-08-03
+Status: Ten of the fourteen rung-6 items are in
+Change-ID: CL-20260803-128
+Commit: pending
+Request-or-TODO: The rung 6 trace analysis
+Goal: Stop the refinement loop spending its budget on things nobody asked for
+Decisions: Enforced the round's scope at the write rather than restating it in
+  the prompt. The prompt already said it twice; what stops a rewrite is a
+  refusal at the moment it is made, while the working program is still there.
+  Compared the executable syntax tree with comments stripped, so reformatting
+  is not a behaviour change and a reworded error message is.
+  Detected parsing from the body's effects rather than from the function name.
+  A false positive costs three cases the function did not need; a false
+  negative costs nothing, because the generic ladder is what it would have had.
+  Made the ladder fail on a non-converged task rather than renaming the metric.
+  The suite exists to measure whether this platform converges, and a green
+  result that means "the program was right anyway" cannot measure that
+Files-or-schemas: new internal/coordinator/edit_scope.go and its test,
+  agent_narration.go, agent_execution.go, agent_outstanding.go,
+  agent_stage_cases.go, internal/pipeline/requirements.go,
+  internal/executor/file_tools.go and its test,
+  engine_produces_program_test.go
+Validation: Build, vet, gofmt, the coordinator, pipeline and executor suites
+Failures-or-discarded-approaches: Requiring path coverage to depend on the
+  integration-tests stage, which points forward in the flow -- coverage is
+  phase D and the suite is phase E. The prerequisite that survives is that
+  tests exist
+Known-limitations: Items 9, 12 and 13 remain: no first-token deadline before
+  escalating, and no focused tests yet for transactional enrichment or reader
+  matching under a real run
+Next-safe-step: Rung 6 again with the ladder now reporting both results
+
 Dev-Log: DL-20260803-137
 Date: 2026-08-03
 Status: Rung 6 is running; the case and documentation defects are closed

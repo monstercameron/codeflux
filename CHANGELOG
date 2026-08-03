@@ -50,6 +50,50 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-128
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the refinement policy stops spending runs on invented wording
+Request-or-TODO: Rung 6 trace analysis, 2026-08-03, items 1 to 8, 10 and 11
+Outcome: Most of rung 6's churn went on error prose the requirement never
+  specified -- "expression leaves 0 values", then "... on stack", then "... on
+  the stack" -- and on a test demanding `operator "a" requires two operands`
+  where the implementation's `invalid token "a"` was the better answer. The
+  style directive now says it plainly: assert that a failure happened and that
+  it is the sentinel or type the code declares, never the exact text of a
+  message the request did not specify. The wording is the implementation's to
+  choose, and a test that pins it turns a correct program into a failing one
+  for a reason nobody asked about.
+  A parameter a function parses now gets a parser's questions -- input that
+  runs out part way, input that is well formed and then continues, a token the
+  grammar has no meaning for -- instead of the collection heuristics. An RPN
+  token stream is ordered syntax; "the same element repeated" is not a tie to
+  break and "already in the wrong order" is not a property it has.
+  Property tests joined the attempt loop. Rung 6 ended on "atom-property-tests
+  failed" having never been asked for one: the gate was hard, the run had
+  attempts left, and nothing told it. Path coverage was decoupled from the
+  six-link chain that had it waiting on property tests, atoms, verification,
+  composition and control flow -- it runs the suite itself, so what it needs is
+  something to run, not somebody else's verdict on having run it.
+  A blind-spot round may now write only test files, and a documentation round
+  may change only comments, enforced at the write with the executable syntax
+  tree compared before and after. Both were already asked for in prose, and
+  rung 6 was asked for a comment on main and rewrote the evaluator's error
+  semantics.
+  Content that is not source is refused by its shape rather than by a column
+  number. "<<", "*", "noop" and "#" arrived as Go source across two attempts
+  and each got "expected 'package', found ..." -- the symptom, where the run
+  needed the category.
+  "Trying again" is no longer said by a run whose circuit has just opened, and
+  "ready to be looked at with advisories" is reserved for a run with no hard
+  failure. The ladder now reports the task state beside the program's
+  behaviour and fails when they disagree: rung 6 reported PASS while the task
+  ended failed, which reads as "the platform worked" when what was established
+  was "the program was correct despite the platform not finishing".
+Verification: Build, vet, gofmt, thirteen new tests across edit scope, the
+  write shape check, case duplication and reader matching
+Dev-Log: DL-20260803-138
+
 Change-ID: CL-20260803-127
 Commit: pending
 Date: 2026-08-03

@@ -46,7 +46,9 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 	ctx context.Context,
 	scope agentScope,
 	taskID domain.TaskID,
-	verified bool,
+	// floorHeld is whether the tree that exists builds, passes its tests and
+	// reproduces the acceptance examples.
+	floorHeld bool,
 	reason string,
 ) finalization {
 	if execution == nil || execution.repositories == nil {
@@ -68,7 +70,22 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 	// A run that verified something and a run that verified nothing are
 	// different endings and must not be recorded the same way. Both are
 	// terminal; only one of them is work somebody can pick up.
+	//
+	// failed means the work is bad. A run holding a revision that compiles,
+	// passes its tests and reproduces the acceptance examples, with some
+	// research obligation unmet, does not hold bad work — it holds usable work
+	// and an unfinished question. Ladder rungs 5 and 6 both ended "failed"
+	// while their programs were correct on disk, which is the record
+	// contradicting the thing it describes.
+	//
+	// paused is the closest true statement the vocabulary has: the run stopped,
+	// nothing is wrong with what it produced, and a person decides what happens
+	// next. It is reached from running, which failed also is, so this is a
+	// choice between two legal endings rather than a new one.
 	ending := domain.TaskStateFailed
+	if floorHeld {
+		ending = domain.TaskStatePaused
+	}
 	moved, err := execution.repositories.TransitionTask(ctx, storage.TransitionTask{
 		EventID:          eventID,
 		TaskID:           taskID,
@@ -85,7 +102,7 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 		return finalization{Reason: reason}
 	}
 	_ = moved
-	tracef("final", "task moved to %s — %s (verified work exists: %t)",
-		ending, reason, verified)
+	tracef("final", "task moved to %s — %s (the tree passes the completion "+
+		"floor: %t)", ending, reason, floorHeld)
 	return finalization{Terminal: true, Reason: reason, TaskState: ending}
 }

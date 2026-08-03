@@ -403,6 +403,7 @@ func (execution *AgentExecution) Run(
 	caseRounds := 0
 	documentationRounds := 0
 	coverageRounds := 0
+	propertyRounds := 0
 	// The circuit breaker's state: how many identical infrastructure failures
 	// have happened in a row, against what, and whether it has opened.
 	// attemptedFindings remembers which criticisms this run has already been
@@ -496,6 +497,10 @@ func (execution *AgentExecution) Run(
 		}
 	}
 
+	// Whether the review that is sending work back found only blind spots,
+	// which decides whether the next attempt is a tests-only round.
+	blindSpotsOnlyThisRound := false
+
 	// The acceptance examples every instruction carries, so a run correcting
 	// one thing cannot quietly break the one thing that defines done.
 	acceptanceGuard := acceptanceInvariant(
@@ -503,6 +508,14 @@ func (execution *AgentExecution) Run(
 
 	sendBack := func(gate string, instruction string, because string) {
 		tracef("sendback", "gate=%s because=%s", gate, because)
+		// What the next attempt may touch, decided from the gate rather than
+		// from the prose. The prose is what the model reads; the gate is what
+		// the coordinator decided, and the two can drift.
+		narrator.permitted = scopeOfNextAttempt(gate, blindSpotsOnlyThisRound)
+		if narrator.permitted != editAnything {
+			tracef("sendback", "  next attempt may edit: %s",
+				narrator.permitted)
+		}
 		// Appended rather than woven in, so it reads as a constraint on the
 		// instruction rather than as another item in it.
 		if acceptanceGuard != "" && !strings.Contains(instruction, "must remain true") {
@@ -748,6 +761,18 @@ func (execution *AgentExecution) Run(
 			errors.Is(runErr, providers.ErrRateLimited) {
 			sendBackInfrastructure(providerFailureInstruction(runErr),
 				providerOutcomeOf(runErr))
+			// Said after the breaker has decided, not before. The message used
+			// to promise another attempt and the circuit then finalised the run
+			// on the next line, so the last thing a reader saw was "Trying
+			// again" from a run that never tried again.
+			if providerCircuitOpen != "" {
+				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+					"Attempt %d could not reach the model: %s. The provider "+
+						"has exhausted its own retries, so refinement stops "+
+						"here and the run finishes from its verified revision.",
+					attempt, runErr.Error()))
+				continue
+			}
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d could not reach the model: %s. Trying again.",
 				attempt, runErr.Error()))
@@ -925,6 +950,7 @@ func (execution *AgentExecution) Run(
 			// A measured defect is never advisory: the tests were actually run
 			// against it and did not catch it, which is a fact about the suite
 			// rather than an opinion about the code.
+			blindSpotsOnlyThisRound = len(blockingFindings(fresh)) == 0
 			if reviewRounds > 0 && len(blockingFindings(fresh)) == 0 {
 				carriedAdvisories = append(
 					carriedAdvisories, advisoryFindings(fresh)...)
@@ -981,7 +1007,8 @@ func (execution *AgentExecution) Run(
 		// record what the agent's own tool calls did, and the agent's last act
 		// is almost always a write.
 		outstanding := execution.outstandingWork(
-			ctx, scope, caseRounds, documentationRounds, coverageRounds, true)
+			ctx, scope, caseRounds, documentationRounds, coverageRounds,
+			propertyRounds, true)
 		if outstanding.any() && progress.lastAttempt() {
 			// Out of attempts with work still owed. Saying so is the whole
 			// point: the run used to fall through here and report
@@ -999,6 +1026,9 @@ func (execution *AgentExecution) Run(
 			}
 			if outstanding.askedForCoverage {
 				coverageRounds++
+			}
+			if outstanding.askedForProperty {
+				propertyRounds++
 			}
 			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
@@ -1243,11 +1273,16 @@ func (execution *AgentExecution) Run(
 				"a person's decision and this run cannot make it", nil)
 		ledger.record(ctx, pipeline.StageDeliver, pipeline.StateBlocked,
 			"nothing is delivered before a person accepts it", nil)
-	case checkpoint.taken:
+	case checkpoint.taken && verified:
+		// "Ready with advisories" is reserved for a run whose hard gates all
+		// held. Rung 6 said it while a hard property-test gate had failed and
+		// the task was moving to a stopped state, which is the ledger being
+		// cheerful about something it had just refused.
 		ledger.record(ctx, pipeline.StageHumanAcceptance, pipeline.StateBlocked,
-			"the work is ready to be looked at with advisories: revision "+
-				checkpoint.digest+" "+checkpoint.reason+", and what is still "+
-				"outstanding is refinement rather than correctness", nil)
+			"the completion floor passes on revision "+checkpoint.digest+
+				" — it "+checkpoint.reason+" — but this is not ready for "+
+				"review: a required gate did not hold, and what it is is "+
+				"recorded above", nil)
 		ledger.record(ctx, pipeline.StageDeliver, pipeline.StateBlocked,
 			"nothing is delivered before a person accepts it", nil)
 	default:
@@ -1307,7 +1342,7 @@ func (execution *AgentExecution) Run(
 	// A message saying a run has ended is not an ending. The durable state is.
 	if !finished.Terminal {
 		finished = execution.finaliseNonTerminalRun(
-			ctx, scope, taskID, checkpoint.taken, finished.Reason)
+			ctx, scope, taskID, compiles && verified, finished.Reason)
 	}
 
 	// The terminal record, last, once the state it describes is durable.
@@ -1807,6 +1842,7 @@ const FunctionalStyleDirective = `Write in a functional style.
 - Compose the pipeline out of those functions rather than inlining the steps into one body.
 - Give the program a testable seam and test that, not main. Put the work in a function taking an io.Reader and an io.Writer and returning an error, and let main do nothing but wire os.Stdin, os.Stdout and os.Args to it and report failure. Tests then pass a strings.Reader and a bytes.Buffer, which cannot deadlock.
 - Never reassign os.Stdin or os.Stdout in a test. Swapping them for an os.Pipe and then reading to EOF blocks forever unless the write end is closed first, and a deferred close runs too late — that is a hang, not a failure, and it stops the run rather than reporting anything. The built program is already run against the acceptance examples, so a test never needs to fake standard input.
+- Assert that a failure happened, not what it was called. Unless the request states the wording of an error, a test must check that an error was returned, that it is the sentinel or type the code declares, and that no plausible-looking value came back with it. Never assert the exact text of a message the request did not specify: the wording is the implementation's to choose, a test that pins it fails the next time anyone rephrases it, and it turns a correct program into a failing one for a reason nobody asked about.
 - This is a house style, not a licence to invent machinery: use plain Go, and do not add abstractions the task does not need.`
 
 // validationDetail says what the run's own verification actually did.

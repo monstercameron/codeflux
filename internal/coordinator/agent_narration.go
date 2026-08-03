@@ -64,6 +64,10 @@ type narratingExecutor struct {
 	lastTestFailed      bool
 	// worktree is where the produced work lives, needed to fingerprint it.
 	worktree string
+	// permitted is what this attempt is allowed to change. Set by the attempt
+	// loop from the gate that sent the work back, and cleared to editAnything
+	// for an ordinary round.
+	permitted editScope
 	// lastFailure is the output of the most recent tool that did not succeed.
 	// It is what the next attempt is shown: an agent told only that its tests
 	// failed will guess at why, and the guess is usually a second failure.
@@ -106,6 +110,33 @@ func (narrator *narratingExecutor) ExecuteTool(
 	beforeWrite := ""
 	if executor.ToolName(name) == executor.ToolApplyEdit && narrator.worktree != "" {
 		beforeWrite = producedTreeDigest(narrator.worktree)
+	}
+
+	// A write outside this round's scope is refused before it lands.
+	//
+	// The instruction already asks for it — "add the missing test first",
+	// "these functions have no doc comment" — and an instruction is a request.
+	// Rung 6 was asked for a comment on main and rewrote the evaluator's error
+	// semantics, breaking a program that had been correct. Refusing at the
+	// write tells the run immediately, with the working program still intact,
+	// instead of three gates later with it gone.
+	if executor.ToolName(name) == executor.ToolApplyEdit &&
+		narrator.permitted != editAnything && narrator.worktree != "" {
+		path := toolArgument(request.Request, "path")
+		content := []byte(toolArgument(request.Request, "content"))
+		if allowed, why := narrator.permitted.permits(
+			narrator.worktree, path, content,
+		); !allowed {
+			tracef("tool", "%-12s %-10s %s", name, "out-of-scope",
+				traceOneLine(why, 110))
+			narrator.execution.publishTool(narrator.ctx, narrator.scope,
+				events.KindToolCompleted, executionID, name,
+				string(domain.CommandExecutionStateFailed),
+				detail+" — refused: outside this round's scope")
+			narrator.lastFailure = why
+			return executor.ToolResult{State: "failed", StdoutRedacted: why},
+				nil
+		}
 	}
 
 	result, err := narrator.inner.ExecuteTool(ctx, request)

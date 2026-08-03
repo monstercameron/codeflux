@@ -306,8 +306,8 @@ func synthesiseCases(functions []producedFunction) map[string][]atomCase {
 		}
 		var cases []atomCase
 		for _, parameter := range function.Parameters {
-			cases = append(cases,
-				withoutExplosiveCases(function, casesForType(parameter))...)
+			cases = append(cases, withoutExplosiveCases(function,
+				casesForParameter(function, parameter))...)
 		}
 		// A function that can fail owes a case that makes it fail. Without one
 		// the failure path is written and never walked, which is where the
@@ -1202,4 +1202,76 @@ func withoutDuplicateShapes(cases []atomCase) []atomCase {
 		kept = append(kept, candidate)
 	}
 	return kept
+}
+
+// casesForParameter is the ladder for one argument, narrowed by what the
+// argument is for rather than only by its type.
+//
+// A []string is a bag of items when a function counts or sorts it and a
+// sequence of syntax when a function parses it. The generic ladder asks a
+// parser for "the same element repeated" and for "the input already in the
+// wrong order, so ordering is not assumed", and neither means anything about a
+// token stream: repetition is not a tie to break, and the order is the input.
+// Ladder rung 6 spent most of its attempts on cases like these.
+//
+// So a parameter whose function reads it as syntax gets the questions a parser
+// actually has to answer. Everything else keeps the generic ladder, which is
+// right for the collections it was written for.
+func casesForParameter(
+	function producedFunction, parameter string,
+) []atomCase {
+	if !parsesItsInput(function) || !strings.HasPrefix(parameter, "[]") {
+		return casesForType(parameter)
+	}
+	generic := casesForType(parameter)
+	kept := make([]atomCase, 0, len(generic))
+	for _, candidate := range generic {
+		// The two collection heuristics that say nothing about syntax.
+		if strings.Contains(candidate.Why, "duplicate handling") ||
+			strings.Contains(candidate.Why, "ordering is not assumed") {
+			continue
+		}
+		kept = append(kept, candidate)
+	}
+	return append(kept,
+		atomCase{
+			Shape: "a sequence one element shorter than the shortest valid one",
+			Why: "input that runs out part way through, which is where a " +
+				"parser reads past its end",
+			Class: caseWrong,
+		},
+		atomCase{
+			Shape: "a sequence with one element left over at the end",
+			Why: "input that is well formed and then continues, which a " +
+				"parser must refuse rather than silently ignore",
+			Class: caseWrong,
+		},
+		atomCase{
+			Shape: "a sequence holding an element this grammar has no meaning for",
+			Why: "an unrecognised token, which must be named in the refusal " +
+				"rather than skipped",
+			Class: caseWrong,
+		},
+	)
+}
+
+// parsesItsInput reports whether a function reads its argument as syntax.
+//
+// Read from what the body does rather than from the name: a function that
+// converts strings to numbers, walks a sequence deciding what each element
+// means, or reports a position in its input is parsing, whatever it is called.
+// Deliberately narrow — a false positive costs a function three cases it did
+// not need, and a false negative costs nothing at all, because the generic
+// ladder is what it would have had anyway.
+func parsesItsInput(function producedFunction) bool {
+	for _, effect := range function.Effects {
+		switch {
+		case strings.HasPrefix(effect, "strconv."),
+			strings.HasPrefix(effect, "json."),
+			strings.HasPrefix(effect, "encoding/"),
+			strings.HasPrefix(effect, "regexp."):
+			return true
+		}
+	}
+	return false
 }

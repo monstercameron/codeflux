@@ -32,6 +32,9 @@ type outstanding struct {
 	// askedForCoverage records whether this instruction named uncovered lines,
 	// so the caller can count the round it has spent.
 	askedForCoverage bool
+	// askedForProperty records whether this instruction asked for a property
+	// test, which is asked at most once per run.
+	askedForProperty bool
 	// owedCases is how many synthesised cases were still untried when this was
 	// computed, so the next round can tell whether the run is closing the gap
 	// or standing still. See the case ladder in outstandingWork.
@@ -58,6 +61,9 @@ func (execution *AgentExecution) outstandingWork(
 	// coverageRounds is how many times this run has already been shown its
 	// uncovered lines.
 	coverageRounds int,
+	// propertyRounds is how many times this run has already been asked for a
+	// property test.
+	propertyRounds int,
 	// testsPassed is whether the run's own suite is actually known to have
 	// passed. Three instruction builders used to assert that it had, whether or
 	// not anything established it — see validationPreamble.
@@ -158,6 +164,34 @@ func (execution *AgentExecution) outstandingWork(
 	// Asked last, and only for leaf functions, because it is the most
 	// expensive instruction in the set — nineteen fields per atom — and a run
 	// still failing to compile has more urgent problems than being findable.
+	// A property over a set of inputs, while there are still attempts to add
+	// one.
+	//
+	// This was measured only after the loop. Ladder rung 6 ended on
+	// "atom-property-tests failed" having never once been asked for a property
+	// test: the gate was hard, the run had attempts left, and nothing told it.
+	// That is the same late-gate defect path coverage had, in a second place.
+	//
+	// Asked once. A property test is a small, well-defined piece of work — one
+	// table over a set of inputs asserting a relationship rather than a value —
+	// and a run that was told exactly that and did not do it will not do it on
+	// the third telling.
+	if len(parts) == 0 && propertyRounds == 0 {
+		if outcome := checkPropertyTests(scope.worktree); !outcome.Held &&
+			!outcome.Skipped {
+			work.gate = "atom-property-tests"
+			work.because = "nothing states a property over a set of inputs"
+			work.askedForProperty = true
+			parts = append(parts, propertyTestInstruction(outcome.Detail))
+			summaries = append(summaries,
+				"no test states a property over a set of inputs")
+		} else if outcome.Held {
+			satisfied = append(satisfied,
+				"At least one test examines a set of inputs rather than one "+
+					"example.")
+		}
+	}
+
 	// Uncovered changed lines, while there are still attempts to fix them.
 	//
 	// This was measured only after the loop, in examineStructure, so a run
@@ -312,4 +346,26 @@ func uncoveredLineInstruction(uncovered []string) string {
 			"state the types forbid — say so in a comment on that line and "+
 			"leave it.",
 		strings.Join(uncovered, ", "))
+}
+
+// propertyTestInstruction asks for one test that states a relationship.
+//
+// It says what a property is in terms of the code rather than in terms of
+// testing vocabulary. A run told "add a property-based test" reaches for a
+// fuzzing library it does not have; a run told "write one table over several
+// inputs and assert the relationship that holds for all of them" writes the
+// thing that was wanted, in plain Go, in ten lines.
+func propertyTestInstruction(detail string) string {
+	return "No test states a property over a set of inputs — every test " +
+		"checks one example and its one expected answer. " + detail +
+		"\n\nAdd one test that asserts a relationship which must hold across " +
+		"a range of inputs, rather than a value for a single input. Write it " +
+		"as an ordinary table in plain Go over a handful of chosen inputs; no " +
+		"fuzzing library is needed or wanted.\n\n" +
+		"A property is a statement that stays true as the input varies: that " +
+		"a decoded value round-trips to what encoded it, that a sorted result " +
+		"holds the same elements as its input, that a total equals the sum of " +
+		"its parts, that an operation on two values agrees with the operator " +
+		"it implements. Keep the values small enough that overflow is not the " +
+		"thing under test."
 }

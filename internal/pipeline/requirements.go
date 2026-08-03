@@ -247,11 +247,30 @@ var Requirements = []Requirement{
 	}},
 
 	{StagePathCoverage, []Number{
-		// Coverage is measured by running the tests, and it is measured
-		// against the flow's finished state rather than a partially
-		// discharged one, so it needs both the tests and the discharge.
-		StageControlFlow,
-		StageControlTests,
+		// Coverage is measured by running the tests. That is the whole
+		// prerequisite: a suite that runs produces a profile, and the profile
+		// says which of this run's changed lines were executed.
+		//
+		// It used to require the control-flow discharge, which put it at the
+		// end of a six-link chain — property tests, atoms, atom verification,
+		// composition obligations, control tests, control flow — so any one of
+		// those failing left coverage recorded as "blocked" rather than
+		// measured. Ladder rung 6 failed its property-test gate and coverage
+		// was never measured at all, which is a fact about the flow's
+		// bookkeeping rather than about the program: the suite ran, it passed,
+		// and the profile was sitting there.
+		//
+		// A measurement that can be taken should be taken. Reporting "blocked"
+		// for a number nothing prevented computing is how a run comes to have
+		// fewer answers than it paid for.
+		//
+		// The prerequisite is that tests exist, which is what
+		// atom-example-tests establishes. Requiring the suite itself would
+		// point forward in the flow — the suite is phase E and this is phase D
+		// — and this stage runs `go test -coverprofile` for itself anyway, so
+		// what it needs is something to run, not somebody else's verdict on
+		// having run it.
+		StageAtomExampleTests,
 	}},
 
 	// Phase E — the program.

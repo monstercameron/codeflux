@@ -3,6 +3,7 @@ package coordinator
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -72,4 +73,35 @@ func discardRefinement(
 			"you left. Make the smallest change that addresses the failure " +
 			"above, and change nothing else.")
 	return note.String()
+}
+
+// changedFileSummary names the files a discarded attempt touched.
+//
+// Read from the copy that was kept rather than from a diff, because the
+// question the next attempt needs answered is "what did I just change", and the
+// file list answers it in one line. A diff would answer it in five hundred.
+func changedFileSummary(discarded, restored string) string {
+	entries, err := os.ReadDir(discarded)
+	if err != nil {
+		return ""
+	}
+	var changed []string
+	for _, entry := range entries {
+		if entry.IsDir() || skipFromCheckpoint(entry.Name()) {
+			continue
+		}
+		changed = append(changed, entry.Name())
+	}
+	// Nested directories are where produced code usually lives, so the top
+	// level alone is often empty. Fall back to the whole tree's digest, which
+	// at least says the attempt changed something.
+	if len(changed) == 0 {
+		if digest := producedTreeDigest(discarded); digest != "" &&
+			digest != producedTreeDigest(restored) {
+			return "the produced source (revision " + digest + ")"
+		}
+		return ""
+	}
+	sort.Strings(changed)
+	return strings.Join(changed, ", ")
 }

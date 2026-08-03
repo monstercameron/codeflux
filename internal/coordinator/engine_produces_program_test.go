@@ -6141,7 +6141,8 @@ func (engine engineFixture) carryOut(
 		switch task.State {
 		case domain.TaskStateCompleted, domain.TaskStateFailed,
 			domain.TaskStateCancelled, domain.TaskStateRolledBack,
-			domain.TaskStateRecoveryRequired, domain.TaskStateAwaitingReview:
+			domain.TaskStateRecoveryRequired, domain.TaskStateAwaitingReview,
+			domain.TaskStatePaused:
 			return true
 		default:
 			return false
