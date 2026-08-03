@@ -25,6 +25,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-105
+Date: 2026-08-03
+Status: Rung one green; the ladder can be climbed
+Change-ID: CL-20260803-095
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Make every pipeline stage pass for a rung without fitting the fix to it
+Assumptions: That a stage failing on correct code was a model problem -- wrong
+  in both cases. Both were gates that no output whatsoever could satisfy
+Decisions: Confirmed the first failure on a second, unrelated rung before
+  fixing anything. One rung failing is a fixture story; two rungs with
+  different requirements and different plans failing identically is a
+  structural one, and only the second justifies changing a gate.
+  Fixed the property-test gate by reusing synthesiseCases rather than adding a
+  second rule. Two stages had already reached opposite conclusions about one
+  fact, which is what happens when each decides it for itself.
+  Made readProducedWork ask git what this run added or changed, taking both
+  the untracked list and the diff against HEAD, because a created file and an
+  edited file are different questions. This is worth more than the fixture: on
+  a real repository there are always commands the run did not write, so the
+  old reading was not merely wrong here, it was unusable there.
+  Kept the fallback when git cannot answer, and said why in the comment: a
+  fixture that silently judged nothing would report every rung as producing no
+  program, which reads as a pass
+Files-or-schemas: agent_execution.go's decompositionGaps,
+  agent_stage_obligations.go's checkPropertyTests, engine_produces_program_test
+  .go's readProducedWork and a new filesTheRunWrote, plus two new test files
+Validation: Rung one at 27.32s, 41 of 41 stages, none failed. Each fix
+  reverted and its recorded failure reproduced before being restored
+Failures-or-discarded-approaches: Three runs stalled past five minutes and two
+  completed in under thirty seconds on identical inputs. The goroutine dump
+  put the coordinator in Supervisor.reap with nothing of ours running, so the
+  stall is in the worker subprocess rather than a coordinator deadlock. Not
+  diagnosed further
+Known-limitations: The registry is still empty. The intermittent stall
+Next-safe-step: Rung two, then the atom documentation the registry needs
+
 Dev-Log: DL-20260802-104
 Date: 2026-08-02
 Status: Two closed, one partial, three blocked with reasons, one new defect

@@ -50,6 +50,51 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-095
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- two gates no plan could pass, and a fixture reading somebody
+  else's program
+Request-or-TODO: Direct instruction, 2026-08-03: run the ladder rungs and make
+  every pipeline stage pass without fitting the fix to the run
+Outcome: The first ladder rung ever driven through the real flow died at stage
+  four with correct produced code, and so did rung five, with a different plan
+  and a different requirement. Two gates were unpassable by construction and a
+  third check was reading files nobody in the run had written.
+  Decomposition coverage compared the plan's files against the files the
+  request named and treated an empty set as proof that every planned file was
+  invented. A request that describes behaviour rather than naming files -- the
+  ordinary case, and the ladder's own stated premise -- could therefore never
+  pass it. Delegating the layout is not inventing work: with nothing named
+  there is no stated intent for a planned file to contradict.
+  Atom property tests then demanded a table-driven test from a program with no
+  input space. Worse, the run already knew better: atom-case-synthesis recorded
+  skipped, saying nothing could be varied, in the same run where this stage
+  failed for not having varied it. The two had drifted into contradicting each
+  other, so the fix is to share the judgement rather than write a second one.
+  The ladder's own readProducedWork claimed to read what the run wrote and
+  actually read every Go file in the worktree. The fixture repository ships a
+  placeholder main.go, so a run that correctly added a command produced two
+  main packages and the harness refused to judge either
+Affected-behavior: Rung one now passes end to end: 41 of 41 stages performed,
+  none failed, 21 satisfied, 18 skipped with stated reasons, and the two
+  blocked stages are human acceptance and delivery, which are a person's
+  decision and correctly not the run's
+Compatibility-or-migration: None. Both gates keep their original arm for the
+  case they were written for
+Verification: Each fix has a discrimination test verified by reverting the
+  change and reproducing the exact recorded failure, and a control proving the
+  gate still fires for the case it exists to catch: a request that does name a
+  file and a step writing something else, and a unit that does take inputs
+  tested by a single example
+Known-limitations: Nothing is registered as an atom yet -- the run produces no
+  //codeflux:atom documentation, so registration correctly skips and the
+  registry stays empty. Runs stall intermittently: the same binary and inputs
+  completed in 25 and 27 seconds twice and hung past five minutes three times,
+  with the coordinator idle in Supervisor.reap and the worker subprocess not
+  returning. That is a real robustness defect, separately tracked
+Dev-Log: DL-20260803-105
+
 Change-ID: CL-20260802-094
 Commit: pending
 Date: 2026-08-02

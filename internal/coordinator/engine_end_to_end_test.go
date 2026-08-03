@@ -270,10 +270,51 @@ func startEscalatingEngineFixture(
 	return startEngineWith(t, ApplicationOptions{AgentModelFactory: factory})
 }
 
+// durableEngineRootEnvironment names a directory the engine fixture should
+// build its project under instead of a temporary one.
+//
+// t.TempDir is deleted when the test ends, which is right for a suite and
+// wrong for the one case where the run itself is the thing being examined: a
+// ladder rung whose database somebody wants to open afterwards, inspect, or
+// serve to the browser client. Without this the atoms and memories a real run
+// deposits are unreachable the moment the run that deposited them returns.
+const durableEngineRootEnvironment = "CODEFLUX_ENGINE_ROOT"
+
+// durableEngineRoot is the project root for one engine fixture.
+//
+// It is a temporary directory unless the environment names somewhere durable,
+// and it refuses a non-empty durable directory rather than running against
+// whatever a previous run left there: a shared-ladder run's whole point is
+// that what it finds was put there by its own earlier rungs, and silently
+// inheriting an unrelated project would make the recall stage's account of
+// what it searched a lie.
+func durableEngineRoot(t *testing.T) string {
+	t.Helper()
+	named := strings.TrimSpace(os.Getenv(durableEngineRootEnvironment))
+	if named == "" {
+		return t.TempDir()
+	}
+	if err := os.MkdirAll(named, 0o755); err != nil {
+		t.Fatalf("create the durable engine root: %v", err)
+	}
+	entries, err := os.ReadDir(named)
+	if err != nil {
+		t.Fatalf("read the durable engine root: %v", err)
+	}
+	if len(entries) > 0 {
+		t.Fatalf("the durable engine root %s is not empty: %d entry(s). "+
+			"Remove it first, so what this run finds is what this run put "+
+			"there", named, len(entries))
+	}
+	t.Logf("engine root: %s, kept rather than removed, so the database this "+
+		"run writes can be opened afterwards", named)
+	return named
+}
+
 // startEngineWith is the shared body, given whichever model arrangement.
 func startEngineWith(t *testing.T, agent ApplicationOptions) engineFixture {
 	t.Helper()
-	root := t.TempDir()
+	root := durableEngineRoot(t)
 	repositoryPath := filepath.Join(root, "repo")
 	initializeCoordinatorGitRepository(t, repositoryPath)
 

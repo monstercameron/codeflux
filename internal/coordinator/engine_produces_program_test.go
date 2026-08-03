@@ -6085,8 +6085,15 @@ func (engine engineFixture) carryOut(
 		BaselineModelRevision:    "engine-program",
 		ToolConfigurationVersion: "tools-v1",
 		ValidationProfileVersion: "profile-v1",
-		AffectedPackages:         []string{"."},
-		IdempotencyKey:           ticket,
+		// Empty rather than ".", which intake refuses: fingerprint's
+		// shapeImportPath requires each segment to start with an
+		// alphanumeric, so "." never matched and every rung died at intake
+		// with "entries must match the field's documented syntax" before
+		// reaching a provider. Empty is also the honest value — no rung
+		// names a package, so there is no package hint to give. Non-nil,
+		// because normalizedStrings rejects nil.
+		AffectedPackages: []string{},
+		IdempotencyKey:   ticket,
 	})
 	if err != nil {
 		t.Fatalf("intake refused the requirement: %v", err)
@@ -6241,6 +6248,42 @@ type producedWork struct {
 	entry   string
 }
 
+// filesTheRunWrote is the set of repository-relative paths this run added or
+// changed, read from git rather than inferred.
+//
+// It returns nil when the answer cannot be established — an unreadable
+// worktree, a git that will not run — and every caller then falls back to
+// reading the whole tree, because a fixture that silently judged nothing
+// would report every rung as producing no program at all. A wrong answer
+// that announces itself is recoverable; an empty one that looks like a pass
+// is not.
+func filesTheRunWrote(t *testing.T, worktree string) map[string]bool {
+	t.Helper()
+	// Both halves are needed and they are different questions: --others finds
+	// a file the run created, and the diff finds one it edited in place.
+	written := map[string]bool{}
+	for _, argument := range [][]string{
+		{"ls-files", "--others", "--exclude-standard"},
+		{"diff", "--name-only", "HEAD"},
+	} {
+		command := exec.Command("git", argument...)
+		command.Dir = worktree
+		output, err := command.Output()
+		if err != nil {
+			t.Logf("could not establish what the run wrote (%v %v): %v; "+
+				"falling back to reading the whole worktree",
+				"git", argument, err)
+			return nil
+		}
+		for _, line := range strings.Split(string(output), "\n") {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				written[filepath.ToSlash(trimmed)] = true
+			}
+		}
+	}
+	return written
+}
+
 // readProducedWork reads the worktree and finds the program in it.
 //
 // The command is found rather than assumed. The requirement asks for a program
@@ -6248,9 +6291,19 @@ type producedWork struct {
 // package must declare a main function. None means no program was produced;
 // several means there is no saying which was meant, and building whichever
 // sorted first is how a suite ends up judging the wrong binary.
+//
+// "What the run wrote" is taken literally, against the worktree's own base
+// revision, rather than meaning "every Go file present". Those are the same
+// thing only on an empty repository, and they were not the same here: the
+// fixture's repository ships a placeholder `main.go`, so a run that correctly
+// added its own command produced two main packages and this refused to judge
+// either. On a real repository — the case PIPE-122 exists for — there are
+// always commands the run did not write, so reading them as the run's work
+// would make this unusable there rather than merely wrong here.
 func readProducedWork(t *testing.T, worktree string) producedWork {
 	t.Helper()
 	work := producedWork{worktree: worktree}
+	authored := filesTheRunWrote(t, worktree)
 	walk := func(where string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -6275,6 +6328,12 @@ func readProducedWork(t *testing.T, worktree string) producedWork {
 			return readErr
 		}
 		slashed := filepath.ToSlash(relative)
+		if authored != nil && !authored[slashed] {
+			// Present in the worktree, and not this run's doing. See this
+			// function's own comment: judging it would judge somebody else's
+			// program.
+			return nil
+		}
 		work.files = append(work.files,
 			describeProducedFile(slashed, path.Dir(slashed),
 				strings.HasSuffix(entry.Name(), "_test.go"), string(body)))

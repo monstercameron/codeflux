@@ -1362,6 +1362,18 @@ func programDetail(compiles bool) string {
 // It returns the files the request asked for that no step will write, and the
 // files steps will write that the request never mentioned. Both are defects
 // and they are different ones: the first drops work, the second invents it.
+//
+// A request that names no file at all is the exception, and it is the common
+// case rather than a corner: "write a program that prints the sum of its
+// arguments" delegates the layout to the run, which is the product's whole
+// premise. Judging planned files against an empty asked-set marked every one
+// of them as invented, so the gate could not be passed by any plan whatsoever
+// — the model wrote correct code and the flow refused it at stage four,
+// reproduced on two unrelated ladder rungs. Delegation is not invention: with
+// nothing named there is no stated intent for a planned file to contradict,
+// so the second arm has nothing to say and stays silent. The first arm is
+// unaffected either way, because a request that named nothing cannot have
+// named something a step then dropped.
 func decompositionGaps(
 	requirement string,
 	steps []agentloop.PlanStep,
@@ -1383,14 +1395,20 @@ func decompositionGaps(
 			uncovered = append(uncovered, file)
 		}
 	}
-	for file := range planned {
-		// A test file the run adds for a source file the request named is
-		// wanted work, not invented work: the request asked for the behaviour
-		// and the product requires it be tested.
-		if asked[file] || asked[strings.TrimSuffix(file, "_test.go")+".go"] {
-			continue
+	// Nothing named means the layout was delegated, so there is no stated
+	// intent for a planned file to contradict. See this function's own
+	// comment: without this the gate is unpassable for every request that
+	// describes behaviour rather than files.
+	if len(asked) > 0 {
+		for file := range planned {
+			// A test file the run adds for a source file the request named is
+			// wanted work, not invented work: the request asked for the
+			// behaviour and the product requires it be tested.
+			if asked[file] || asked[strings.TrimSuffix(file, "_test.go")+".go"] {
+				continue
+			}
+			unasked = append(unasked, file)
 		}
-		unasked = append(unasked, file)
 	}
 	sort.Strings(uncovered)
 	sort.Strings(unasked)

@@ -17,7 +17,27 @@ import (
 // property. The distinction matters because a suite made entirely of single
 // examples passes for exactly the inputs somebody thought of, which are the
 // inputs least likely to be wrong.
+//
+// A unit with no inputs to vary is the exception, and it is not a corner
+// case: "print this line" has no input space, so there is no property over
+// one to state and no table a test could be driven from. Demanding a tabular
+// test there failed the gate for work that was correct and complete, and
+// blocked fourteen downstream stages behind it.
+//
+// Whether anything can be varied is not decided again here. It is
+// synthesiseCases', the same judgement atom-case-synthesis records when it
+// skips for this reason. Two stages deciding one fact separately is how they
+// come to disagree, and they had: case-synthesis skipped saying nothing could
+// be varied while this stage failed for not having varied it.
 func checkPropertyTests(worktree string) stageOutcome {
+	produced, err := readProducedFunctions(worktree)
+	if err != nil {
+		return broke("the produced source could not be parsed: "+err.Error(), nil)
+	}
+	if len(synthesiseCases(produced)) == 0 {
+		return skipped("the run produced no atom whose inputs could be " +
+			"varied, so there is no property over an input set to state")
+	}
 	files, err := producedGoFiles(worktree)
 	if err != nil {
 		return broke("the produced tests could not be read: "+err.Error(), nil)
