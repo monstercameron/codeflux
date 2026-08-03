@@ -764,8 +764,16 @@ func (execution *AgentExecution) Run(
 				Steps: steps,
 			},
 			RepositoryContext: context,
-			ApprovedTools:     agentApprovedTools(),
-			Limits:            agentLoopLimits(maximumCost),
+			// The suite is offered only when something could have changed
+			// since it last ran. A round that has changed nothing would learn
+			// nothing from another run, and the model cannot see that: it
+			// re-ran the same command against the same bytes and each run
+			// looked to it like a step forward.
+			ApprovedTools: agentApprovedTools(
+				narrator.lastTestFingerprint == "" ||
+					narrator.lastTestFingerprint !=
+						producedTreeDigest(scope.worktree)),
+			Limits: agentLoopLimits(maximumCost),
 		})
 		// A malformed turn is a mistake the model made, not a failure of the
 		// machinery, so it costs an attempt rather than the run.

@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-149
+Date: 2026-08-03
+Status: Rung 8 running; items 7 and 10 in
+Change-ID: CL-20260803-139
+Commit: pending
+Request-or-TODO: Pipeline analysis items 7 and 10
+Goal: Stop asking two questions at once, and stop paying for answers already
+  known
+Decisions: Deleted the format sentence rather than making it agree with the
+  schema. A format described twice is a format that can disagree with itself;
+  described once, in the place that is enforced, it cannot.
+  Withheld the tool rather than refusing the call. The refusal already existed
+  and is a worse teacher: it spends the round to say what the allowlist could
+  have said before it started
+Files-or-schemas: agent_planning.go, agent_narration.go, agent_execution.go,
+  refinement_round_test.go
+Validation: Build, vet, gofmt, the planning and refinement tests
+Failures-or-discarded-approaches: None
+Known-limitations: Items 8, 9 and 11 to 17 remain: model assignment is not
+  sized to the round, the completion reply is still free-form prose, the
+  synthesised cases are still type-derived rather than semantic, and the memory
+  audit trail is thin
+Next-safe-step: Read rung 8
+
 Dev-Log: DL-20260803-148
 Date: 2026-08-03
 Status: Items 1 to 6 of the pipeline analysis are in

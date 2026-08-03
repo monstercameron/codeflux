@@ -50,6 +50,30 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-139
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- one protocol for the decomposition answer, and no suite run that
+  could learn nothing
+Request-or-TODO: Pipeline analysis, items 7 and 10
+Outcome: The decomposition prompt asked for "one behaviour per line and nothing
+  else" while the request carried a JSON schema the answer had to satisfy. Two
+  protocols, one enforced and the other merely asked for, and a model reading
+  both has to guess which is real — which is a plausible part of why the same
+  request decomposed into seven behaviours one run and six the next. The schema
+  is the format now, and the instruction says only what to put in it: what is
+  observable from outside the program, because that is what a test can check,
+  and each stated error case as its own behaviour, because refusing bad input
+  is something a program does and something that can be got wrong on its own.
+  The suite is no longer offered to a round that has changed nothing since it
+  last ran. The coordinator already noticed and said so afterwards; the model
+  cannot see it, and each re-run looked to it like a step forward. Withholding
+  the tool is more honest than letting it be called and then explaining that
+  the answer was already known. The write tools are still offered, because a
+  round that cannot usefully test can still be a round that writes.
+Verification: Build, vet, gofmt, one new test and the planning suite
+Dev-Log: DL-20260803-149
+
 Change-ID: CL-20260803-138
 Commit: pending
 Date: 2026-08-03

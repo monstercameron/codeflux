@@ -576,12 +576,20 @@ func filesNamedIn(requirement string) []string {
 }
 
 // agentApprovedTools is what a run may do.
-func agentApprovedTools() []agentloop.ApprovedTool {
+// agentApprovedTools is what a run may do this round.
+//
+// offerTest is whether running the suite is worth offering at all. A round that
+// has changed nothing since the last test run would learn nothing from another,
+// and the model cannot see that: it re-ran the same command against the same
+// bytes repeatedly, and each run looked to it like a step forward. Withholding
+// the tool is more honest than letting it be called and then explaining
+// afterwards that the answer was already known.
+func agentApprovedTools(offerTest bool) []agentloop.ApprovedTool {
 	catalog := map[executor.ToolName]executor.ToolDescriptor{}
 	for _, descriptor := range executor.ToolCatalog() {
 		catalog[descriptor.Name] = descriptor
 	}
-	return []agentloop.ApprovedTool{
+	tools := []agentloop.ApprovedTool{
 		{
 			Descriptor: catalog[executor.ToolApplyEdit],
 			Arguments: []agentloop.ToolArgumentDefinition{
@@ -609,7 +617,9 @@ func agentApprovedTools() []agentloop.ApprovedTool {
 			MaterialEdit:      true,
 			CreatesCheckpoint: true,
 		},
-		{
+	}
+	if offerTest {
+		tools = append(tools, agentloop.ApprovedTool{
 			Descriptor: catalog[executor.ToolTest],
 			Arguments: []agentloop.ToolArgumentDefinition{
 				{Name: "executable", Required: true},
@@ -617,8 +627,9 @@ func agentApprovedTools() []agentloop.ApprovedTool {
 				{Name: "arg2", Required: true},
 			},
 			DefaultTimeout: 4 * time.Minute,
-		},
+		})
 	}
+	return tools
 }
 
 // agentContextItem binds content to its digest.

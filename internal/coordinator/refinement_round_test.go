@@ -1,6 +1,11 @@
 package coordinator
 
-import "testing"
+import (
+	"testing"
+
+	agentloop "codeflux.dev/codeflux/internal/agent"
+	"codeflux.dev/codeflux/internal/executor"
+)
 
 // TestScopeFollowsTheFindingsNotTheGate is the defect rung 6 showed.
 //
@@ -110,5 +115,39 @@ func TestAFindingThatStopsBeingRaisedIsVerified(t *testing.T) {
 	if _, _ = ledger.reconcile(nil); len(ledger.verified) != 1 {
 		t.Errorf("%d finding(s) verified after one stopped being raised",
 			len(ledger.verified))
+	}
+}
+
+// TestTheSuiteIsWithheldWhenNothingChanged covers the premature test run.
+//
+// A round that has changed nothing would learn nothing from another run, and
+// the model cannot see that: it re-ran the same command against the same bytes
+// and each run looked to it like a step forward. Withholding the tool is more
+// honest than letting it be called and explaining afterwards that the answer
+// was already known.
+func TestTheSuiteIsWithheldWhenNothingChanged(t *testing.T) {
+	offers := func(tools []agentloop.ApprovedTool) bool {
+		for _, tool := range tools {
+			if tool.Descriptor.Name == executor.ToolTest {
+				return true
+			}
+		}
+		return false
+	}
+	if !offers(agentApprovedTools(true)) {
+		t.Error("a round where something may have changed was not offered the suite")
+	}
+	if offers(agentApprovedTools(false)) {
+		t.Error("a round that changed nothing was offered the suite anyway")
+	}
+	// The write tools are offered either way: a round that cannot test can
+	// still be a round that writes, and withholding those would leave it
+	// nothing to do at all.
+	for _, offered := range [][]agentloop.ApprovedTool{
+		agentApprovedTools(true), agentApprovedTools(false),
+	} {
+		if len(offered) == 0 {
+			t.Fatal("a round was offered no tools at all")
+		}
 	}
 }
