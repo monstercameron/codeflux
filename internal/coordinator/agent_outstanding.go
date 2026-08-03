@@ -122,6 +122,32 @@ func (execution *AgentExecution) outstandingWork(
 		work.owedCases = owedNow
 	}
 
+	// Atoms nobody can register are atoms nobody can reuse.
+	//
+	// Registration refuses a declaration with no //codeflux:atom schema
+	// comment, and nothing asked for one, so the registry stayed empty and the
+	// recall stage searched an empty project on every run of this session.
+	// That is the compounding-effort thesis unstarted rather than unproven: a
+	// run cannot reuse what no run ever registered.
+	//
+	// Asked last, and only for leaf functions, because it is the most
+	// expensive instruction in the set — nineteen fields per atom — and a run
+	// still failing to compile has more urgent problems than being findable.
+	if produced, err := readProducedFunctions(scope.worktree); err == nil {
+		if undocumented := atomsWithoutRegistrableDocumentation(
+			scope.worktree, produced,
+		); len(undocumented) > 0 {
+			if work.gate == "" {
+				work.gate = "atom-documentation"
+				work.because = "its atoms cannot be found by a later task"
+			}
+			parts = append(parts, atomDocumentationInstruction(undocumented))
+			summaries = append(summaries, fmt.Sprintf(
+				"%d atom(s) carry no registrable documentation",
+				len(undocumented)))
+		}
+	}
+
 	if len(parts) == 0 {
 		return outstanding{}
 	}
