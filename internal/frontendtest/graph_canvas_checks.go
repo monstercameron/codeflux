@@ -19,6 +19,48 @@ type graphViewportState struct {
 
 const graphTransformTolerance = 0.001
 
+// The mounted graph checks assert against the exact content the REPO-041
+// seeded thread produces: `codeflux-dev seed success` in serve mode (see
+// internal/testharness.StartMountedThread) drives one real requirement --
+// "create cmd/report/main.go, add its companion test, run the project's
+// tests" -- through the real coordinator, over real SQLite, to
+// awaiting-review. These strings were read back from that real run's
+// database (internal/coordinator/agent_graph.go's shortGraphLabel and
+// web/frontend/graphcanvas/component.go's "<title> - <StatusLabel>" aria
+// format), not invented: the commit that follows REPO-039's precedent here
+// is REPO-044, which is what made a real run reach six distinct node
+// classes in the first place. The old constants ("requirements",
+// "responsive", "implementation", "Shell requirements - Complete") named a
+// ten-node demo fixture that commit 964e09d deleted at the user's explicit
+// request to stop using seeded UI data; reseeding that content would have
+// resurrected exactly the anti-pattern the product removed.
+//
+// Two nodes this run produces share a label with another node of a
+// different class -- the atom-operation and artifact-result nodes for each
+// written file both read "<path> - Passed", and the effect and obligation
+// nodes for the test run both read "go test ./... - Passed" -- because both
+// halves of each pair genuinely share the same display name and status.
+// That is real and not a defect (see REPO-041's TODOS.md entry), but it
+// means only the nodes below are safe to address by accessible name: it is
+// exactly one requirement, one plan region, and one plan step, and each is
+// unique among the eleven.
+const (
+	// seededRequirementNodeLabel is the requirement node: always passed,
+	// because a requirement is projected once and never re-stated.
+	seededRequirementNodeLabel = "Create cmd/report/main.go so the program prints a report line. - Passed"
+	// seededPlanRegionNodeLabel is "The plan" region node. It is the run's
+	// only node left in the active status projector.go ever assigns a plan
+	// region, which is also what makes it the graph's CurrentID fallback
+	// (web/frontend/shell/reference_chrome.go's currentGraphNodeID) and
+	// therefore the node selected by default when the canvas first mounts.
+	seededPlanRegionNodeLabel = "The plan - Active"
+	// seededVerifyStepNodeLabel is the plan step that runs the project's own
+	// tests, still pending because nothing in this graph vocabulary marks a
+	// plan step implemented or validated -- only the operation, effect, and
+	// obligation nodes it controls carry a terminal status.
+	seededVerifyStepNodeLabel = "Run the tests: executable go, arg1 test, arg2 ./... - Pending"
+)
+
 func runMountedGraphCanvasContractCheck(
 	page playwright.Page,
 	base *url.URL,
@@ -71,8 +113,17 @@ func runMountedGraphCanvasContractCheck(
 		ID: "graph-canvas-mounted-high-dpi-accessible-overlay", Route: route, Viewport: "wide",
 		Passed: err == nil && canvasCountErr == nil && canvasCount == 1 &&
 			surfaceCountErr == nil && surfaceCount == 1 && canvasVisibleErr == nil && canvasVisible &&
-			surfaceVisibleErr == nil && surfaceVisible && nodeCountErr == nil && nodeCount == 10 &&
-			accessibleNodes && len(shapes) >= 4 && selectedCount == 1 &&
+			// The seeded requirement (REPO-041, REPO-044) produces exactly
+			// eleven nodes across all six wired classes: one requirement, one
+			// plan region plus its three steps, two file-edit operations, one
+			// command effect, one validation obligation, and two stored
+			// artifacts. REPO-044's own investigation names the ceiling: two
+			// classes (ApprovalBoundary, RecoveryObserved) have no production
+			// caller, so six is the most any real run can show today, and
+			// this assertion is pinned to that ceiling rather than a looser
+			// "at least" bound the product has already exceeded.
+			surfaceVisibleErr == nil && surfaceVisible && nodeCountErr == nil && nodeCount == 11 &&
+			accessibleNodes && len(shapes) == 6 && selectedCount == 1 &&
 			viewportErr == nil && viewport.Zoom > 0 &&
 			backingMatches,
 		Detail: fmt.Sprintf(
@@ -199,35 +250,55 @@ func runGraphCanvasInteractionCheck(
 		math.Abs(resetState.PanY) > graphTransformTolerance) {
 		err = fmt.Errorf("reset did not clear pan: %v", resetState)
 	}
+	// Node identity (nod_...) is a fresh ULID every time the thread is
+	// reseeded, so unlike the accessible names above it cannot be a
+	// compile-time constant. It is read back from the same button
+	// GetByRole/Name resolves, right after the interaction that selects it,
+	// and every data-selected-node-id assertion below compares against that
+	// captured value rather than a literal.
 	inspected := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
-		Name: "Shell requirements - Complete", Exact: playwright.Bool(true),
+		Name: seededRequirementNodeLabel, Exact: playwright.Bool(true),
 	})
 	keyboardSelected := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
-		Name: "Responsive layout - Active", Exact: playwright.Bool(true),
+		Name: seededVerifyStepNodeLabel, Exact: playwright.Bool(true),
 	})
-	keyboardSelectedDOM := canvas.Locator(
-		`button[data-component="graph-node"][data-node-id="responsive"]`,
-	)
+	// The plan region is the run's only active-status node, which makes it
+	// web/frontend/shell/reference_chrome.go's currentGraphNodeID fallback
+	// and therefore the "current" node "Return to current graph node"
+	// returns to.
 	current := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
-		Name: "GWC workspace - Active", Exact: playwright.Bool(true),
+		Name: seededPlanRegionNodeLabel, Exact: playwright.Bool(true),
 	})
+	var inspectedID, keyboardSelectedID, currentID string
 	if err == nil {
 		err = inspected.Click()
+	}
+	if err == nil {
+		inspectedID, err = inspected.GetAttribute("data-node-id")
 	}
 	if err == nil {
 		err = browserAssertions().Locator(inspected).ToHaveAttribute("data-selected", "true")
 	}
 	if err == nil {
-		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", "requirements")
+		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", inspectedID)
 	}
 	if err == nil {
 		err = focusAndPress(keyboardSelected, "Enter")
 	}
 	if err == nil {
+		keyboardSelectedID, err = keyboardSelected.GetAttribute("data-node-id")
+	}
+	if err == nil {
 		err = browserAssertions().Locator(keyboardSelected).ToHaveAttribute("aria-pressed", "true")
 	}
 	if err == nil {
-		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", "responsive")
+		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", keyboardSelectedID)
+	}
+	var keyboardSelectedDOM playwright.Locator
+	if err == nil {
+		keyboardSelectedDOM = canvas.Locator(
+			fmt.Sprintf(`button[data-component="graph-node"][data-node-id="%s"]`, keyboardSelectedID),
+		)
 	}
 	requestReview := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
 		Name: "Request review", Exact: playwright.Bool(true),
@@ -256,17 +327,20 @@ func runGraphCanvasInteractionCheck(
 		err = returnCurrent.Click()
 	}
 	if err == nil {
+		currentID, err = current.GetAttribute("data-node-id")
+	}
+	if err == nil {
 		err = browserAssertions().Locator(current).ToHaveAttribute("aria-pressed", "true")
 	}
 	if err == nil {
-		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", "implementation")
+		err = browserAssertions().Locator(canvas).ToHaveAttribute("data-selected-node-id", currentID)
 	}
 	appendInteractionResult(page, artifactDir, result, CheckResult{
 		ID: "graph-canvas-viewport-selection-and-deliberate-inspection", Route: route, Viewport: "wide",
 		Passed: err == nil,
 		Detail: fmt.Sprintf(
-			"initial=%+v zoomed=%+v panned=%+v fitted=%+v reset=%+v click_node=requirements keyboard_node=responsive returned=implementation error=%v",
-			initial, zoomed, panned, fitted, resetState, err,
+			"initial=%+v zoomed=%+v panned=%+v fitted=%+v reset=%+v click_node=%s keyboard_node=%s returned=%s error=%v",
+			initial, zoomed, panned, fitted, resetState, inspectedID, keyboardSelectedID, currentID, err,
 		),
 	})
 }

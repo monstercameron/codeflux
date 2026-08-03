@@ -48,15 +48,18 @@ func runGraphSelectionPersistenceCheck(
 		interactionThreadViewportHeight,
 		"minimum",
 	)
-	detail := []string{"selected=Responsive layout"}
+	detail := []string{"selected=requirement node"}
 	graphTab := page.GetByRole(*playwright.AriaRoleTab, playwright.PageGetByRoleOptions{
 		Name: "Task graph", Exact: playwright.Bool(true),
 	})
 	conversationTab := page.GetByRole(*playwright.AriaRoleTab, playwright.PageGetByRoleOptions{
 		Name: "Conversation", Exact: playwright.Bool(true),
 	})
+	// The requirement node (REPO-041's seeded thread) is deliberately not the
+	// default-selected node, unlike the plan region: selecting it is what
+	// this check needs to exercise, not what it starts already true.
 	selectedNode := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
-		Name: "Responsive layout - Active", Exact: playwright.Bool(true),
+		Name: seededRequirementNodeLabel, Exact: playwright.Bool(true),
 		IncludeHidden: playwright.Bool(true),
 	})
 	graph := page.GetByRole(*playwright.AriaRoleComplementary, playwright.PageGetByRoleOptions{
@@ -500,6 +503,17 @@ func loadInteractionThread(
 	if err := browserAssertions().Locator(root).ToHaveAttribute("data-responsive-mode", mode); err != nil {
 		return route, root, err
 	}
+	// Bare /tasks is deliberately a thread picker: it does not auto-adopt a
+	// thread the way /graphs and /memory adopt the coordinator's
+	// SelectedThreadID (see the route comment on selectDurableSessionForComposer).
+	// Every check that reaches this function needs a real, coordinator-backed
+	// thread with a real task graph and real timeline cards, not the empty
+	// shell-preview /tasks renders before one is picked, so the picker is
+	// driven here, once, at the single shared entry point every interaction
+	// check calls (REPO-041).
+	if err := selectDurableThreadRow(page, mode); err != nil {
+		return route, root, err
+	}
 	// Every check in this file shares one Playwright page across the whole
 	// suite, and the navigation above does not by itself guarantee
 	// document.activeElement starts empty: a check earlier in the run can
@@ -524,6 +538,12 @@ func loadInteractionThread(
 // editable mounted composer. M18 deliberately disables mutations before a
 // session is selected, so browser checks select a coordinator-backed thread
 // instead of relying on the disconnected preview.
+//
+// loadInteractionThread now selects a thread itself (REPO-041), so by the
+// time most checks reach this function the composer is already enabled and
+// this is a no-op. It stays as the explicit, defensive entry point for a
+// composer-specific acceptance, and still does the work itself if the
+// composer is ever reached before a thread has been picked.
 func selectDurableSessionForComposer(page playwright.Page, composer playwright.Locator) error {
 	disabled, err := composer.IsDisabled()
 	if err != nil || !disabled {
@@ -533,7 +553,30 @@ func selectDurableSessionForComposer(page playwright.Page, composer playwright.L
 	if modeErr != nil {
 		return modeErr
 	}
-	if mode == "compact" || mode == "minimum" {
+	if err := selectDurableThreadRow(page, mode); err != nil {
+		return err
+	}
+	if err := composer.WaitFor(playwright.LocatorWaitForOptions{
+		State: playwright.WaitForSelectorStateVisible,
+	}); err != nil {
+		return fmt.Errorf("wait for selected-session composer: %w", err)
+	}
+	return browserAssertions().Locator(composer).ToBeEnabled()
+}
+
+// selectDurableThreadRow picks a real coordinator-backed thread from the
+// rail, opening it first when the responsive mode hides it behind a toggle.
+//
+// Route note (established investigating REPO-041): bare /tasks is
+// deliberately a thread picker, not a route that auto-adopts a thread --
+// unlike /graphs and /memory, which adopt the coordinator's
+// SelectedThreadID. web/client/main.go is correct as written and is not
+// this ticket's defect; the mounted browser matrix simply never drove the
+// picker, so every check asserting on graph or timeline content ran against
+// the empty shell-preview state no supported path could ever populate.
+func selectDurableThreadRow(page playwright.Page, mode string) error {
+	narrow := mode == "compact" || mode == "minimum"
+	if narrow {
 		toggle := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
 			Name: "Toggle thread rail", Exact: playwright.Bool(true),
 		})
@@ -552,12 +595,12 @@ func selectDurableSessionForComposer(page playwright.Page, composer playwright.L
 		return err
 	}
 	if count == 0 {
-		return fmt.Errorf("no durable session is available for composer acceptance")
+		return fmt.Errorf("no durable session is available to select")
 	}
 	if err := rows.First().Click(); err != nil {
 		return err
 	}
-	if mode == "compact" || mode == "minimum" {
+	if narrow {
 		collapse := page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
 			Name: "Collapse thread rail", Exact: playwright.Bool(true),
 		})
@@ -572,12 +615,7 @@ func selectDurableSessionForComposer(page playwright.Page, composer playwright.L
 			return fmt.Errorf("wait for responsive thread rail close: %w", err)
 		}
 	}
-	if err := composer.WaitFor(playwright.LocatorWaitForOptions{
-		State: playwright.WaitForSelectorStateVisible,
-	}); err != nil {
-		return fmt.Errorf("wait for selected-session composer: %w", err)
-	}
-	return browserAssertions().Locator(composer).ToBeEnabled()
+	return nil
 }
 
 func interactionTaskRoute() string {

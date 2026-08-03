@@ -5,8 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/testfixtures"
@@ -63,6 +70,18 @@ func runSeed(
 		return exitFailure
 	}
 
+	// CODEFLUX_DEV_SEED_SERVE opts into actually opening a database and
+	// driving a real requirement through it (REPO-041), rather than only
+	// printing the scenario's description. It is an environment toggle
+	// rather than a new flag or a second positional argument because
+	// registry.go's invocation parser and main.go's per-command argument
+	// limits are outside this file's ownership, and every existing caller of
+	// `seed` -- including TestAUDIT029_SeedListsAndDescribesTheClosedScenarioSet
+	// -- depends on the descriptive behavior staying the default.
+	if os.Getenv(seedServeEnvironment) == "1" {
+		return runSeedServe(stdout, stderr, invocation, scenario, label)
+	}
+
 	if invocation.JSON {
 		return writeCommandJSON(stdout, stderr, label, describeScenario(scenario))
 	}
@@ -80,6 +99,178 @@ func runSeed(
 		fmt.Fprintf(stdout, "  %2d. %s\n", index+1, kind)
 	}
 	return exitSuccess
+}
+
+// seedServeEnvironment opts `seed` into driving a real requirement through a
+// real booted coordinator and serving it, instead of only printing the named
+// scenario's description. See the comment at its one call site in runSeed.
+const seedServeEnvironment = "CODEFLUX_DEV_SEED_SERVE"
+
+// seedServeSecondsEnvironment bounds how long the served application stays up
+// before it shuts itself down. A bounded default rather than "forever" means
+// a caller that forgets to stop it does not leave an orphaned coordinator
+// running past the session that needed it, which is exactly the failure mode
+// AGENTS.md's "Stop What You Start" section exists to prevent.
+const seedServeSecondsEnvironment = "CODEFLUX_DEV_SEED_SERVE_SECONDS"
+
+const defaultSeedServeSeconds = 20 * 60
+
+// runSeedServe drives one real requirement through a real Application over
+// real SQLite (REPO-041) and serves it on a loopback address until it is
+// interrupted or its bounded lifetime elapses.
+//
+// It exists because the mounted browser matrix needs a durably-open thread
+// carrying a real task graph and real timeline cards, and nothing on a
+// freshly migrated database creates one: bare `/tasks` is deliberately a
+// thread picker, not a route that auto-opens a session. This gives the
+// picker something real to pick.
+//
+// Only the "success" scenario is wired to a real run today. The other eleven
+// named scenarios describe fault behavior -- denied approvals, budget caps,
+// worker crashes -- that this command does not attempt to inject into the
+// real engine; driving those honestly would mean reproducing fault injection
+// this repository already has in internal/coordinator's own test suite, which
+// is out of scope for the seeding gap this ticket closes.
+func runSeedServe(
+	stdout io.Writer,
+	stderr io.Writer,
+	invocation commandInvocation,
+	scenario testharness.Scenario,
+	label string,
+) int {
+	if scenario.Name != testharness.ScenarioSuccess {
+		fmt.Fprintf(stderr,
+			"%s: --serve only drives the %q scenario through a real run today; "+
+				"the other named scenarios describe fault behavior this command does not "+
+				"inject into the real engine\n",
+			label, testharness.ScenarioSuccess)
+		return exitUsage
+	}
+
+	repository, err := repositoryRoot()
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: repository: %v\n", label, err)
+		return exitFailure
+	}
+	root, err := resolveCommandRoot(repository, "seed", invocation.Root)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: root: %v\n", label, err)
+		return exitUsage
+	}
+	// The served database describes exactly one run: a stale one from a
+	// previous invocation left sitting under this root would be a second,
+	// silent seeding path that this ticket exists to close off.
+	if err := os.RemoveAll(root); err != nil {
+		fmt.Fprintf(stderr, "%s: clear %s: %v\n", label, root, err)
+		return exitFailure
+	}
+
+	buildCtx, cancelBuild := context.WithTimeout(context.Background(), 3*time.Minute)
+	workerPath, err := buildSeedWorkerExecutable(buildCtx, repository, root)
+	cancelBuild()
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: build worker executable: %v\n", label, err)
+		return exitFailure
+	}
+
+	// A coordinator with no frontend asset set mounts no browser server at
+	// all: coordinator.ApplicationOptions gates the browser server, its
+	// security headers, and its same-origin CSP on
+	// FrontendAssetsDirectory/FrontendAssets being set, so without this a
+	// served coordinator answers every request 404 and app-root never
+	// appears. Built through the same runBuildFrontend `build-frontend`
+	// itself calls, at its fixed default location, so a stale asset set from
+	// a previous invocation cannot silently linger.
+	assetsCtx, cancelAssets := context.WithTimeout(context.Background(), 5*time.Minute)
+	assetCode := runBuildFrontend(assetsCtx, stdout, stderr, commandInvocation{})
+	cancelAssets()
+	if assetCode != exitSuccess {
+		fmt.Fprintf(stderr, "%s: build frontend assets: exit %d\n", label, assetCode)
+		return exitFailure
+	}
+	assetsDirectory, err := resolveCommandRoot(repository, frontendAssetDirectory, "")
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: resolve frontend assets directory: %v\n", label, err)
+		return exitFailure
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	const program = "package main\n\nimport \"fmt\"\n\n" +
+		"// main prints the report line this task was asked for.\n" +
+		"func main() {\n\tfmt.Println(\"report\")\n}\n"
+	const programTest = "package main\n\nimport \"testing\"\n\n" +
+		"// TestReport calls main to confirm the program runs without a panic.\n" +
+		"func TestReport(t *testing.T) {\n\tmain()\n}\n"
+
+	result, err := testharness.StartMountedThread(ctx, testharness.MountedThreadOptions{
+		Root:                    filepath.Join(root, "mounted"),
+		WorkerExecutable:        workerPath,
+		FrontendAssetsDirectory: assetsDirectory,
+		Requirement:             "Create cmd/report/main.go so the program prints a report line.",
+		AffectedPackages:        []string{"cmd/report"},
+		EditPath:                "cmd/report/main.go",
+		EditContent:             program,
+		TestPath:                "cmd/report/main_test.go",
+		TestContent:             programTest,
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: drive the seeded requirement: %v\n", label, err)
+		return exitFailure
+	}
+
+	seconds := defaultSeedServeSeconds
+	if raw := os.Getenv(seedServeSecondsEnvironment); raw != "" {
+		if parsed, parseErr := strconv.Atoi(raw); parseErr == nil && parsed > 0 {
+			seconds = parsed
+		} else {
+			fmt.Fprintf(stderr, "%s: %s=%q must be a positive integer; using the default\n",
+				label, seedServeSecondsEnvironment, raw)
+		}
+	}
+
+	fmt.Fprintf(stdout, "CODEFLUX_FRONTEND_URL=http://%s/\n", result.Application.Address())
+	fmt.Fprintf(stdout, "database:  %s\n", filepath.Join(root, "mounted", "coordinator.sqlite3"))
+	fmt.Fprintf(stdout, "thread:    %s\n", result.ThreadID)
+	fmt.Fprintf(stdout, "task:      %s state=%s\n", result.TaskID, result.FinalState)
+	fmt.Fprintf(stdout, "%s: serving for up to %ds; interrupt (Ctrl+C) to stop sooner\n", label, seconds)
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Duration(seconds) * time.Second):
+		fmt.Fprintf(stdout, "%s: bounded serve lifetime elapsed; stopping\n", label)
+	}
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelShutdown()
+	if err := result.Application.Shutdown(shutdownCtx); err != nil {
+		fmt.Fprintf(stderr, "%s: shutdown: %v\n", label, err)
+		return exitFailure
+	}
+	return exitSuccess
+}
+
+// buildSeedWorkerExecutable compiles the real codeflux-worker subprocess
+// entry point beneath the artifact root, mirroring how
+// internal/coordinator's own end-to-end fixtures build it for a test. A
+// stub would prove only that some process was spawned; the real subprocess
+// proves the coordinator hands it something it can decode.
+func buildSeedWorkerExecutable(ctx context.Context, repository string, root string) (string, error) {
+	name := "codeflux-worker"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	output := filepath.Join(root, "bin", name)
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return "", err
+	}
+	command := exec.CommandContext(ctx,
+		"go", "build", "-o", output, "codeflux.dev/codeflux/cmd/codeflux-worker")
+	command.Dir = repository
+	if built, err := command.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("%w\n%s", err, built)
+	}
+	return output, nil
 }
 
 // runReplay implements `codeflux-dev replay <fixture>` (M22-114 through

@@ -395,9 +395,24 @@ func runM17InteractiveControlSweep(
 		err = inspectGraph.Click()
 	}
 	if err == nil && !inspectGraphDisabled {
-		err = browserAssertions().Locator(
-			page.Locator(`[data-component="graph-canvas"]`),
-		).ToHaveAttribute("data-selected-node-id", "implementation")
+		// "Inspect graph" jumps the canvas to the graph's CurrentID node,
+		// which for the REPO-041 seeded thread is the plan region: it is the
+		// run's only node projector.go leaves in the active status, and
+		// web/frontend/shell/reference_chrome.go's currentGraphNodeID falls
+		// back to the first active/running node when nothing is explicitly
+		// selected. Node identity is a fresh ULID per seed, so it is read
+		// back from the node's own accessible name rather than assumed.
+		var currentNodeID string
+		currentNodeID, err = page.Locator(`[data-component="graph-canvas"]`).GetByRole(
+			*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{
+				Name: seededPlanRegionNodeLabel, Exact: playwright.Bool(true),
+			},
+		).GetAttribute("data-node-id")
+		if err == nil {
+			err = browserAssertions().Locator(
+				page.Locator(`[data-component="graph-canvas"]`),
+			).ToHaveAttribute("data-selected-node-id", currentNodeID)
+		}
 		if err == nil {
 			inspectGraphOperated = true
 		}
@@ -661,20 +676,40 @@ func runM17TimelineNavigationAndReviewCheck(
 	}
 	// Scope the deliberate-inspection target to the mounted canvas and its
 	// stable graph identity. A global accessible-name lookup became ambiguous
-	// once other current surfaces exposed the same human-readable label.
-	inspected := page.Locator(`[data-component="graph-canvas"]`).Locator(
-		`button[data-component="graph-node"][data-node-id="requirements"][data-status="complete"]`,
+	// once other current surfaces exposed the same human-readable label --
+	// here, the requirement text is also the thread's opening message body.
+	// Node identity is a fresh ULID per seed (REPO-041), so the target is
+	// found once by its accessible name and then re-addressed by the
+	// data-node-id that lookup reports, matching the DOM-identity pattern
+	// this check already used.
+	inspectedByName := page.Locator(`[data-component="graph-canvas"]`).GetByRole(
+		*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{
+			Name: seededRequirementNodeLabel, Exact: playwright.Bool(true),
+		},
 	)
-	inspectedCount, inspectedCountErr := inspected.Count()
+	inspectedID, inspectedIDErr := inspectedByName.GetAttribute("data-node-id")
+	if err == nil && inspectedIDErr != nil {
+		err = inspectedIDErr
+	}
+	var inspected playwright.Locator
+	if err == nil {
+		inspected = page.Locator(`[data-component="graph-canvas"]`).Locator(
+			fmt.Sprintf(`button[data-component="graph-node"][data-node-id="%s"][data-status="passed"]`, inspectedID),
+		)
+	}
+	inspectedCount, inspectedCountErr := 0, error(nil)
+	if err == nil {
+		inspectedCount, inspectedCountErr = inspected.Count()
+	}
 	if err == nil && inspectedCountErr != nil {
 		err = inspectedCountErr
 	}
 	if err == nil && inspectedCount != 1 {
-		err = fmt.Errorf("completed requirements graph node count=%d, want 1", inspectedCount)
+		err = fmt.Errorf("passed requirement graph node count=%d, want 1", inspectedCount)
 	}
 	if err == nil {
 		err = browserAssertions().Locator(inspected).ToHaveAttribute(
-			"aria-label", "Shell requirements - Complete",
+			"aria-label", seededRequirementNodeLabel,
 		)
 	}
 	if err == nil {
@@ -723,9 +758,9 @@ func runM17TimelineNavigationAndReviewCheck(
 		Passed: err == nil && cleanupErr == nil && countErr == nil && controlCount == 1 && beginningVisible &&
 			selectedBeforeClose == "true" && selectedAfterClose == "true",
 		Detail: fmt.Sprintf(
-			"controls=%d beginning_visible=%t inspected_node=requirements inspected_count=%d selected_before_close=%q selected_after_close=%q error=%v cleanup_error=%v count_error=%v inspected_count_error=%v",
-			controlCount, beginningVisible, inspectedCount, selectedBeforeClose, selectedAfterClose,
-			err, cleanupErr, countErr, inspectedCountErr,
+			"controls=%d beginning_visible=%t inspected_node_id=%q inspected_count=%d selected_before_close=%q selected_after_close=%q error=%v cleanup_error=%v count_error=%v inspected_count_error=%v inspected_id_error=%v",
+			controlCount, beginningVisible, inspectedID, inspectedCount, selectedBeforeClose, selectedAfterClose,
+			err, cleanupErr, countErr, inspectedCountErr, inspectedIDErr,
 		),
 	})
 }

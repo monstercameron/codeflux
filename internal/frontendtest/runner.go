@@ -691,6 +691,15 @@ func runRouteContractChecks(
 		appendVisibleDescendantBoundsCheck(result, root, viewport, route)
 		appendFullPageScrollWidthCheck(result, page, viewport, route)
 		if route == "/tasks" || strings.Contains(route, "/thread/") {
+			// Bare /tasks is deliberately a thread picker (see the comment on
+			// selectDurableThreadRow): it renders no graph pane until a
+			// thread is selected, so "wide-graph-visible" and
+			// "standard-graph-visible" could never pass against it on a
+			// freshly migrated database. A selection failure here is
+			// reported through the checks below rather than aborting the
+			// whole route sweep, matching how a missing heading is handled
+			// two checks up.
+			_ = selectDurableThreadRow(page, viewport.Mode)
 			runThreadRouteChecks(page, route, viewport, result)
 		}
 	}

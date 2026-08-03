@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-099
+Date: 2026-08-02
+Status: Open; the seeding works and the checks do not
+Change-ID: CL-20260802-089
+Commit: pending
+Request-or-TODO: REPO-041
+Goal: Give the matrix something real to look at
+Assumptions: That the ~13 named failures were the whole problem -- wrong, and
+  the run is what established it
+Decisions: Read the seeded node classes back out of the database with a scratch
+  dump rather than asserting what the projector ought to have written, after
+  discovering inspect-db does not expose node content.
+  Captured node identifiers from the DOM rather than hardcoding them, because
+  they are minted fresh per seed.
+  Left twenty-five checks failing rather than relaxing any of them. Four are
+  unsatisfiable where they look, and relabelling them would have converted a
+  discovered redesign into a passing test that proves nothing
+Files-or-schemas: new internal/testharness/mounted_thread.go,
+  cmd/codeflux-dev/devtools.go, and three frontendtest check files
+Validation: One sequential run, 235 of 260, every failure listed
+Failures-or-discarded-approaches: Three earlier attempts stalled reporting
+  nothing, because test-browser takes about 660s against a 600s foreground
+  ceiling. Backgrounding the run and blocking on its log is what got a result
+Known-limitations: Four repointings, one real state bug, five uncaused
+  failures, and cleanup that is not orphan-safe
+Next-safe-step: REPO-041a, which is mechanical, before REPO-041b
+
 Dev-Log: DL-20260802-098
 Date: 2026-08-02
 Status: One declined with evidence, one built and uncalled, one done

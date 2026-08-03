@@ -50,6 +50,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-089
+Commit: pending
+Date: 2026-08-02
+Type: Test -- the browser matrix reaches a real populated thread
+Request-or-TODO: REPO-041
+Outcome: The mounted browser checks assumed a durably-open thread carrying a
+  real task graph and real timeline cards, and nothing on a freshly migrated
+  database creates one -- bare /tasks is deliberately a thread picker rather
+  than a route that adopts a session. seed now drives one real requirement
+  through a real Application over real SQLite to awaiting-review and serves it,
+  behind an environment toggle so the descriptive default output is untouched.
+  The checks were rewritten against the node classes read back out of the
+  database rather than guessed, and node identifiers are captured from the DOM
+  because they are fresh identifiers per seed.
+  The result is worse-looking and more honest: 235 of 260 pass where 248 passed
+  before. Seeding a real thread reached checks that had never executed at all,
+  and the failures are not the ones this ticket predicted
+Affected-behavior: seed gains a serving mode. Its default output is unchanged
+Compatibility-or-migration: The toggle is an environment variable rather than a
+  flag because the invocation parser and per-command argument limits are in
+  files this change does not own
+Verification: One clean sequential run, one seed server, one test-browser
+  invocation. Every failure is listed with what could and could not be
+  established about its cause. No assertion was weakened to reach green and the
+  suite is not reported as green
+Known-limitations: The largest finding is that this ticket predates a redesign.
+  The graph canvas is no longer inline on /tasks at wide viewport -- it moved to
+  the observation rail and has its own route -- so four checks assert something
+  unsatisfiable by design and need repointing. A genuine state bug surfaced:
+  task selection is lost on viewport resize. The route-contract path swallows a
+  selection error, so five narrow-viewport failures have no established cause.
+  The seed server's cleanup is not orphan-safe: a hard kill leaves a worker
+  holding the database and the next run fails to clear its directory, which was
+  reproduced three times. Filed as REPO-041a, REPO-041b and REPO-041c
+Dev-Log: DL-20260802-099
+
 Change-ID: CL-20260802-088
 Commit: pending
 Date: 2026-08-02
