@@ -138,23 +138,31 @@ func (execution *AgentExecution) completeRunIfPossible(
 	// A model outcome is a proposal. Only the reconciled ledger says a run is
 	// ready, so this takes that answer rather than deriving its own.
 	clean bool,
-) {
-	if execution.completion == nil || execution.completionValidations == nil ||
-		execution.completionGate == nil || !compiles || !verified || !clean {
-		return
+) finalization {
+	switch {
+	case execution.completion == nil || execution.completionValidations == nil ||
+		execution.completionGate == nil:
+		return finalization{Reason: "this build performs no completion"}
+	case !compiles:
+		return finalization{Reason: "the work does not compile"}
+	case !verified:
+		return finalization{Reason: "the work was never verified"}
+	case !clean:
+		return finalization{
+			Reason: "a stage the flow requires did not hold"}
 	}
 	stepIDs := make([]string, 0, len(steps))
 	for _, step := range steps {
 		stepIDs = append(stepIDs, step.ID)
 	}
 	if len(stepIDs) == 0 {
-		return
+		return finalization{Reason: "the run declared no plan steps"}
 	}
 	command, err := finalValidationCommand(taskID, runID, scope.worktree, stepIDs)
 	if err != nil {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's final validation could not be prepared: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	// BindValidationProfile refuses a name it cannot rank against the plan's
 	// own recorded floor (storage.BindRunValidationProfile): the profile a
@@ -182,20 +190,20 @@ func (execution *AgentExecution) completeRunIfPossible(
 	if err != nil {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's completion evidence could not be recorded: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	if !outcome.ReadyForCompletion || len(outcome.Reports) == 0 {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's completion evidence did not resolve, so it stays running: "+
 				outcome.UnresolvedReason)
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	report := outcome.Reports[len(outcome.Reports)-1]
 	if len(report.Executions) == 0 || report.Executions[0].ValidationID.IsZero() {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's validation passed but recorded no attributable "+
 				"evidence, so it stays running.")
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	// Every declared step is already durably Validated at this point.
 	// ValidateAndRepair's own validation pass (runValidationPass, in this
@@ -215,14 +223,14 @@ func (execution *AgentExecution) completeRunIfPossible(
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's current revision could not be read, so completion was "+
 				"not recorded: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	validationEventID, err := domain.NewEventID()
 	if err != nil {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's validation transition could not be attributed to an "+
 				"event, so it stays running: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	transitioned, err := execution.repositories.TransitionRunToValidation(
 		ctx, storage.TransitionRunToValidation{
@@ -236,14 +244,14 @@ func (execution *AgentExecution) completeRunIfPossible(
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The task could not be moved into validation, so it stays "+
 				"running: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	completionEventID, err := domain.NewEventID()
 	if err != nil {
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's completion could not be attributed to an event, so it "+
 				"stays validating rather than awaiting review: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	result, err := execution.completion.PrepareCompletion(ctx, CompletionInput{
 		TaskID: taskID, RunID: runID, PlanRevision: plan.Revision,
@@ -258,11 +266,16 @@ func (execution *AgentExecution) completeRunIfPossible(
 		execution.say(ctx, scope, events.KindMessageFinal,
 			"The run's completion evidence could not be recorded, so it stays "+
 				"validating rather than awaiting review: "+err.Error())
-		return
+		return finalization{Reason: "completion could not be recorded"}
 	}
 	execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 		"This run's work is now awaiting review (completion revision %d).",
 		result.Revision))
+	return finalization{
+		Terminal:  true,
+		Reason:    "every required gate held and the work is awaiting review",
+		TaskState: domain.TaskStateAwaitingReview,
+	}
 }
 
 // finalValidationCommand describes the one required validation completion's

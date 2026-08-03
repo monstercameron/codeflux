@@ -159,11 +159,15 @@ func (execution *AgentExecution) assembleEvidence(
 		return broke("the run's own record could not be read: "+err.Error(), nil), false
 	}
 	counts := map[pipeline.State]int{}
-	var failed, unexamined []string
+	var failed, advisory, unexamined []string
 	for _, record := range recorded {
 		counts[record.State]++
 		switch record.State {
 		case pipeline.StateFailed:
+			if advisoryStages[record.Stage] {
+				advisory = append(advisory, record.Name)
+				continue
+			}
 			failed = append(failed, record.Name)
 		case pipeline.StateNotImplemented, pipeline.StateBlocked,
 			pipeline.StateSkipped:
@@ -174,6 +178,7 @@ func (execution *AgentExecution) assembleEvidence(
 		"stages_total":     len(recorded),
 		"satisfied":        counts[pipeline.StateSatisfied],
 		"failed":           failed,
+		"advisory":         advisory,
 		"not_examined":     unexamined,
 		"artifacts_stored": countArtifacts(ctx, execution.repositories, taskID),
 	}
@@ -188,10 +193,10 @@ func (execution *AgentExecution) assembleEvidence(
 	evidence["stages_not_yet_recorded"] = len(pipeline.Flow) - len(recorded)
 	return held(fmt.Sprintf(
 		"of the %d stage(s) recorded before this one: %d satisfied, %d failed, "+
-			"%d never examined; the %d delivery stage(s) after it are recorded "+
-			"separately",
+			"%d failed advisorily, %d never examined; the %d delivery stage(s) "+
+			"after it are recorded separately",
 		len(recorded), counts[pipeline.StateSatisfied], len(failed),
-		len(unexamined), len(pipeline.Flow)-len(recorded)),
+		len(advisory), len(unexamined), len(pipeline.Flow)-len(recorded)),
 		evidence), len(failed) == 0
 }
 
@@ -218,4 +223,24 @@ func countArtifacts(
 // specific import and name a function reached for.
 func effectsOf(function producedFunction) []string {
 	return function.Effects
+}
+
+// advisoryStages are the ones whose failure is worth saying and is not worth
+// withholding the work for.
+//
+// The line is the completion floor: it builds, its tests pass, it does what was
+// asked. A coverage percentage below a threshold and an atom without a registry
+// row are both real and neither makes the program wrong. Rung 3 crossed the
+// floor with twenty-nine stages satisfied and was held back by these three,
+// which then left the task running because nothing downstream knew how to
+// finish a run that had not passed everything.
+//
+// Deliberately a short, explicit list rather than a rule. "Anything after stage
+// N" would sweep in whatever gets added next, and the decision that a gate is
+// advisory is a judgement about that gate, made once, in writing.
+var advisoryStages = map[pipeline.Number]bool{
+	pipeline.StagePathCoverage:         true,
+	pipeline.StageAtomDocumentation:    true,
+	pipeline.StageAtomRegistration:     true,
+	pipeline.StageMoleculeRegistration: true,
 }

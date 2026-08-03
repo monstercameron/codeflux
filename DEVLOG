@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-128
+Date: 2026-08-03
+Status: The terminal-state invariant is enforced at the one place that returns
+Change-ID: CL-20260803-118
+Commit: pending
+Request-or-TODO: The terminal-state analysis
+Goal: Never return from execution with a running task
+Decisions: Returned a struct rather than adding a bool. Terminal and the reason
+  travel together, so a caller cannot check one and forget the other.
+  Made the disposition conditional on the task still being running. A run that
+  recorded a specific outcome has given a better account than this generic one.
+  Wrote the advisory set as an explicit list rather than a rule. "Anything
+  after stage N" would sweep in whatever gets added next, and the decision that
+  a gate is advisory is a judgement about that gate, made once, in writing.
+  Asserted in a test that the completion floor is not in that list.
+  Derived the atom schema instead of asking for it. Every field is a fact the
+  run measured, and asking a model to restate them cost an attempt, competed
+  with the delivery gates, and produced a worse answer
+Files-or-schemas: new internal/coordinator/finalization.go and its test, new
+  atom_documentation_derive.go, agent_execution_completion.go,
+  agent_execution.go, agent_stage_delivery.go
+Validation: Build, vet, gofmt, three finalization tests
+Failures-or-discarded-approaches: None
+Known-limitations: The evidence bundle's own failed-count and the trace still
+  need reconciling against advisory stages in the ladder harness. No regression
+  test yet drives a whole run to a failed task state; the invariant is covered
+  at the unit level only
+Next-safe-step: Rung 3 in a terminal, confirming it reaches a terminal state at
+  roughly 71 seconds instead of hanging
+
 Dev-Log: DL-20260803-127
 Date: 2026-08-03
 Status: Rung 3 reaches 29 of 37 stages in 71 seconds, from 447+ and stalling

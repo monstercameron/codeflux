@@ -50,6 +50,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-118
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a run may not return with its task still running
+Request-or-TODO: Terminal-state analysis of the rung 3 run, 2026-08-03
+Outcome: The stall was never the circuit breaker. completeRunIfPossible had
+  fifteen bare returns in it, every one a real decision -- the evidence did not
+  resolve, a required stage did not hold, the revision could not be read -- and
+  every one left the task in `running` with nothing recorded. The ladder waited
+  for a terminal state nothing was going to write. Rung 3 verified its work at
+  60 seconds, finished its checks at 71, and sat there until the enclosing
+  timeout.
+  Completion now returns a finalization carrying whether the ending is terminal
+  and why. A caller that gets a non-terminal result gives the run an ending
+  itself, conditional on the task still being running so a specific outcome
+  already recorded is never overwritten by this generic one.
+  Path coverage, atom documentation, and both registration stages are declared
+  advisory. They are refinement-ceiling gates: a coverage percentage below a
+  threshold and an atom without a registry row are both real and neither makes
+  the program wrong. The completion floor -- assembly, integration tests,
+  end-to-end, atom verification -- can never be advisory, and a test says so,
+  because a program that does not build must never read as awaiting review.
+  The terminal record moved after the transition it describes. It used to be
+  written before, which made it a prediction: it named a status while the task
+  was still running, and the two could disagree with nobody the wiser.
+  The atom schema is now derived from what the run measured rather than asked
+  of the model. All nineteen fields are facts the analysis already holds -- the
+  signature gives inputs and outputs, the effect analysis gives effects and
+  determinism, ReturnsError gives failure semantics, LoopDepth gives the
+  complexity bound. It runs after verification, against the verified tree, and
+  is reverted whole if it breaks anything: a registry row is worth having and
+  is not worth a working program.
+Verification: Build, vet, gofmt, three new finalization tests
+Dev-Log: DL-20260803-128
+
 Change-ID: CL-20260803-117
 Commit: pending
 Date: 2026-08-03

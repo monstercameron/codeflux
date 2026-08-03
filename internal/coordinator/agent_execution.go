@@ -983,27 +983,35 @@ func (execution *AgentExecution) Run(
 	tracef("checkpoint", "restored=%t verified_revision=%s",
 		restoredFromCheckpoint, checkpoint.digest)
 
-	// The terminal record, emitted on every exit path.
+	// Enrichment, after the work is verified and never before it.
 	//
-	// A run that stopped because the provider went away, because it ran out of
-	// attempts, or because it finished, all used to end with whatever the last
-	// message happened to be. A reader then has to reconstruct what was
-	// actually achieved from a trace, and the one fact they most need — is
-	// there a verified revision, and is it the one on disk — was never stated
-	// anywhere.
-	report := terminalReport(terminalFacts{
-		status:           terminalStatus(providerCircuitOpen, checkpoint, unfinished),
-		verifiedRevision: checkpoint.digest,
-		verifiedBecause:  checkpoint.reason,
-		currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
-			producedTreeDigest(scope.worktree) == checkpoint.digest),
-		advisories:            carriedAdvisories,
-		attempts:              attempts,
-		infrastructureRetries: repeatedInfrastructureFailures,
-		unresolved:            unfinished,
-	})
-	traceBlock("final", "how this run ended:", report)
-	execution.say(ctx, scope, events.KindMessageFinal, report)
+	// The atom schema used to be asked of the model, which cost attempts,
+	// competed with the delivery gates, and produced a worse answer than the
+	// analysis already had. Every one of the nineteen fields is a fact this run
+	// measured: the signature gives inputs and outputs, the effect analysis
+	// gives effects and determinism, ReturnsError gives failure semantics,
+	// LoopDepth gives the complexity bound.
+	//
+	// Reverted whole if it breaks anything. A registry row is worth having and
+	// is not worth a working program.
+	if checkpoint.taken && !restoredFromCheckpoint {
+		if produced, readErr := readProducedFunctions(scope.worktree); readErr == nil {
+			if documented, deriveErr := deriveAtomDocumentation(
+				scope.worktree, produced,
+			); documented > 0 {
+				held, _ := revalidateAfterWrite(ctx, scope.worktree)
+				if deriveErr != nil || !held {
+					checkpoint.restore(scope.worktree)
+					tracef("enrich", "documenting %d atom(s) broke the work; "+
+						"reverted to %s", documented, checkpoint.digest)
+				} else {
+					assembled = execution.assemble(ctx, scope.worktree)
+					tracef("enrich", "documented %d atom(s) from measured "+
+						"facts; tests still pass", documented)
+				}
+			}
+		}
+	}
 
 	// The assembly gate. A run that cannot produce something that builds has
 	// not produced a program, whatever else it did, and everything downstream
@@ -1196,8 +1204,43 @@ func (execution *AgentExecution) Run(
 	// state, moves the task into awaiting-review. A run whose own validation
 	// did not pass, or whose code does not compile, is left running with the
 	// reason said above rather than completed on a weaker check.
-	execution.completeRunIfPossible(
+	finished := execution.completeRunIfPossible(
 		ctx, scope, taskID, runID, plan, steps, compiles, verified, clean)
+	// A run may not return with its task still running.
+	//
+	// Completion had fifteen bare returns in it, every one a real decision —
+	// the evidence did not resolve, a required stage did not hold, the revision
+	// could not be read — and every one left the task in `running` with nothing
+	// recorded. The ladder then waited for a terminal state nothing was going
+	// to write: rung 3 verified its work at 60 seconds, finished its checks at
+	// 71, and sat there until the enclosing timeout.
+	//
+	// A message saying a run has ended is not an ending. The durable state is.
+	if !finished.Terminal {
+		finished = execution.finaliseNonTerminalRun(
+			ctx, scope, taskID, checkpoint.taken, finished.Reason)
+	}
+
+	// The terminal record, last, once the state it describes is durable.
+	//
+	// It used to be written before this, which made it a prediction: it named a
+	// verified revision and a status while the task was still running, and the
+	// two could disagree with nobody the wiser. Now it reports what the store
+	// will answer if someone asks.
+	report := terminalReport(terminalFacts{
+		status:           string(finished.TaskState),
+		reason:           finished.Reason,
+		verifiedRevision: checkpoint.digest,
+		verifiedBecause:  checkpoint.reason,
+		currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
+			producedTreeDigest(scope.worktree) == checkpoint.digest),
+		advisories:            carriedAdvisories,
+		attempts:              attempts,
+		infrastructureRetries: repeatedInfrastructureFailures,
+		unresolved:            unfinished,
+	})
+	traceBlock("final", "how this run ended:", report)
+	execution.say(ctx, scope, events.KindMessageFinal, report)
 	return nil
 }
 
@@ -1918,6 +1961,7 @@ func providerOutcomeOf(err error) string {
 // terminalFacts is everything a reader needs to know how a run ended.
 type terminalFacts struct {
 	status                string
+	reason                string
 	verifiedRevision      string
 	verifiedBecause       string
 	currentIsVerified     bool
@@ -1954,7 +1998,11 @@ func terminalStatus(
 // where they stand.
 func terminalReport(facts terminalFacts) string {
 	var report strings.Builder
-	fmt.Fprintf(&report, "Final status: %s.\n", facts.status)
+	fmt.Fprintf(&report, "Final status: %s", facts.status)
+	if facts.reason != "" {
+		fmt.Fprintf(&report, " — %s", facts.reason)
+	}
+	report.WriteString(".\n")
 	if facts.verifiedRevision == "" {
 		report.WriteString(
 			"No revision of this work was ever verified, so there is nothing " +
