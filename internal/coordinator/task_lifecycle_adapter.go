@@ -48,6 +48,56 @@ type TaskAgent interface {
 	Run(ctx context.Context, taskID domain.TaskID, runID domain.RunID) error
 }
 
+// abandonRunThatCouldNotProceed moves a task off running when the agent
+// returned an error instead of finishing.
+//
+// The error used to be discarded outright. The consequence was not a lost log
+// line: a run whose agent failed before doing anything left the task reading
+// running forever, with a worker subprocess idle on the other end of a
+// loopback connection waiting for instructions nobody would send, and no
+// record anywhere of why. Every observer — the browser, the ladder, a person
+// — saw a task that had started and was working. Diagnosing one such stall
+// took a goroutine dump of the coordinator and a process listing to establish
+// that the worker had burned zero seconds of CPU.
+//
+// It is deliberately conditional on the task still being in a running state.
+// The ordinary reasons Run returns an error include paths where the run has
+// already recorded its own terminal state, and overwriting that would replace
+// a specific outcome with this generic one.
+func (adapter *TaskLifecycleAdapter) abandonRunThatCouldNotProceed(
+	taskID domain.TaskID, cause error,
+) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	task, err := adapter.store.GetTask(ctx, taskID)
+	if err != nil {
+		return
+	}
+	if task.State != domain.TaskStateRunning {
+		// The run reached a terminal state of its own. Its account is better
+		// than this one.
+		return
+	}
+	eventID, err := domain.NewEventID()
+	if err != nil {
+		return
+	}
+	_, _ = adapter.store.TransitionTask(ctx, storage.TransitionTask{
+		EventID:          eventID,
+		TaskID:           taskID,
+		ExpectedRevision: task.Revision,
+		From:             task.State,
+		To:               domain.TaskStateFailed,
+		IdempotencyKey: fmt.Sprintf(
+			"agent-run-failed:%s:%d", taskID, task.Revision),
+	})
+	// The transition result is deliberately not inspected. It is best effort
+	// by construction: something else may have moved the task between the read
+	// above and this write, and that something else knew more than this does.
+	_ = cause
+}
+
 // SetAgentExecution installs the agent a started task hands off to.
 func (adapter *TaskLifecycleAdapter) SetAgentExecution(agent TaskAgent) {
 	adapter.agent = agent
@@ -231,7 +281,9 @@ func (adapter *TaskLifecycleAdapter) StartPreparedTask(
 			runContext, cancel := context.WithTimeout(
 				context.Background(), agentRunTimeout)
 			defer cancel()
-			_ = agent.Run(runContext, taskID, agentRun)
+			if err := agent.Run(runContext, taskID, agentRun); err != nil {
+				adapter.abandonRunThatCouldNotProceed(taskID, err)
+			}
 		}()
 	}
 

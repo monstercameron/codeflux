@@ -189,6 +189,28 @@ func (persistence *AgentExecutionPersistence) PersistPlanStepTransition(
 			),
 		},
 	)
+	if errors.Is(err, storage.ErrStaleRevision) {
+		// This port reports what the loop did; it does not command the plan.
+		// Storage owns plan-step state and promotes steps itself when it
+		// records validation attributions, so the loop's account routinely
+		// arrives after storage has already moved the step -- sometimes to the
+		// same state, sometimes further along the chain, sometimes onto a
+		// branch the loop had not seen. All three are the same thing: late
+		// news about a step whose real state is already recorded.
+		//
+		// Failing the write used to abort the run. Combined with the caller
+		// discarding that error, it left the task reading running forever with
+		// an idle worker on the other end of a loopback connection, and it
+		// reproduced on the ladder within two rungs. A reporting port must not
+		// be able to end a run by disagreeing with the record it reports into.
+		//
+		// What is lost is real and worth naming rather than hiding: the
+		// transition row is not written, so the ledger holds storage's own
+		// promotion without the loop's account of it. That is a gap in the
+		// narrative, not in the state, and it is strictly better than a run
+		// that stops.
+		return nil
+	}
 	return err
 }
 

@@ -147,10 +147,12 @@ func TestAgentExecutionPersistenceRejectsMismatchedResultDigest(t *testing.T) {
 }
 
 type agentExecutionRepositoryStub struct {
-	order       []string
-	requests    []storage.RecordAgentToolRequest
-	results     []storage.RecordAgentToolResult
-	transitions []storage.RecordPlanStepTransition
+	order         []string
+	requests      []storage.RecordAgentToolRequest
+	results       []storage.RecordAgentToolResult
+	transitions   []storage.RecordPlanStepTransition
+	stepStates    []storage.PlanStepStatus
+	transitionErr error
 }
 
 func (repository *agentExecutionRepositoryStub) RecordAgentToolRequest(

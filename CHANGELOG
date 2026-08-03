@@ -50,6 +50,64 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-096
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a run can no longer be stranded, and the ledger describes the run
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: Climbing from rung one to rung two exposed four defects, three of them
+  in the platform rather than in anything a model wrote.
+  A run whose agent returned an error was stranded. The error was discarded at
+  the call site, so the task sat in running with an idle worker on the other end
+  of a loopback connection until something timed out half an hour later, and
+  nothing anywhere recorded why. Establishing that took a goroutine dump and a
+  process listing: the worker had burned zero seconds of CPU and had no
+  connection to any provider. The error is now acted on and the task reaches a
+  terminal state, which turned a silent thirty-minute hang into a forty-second
+  failure that named its own cause.
+  What it named was the second defect. PersistPlanStepTransition is the port the
+  loop reports through; storage owns plan-step state and promotes steps itself
+  when it records validation attributions, so the loop's account routinely
+  arrives after the fact. A stale-revision refusal aborted the whole run. Two
+  narrower rules were tried first -- already at the target state, then already
+  past it along the forward chain -- and both still failed on real runs, so the
+  rule is now the general one: a reporting port may not end a run by disagreeing
+  with the record it reports into.
+  Third, atom-case-synthesis demanded that a test contain the synthesiser's own
+  invented literals. []string{"a", "b", "c"} does not mean the letters a, b and
+  c, it means three distinct strings, and searching the test source for that
+  exact text asked for a coincidence. Rung two recorded ten of eighteen cases
+  never tried for a program that was correct, built, ran, and survived the
+  adversarial probe. Matching is now structural -- same type, same cardinality
+  class, same repeats-or-not -- and scalars are still matched literally because
+  nil, "" and 0 mean exactly themselves. That took the same run to four of nine,
+  and those four are real gaps the tests genuinely do not cover.
+  Fourth, the flow ledger described the first draft rather than the run. It was
+  built once per Run while Run loops over attempts, and storage keeps the first
+  row for a task, attempt and stage, so every attempt after the first was
+  discarded. A run that converged after six attempts still read as whatever
+  failed on attempt one -- not merely incomplete, but disagreeing with the
+  outcome the same run reported
+Affected-behavior: A stranded run becomes a failed one. A converged run's ledger
+  now shows the attempt that converged. The case gate is satisfiable
+Compatibility-or-migration: Stages decided before the attempt loop are sealed
+  and re-recorded under each later attempt rather than left out. Recording them
+  as never performed was the first thing the ledger change got wrong, and it is
+  written down here rather than quietly corrected
+Verification: Each gate fix has a discrimination test verified by reverting and
+  reproducing the exact recorded failure, and a control keeping the gate firing
+  for the case it exists to catch. The strand and the race were verified against
+  real ladder runs rather than fixtures: same binary, same rung, hang before and
+  a named failure after
+Known-limitations: The transition row is not written when the report is late, so
+  the ledger holds storage's promotion without the loop's account of it. A gap
+  in the narrative, not in the state.
+  A separate code-generation defect is observed and unfixed: the model twice
+  wrote a file beginning with an asterisk, giving "expected 'package', found
+  '*'". The run recovered both times, so the write path is accepting output that
+  is not Go source
+Dev-Log: DL-20260803-106
+
 Change-ID: CL-20260803-095
 Commit: pending
 Date: 2026-08-03

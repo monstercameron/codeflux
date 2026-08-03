@@ -479,8 +479,20 @@ func (execution *AgentExecution) Run(
 	// one does not work; charging them to the new one gave the strong model
 	// the tail of an exhausted budget and put decomposition out of reach
 	// entirely on the shipped defaults.
+	// Intake, clarification and planning are decided once, above this loop.
+	// Sealing them here lets each later attempt carry them forward instead of
+	// recording them as never performed.
+	ledger.sealPreAttemptStages()
 	for attempt := 1; progress.moreAttempts() && awaitingApproval == ""; attempt++ {
 		progress.beginAttempt()
+		if attempt > 1 {
+			// The flow ledger follows the attempt loop rather than the run, so
+			// each attempt's stages are recorded under their own number. See
+			// pipelineLedger.beginAttempt: without this every attempt wrote
+			// into attempt one, storage kept the first row, and a run that
+			// converged still read as its first draft.
+			ledger.beginAttempt(ctx)
+		}
 		attempts = attempt
 		if attempt > 1 {
 			// The reason is carried rather than assumed. There are four ways a

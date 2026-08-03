@@ -372,6 +372,23 @@ func caseIsTried(testSource string, tests []string, candidate atomCase) bool {
 	if describesRatherThanQuotes(candidate.Shape) {
 		return true
 	}
+	// A composite literal's element values are the synthesiser's invention:
+	// nothing about `[]string{"a", "b", "c"}` says "a", it says "three
+	// distinct strings". Searching the test source for that exact text asked
+	// a test to contain values chosen at random by this file, which no
+	// correct test would, so a run that wrote a thorough table-driven suite
+	// over its real inputs still failed with ten of eighteen cases untried.
+	//
+	// What is checked instead is the shape's structure: the same type, the
+	// same cardinality class, and whether the elements repeat. Those are the
+	// properties the case was synthesised to demand — an empty slice, a
+	// one-element slice, a slice with a duplicate — and a test exercising the
+	// same structure with its own values satisfies them. A scalar shape has
+	// no invented part and is still matched literally: "nil", `""` and 0 mean
+	// exactly themselves.
+	if wanted, isComposite := compositeShapeSignature(candidate.Shape); isComposite {
+		return testSourceHasCompositeShape(testSource, wanted)
+	}
 	return strings.Contains(testSource, candidate.Shape)
 }
 
@@ -423,6 +440,148 @@ func untriedCases(worktree string) (map[string][]atomCase, error) {
 		}
 	}
 	return owed, nil
+}
+
+// compositeShapeSignature is what a composite literal is being asked for,
+// with the synthesiser's arbitrary element values discarded.
+//
+// cardinality is bucketed rather than exact — none, one, many — because the
+// case classes ask for an empty input, a single-element input, or an input
+// with several, and never for exactly three. repeats records whether every
+// element is the same, which is the one element-level property a case
+// genuinely demands (a duplicate is a different case from three distinct
+// values, and a run that only ever tests distinct values has not tried it).
+type compositeShape struct {
+	typeText    string
+	cardinality string
+	repeats     bool
+}
+
+// compositeShapeSignature reads a shape written as `T{...}`.
+//
+// It reports false for anything else, including a bare scalar, so the caller
+// falls back to matching that text literally.
+func compositeShapeSignature(shape string) (compositeShape, bool) {
+	open := strings.Index(shape, "{")
+	if open < 0 || !strings.HasSuffix(strings.TrimSpace(shape), "}") {
+		return compositeShape{}, false
+	}
+	typeText := strings.TrimSpace(shape[:open])
+	if typeText == "" {
+		return compositeShape{}, false
+	}
+	inner := strings.TrimSpace(shape[open+1 : strings.LastIndex(shape, "}")])
+	return compositeShape{
+		typeText:    typeText,
+		cardinality: cardinalityOf(splitTopLevelElements(inner)),
+		repeats:     elementsRepeat(splitTopLevelElements(inner)),
+	}, true
+}
+
+// testSourceHasCompositeShape reports whether the tests build a literal of the
+// same type with the same structure.
+func testSourceHasCompositeShape(testSource string, wanted compositeShape) bool {
+	for index := 0; ; {
+		found := strings.Index(testSource[index:], wanted.typeText+"{")
+		if found < 0 {
+			return false
+		}
+		start := index + found + len(wanted.typeText)
+		inner, end, ok := balancedBraceContent(testSource, start)
+		if !ok {
+			return false
+		}
+		elements := splitTopLevelElements(inner)
+		if cardinalityOf(elements) == wanted.cardinality &&
+			elementsRepeat(elements) == wanted.repeats {
+			return true
+		}
+		index = end
+	}
+}
+
+// balancedBraceContent returns the text between the brace at open and its
+// match, and the index just past that match.
+func balancedBraceContent(text string, open int) (string, int, bool) {
+	if open >= len(text) || text[open] != '{' {
+		return "", 0, false
+	}
+	depth := 0
+	for index := open; index < len(text); index++ {
+		switch text[index] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return text[open+1 : index], index + 1, true
+			}
+		}
+	}
+	return "", 0, false
+}
+
+// splitTopLevelElements splits a literal's contents on commas that are not
+// inside a nested literal or a string.
+func splitTopLevelElements(inner string) []string {
+	trimmed := strings.TrimSpace(inner)
+	if trimmed == "" {
+		return nil
+	}
+	var elements []string
+	depth, quoted, escaped, start := 0, false, false, 0
+	for index := 0; index < len(trimmed); index++ {
+		character := trimmed[index]
+		switch {
+		case escaped:
+			escaped = false
+		case character == '\\' && quoted:
+			escaped = true
+		case character == '"':
+			quoted = !quoted
+		case quoted:
+		case character == '{' || character == '[' || character == '(':
+			depth++
+		case character == '}' || character == ']' || character == ')':
+			depth--
+		case character == ',' && depth == 0:
+			elements = append(elements, strings.TrimSpace(trimmed[start:index]))
+			start = index + 1
+		}
+	}
+	if last := strings.TrimSpace(trimmed[start:]); last != "" {
+		elements = append(elements, last)
+	}
+	return elements
+}
+
+// cardinalityOf buckets how many elements a literal holds.
+func cardinalityOf(elements []string) string {
+	switch len(elements) {
+	case 0:
+		return "none"
+	case 1:
+		return "one"
+	default:
+		return "many"
+	}
+}
+
+// elementsRepeat reports whether every element is the same text.
+//
+// False for fewer than two elements: a single value cannot repeat, and
+// reporting that it does would make the one-element case indistinguishable
+// from the duplicate case.
+func elementsRepeat(elements []string) bool {
+	if len(elements) < 2 {
+		return false
+	}
+	for _, element := range elements[1:] {
+		if element != elements[0] {
+			return false
+		}
+	}
+	return true
 }
 
 // describesRatherThanQuotes reports whether a shape is prose rather than code.

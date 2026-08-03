@@ -34,6 +34,10 @@ type pipelineLedger struct {
 	// the closing sweep can fill in the rest without overwriting a real result
 	// with a default one.
 	recorded map[pipeline.Number]bool
+	// history is what each stage of the current attempt decided, and perRun is
+	// the subset decided before the attempt loop began. See beginAttempt.
+	history map[pipeline.Number]decidedStage
+	perRun  map[pipeline.Number]decidedStage
 	// stageStarted is when the stage now being decided began (PIPE-006).
 	//
 	// The flow is sequential, so a stage starts when the previous one was
@@ -105,10 +109,75 @@ func newPipelineLedger(
 		repositories: repositories, taskID: taskID, runID: runID,
 		attempt:  attempt,
 		recorded: map[pipeline.Number]bool{},
+		history:  map[pipeline.Number]decidedStage{},
 		now:      time.Now,
 	}
 	ledger.stageStarted = ledger.clock()
 	return ledger
+}
+
+// decidedStage is one stage outcome, kept so a later attempt can carry
+// forward what did not change.
+type decidedStage struct {
+	state    pipeline.State
+	detail   string
+	evidence map[string]any
+	started  time.Time
+}
+
+// sealPreAttemptStages marks everything decided so far as belonging to the run
+// rather than to one attempt.
+//
+// Intake, clarification and planning happen once, before the attempt loop.
+// They are as true on attempt six as on attempt one, and an attempt that
+// omitted them would read as though the run had stopped performing them.
+func (ledger *pipelineLedger) sealPreAttemptStages() {
+	if ledger == nil {
+		return
+	}
+	ledger.mutex.Lock()
+	defer ledger.mutex.Unlock()
+	ledger.perRun = make(map[pipeline.Number]decidedStage, len(ledger.history))
+	for stage, decided := range ledger.history {
+		ledger.perRun[stage] = decided
+	}
+}
+
+// beginAttempt moves the ledger onto the next attempt of the same run.
+//
+// A run's attempt loop revises the work and re-decides every stage it reaches,
+// and until this existed the ledger was built once per run and every attempt
+// wrote into attempt one. Storage keeps the first row for a (task, attempt,
+// stage), so attempts after the first were discarded and the flow permanently
+// described the first draft — a run that converged after six attempts still
+// read as whatever failed on attempt one. The ledger was not merely
+// incomplete, it disagreed with the outcome the same run reported.
+//
+// The stages sealed before the loop are re-recorded under the new number
+// rather than left out. They did not happen again, but they are still true,
+// and the alternative — recording them as never performed — was the first
+// thing this change got wrong.
+func (ledger *pipelineLedger) beginAttempt(ctx context.Context) {
+	if ledger == nil {
+		return
+	}
+	ledger.mutex.Lock()
+	ledger.attempt++
+	ledger.recorded = map[pipeline.Number]bool{}
+	ledger.history = map[pipeline.Number]decidedStage{}
+	carried := make(map[pipeline.Number]decidedStage, len(ledger.perRun))
+	for stage, decided := range ledger.perRun {
+		carried[stage] = decided
+	}
+	ledger.mutex.Unlock()
+
+	ledger.stageStarted = ledger.clock()
+	for stage, decided := range carried {
+		ledger.recordMeasured(
+			ctx, stage, decided.state, decided.detail,
+			decided.evidence, decided.started,
+		)
+	}
 }
 
 // clock reads the ledger's time source.
@@ -225,6 +294,9 @@ func (ledger *pipelineLedger) recordMeasured(
 	}
 	ledger.mutex.Lock()
 	ledger.recorded[stage] = true
+	ledger.history[stage] = decidedStage{
+		state: state, detail: detail, evidence: evidence, started: started,
+	}
 	ledger.mutex.Unlock()
 }
 

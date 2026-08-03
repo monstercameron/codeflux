@@ -25,6 +25,41 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-106
+Date: 2026-08-03
+Status: Rung one green; rung two reaches every stage
+Change-ID: CL-20260803-096
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Ascend a rung only once the one below it passes every stage
+Assumptions: That the intermittent stall was provider latency -- wrong, and
+  measuring rather than guessing is what settled it. The worker had zero CPU
+  and no provider connection; it had never been given work
+Decisions: Fixed the discarded error before diagnosing the thing it was hiding.
+  A subsystem that cannot report its own failure cannot be debugged, and the
+  cause named itself within one run of the error becoming visible.
+  Generalised the plan-step rule after two narrower ones failed against real
+  runs rather than continuing to guess at state pairs. The narrow rules were
+  each defensible and each wrong, and the third attempt is the one that follows
+  from what the port is for rather than from the states it happened to see.
+  Matched synthesised cases structurally and kept scalars literal. A shape's
+  element values are this file's invention and its structure is the demand; the
+  split falls exactly there.
+  Sealed the pre-loop stages rather than clearing everything per attempt. The
+  first version of the ledger change reported intake, clarification and planning
+  as never performed on every attempt after the first, which is a worse lie than
+  the one it was fixing
+Files-or-schemas: task_lifecycle_adapter.go, agent_execution_persistence.go,
+  agent_stage_cases.go, agent_pipeline_ledger.go, agent_execution.go, and a new
+  case-shape test
+Validation: The ledger's own tests, PIPE-002, PIPE-003 and PIPE-006, still pass.
+  Rung two went from five stages performed to forty-one
+Failures-or-discarded-approaches: Two plan-step rules discarded. One ledger
+  regression introduced and corrected in the same change
+Known-limitations: The model writes non-Go text into .go files often enough to
+  cost a run two attempts
+Next-safe-step: The write path, then rung two's four genuine coverage gaps
+
 Dev-Log: DL-20260803-105
 Date: 2026-08-03
 Status: Rung one green; the ladder can be climbed
