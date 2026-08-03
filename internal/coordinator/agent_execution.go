@@ -138,26 +138,36 @@ func (execution *AgentExecution) Run(
 	// performed all of them.
 	ledger := newPipelineLedger(ctx, execution.repositories, taskID, runID)
 	defer ledger.close(ctx)
-	// The gate allows a request with no executable example only if the absence
-	// is explicit. Nothing supplies examples yet, so the absence is what gets
-	// recorded — stating it is the difference between a gate that is met and
-	// one that is merely not checked.
-	// The instructions stage now counts both acceptance forms (PIPE-118): a
-	// command's expected output, and a named test that must pass.
+
+	// The append-only chronological record §31 assumes exists (MEM-001):
+	// opened here, at the start of the run, bound to this task's real
+	// pipeline attempt number (MEM-003) so a task started twice gets two
+	// episodes rather than one clobbering the other's evidence. Closed by
+	// the deferred call below at every return path out of this function,
+	// not only the one at its end.
+	episode := execution.openRunEpisode(ctx, scope, taskID, runID, ledger.currentAttempt())
+	defer execution.closeRunEpisode(ctx, episode, scope)
+	// The gate requires at least one executable acceptance example (PIPE-019).
+	// It used to also accept an explicit declaration that none was supplied,
+	// which let a request with nothing external to check it ride through this
+	// stage as satisfied — the same shape of defect the ledger exists to
+	// catch, reproduced in the ledger's own first stage. That escape is gone:
+	// zero examples now fails the gate rather than satisfying a weaker one.
 	//
-	// It does not yet *require* one. Making the example mandatory is PIPE-019
-	// and is deliberately not done here — see that item for why.
+	// It was blocked on PIPE-117/PIPE-118: without a second form, requiring an
+	// example would have refused every task class with no command-line
+	// surface. The instructions stage counts both forms a requirement can use
+	// today: a command's expected output, and a named test that must pass.
 	examples := parseAcceptanceExamples(scope.requirement)
 	namedExamples := parseNamedTestExamples(scope.requirement)
 	totalExamples := len(examples) + len(namedExamples)
-	ledger.satisfied(ctx, pipeline.StageInstructions,
+	ledger.require(ctx, pipeline.StageInstructions, totalExamples > 0,
 		acceptanceDetail(totalExamples),
 		map[string]any{
 			"requirement_bytes":   len(scope.requirement),
 			"acceptance_examples": len(examples),
 			"named_test_examples": len(namedExamples),
 			"total_examples":      totalExamples,
-			"absence_declared":    totalExamples == 0,
 		})
 
 	// A request that reads two ways is settled before anything is written. The
@@ -1296,9 +1306,9 @@ func decompositionDetail(uncovered, unasked []string) string {
 // acceptanceDetail states what the request is judged against (PIPE-019).
 func acceptanceDetail(count int) string {
 	if count == 0 {
-		return "the request was recorded as a message; no executable " +
-			"acceptance example was supplied, and that is recorded rather " +
-			"than assumed"
+		return "the request carries no executable acceptance example, so " +
+			"nothing external would check whether the finished work does " +
+			"what was asked"
 	}
 	return fmt.Sprintf("the request was recorded as a message and carries %d "+
 		"executable acceptance example(s) the finished work must satisfy",

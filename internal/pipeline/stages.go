@@ -162,7 +162,7 @@ type Stage struct {
 // answer only if the stages are totally ordered.
 var Flow = []Stage{
 	{StageInstructions, "instructions",
-		"the request is recorded with at least one executable acceptance example, or the absence of one is explicit"},
+		"the request is recorded with at least one executable acceptance example"},
 	{StageClarification, "clarification",
 		"no material ambiguity is left unresolved: it was asked about or a bounded reading was stated"},
 	{StageAtomicInstructions, "atomic-instructions",

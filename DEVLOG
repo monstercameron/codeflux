@@ -51,6 +51,33 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-058
+Date: 2026-08-02
+Status: Gate tightened
+Change-ID: CL-20260802-048
+Commit: pending
+Request-or-TODO: PIPE-019
+Goal: Stop a run satisfying the flow against a request nothing external checks
+Assumptions: A declared absence of an acceptance example is not an acceptance
+  example
+Decisions: Replaced the unconditional satisfied write with a require on the
+  example count, and cleared PIPE-019 from StageEndToEndTests' unestablished
+  marker in the same change -- the end-to-end gate claims the executable
+  reproduces every acceptance example, which is trivially true of none, so
+  tightening instructions is what makes that gate mean anything. Leaving the
+  marker would have understated the repair
+Files-or-schemas: internal/coordinator/agent_execution.go, agent_acceptance.go,
+  internal/pipeline/stages.go, checks.go, and the integration-tagged ledger test
+Validation: TestPIPE, TestEveryStage and TestAUDIT suites green; the tagged
+  ledger test run with -tags integration
+Failures-or-discarded-approaches: None
+Known-limitations: The escalation ladder test supplies no acceptance example and
+  fails its whole run on any failed stage row, so its next paid execution fails
+  every rung here. It is gated behind CODEFLUX_LADDER, so this is invisible
+  until somebody spends money. Filed as PIPE-020a and deliberately not fixed
+  here, since verifying a fix requires running the paid ladder
+Next-safe-step: PIPE-020a before the ladder is next run
+
 Dev-Log: DL-20260802-057
 Date: 2026-08-02
 Status: Declared and validated

@@ -66,6 +66,28 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-048
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- instructions gate
+Request-or-TODO: PIPE-019
+Outcome: The instructions stage now requires at least one executable acceptance
+  example instead of permitting a declared absence. This is what makes the
+  end-to-end gate non-vacuous -- it claims the built executable reproduces every
+  acceptance example, which was trivially true when there were none -- so
+  StageEndToEndTests no longer carries PIPE-019 as unestablished
+Affected-behavior: A run whose request carries no acceptance example now fails
+  at the first stage rather than proceeding and satisfying downstream gates
+  against nothing
+Compatibility-or-migration: None
+Verification: go test ./internal/coordinator/ -run 'TestPIPE|TestEveryStage|
+  TestAUDIT' green; the affected integration-tagged ledger test updated and run
+  with -tags integration
+Known-limitations: The CODEFLUX_LADDER escalation test supplies no acceptance
+  example and fails the whole test on any failed stage row, so its next paid run
+  fails every rung at this stage. Filed as PIPE-020a and not fixed here
+Dev-Log: DL-20260802-058
+
 Change-ID: CL-20260802-047
 Commit: pending
 Date: 2026-08-02

@@ -109,11 +109,17 @@ func TestEveryStageOfTheFlowIsRecordedIncludingTheOnesNothingImplements(t *testi
 	}
 
 	// 2. The stages this build really performs said so.
+	//
+	// StageInstructions is StateFailed rather than StateSatisfied (PIPE-019):
+	// this fixture's requirement carries no executable acceptance example, and
+	// the gate no longer accepts a declared absence as satisfying it. Failing
+	// this stage is itself the check performing something real, which is why
+	// it belongs in this list rather than in the not-implemented sweep below.
 	for _, expected := range []struct {
 		stage pipeline.Number
 		state pipeline.State
 	}{
-		{pipeline.StageInstructions, pipeline.StateSatisfied},
+		{pipeline.StageInstructions, pipeline.StateFailed},
 		{pipeline.StageClarification, pipeline.StateSatisfied},
 		{pipeline.StageAtomicInstructions, pipeline.StateSatisfied},
 		{pipeline.StageProgram, pipeline.StateSatisfied},

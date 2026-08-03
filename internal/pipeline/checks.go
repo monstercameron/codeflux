@@ -43,7 +43,7 @@ var Checks = []StageCheck{
 	{StageAtomDocumentation, "checkAtomDocumentation", true, ""},
 	{StageAtomCaseSynthesis, "checkCaseCoverage", true, ""},
 	{StageAtomExampleTests, "checkAtomTests", true, ""},
-	{StageAtomPropertyTests, "checkAtomPropertyTests", true, ""},
+	{StageAtomPropertyTests, "checkPropertyTests", true, ""},
 	{StageAtomFuzz, "checkFuzzing", true, ""},
 	{StageAtomVerification, "checkAtomVerification", true, "PIPE-141"},
 	{StageAtomMutation, "checkMutations", true, "PIPE-127"},
@@ -61,7 +61,11 @@ var Checks = []StageCheck{
 	{StageAssembly, "AgentExecution.Run", true, ""},
 	{StageGlobalInvariants, "checkGlobalInvariants", true, "PIPE-134"},
 	{StageIntegrationTests, "AgentExecution.Run", true, ""},
-	{StageEndToEndTests, "AgentExecution.checkAcceptance", true, "PIPE-019"},
+	// PIPE-019 made the instructions stage require an example, which is what
+	// makes this gate non-vacuous: a run can no longer reach this stage having
+	// declared, at the flow's very first stage, that nothing external checks
+	// it.
+	{StageEndToEndTests, "AgentExecution.checkAcceptance", true, ""},
 	{StageRepetition, "checkRepetition", true, ""},
 	{StageAdversarial, "AgentExecution.probeProducedCommands", true, "PIPE-093a"},
 	{StageNonFunctional, "checkNonFunctional", true, ""},
