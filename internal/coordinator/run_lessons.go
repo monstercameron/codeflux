@@ -50,12 +50,102 @@ func (execution *AgentExecution) recordRunLesson(
 	if statement == "" {
 		return
 	}
+	// The seed is what makes the same lesson from two runs one fact rather than
+	// two. It is the gate and the reason, not the detail, because the detail
+	// carries file names and line numbers that differ between runs of the same
+	// mistake.
+	execution.storeLesson(ctx, scope,
+		"run-lesson:"+gate+":"+strings.ToLower(strings.TrimSpace(because)),
+		statement)
+}
+
+// recordToolLesson writes down a mistake a tool refused, as distinct from one a
+// gate refused.
+//
+// Gates see a finished attempt; tools see the mistake as it is made, and some
+// of the most repeated ones never reach a gate at all. Ladder rung 3 had two
+// writes refused for wrapping Go source in markdown, a call left with the wrong
+// number of arguments after a signature changed, and a use of strings with no
+// import — four attempts spent on four things a sentence apiece would have
+// prevented, none of which the gate vocabulary has a word for.
+//
+// Only recognised shapes are recorded. A lesson invented from arbitrary
+// compiler output carries the file and line it happened at, so it never merges
+// with the same mistake made elsewhere, and a lessons list that grows by one
+// per failure is the context bloat that makes a run skip the section.
+func (execution *AgentExecution) recordToolLesson(
+	ctx context.Context,
+	scope agentScope,
+	output string,
+) {
+	if execution == nil || execution.repositories == nil {
+		return
+	}
+	key, statement, recognised := toolLessonFor(output)
+	if !recognised {
+		return
+	}
+	execution.storeLesson(ctx, scope, "tool-lesson:"+key, statement)
+}
+
+// toolLessonFor names the mistake behind a tool's output, if it is one this
+// recognises.
+func toolLessonFor(output string) (key, statement string, ok bool) {
+	lower := strings.ToLower(output)
+	for _, known := range toolFailureLessons {
+		if strings.Contains(lower, known.marker) {
+			return known.key, known.statement, true
+		}
+	}
+	return "", "", false
+}
+
+// toolFailureLessons is the imperative behind each mistake a tool refuses.
+//
+// Ordered most specific first: a markdown-wrapped file also fails to compile,
+// and telling a run to check its imports when what it actually did was paste a
+// fenced block would send it looking in the wrong place.
+var toolFailureLessons = []struct {
+	marker    string
+	key       string
+	statement string
+}{
+	{"does not parse as go", "unparsable-write",
+		"Write a Go file's source exactly, with no prose, markdown fence, " +
+			"diff marker or heading around it. The file is the file, not a " +
+			"message about the file."},
+	{"arguments in call to", "signature-drift",
+		"When a function's signature changes, change every call to it in the " +
+			"same edit. A caller left behind does not compile."},
+	{"undefined:", "missing-import",
+		"Add the import a new call needs in the same edit that introduces the " +
+			"call, and remove one when its last use goes."},
+	{"declared and not used", "unused-declaration",
+		"Remove a variable in the same edit that removes its last use. Go " +
+			"refuses to compile one that is left behind."},
+}
+
+// storeLesson records one statement as a project observation.
+//
+// It is recorded as an observation rather than a rule, with evidence strength
+// fixed at none by the domain constructor, because one run failing one way is
+// not yet a law about this project -- it is a thing that happened, which is
+// exactly what the observation tier is for.
+//
+// The evidence source is the automated validation run, not the agent. A refusal
+// is something the platform observed; the agent's own account of it would be
+// self-report, which UpsertExtractedMemoryFact refuses outright and should.
+func (execution *AgentExecution) storeLesson(
+	ctx context.Context,
+	scope agentScope,
+	seed string,
+	statement string,
+) {
 	content, err := domain.NewObservationHypothesisContent(
 		scope.repositoryID, statement)
 	if err != nil {
 		return
 	}
-	source := domain.EvidenceSourceKindAutomatedValidationRun
 	_, _ = execution.repositories.UpsertExtractedMemoryFact(ctx,
 		storage.UpsertExtractedMemoryFact{
 			ProjectID: scope.projectID,
@@ -63,14 +153,9 @@ func (execution *AgentExecution) recordRunLesson(
 				Kind:                  domain.MemoryArtifactKindObservationHypothesis,
 				ObservationHypothesis: &content,
 			},
-			// The seed is what makes the same lesson from two runs one fact
-			// rather than two. It is the gate and the reason, not the detail,
-			// because the detail carries file names and line numbers that
-			// differ between runs of the same mistake.
-			DeterministicSeed: "run-lesson:" + gate + ":" +
-				strings.ToLower(strings.TrimSpace(because)),
+			DeterministicSeed: seed,
 			Evidence: &storage.UpsertExtractedMemoryFactEvidence{
-				Source: source,
+				Source: domain.EvidenceSourceKindAutomatedValidationRun,
 				TaskID: scope.taskID,
 			},
 		})

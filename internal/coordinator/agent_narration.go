@@ -87,6 +87,8 @@ func (narrator *narratingExecutor) ExecuteTool(
 			events.KindToolCompleted, executionID, name,
 			string(domain.CommandExecutionStateFailed),
 			detail+" — refused: "+err.Error())
+		narrator.execution.recordToolLesson(
+			narrator.ctx, narrator.scope, err.Error())
 		return result, err
 	}
 	summary := detail
@@ -118,6 +120,13 @@ func (narrator *narratingExecutor) ExecuteTool(
 	if completed != domain.CommandExecutionStateSucceeded {
 		narrator.lastFailure = strings.TrimSpace(
 			result.StdoutRedacted + "\n" + result.StderrRedacted)
+		// Written down here rather than at the gate, because the most repeated
+		// mistakes never reach one: a markdown-fenced file is refused by the
+		// write, a caller left behind by a signature change is refused by the
+		// compiler, and the run fixes both and arrives at the gate clean. The
+		// lesson is real, and nothing downstream would ever have seen it.
+		narrator.execution.recordToolLesson(
+			narrator.ctx, narrator.scope, narrator.lastFailure)
 	}
 	narrator.execution.publishTool(narrator.ctx, narrator.scope,
 		events.KindToolCompleted, executionID, name, string(completed), summary)

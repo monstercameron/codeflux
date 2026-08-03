@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-120
+Date: 2026-08-03
+Status: The lesson loop covers tool refusals as well as gate refusals
+Change-ID: CL-20260803-110
+Commit: pending
+Request-or-TODO: The memory-loop instruction
+Goal: Capture the mistakes that are fixed before any gate can see them
+Decisions: Recorded only from a fixed table of recognised markers. The
+  alternative -- draw a lesson from whatever the compiler said -- produces one
+  fact per failure, none of which merge, which is the bloat the instruction
+  named specifically.
+  Ordered the table most specific first. A markdown-wrapped file also fails to
+  compile, and telling a run to check its imports would send it looking in the
+  wrong place.
+  Seeded on the mistake, not the message, so the same mistake in two runs is
+  one fact.
+  Recorded from both the refusal path and the failed-result path: an
+  unparsable write is refused by the executor, a bad call by the compiler, and
+  either way the run learned the same thing
+Files-or-schemas: internal/coordinator/run_lessons.go and its test,
+  agent_narration.go
+Validation: Build, vet, three new tests
+Failures-or-discarded-approaches: None
+Known-limitations: Four shapes. Every other tool failure still teaches nothing,
+  and which shapes to add next should come from watching runs rather than from
+  guessing at the compiler's vocabulary
+Next-safe-step: Re-run rung 3 with the case fix and see which lessons land
+
 Dev-Log: DL-20260803-119
 Date: 2026-08-03
 Status: The literal-matching defect is closed for slices, strings and integers

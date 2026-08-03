@@ -50,6 +50,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-110
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- a refused tool teaches the next run, not only a refused gate
+Request-or-TODO: The memory-loop instruction, 2026-08-03
+Outcome: Lessons were recorded only where a gate sent work back. The most
+  repeated mistakes never reach a gate: the run makes them, a tool refuses
+  them, the run fixes them and arrives at the gate clean, and nothing
+  downstream ever sees what happened.
+  Ladder rung 3, watched in a terminal, made four such mistakes in seven
+  attempts -- two writes wrapping Go source in a markdown fence, a caller left
+  with the wrong number of arguments after a signature changed, and a use of
+  strings with no import. The gate vocabulary has a word for none of them, and
+  each is a sentence apiece to prevent.
+  Only recognised shapes are recorded. A lesson invented from arbitrary
+  compiler output carries the file and line it happened at, so it never merges
+  with the same mistake made elsewhere, and a list that grows by one per
+  failure is the context bloat that makes a run skip the section.
+Verification: Build, vet, three new tests covering the four shapes, the refusal
+  of unrecognised output, and the ordering that reads a markdown fence before a
+  missing import
+Dev-Log: DL-20260803-120
+
 Change-ID: CL-20260803-109
 Commit: pending
 Date: 2026-08-03
