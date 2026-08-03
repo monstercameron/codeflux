@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-071
+Date: 2026-08-02
+Status: Normalised centrally
+Change-ID: CL-20260802-061
+Commit: pending
+Request-or-TODO: PIPE-019a
+Goal: Leave exactly one definition of the requirement text
+Assumptions: Three computations disagreeing is a design fault, not three bugs
+Decisions: Normalised inside AnalyzeTaskRequirement. Every other candidate site
+  adds a definition rather than removing one, and the diagnosis showed the
+  problem is precisely that more than one exists.
+  Rejected normalising at persist time. The stored message is the user's own
+  content; rewriting what a person typed to settle an internal disagreement is
+  the wrong trade, and it would have made the message and the analysis disagree
+  in the other direction.
+  Recorded the clarification stage as failed with the error rather than letting
+  it fall through to not-implemented, because a failure surfacing four stages
+  later as a constraint error is a debugging trap and was half of what this
+  ticket complained about
+Files-or-schemas: internal/storage/agent_plan_contract.go,
+  internal/coordinator/agent_execution.go (ambiguity site and one comment),
+  pipe019a_repro_test.go
+Validation: Storage and coordinator PIPE-019 tests green, including the
+  TestPIPE001 regression check
+Failures-or-discarded-approaches: Persist-time normalisation, above
+Known-limitations: Exposed PIPE-019b, which this failure had been masking:
+  agentPlanSteps embeds the raw requirement in a plan step's redacted detail and
+  Validate refuses trailing whitespace there. It fails loudly, which is an
+  improvement on stalling silently, but it still blocks the full Run path for
+  multi-line acceptance requirements
+Next-safe-step: PIPE-019b
+
 Dev-Log: DL-20260802-070
 Date: 2026-08-02
 Status: CI gate enforcing

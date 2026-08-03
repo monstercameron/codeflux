@@ -201,6 +201,18 @@ func (execution *AgentExecution) Run(
 				"policy":      string(execution.ambiguityPolicy()),
 				"assumptions": len(decision.Assumptions),
 			})
+	} else {
+		// This used to be swallowed: the stage was simply never recorded, so
+		// the ledger's own close() reported it not-implemented with no way to
+		// tell that from a build that genuinely performs no clarification
+		// check. Recording the failure here, with the analysis error in the
+		// detail, says why in the one place a reader is already looking
+		// (PIPE-019a).
+		ledger.failed(ctx, pipeline.StageClarification,
+			fmt.Sprintf(
+				"the requirement could not be analysed for ambiguity: %v",
+				analysisErr,
+			))
 	}
 
 	// How the work is broken up is decided before anything is written, on the
@@ -827,18 +839,16 @@ func (execution *AgentExecution) requirementOf(
 	if err != nil {
 		return ""
 	}
-	// Deliberately not trimmed (PIPE-019a). storage.RecordTaskRequirement
+	// Deliberately not trimmed here (PIPE-019a). storage.RecordTaskRequirement
 	// independently re-reads this same message row and re-derives its own
-	// analysis from those exact bytes, then requires it to match byte-for-byte
-	// the analysis this run computed from scope.requirement. Trimming here
-	// alone makes this side agree with a hand-trimmed scope.requirement while
-	// the store's side still reads the untrimmed row, so an untrimmed message
-	// still fails — now inside RecordTaskRequirement's generic constraint
-	// error instead of storage.AnalyzeTaskRequirement's own clearer one, and a
-	// run stalls after StageDecompositionCover either way. See PIPE-019a for
-	// the reproduction and the fix this actually needs (normalize inside
-	// storage.AnalyzeTaskRequirement, or when the message is first persisted —
-	// both are outside this package).
+	// analysis from those exact bytes, so trimming on this side alone would
+	// only make this copy agree with a hand-trimmed one while the store's
+	// side still read the untrimmed row. The fix is that
+	// storage.AnalyzeTaskRequirement now normalizes internally before it
+	// derives anything, so every caller — this one, recordDurablePlan, and
+	// RecordTaskRequirement's own re-derivation — computes the same analysis
+	// from the same untrimmed bytes without needing to agree on trimming
+	// beforehand. See PIPE-019a.
 	return message.BodyRedacted
 }
 

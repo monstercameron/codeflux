@@ -42,6 +42,35 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-061
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- one definition of the requirement text
+Request-or-TODO: PIPE-019a
+Outcome: AnalyzeTaskRequirement trims before validating instead of refusing an
+  untrimmed body. It is the one function all three disagreeing computations
+  already call, so normalising there and only there makes disagreement
+  structurally impossible without a fourth definition of the requirement text.
+  The silent swallow is fixed: the ambiguity check records the clarification
+  stage as failed with the analysis error in its detail, rather than leaving the
+  stage absent so ledger close later mislabels it not-implemented
+Affected-behavior: A requirement carrying a trailing newline -- which the
+  acceptance blocks PIPE-019 makes mandatory produce -- analyses and records
+  instead of stalling the run four stages later with a constraint error
+Compatibility-or-migration: None. agent_plan_repository.go and
+  agent_plan_record.go needed no change once the shared function was correct,
+  which is the evidence that a single definition was the right shape
+Verification: The reproduction test that asserted the old refusal was rewritten
+  to assert the new invariant rather than deleted, and a new test round-trips a
+  multi-line acceptance requirement to a bound plan revision
+Known-limitations: Persist-time normalisation was rejected deliberately -- the
+  stored message is the user's own content and an internal analysis
+  disagreement is no reason to rewrite what a person typed. Fixing this also
+  exposed PIPE-019b, previously unreachable because this failure always fired
+  first: agentPlanSteps embeds the raw requirement in a plan step's redacted
+  detail, which Validate refuses for trailing whitespace
+Dev-Log: DL-20260802-071
+
 Change-ID: CL-20260802-060
 Commit: pending
 Date: 2026-08-02

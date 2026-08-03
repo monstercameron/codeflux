@@ -99,10 +99,26 @@ var (
 
 // AnalyzeTaskRequirement classifies and extracts bounded facts with a stable
 // rule set. It does not call a model and therefore cannot silently vary.
+//
+// The body is normalized here, once, before anything is derived from it
+// (PIPE-019a). Every caller that needs "the analysis of this requirement" —
+// the ambiguity check, the plan builder, and the store's own re-derivation
+// from the persisted message — reaches this function with whatever leading
+// or trailing whitespace its own copy happens to carry, and a mandatory
+// multi-line <<<ACCEPTANCE ... >>> block (PIPE-019) leaves a trailing
+// newline on every requirement that uses it. Refusing that instead of
+// normalizing it made the three call sites disagree about whether "the
+// requirement text" included the newline, which is the same fact computed
+// three times with three different answers. Trimming inside the one function
+// every caller already goes through makes it impossible for them to
+// disagree, without touching what was actually persisted: the stored user
+// message is untouched by this, because nothing here writes it back. Only
+// the derived analysis is normalized, and only in this one place.
 func AnalyzeTaskRequirement(body string) (RequirementAnalysis, error) {
-	if strings.TrimSpace(body) != body || body == "" || len(body) > 131_072 {
+	body = strings.TrimSpace(body)
+	if body == "" || len(body) > 131_072 {
 		return RequirementAnalysis{},
-			errors.New("requirement body must be non-empty, trimmed, and bounded")
+			errors.New("requirement body must be non-empty and bounded")
 	}
 	lower := strings.ToLower(body)
 	analysis := RequirementAnalysis{
