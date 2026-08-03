@@ -150,3 +150,65 @@ func TestADerivedSchemaCarriesTheFactsTheRunMeasured(t *testing.T) {
 		t.Errorf("the derived schema carries %d field(s), wanted 19", fields)
 	}
 }
+
+// TestTheSchemaSaysUnknownRatherThanGuessing covers the claims rung 5's
+// generated documentation made and could not support.
+//
+// A function handed an io.Reader is "pure" by the effect analysis — it reaches
+// nothing outside its arguments — and calling it twice does not give the same
+// answer, because the reader is consumed. A body with no loop that calls a JSON
+// decoder is not constant time. Both were written confidently and both were
+// false, which is worse than an empty field: a later run reuses on that basis.
+func TestTheSchemaSaysUnknownRatherThanGuessing(t *testing.T) {
+	reader := producedFunction{
+		Name:         "readEntries",
+		Parameters:   []string{"io.Reader"},
+		Results:      []string{"[]entry", "error"},
+		ReturnsError: true,
+		Pure:         true,
+		Effects:      []string{"json.NewDecoder"},
+	}
+	comment := atomSchemaComment(reader)
+	for _, mustNotSay := range []string{
+		"the same arguments give the same results",
+		"safe to retry",
+		"constant in the size of its input",
+	} {
+		if strings.Contains(comment, mustNotSay) {
+			t.Errorf("the schema claims %q of a function reading a stream:\n%s",
+				mustNotSay, comment)
+		}
+	}
+	for _, mustSay := range []string{
+		"consumed as it is read",
+		"the first call consumed it",
+		"dominated by what it calls",
+	} {
+		if !strings.Contains(comment, mustSay) {
+			t.Errorf("the schema does not say %q:\n%s", mustSay, comment)
+		}
+	}
+
+	// A genuinely pure function keeps its confident answers: the point is
+	// accuracy, not timidity.
+	pure := producedFunction{
+		Name: "add", Parameters: []string{"int", "int"},
+		Results: []string{"int"}, Pure: true,
+	}
+	confident := atomSchemaComment(pure)
+	if !strings.Contains(confident, "the same arguments give the same results") {
+		t.Errorf("a genuinely deterministic function was hedged:\n%s", confident)
+	}
+}
+
+// TestVerificationDoesNotOverclaim keeps the acceptance examples describing the
+// command they actually exercise.
+func TestVerificationDoesNotOverclaim(t *testing.T) {
+	comment := atomSchemaComment(producedFunction{
+		Name: "parse", Parameters: []string{"string"}, Results: []string{"int"},
+	})
+	if !strings.Contains(comment, "properties of the whole command") {
+		t.Errorf("the schema presents whole-command evidence as if it verified "+
+			"this function alone:\n%s", comment)
+	}
+}

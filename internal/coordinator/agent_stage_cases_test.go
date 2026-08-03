@@ -377,3 +377,44 @@ func TestAReaderCaseNeedsASuiteThatActuallyReads(t *testing.T) {
 		t.Error("a suite that never builds a reader satisfied a reader case")
 	}
 }
+
+// TestTwoCasesAreNeverTheSameLiteral covers the duplicate rung 5 was asked for.
+//
+// []entry{entry{}, entry{}, entry{}} was labelled both "several distinct items"
+// and "the same item repeated". No suite can answer both with one literal,
+// because they are the same literal.
+func TestTwoCasesAreNeverTheSameLiteral(t *testing.T) {
+	// A produced struct: sampleOf knows no distinct values for it.
+	shapes := map[string]string{}
+	for _, candidate := range casesForType("[]entry") {
+		if earlier, clash := shapes[candidate.Shape]; clash {
+			t.Errorf("%q is asked for as both %q and %q",
+				candidate.Shape, earlier, candidate.Why)
+		}
+		shapes[candidate.Shape] = candidate.Why
+	}
+	// And a type it does know: the literals must stay literal there.
+	for _, candidate := range casesForType("[]int") {
+		if strings.Contains(candidate.Shape, "distinct items") {
+			t.Errorf("a slice of a type with known samples was described "+
+				"rather than written: %q", candidate.Shape)
+		}
+	}
+}
+
+// TestDuplicateShapesCollapseToTheMostImportantClass keeps the survivor the one
+// worth trying if a run only gets to try one.
+func TestDuplicateShapesCollapseToTheMostImportantClass(t *testing.T) {
+	kept := withoutDuplicateShapes([]atomCase{
+		{Shape: "x{}", Why: "straightforward", Class: caseStraightforward},
+		{Shape: "x{}", Why: "complex", Class: caseComplex},
+		{Shape: "y{}", Why: "edge", Class: caseEdge},
+	})
+	if len(kept) != 2 {
+		t.Fatalf("%d case(s) kept, wanted 2", len(kept))
+	}
+	if kept[0].Why != "straightforward" {
+		t.Errorf("the surviving duplicate is %q, wanted the straightforward one",
+			kept[0].Why)
+	}
+}

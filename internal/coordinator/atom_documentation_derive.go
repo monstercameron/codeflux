@@ -175,6 +175,20 @@ func derivedSemantics(function producedFunction) string {
 }
 
 func derivedDeterminism(function producedFunction) string {
+	// A stream is not an argument you can pass twice.
+	//
+	// Purity here means the body reaches nothing outside its arguments, which
+	// is true of a function handed an io.Reader and says nothing about whether
+	// calling it twice gives the same answer: the reader is consumed, and the
+	// second call sees an empty one. Writing "the same arguments give the same
+	// results" of such a function is a confident claim that is simply false,
+	// and a later run reusing it on that basis will be wrong in a way the
+	// documentation caused.
+	if consumesAStream(function) {
+		return "unknown: it takes a stream, which is consumed as it is read, " +
+			"so a second call with the same argument does not see the same " +
+			"input. Nothing here establishes what it does then."
+	}
 	if function.Pure {
 		return "deterministic: the same arguments give the same results."
 	}
@@ -183,6 +197,10 @@ func derivedDeterminism(function producedFunction) string {
 }
 
 func derivedIdempotency(function producedFunction) string {
+	if consumesAStream(function) {
+		return "unknown: retrying against the same stream does not retry " +
+			"against the same input, because the first call consumed it."
+	}
 	if function.Pure {
 		return "safe to retry: calling it twice costs time and changes nothing."
 	}
@@ -218,6 +236,19 @@ func derivedDependencies(function producedFunction) string {
 }
 
 func derivedComplexity(function producedFunction) string {
+	// Loop depth bounds the code, not the work.
+	//
+	// A body with no loop that calls a decoder or a sort is not constant time;
+	// it is exactly as expensive as the thing it called, and this cannot see
+	// inside that. Rung 5 documented a JSON decode as constant and a name sort
+	// as linear, both confidently and both wrong. Where the work happens
+	// somewhere this cannot measure, the honest answer is that it was not
+	// measured.
+	if len(function.Calls) > 0 || callsUnmeasuredWork(function) {
+		return "unknown: the cost is dominated by what it calls, which this " +
+			"has not measured. Its own body has " +
+			loopDescription(function.LoopDepth) + "."
+	}
 	switch function.LoopDepth {
 	case 0:
 		return "constant in the size of its input: no loop."
@@ -231,8 +262,14 @@ func derivedComplexity(function producedFunction) string {
 }
 
 func derivedVerification(function producedFunction) string {
-	return "verified by this project's own suite: it compiles, its tests pass, " +
-		"and the acceptance examples for the task that produced it match."
+	// What is true is what the run measured about the whole program. Claiming
+	// the acceptance examples verify this function independently would be
+	// claiming something nobody checked: they exercise the command, and this is
+	// one part of it.
+	return "the program containing it compiles, its suite passes, and the " +
+		"acceptance examples for the task that produced it match. Those are " +
+		"properties of the whole command; what this function alone guarantees " +
+		"is whatever its own tests assert."
 }
 
 // derivedRetrievalConcepts is the field a later run's search actually reads, so
@@ -379,5 +416,51 @@ func derivedExampleItems(function producedFunction) []string {
 	return []string{
 		"the tests that name " + function.Name + " are the worked examples, " +
 			"and they are executed rather than described",
+	}
+}
+
+// consumesAStream reports whether an argument is read rather than passed.
+//
+// A stream is consumed by reading it, so the second call with "the same
+// argument" is not the same call. Determinism and idempotency both depend on
+// that and both were being answered as though it were not true.
+func consumesAStream(function producedFunction) bool {
+	for _, parameter := range function.Parameters {
+		switch {
+		case strings.Contains(parameter, "io.Reader"),
+			strings.Contains(parameter, "io.ReadCloser"),
+			strings.Contains(parameter, "io.Writer"),
+			strings.Contains(parameter, "bufio.Scanner"),
+			strings.Contains(parameter, "chan "):
+			return true
+		}
+	}
+	return false
+}
+
+// callsUnmeasuredWork reports whether the body reaches something whose cost
+// this cannot see: a decoder, a sort, a regular expression.
+func callsUnmeasuredWork(function producedFunction) bool {
+	for _, effect := range function.Effects {
+		for _, expensive := range []string{
+			"json.", "xml.", "sort.", "regexp.", "template.", "sql.",
+		} {
+			if strings.HasPrefix(effect, expensive) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// loopDescription names the looping in a body, for the complexity field.
+func loopDescription(depth int) string {
+	switch depth {
+	case 0:
+		return "no loop"
+	case 1:
+		return "one level of looping"
+	default:
+		return fmt.Sprintf("%d nested loop levels", depth)
 	}
 }

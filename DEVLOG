@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-137
+Date: 2026-08-03
+Status: Rung 6 is running; the case and documentation defects are closed
+Change-ID: CL-20260803-127
+Commit: pending
+Request-or-TODO: The rung 5 enrichment analysis, items 5 and 7
+Goal: Stop asking for a distinction that is not there, and stop asserting
+  properties nobody established
+Decisions: Described the case rather than inventing distinct struct values.
+  Writing entry{Name: "a"} would guess at fields the synthesiser cannot see,
+  and a wrong literal is worse than an honest description.
+  Deduplicated inside casesForType rather than only at the corpus, so no
+  consumer ever sees one input wearing two labels.
+  Kept the confident answers where they are true. A schema that hedges
+  everything is as useless as one that guesses, and the whole value of deriving
+  from measured facts is that the measured ones are certain
+Files-or-schemas: agent_stage_cases.go and its test,
+  atom_documentation_derive.go and its test
+Validation: Build, vet, gofmt, the case, schema, derive, registration and
+  recall suites
+Failures-or-discarded-approaches: None
+Known-limitations: Items 6, 8, 9, 11 and 12 remain: stale advisories naming
+  symbols from discarded revisions, evidence-bundle advisory counting, terminal
+  message reconciliation, and focused tests for path coverage in-loop and the
+  performance noise floor
+Next-safe-step: Read rung 6, then rung 7
+
 Dev-Log: DL-20260803-136
 Date: 2026-08-03
 Status: Post-loop enrichment is transactional and its output is durable

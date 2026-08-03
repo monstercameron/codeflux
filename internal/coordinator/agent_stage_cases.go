@@ -97,26 +97,55 @@ type atomCase struct {
 // code does, and a case derived from the signature checks what the signature
 // promised. They differ exactly where the bug is.
 func casesForType(typeName string) []atomCase {
+	// Deduplicated on the way out, so no consumer ever sees one input wearing
+	// two labels. For a type sampleOf knows no distinct values of, several
+	// cases collapse onto the zero value: a slice of a produced struct rendered
+	// its one-element case and its zero-valued-element case as the same text,
+	// as well as its distinct and repeated cases.
+	return withoutDuplicateShapes(casesForTypeUnfiltered(typeName))
+}
+
+func casesForTypeUnfiltered(typeName string) []atomCase {
 	switch {
 	case strings.HasPrefix(typeName, "[]"):
 		element := strings.TrimPrefix(typeName, "[]")
 		zero := zeroOf(element)
+		// A type this cannot write two different values of gets described
+		// rather than quoted.
+		//
+		// sampleOf falls back to the zero value for anything it does not know,
+		// so a slice of a produced struct rendered "three distinct items" and
+		// "the same item repeated" as the identical text — []entry{entry{},
+		// entry{}, entry{}} under both labels. One of those is not what it
+		// says, the run cannot satisfy both from one literal, and counting them
+		// separately asks for a case that does not exist.
+		distinct := sampleOf(element, 1) != sampleOf(element, 2)
+		ordinary := atomCase{
+			Shape: fmt.Sprintf("a %s of three distinct items", typeName),
+			Why:   "an ordinary collection of a few distinct items",
+			Class: caseStraightforward,
+		}
+		repeated := atomCase{
+			Shape: fmt.Sprintf("a %s of the same item three times", typeName),
+			Why: "the same element repeated, so duplicate handling is decided " +
+				"rather than assumed",
+			Class: caseComplex,
+		}
+		if distinct {
+			ordinary.Shape = fmt.Sprintf("%s{%s, %s, %s}", typeName,
+				sampleOf(element, 1), sampleOf(element, 2), sampleOf(element, 3))
+			repeated.Shape = fmt.Sprintf("%s{%s, %s, %s}", typeName,
+				sampleOf(element, 1), sampleOf(element, 1), sampleOf(element, 1))
+		}
 		return []atomCase{
-			{fmt.Sprintf("%s{%s, %s, %s}", typeName, sampleOf(element, 1),
-				sampleOf(element, 2), sampleOf(element, 3)),
-				"an ordinary collection of a few distinct items",
-				caseStraightforward},
+			ordinary,
 			{"nil", "a nil slice, which is not the same as an empty one",
 				caseDegenerate},
 			{fmt.Sprintf("%s{}", typeName), "an empty slice: no work to do",
 				caseEdge},
 			{fmt.Sprintf("%s{%s}", typeName, sampleOf(element, 1)),
 				"exactly one element, where off-by-one errors live", caseEdge},
-			{fmt.Sprintf("%s{%s, %s, %s}", typeName, sampleOf(element, 1),
-				sampleOf(element, 1), sampleOf(element, 1)),
-				"the same element repeated, so duplicate handling is decided " +
-					"rather than assumed",
-				caseComplex},
+			repeated,
 			{fmt.Sprintf("%s{%s, %s} reversed and re-sorted", typeName,
 				sampleOf(element, 3), sampleOf(element, 1)),
 				"input already in the wrong order, so ordering is not assumed",
@@ -296,7 +325,7 @@ func synthesiseCases(functions []producedFunction) map[string][]atomCase {
 		sort.SliceStable(cases, func(first, second int) bool {
 			return cases[first].Class.rank() < cases[second].Class.rank()
 		})
-		corpus[function.Name] = cases
+		corpus[function.Name] = withoutDuplicateShapes(cases)
 	}
 	return corpus
 }
@@ -1147,4 +1176,30 @@ func testSourceBuildsAReader(testSource string) bool {
 		}
 	}
 	return false
+}
+
+// withoutDuplicateShapes keeps one case per distinct input.
+//
+// Two cases written as the same text are one case wearing two labels, and
+// counting them separately asks a run to satisfy a difference that is not
+// there. Rung 5's readEntries was asked for []entry{entry{}, entry{}, entry{}}
+// as both "several distinct items" and "the same item repeated"; no suite can
+// answer both with one literal, because they are the same literal.
+//
+// The survivor is the earlier one, and the list arrives sorted by class rank,
+// so the case that survives is the one whose class matters most. A duplicate
+// of a straightforward case loses to the straightforward case, which is the
+// right way round: if a run can only try one input, that is the one to try.
+func withoutDuplicateShapes(cases []atomCase) []atomCase {
+	seen := map[string]bool{}
+	kept := make([]atomCase, 0, len(cases))
+	for _, candidate := range cases {
+		shape := strings.Join(strings.Fields(candidate.Shape), " ")
+		if seen[shape] {
+			continue
+		}
+		seen[shape] = true
+		kept = append(kept, candidate)
+	}
+	return kept
 }

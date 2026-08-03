@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-127
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- two cases stop being one, and the schema stops claiming what it
+  cannot know
+Request-or-TODO: Rung 5 enrichment analysis, items 5 and 7
+Outcome: sampleOf falls back to the zero value for any type it does not know,
+  so a slice of a produced struct rendered its "three distinct items" case and
+  its "the same item repeated" case as the identical text, and its
+  one-element case and its zero-valued-element case likewise. One label of each
+  pair is not what it says, no suite can answer both from one literal, and
+  counting them separately asked for a case that does not exist. Where no two
+  distinct values can be written the cases are now described rather than
+  quoted, and every type's ladder is deduplicated on the way out, keeping the
+  case whose class matters most -- if a run only gets to try one input, that is
+  the one to try.
+  The derived documentation stopped making claims the analysis cannot support.
+  A function handed an io.Reader is pure by the effect analysis, because it
+  reaches nothing outside its arguments, and calling it twice does not give the
+  same answer: the reader is consumed. Writing "the same arguments give the
+  same results" of it is confidently false, and a later run reusing it on that
+  basis is wrong in a way the documentation caused. Determinism and idempotency
+  now read unknown for a function taking a stream, complexity reads unknown
+  where the cost is dominated by something this cannot measure -- a JSON decode
+  is not constant time because the body has no loop -- and verification says
+  the acceptance examples are properties of the whole command rather than of
+  this function alone. A genuinely pure function keeps its confident answers:
+  the point is accuracy, not timidity.
+Verification: Build, vet, gofmt, four new tests
+Dev-Log: DL-20260803-137
+
 Change-ID: CL-20260803-126
 Commit: pending
 Date: 2026-08-03
