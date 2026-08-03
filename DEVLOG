@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-122
+Date: 2026-08-03
+Status: Registration is visible in the flow it belongs to
+Change-ID: CL-20260803-112
+Commit: pending
+Request-or-TODO: The memory-layer analysis
+Goal: Stop the ledger and registration disagreeing about whether registration ran
+Decisions: Returned the outcomes from recall rather than keeping the direct
+  storage write. The direct write was added so a stage that genuinely ran would
+  not read like one nothing performs; it produced the opposite, because the
+  ledger's own not-implemented marker is what a reader sees.
+  Made "produced atoms, registered none" a failure rather than a skip. It is
+  the exact condition that kept the registry empty all session, and a skip is
+  what a reader scrolls past
+Files-or-schemas: agent_stage_recall.go, agent_execution.go
+Validation: Build, vet, gofmt, recall and registration suites
+Failures-or-discarded-approaches: None
+Known-limitations: Registration still runs at the end of the run rather than
+  after human acceptance, so a merely-compiling implementation can still reach
+  it. Influence is still not recorded
+Next-safe-step: A shared two-rung run, reading the preflight counts and the
+  registration stage rows together
+
 Dev-Log: DL-20260803-121
 Date: 2026-08-03
 Status: P0 orderings landed; influence recording and the terminal record are not

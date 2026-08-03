@@ -119,7 +119,7 @@ func TestPIPE048_RegisterVerifiedAtomsWritesARealRegistryRow(t *testing.T) {
 
 	worktree := recallWorktree(t, atomRegistrationFixtureSource)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -184,7 +184,7 @@ func ReserveFundsForCheckout(amount int) (string, error) {
 }
 `)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -279,7 +279,7 @@ func TestPIPE049_RegisterVerifiedMoleculesNamesItsComposedAtoms(t *testing.T) {
 
 	worktree := recallWorktree(t, moleculeRegistrationFixtureSource)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -322,7 +322,7 @@ func TestPIPE048_RegistrationReusesTheSameAtomIdentityAcrossRuns(t *testing.T) {
 	scope.revision = "identity-fixture-revision"
 
 	worktree := recallWorktree(t, atomRegistrationFixtureSource)
-	first := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	first, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !first.Held {
 		t.Fatalf("first recall did not hold: %s", first.Detail)
 	}
@@ -339,7 +339,7 @@ func TestPIPE048_RegistrationReusesTheSameAtomIdentityAcrossRuns(t *testing.T) {
 	// atom_documentation_revisions carries no task scoping at all, so this
 	// only needs to prove that registering the same contract twice extends
 	// the same atom identity rather than forking a new one.
-	second := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	second, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !second.Held {
 		t.Fatalf("second recall did not hold: %s", second.Detail)
 	}
@@ -376,7 +376,7 @@ func TestPIPE048_ChangedContractMintsADifferentAtomIdentity(t *testing.T) {
 	execution.redactor = registrationTestRedactionPipeline(t)
 	scope.revision = "identity-fixture-revision"
 
-	first := execution.recallKnownAtoms(context.Background(),
+	first, _ := execution.recallKnownAtoms(context.Background(),
 		scope, recallWorktree(t, atomRegistrationFixtureSource))
 	if !first.Held {
 		t.Fatalf("first recall did not hold: %s", first.Detail)
@@ -454,7 +454,7 @@ func TestPIPE048_ChangedContractMintsADifferentAtomIdentity(t *testing.T) {
 func ReleaseFundsHoldByIdentity(holdID string) {
 }
 `)
-	second := execution.recallKnownAtoms(context.Background(), secondScope, secondWorktree)
+	second, _ := execution.recallKnownAtoms(context.Background(), secondScope, secondWorktree)
 	if !second.Held {
 		t.Fatalf("second recall did not hold: %s", second.Detail)
 	}
@@ -528,7 +528,7 @@ func AuthorizeAndHoldFunds(amount int) (string, error) {
 		t.Fatalf("seed a failing atom-verification row: %v", err)
 	}
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -583,7 +583,7 @@ func AuthorizeAndHoldFunds(amount int) (string, error) {
 }
 `)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -637,7 +637,7 @@ func AuthorizeAndHoldFunds(amount int) (string, error) {
 		t.Fatalf("seed a satisfied atom-verification row: %v", err)
 	}
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -732,7 +732,7 @@ func NeverBuiltAgain(amount int) (string, error) {
 	return "reservation", nil
 }
 `)
-	seeded := execution.recallKnownAtoms(context.Background(), seedScope, seedWorktree)
+	seeded, _ := execution.recallKnownAtoms(context.Background(), seedScope, seedWorktree)
 	if !seeded.Held {
 		t.Fatalf("seeding recall did not hold: %s", seeded.Detail)
 	}
@@ -768,7 +768,7 @@ func RebuildsTheRegisteredContract(amount int) (string, error) {
 }
 `)
 
-	outcome := execution.recallKnownAtoms(context.Background(), secondScope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), secondScope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}

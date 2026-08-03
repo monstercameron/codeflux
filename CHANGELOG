@@ -50,6 +50,27 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-112
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the registration stages stop reading as unperformed while they run
+Request-or-TODO: The memory-layer analysis, 2026-08-03
+Outcome: Ladder rung 3 recorded "atom-registration: not-implemented -- no part
+  of this build performs this stage" and "molecule-registration:
+  not-implemented" in the same run in which registerAndRecordProducedDeclarations
+  had just been called. Registration wrote its own row directly through storage
+  while the ledger separately declared the stage unperformed, so one run held
+  two records of the same fact that contradicted each other, and every reader
+  of the flow saw the wrong one.
+  The outcomes are now handed back from recall and recorded through the ledger
+  like every other stage, and the three cases stay distinct: nothing was
+  produced to register, something was registered, and something was produced
+  and refused for carrying no schema documentation. The last is the one that
+  mattered -- it is why the registry stayed empty for a whole session -- and
+  reading it as "skipped" hid it.
+Verification: Build, vet, gofmt, the recall and registration suites
+Dev-Log: DL-20260803-122
+
 Change-ID: CL-20260803-111
 Commit: pending
 Date: 2026-08-03

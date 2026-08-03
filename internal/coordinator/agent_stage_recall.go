@@ -89,10 +89,12 @@ func (execution *AgentExecution) recallKnownAtoms(
 	ctx context.Context,
 	scope agentScope,
 	worktree string,
-) stageOutcome {
+) (stageOutcome, registrationOutcomes) {
+	var registration registrationOutcomes
 	functions, err := readProducedFunctions(worktree)
 	if err != nil {
-		return broke("the produced source could not be parsed: "+err.Error(), nil)
+		return broke("the produced source could not be parsed: "+err.Error(), nil),
+			registration
 	}
 	wanted := map[string]producedFunction{}
 	for _, function := range functions {
@@ -104,7 +106,7 @@ func (execution *AgentExecution) recallKnownAtoms(
 		}
 	}
 	if len(wanted) == 0 {
-		return skipped("the run needed no atom, so there was nothing to recall")
+		return skipped("the run needed no atom, so there was nothing to recall"), registration
 	}
 
 	// Earlier work means earlier: the artifacts this run has already stored
@@ -115,7 +117,8 @@ func (execution *AgentExecution) recallKnownAtoms(
 		ctx, scope.projectID, scope.taskID, 200)
 	if err != nil {
 		return broke("the project's earlier work could not be read: "+
-			err.Error(), nil)
+				err.Error(), nil),
+			registration
 	}
 
 	contractIndex, shapeIndex, unparseable := indexKnownArtifactContracts(known)
@@ -128,7 +131,7 @@ func (execution *AgentExecution) recallKnownAtoms(
 		// from one that quietly admitted it.
 		return broke(bindErr.Error(), map[string]any{
 			"functions_needed": len(wanted),
-		})
+		}), registration
 	}
 
 	// PIPE-054/PIPE-055: the registry "as it now stands" is read once, before
@@ -158,6 +161,16 @@ func (execution *AgentExecution) recallKnownAtoms(
 	// stage's evidence and does not change recall's own outcome below.
 	atomRecords, moleculeRecords := execution.registerAndRecordProducedDeclarations(
 		ctx, scope, worktree, wanted, registry)
+	// Handed back so the run's own ledger records these stages, rather than
+	// leaving the ledger to declare them not-implemented while registration
+	// writes a second row saying it ran. Rung 3 showed exactly that
+	// disagreement: atom-registration and molecule-registration both read
+	// "no part of this build performs this stage" in the same run in which
+	// registerAndRecordProducedDeclarations had just been called.
+	registration = registrationOutcomes{
+		atom:     registrationStageOutcome("atom", atomRecords),
+		molecule: registrationStageOutcome("molecule", moleculeRecords),
+	}
 
 	reused := reusedFunctionNames(decisions)
 	evidence := map[string]any{
@@ -176,12 +189,54 @@ func (execution *AgentExecution) recallKnownAtoms(
 	if len(known) == 0 {
 		return held("the project holds no earlier work, so every contract "+
 			"carries a write decision and nothing was rebuilt unnecessarily",
-			evidence)
+			evidence), registration
 	}
 	return held(fmt.Sprintf(
-		"%d contract(s) bound: %d reused by an exact contract-hash match, "+
-			"%d carry a written justification to rebuild",
-		len(decisions), len(reused), len(decisions)-len(reused)), evidence)
+			"%d contract(s) bound: %d reused by an exact contract-hash match, "+
+				"%d carry a written justification to rebuild",
+			len(decisions), len(reused), len(decisions)-len(reused)), evidence),
+		registration
+}
+
+// registrationOutcomes carries what the two registration stages decided, so
+// the run's own ledger can record them rather than declaring them unperformed.
+type registrationOutcomes struct {
+	atom     stageOutcome
+	molecule stageOutcome
+}
+
+// registrationStageOutcome turns registration's records into the stage result
+// the ledger records.
+//
+// The three cases say three different things and must not collapse: nothing was
+// produced to register, something was produced and registered, and something
+// was produced and refused for carrying no schema documentation. The last is
+// the one that mattered — it is why the registry stayed empty for a whole
+// session — and reading it as "skipped" hides it.
+func registrationStageOutcome(kind string, records []registrationRecord) stageOutcome {
+	registered := 0
+	for _, record := range records {
+		if record.Registered {
+			registered++
+		}
+	}
+	evidence := map[string]any{
+		"produced": len(records), "registered": registered,
+	}
+	switch {
+	case len(records) == 0:
+		return skipped("this run produced no candidate " + kind)
+	case registered > 0:
+		return held(fmt.Sprintf(
+			"%d of %d produced %s(s) registered with schema-v1 documentation, "+
+				"so a later task can find them",
+			registered, len(records), kind), evidence)
+	default:
+		return broke(fmt.Sprintf(
+			"0 of %d produced %s(s) carried schema-v1 //codeflux:atom "+
+				"documentation, so nothing was registered and no later task "+
+				"can find this work", len(records), kind), evidence)
+	}
 }
 
 // recallDecision is the binding verdict PIPE-050 requires for one contract:

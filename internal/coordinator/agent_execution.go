@@ -929,8 +929,15 @@ func (execution *AgentExecution) Run(
 		map[bool]string{true: "run their checks", false: "record blocked"}[compiles])
 	execution.examineStructure(ctx, ledger, scope, compiles, verified)
 	if compiles {
-		ledger.decide(ctx, pipeline.StageRecall,
-			execution.recallKnownAtoms(ctx, scope, scope.worktree))
+		recalled, registration := execution.recallKnownAtoms(
+			ctx, scope, scope.worktree)
+		ledger.decide(ctx, pipeline.StageRecall, recalled)
+		// Recorded through the ledger like every other stage. These two used to
+		// write their own rows directly and the ledger separately declared them
+		// not-implemented, so one run's records said both that registration had
+		// run and that no part of this build performs it.
+		ledger.decide(ctx, pipeline.StageAtomRegistration, registration.atom)
+		ledger.decide(ctx, pipeline.StageMoleculeRegistration, registration.molecule)
 	} else {
 		ledger.blocked(ctx, pipeline.StageRecall,
 			"nothing was produced, so nothing could have been reused instead")

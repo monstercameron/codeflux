@@ -157,7 +157,7 @@ func AuthorizeAndHoldFunds(amount int) (string, error) {
 }
 `)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
@@ -192,7 +192,7 @@ func ReserveFunds(amount int) (string, error) {
 }
 `)
 
-	outcome := execution.recallKnownAtoms(context.Background(), scope, worktree)
+	outcome, _ := execution.recallKnownAtoms(context.Background(), scope, worktree)
 	if !outcome.Held {
 		t.Fatalf("recall did not hold: %s", outcome.Detail)
 	}
