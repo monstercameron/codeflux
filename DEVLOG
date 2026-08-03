@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-098
+Date: 2026-08-02
+Status: One declined with evidence, one built and uncalled, one done
+Change-ID: CL-20260802-088
+Commit: pending
+Request-or-TODO: PIPE-045, PIPE-046, PIPE-047
+Goal: Let a run decline a stage before it starts
+Assumptions: That the renumber was mechanical -- checked against live code, and
+  it is not
+Decisions: Traced whether persisted rows are read back by number before
+  renumbering anything, and stopped when they are. The row's name is safe
+  because it is baked in at write time; the classification is not, because it is
+  recomputed from the number by whatever binary is running. That asymmetry is
+  the whole hazard and it is invisible in the schema.
+  Declined rather than renumbered and wrote down what a correct fix needs.
+  Wrote the profile test against the real scheduler rather than against the
+  profile table, so it demonstrates a stage not being run rather than a table
+  saying it should not be.
+  Recorded the integration status in the plan section itself, because this
+  ticket's stated worry is that a profile could quietly become the way a stage
+  stops being performed, and an undocumented half-wired profile is exactly that
+Files-or-schemas: new internal/pipeline/profiles.go and its test, decline.go,
+  docs/plan.md section 33
+Validation: Six profile tests; the pipeline suite; the engine canary at 4.70s
+Failures-or-discarded-approaches: None
+Known-limitations: Nothing consults the profile. The renumber is unstarted
+Next-safe-step: PIPE-046a's three call sites, which are small and unblock
+  PIPE-125 and MEM-027
+
 Dev-Log: DL-20260802-097
 Date: 2026-08-02
 Status: Corrected, and the cause fixed rather than the symptom

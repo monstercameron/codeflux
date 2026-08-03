@@ -21,6 +21,14 @@ const (
 	// can: human acceptance and delivery are decisions a run cannot make for
 	// itself.
 	DeclineNoCheckByDesign DeclineClass = "no-check-by-design"
+	// DeclineByProfile means the run's declared RunProfile marked this stage
+	// inapplicable before the run started (PIPE-046). It takes priority over
+	// every other classification: a stage a profile declines was never asked
+	// to run, so whatever its own check would otherwise have said about it —
+	// principled decline, no-check-by-design, or unimplemented — is beside
+	// the point. docs/plan.md §33 calls this the difference between a
+	// decision and an excuse, and this is the decision.
+	DeclineByProfile DeclineClass = "declined-by-profile"
 )
 
 // ClassifyDecline decides which of the three a non-satisfying stage is.
@@ -58,4 +66,27 @@ func ClassifyDecline(stage Number, state State) (class DeclineClass, ticket stri
 		return DeclinePrincipled, check.Unestablished
 	}
 	return DeclineUnimplemented, ""
+}
+
+// ClassifyDeclineForProfile is ClassifyDecline, extended with the run's
+// declared profile (PIPE-046).
+//
+// A stage the profile declines classifies as DeclineByProfile regardless of
+// what ClassifyDecline alone would have said about it and regardless of
+// whether this run's ledger recorded it skipped or not-implemented: the
+// profile decided the stage did not apply before the run reached it, so the
+// state the run happened to record for an inapplicable stage carries no
+// further information. Every other stage falls through to ClassifyDecline
+// unchanged, which is what keeps this an additive extension rather than a
+// second, divergent rule: a caller passing ProfileDefault, which declines
+// nothing, gets exactly ClassifyDecline's answer for every stage.
+func ClassifyDeclineForProfile(
+	stage Number,
+	state State,
+	profile RunProfile,
+) (class DeclineClass, ticket string) {
+	if reason, declined := profile.DeclinedReason(stage); declined {
+		return DeclineByProfile, reason
+	}
+	return ClassifyDecline(stage, state)
 }

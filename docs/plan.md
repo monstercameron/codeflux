@@ -8208,7 +8208,24 @@ Phases F and G carry nearly all of the added wall-clock, which is the correct pl
 
 Against that, three mechanisms take cost out, and they compound with each other rather than merely adding up. Reuse removes stages entirely, and its saving grows with the registry rather than with the machine. The dependency graph overlaps what remains, bounded by the worktree resource classes and, for model-bearing stages, by the provider's own limit. The digest-keyed cache removes the repeated work inside a run, where attempts re-check files they did not change, and across runs, where a recalled atom arrives with its verdicts already recorded. A first run on a new project is the most expensive run it will ever have, and that is the intended shape.
 
----
+## Declared Run Profiles, As Shipped (PIPE-046/PIPE-047)
+
+"Declared profiles" above describes the design intent against the sixty-six-stage refined flow this section proposes, naming stage 61's crash-recovery and compatibility as its examples. `internal/pipeline` does not carry that flow yet — PIPE-045's renumbering is blocked (see its own record in `TODOS.md`) — so what actually shipped is the same mechanism, `internal/pipeline/profiles.go`, applied to the flow as it exists today: forty-one stages, unrenumbered. This record exists so that fact stays visible rather than being inferred from source, per this rule's own closing sentence: a profile must not become the way a stage quietly stops being performed.
+
+Two profiles are declared:
+
+* `ProfileDefault` — declines nothing. Every one of the forty-one stages applies. `ValidateProfiles` requires this of the default by name, so a run declaring no profile and a run declaring `"default"` cannot behave differently.
+* `ProfileLibrary` — fits a task whose deliverable is an importable package with no runnable command of its own and no declared cross-compilation target. It declines two stages of the current flow, chosen because they are the two the design's own "pure library" example already reaches, not because a wider set was decided and then trimmed:
+  * stage 31, adversarial — the gate feeds hostile input to the built program; a library with no `main` and no produced command has no such surface.
+  * stage 33, platform-matrix — the gate answers for every platform the program claims; a library declaring no cross-compilation target claims none beyond the host it was built on.
+
+**Integration status: declared, not yet consulted.** `RunProfile.ApplicableStages()` and `pipeline.ClassifyDeclineForProfile` are real, tested, and behave correctly when driven directly against `internal/pipeline`'s own scheduler (`RestrictToStages`, `RunConcurrently`) — a profile-restricted schedule measurably invokes a different, smaller stage set. Nothing in `internal/coordinator` or the frontend passes a task's declared profile to that scheduler yet, so every run today behaves exactly as `ProfileDefault` regardless of what a caller might intend. Closing that gap needs three edits outside `internal/pipeline`'s ownership:
+
+* `internal/coordinator/agent_stage_runner.go` — `examineStructureUnconditionalStages` and `examineStructureVerifiedGatedStages` would need to be filtered through the run's declared profile before being handed to `pipeline.RestrictToStages`, and a profile-declined stage recorded skipped, with its reason, before the wave that would otherwise have run it.
+* `internal/coordinator/skip_audit.go` — `classifySkipAuditEntry` would need the run's declared profile threaded in and would call `pipeline.ClassifyDeclineForProfile` in place of `pipeline.ClassifyDecline`, so PIPE-042's audit reports a profile decline as the decision it is rather than folding it into `unimplemented` or `principled-decline`.
+* `web/frontend/pipelineledger/model.go` — `classifyDecline` recomputes a row's classification from its wire-carried stage number and state alone; it would need the run's declared profile on the wire to classify a historical row the same way the server did.
+
+Until those three land, a `library`-profiled task and a default one produce identical ledgers: the profile exists and is provably correct in isolation, but nothing in a real run reads it.
 
 # 34. Functional Program Graph: Decisions, Surface, and Open Questions
 

@@ -50,6 +50,36 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-088
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- declared run profiles, and why the flow was not renumbered
+Request-or-TODO: PIPE-045, PIPE-046, PIPE-047
+Outcome: A run profile declares a stage inapplicable before the run starts, so
+  declining in advance and skipping at runtime stop being the same recorded
+  fact. The table, its validator, and a profile-aware decline classification are
+  in place, with the default profile provably inert across every stage and state.
+  The renumber this section is named for was declined, and the reason is a
+  read-time hazard rather than the numbering: a stage's classification is
+  re-derived from its persisted number against the running binary's tables,
+  including for every row of every historical ledger the frontend renders. A
+  renumber would leave old rows' names correct and their reasons describing a
+  different stage, with nothing to notice the disagreement
+Affected-behavior: None yet. Nothing consults a profile
+Compatibility-or-migration: decline.go is extended additively; the existing
+  classification path is unchanged
+Verification: The discriminating test drives the real scheduler rather than a
+  model of it -- RestrictToStages and RunConcurrently, once per profile -- and
+  proves the runner is never invoked at all for a declined stage
+Known-limitations: Zero production call sites. Every place stage selection or
+  classification happens is in a file this change does not own, so the profile
+  is declared and not yet consulted; that is stated in the plan section this
+  ticket adds rather than left for a reader to discover. Filed as PIPE-046a.
+  PIPE-045 needs decline classification rekeyed by stage name, migration 31's
+  1-to-64 bound widened, and a rows-copy migration that respects the
+  append-only trigger rather than defeating it. Filed as PIPE-045a
+Dev-Log: DL-20260802-098
+
 Change-ID: CL-20260802-087
 Commit: pending
 Date: 2026-08-02
