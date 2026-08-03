@@ -50,6 +50,36 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-066
+Commit: pending
+Date: 2026-08-02
+Type: Record -- four standing decisions closed
+Request-or-TODO: REPO-020a, REPO-024, REPO-037, REPO-038
+Outcome: REPO-020a records the one entry whose commit binding cannot be
+  repaired. CL-20260802-018 was swept into checkpoint 92f1eed with no
+  Change-Log trailer, so git log --grep for it returns nothing and adding the
+  trailer would mean rewriting a released commit. The exception is now written
+  in two places -- this file's Commit-binding preamble, so a reader learning the
+  general rule learns it has one exception, and the entry's own field, so a
+  reader arriving there directly does not have to know the preamble exists.
+  REPO-024: the vendored frontend-design skill is checked and has not drifted --
+  SHA-256 matches on both files against the cached marketplace copy.
+  REPO-037: the adversarial worktree-clean check stays removed. checkSimplification
+  still performs no rewrite, no ticket implements one, and restoring an uncalled
+  function to serve a caller nobody has scheduled is not an improvement.
+  REPO-038: the bootstrap field stays. It is dead in web/client, but three test
+  files outside it assert on its presence and absence as a live proxy for
+  whether a session was established
+Affected-behavior: None. Records and decisions only
+Compatibility-or-migration: None
+Verification: The drift check is a byte comparison, not a reading. The
+  REPO-038 finding is three cited test files, not an absence of grep hits
+Known-limitations: REPO-038's proxy is still a proxy -- whoever revisits it
+  should replace it with a direct assertion rather than delete the signal.
+  This commit names CL-20260802-018 in prose so an un-anchored grep resolves to
+  something pointing at 92f1eed, which the trailer grep never can
+Dev-Log: DL-20260802-076
+
 Change-ID: CL-20260802-065
 Commit: pending
 Date: 2026-08-02

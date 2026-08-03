@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-076
+Date: 2026-08-02
+Status: Four decisions recorded
+Change-ID: CL-20260802-066
+Commit: pending
+Request-or-TODO: REPO-020a, REPO-024, REPO-037, REPO-038
+Goal: Close four standing records rather than leave them as open questions
+Assumptions: A decision nobody wrote down is not a decision
+Decisions: Recorded the CL-20260802-018 exception in two places deliberately.
+  One would have been enough to be true and not enough to be found: a reader who
+  arrives at the entry directly has no reason to consult the preamble, and a
+  reader learning the general binding rule deserves to know it has an exception.
+  Kept the bootstrap field. My own ticket text said the server populates a field
+  nothing reads, and that was wrong -- three test files outside web/client
+  assert on it, using its presence and absence as a proxy for whether a session
+  exists. Removing it from the client alone would have created an inconsistency
+  for no gain
+Files-or-schemas: CHANGELOG preamble and the CL-20260802-018 entry
+Validation: The skill drift check is a byte comparison; the bootstrap finding
+  cites three specific test files rather than resting on an absence of hits
+Failures-or-discarded-approaches: Removing the bootstrap field, abandoned once
+  its real readers were found
+Known-limitations: REPO-038's proxy remains a proxy
+Next-safe-step: None; all four are closed
+
 Dev-Log: DL-20260802-075
 Date: 2026-08-02
 Status: Wired and browser-driven against a fixture
