@@ -83,6 +83,10 @@ func run(ctx context.Context, stdout, stderr io.Writer, args []string) int {
 		fmt.Fprintf(stderr, "codeflux-dev %s: live-provider options are only valid for run-live\n", spec.Name)
 		return exitUsage
 	}
+	if spec.Name != "test-coverage" && invocation.MinCoverage != "" {
+		fmt.Fprintf(stderr, "codeflux-dev %s: --min-coverage is only valid for test-coverage\n", spec.Name)
+		return exitUsage
+	}
 	if len(invocation.Positional) > maximumPositionals(spec.Name) {
 		fmt.Fprintf(stderr, "codeflux-dev %s: unexpected positional arguments %q\n", spec.Name, invocation.Positional)
 		return exitUsage
@@ -486,15 +490,24 @@ func runCoverage(
 		fmt.Fprintf(stderr, "codeflux-dev test-coverage: create artifact directory: %v\n", err)
 		return exitFailure
 	}
-	return runGoIn(
+	profilePath := filepath.Join(coverageDir, "unit.out")
+	// A failing suite is refused, not measured: a percentage taken from a
+	// partial run describes only the packages that happened to pass, and that
+	// number reads as reassuring while meaning nothing. .githooks/pre-push
+	// refuses the same way, for the same reason.
+	if code := runGoIn(
 		ctx,
 		root,
 		stdout,
 		stderr,
 		"test",
-		"-coverprofile="+filepath.Join(coverageDir, "unit.out"),
+		"-coverprofile="+profilePath,
 		"./...",
-	)
+	); code != exitSuccess {
+		fmt.Fprintln(stderr, "codeflux-dev test-coverage: the suite failed, so coverage was not measured.")
+		return code
+	}
+	return enforceCoverageFloor(ctx, root, stdout, stderr, profilePath, invocation.MinCoverage)
 }
 
 func runLint(
@@ -697,6 +710,15 @@ func unformattedGoFiles(root string) ([]string, error) {
 	return unformatted, err
 }
 
+const (
+	// browserPackagePattern names the packages compiled to WebAssembly and served
+	// to the browser.
+	browserPackagePattern = "./web/..."
+	// unusedCheckIdentifier is Staticcheck's unused-code check, which is the one
+	// check whose answer depends on which build target is in view.
+	unusedCheckIdentifier = "U1000"
+)
+
 func staticcheckExecutable(root string) string {
 	executable := filepath.Join(root, ".artifacts", "tools", "bin", "staticcheck")
 	if runtime.GOOS == "windows" {
@@ -710,15 +732,6 @@ func staticcheckExecutable(root string) string {
 
 func requireStaticcheckVersion(
 	ctx context.Context,
-const (
-	// browserPackagePattern names the packages compiled to WebAssembly and served
-	// to the browser.
-	browserPackagePattern = "./web/..."
-	// unusedCheckIdentifier is Staticcheck's unused-code check, which is the one
-	// check whose answer depends on which build target is in view.
-	unusedCheckIdentifier = "U1000"
-)
-
 	root string,
 	stderr io.Writer,
 	staticcheck string,
@@ -764,19 +777,6 @@ func runCommandIn(
 	name string,
 	args ...string,
 ) int {
-	command := exec.CommandContext(ctx, name, args...)
-	command.Dir = root
-	command.Stdout = stdout
-	command.Stderr = stderr
-	if err := command.Run(); err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			fmt.Fprintf(stderr, "codeflux-dev: %s %s failed with exit code %d\n", name, args[0], exitError.ExitCode())
-		} else {
-			fmt.Fprintf(stderr, "codeflux-dev: run %s %s: %v\n", name, args[0], err)
-		}
-		return exitFailure
-) int {
 	return runCommandInWithEnvironment(ctx, root, stdout, stderr, nil, name, args...)
 }
 
@@ -792,14 +792,27 @@ func runCommandInWithEnvironment(
 	environment []string,
 	name string,
 	args ...string,
+) int {
+	command := exec.CommandContext(ctx, name, args...)
+	command.Dir = root
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if len(environment) != 0 {
+		command.Env = append(os.Environ(), environment...)
+	}
+	if err := command.Run(); err != nil {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			fmt.Fprintf(stderr, "codeflux-dev: %s %s failed with exit code %d\n", name, args[0], exitError.ExitCode())
+		} else {
+			fmt.Fprintf(stderr, "codeflux-dev: run %s %s: %v\n", name, args[0], err)
+		}
+		return exitFailure
 	}
 	return exitSuccess
 }
 
 func repositoryRoot() (string, error) {
-	if len(environment) != 0 {
-		command.Env = append(os.Environ(), environment...)
-	}
 	current, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("get current directory: %w", err)

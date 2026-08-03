@@ -51,6 +51,36 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-056
+Date: 2026-08-02
+Status: Baseline measured; ratchet in place
+Change-ID: CL-20260802-046
+Commit: pending
+Request-or-TODO: REPO-026, REPO-027, REPO-028
+Goal: Find out where coverage actually stands and make the floor enforceable
+Assumptions: A floor nobody can meet is a floor everybody bypasses
+Decisions: Measured both the untagged and integration-tagged figures, because
+  REPO-030 changes which tests the default run selects and a floor enforced
+  against the default measures less code than a reader assumes. They came out
+  62.6% and 63.6% -- the retagged packages move a lot in isolation but are small
+  against the module.
+  Chose a ratchet over a constant on that evidence, set a few points below the
+  baseline for platform and noise margin, and recorded the reasoning at the
+  constant rather than leaving a mystery number.
+  Made the decrease protection read the previous committed value rather than
+  trusting a comment, and kept the hook's shell default in step with the Go
+  constant by test, since two copies of a number drift
+Files-or-schemas: cmd/codeflux-dev/coverage.go, coverage_floor.go, registry.go,
+  main.go, .githooks/pre-push, and three test files
+Validation: An isolated module with deterministic 50% coverage exercises
+  below-floor, at-floor, env-only, flag-beats-env, unenforced-by-default, and a
+  failing suite refused without a percentage printed. Four functions hand-mutated
+  and each corresponding test confirmed failing before reverting
+Failures-or-discarded-approaches: None
+Known-limitations: ci.yml still calls test-coverage bare, so CI does not enforce
+  the ratchet. Filed as REPO-027a
+Next-safe-step: REPO-027a
+
 Dev-Log: DL-20260802-055
 Date: 2026-08-02
 Status: Six files tagged; the two commands now differ
@@ -82,6 +112,24 @@ Failures-or-discarded-approaches: None; the two rejected packages are recorded
 Known-limitations: internal/storage remains ~135s and the largest cost in
   test-fast. Filed as REPO-030a
 Next-safe-step: REPO-030a
+
+Dev-Log: DL-20260802-054
+Date: 2026-08-02
+Status: Table complete again
+Change-ID: CL-20260802-044
+Commit: pending
+Request-or-TODO: PIPE-058, PIPE-020
+Goal: Give the new acceptance-oracle stage its dependency entry
+Assumptions: The oracle needs the declared examples and nothing else
+Decisions: Required the instructions stage rather than declaring it a root: with
+  no examples there is nothing to run, and PIPE-019 is what guarantees some
+  exist. Recorded at the entry that this stage's number and its graph position
+  diverge, since it is the clearest example in the table of why the table exists
+Files-or-schemas: internal/pipeline/requirements.go
+Validation: go test ./internal/pipeline/ green
+Failures-or-discarded-approaches: None
+Known-limitations: None
+Next-safe-step: None
 
 Dev-Log: DL-20260802-053
 Date: 2026-08-02

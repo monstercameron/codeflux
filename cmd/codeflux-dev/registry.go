@@ -36,6 +36,7 @@ type commandInvocation struct {
 	ModelRevision string
 	CredentialRef string
 	Database      string
+	MinCoverage   string
 	Positional    []string
 }
 
@@ -75,7 +76,7 @@ func developmentCommandRegistry() []commandSpec {
 		{Name: "seed", Purpose: "Create a named deterministic development scenario.", Prerequisites: []string{"implemented storage and event subsystems"}, Arguments: []string{"[scenario]", "[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
 		{Name: "test-all", Purpose: "Run the required current-scope local pre-submit suite.", Prerequisites: []string{"Go", "Git", "Staticcheck 2026.1", "pinned Buf"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-browser", Purpose: "Run locator-based responsive, accessibility, focus, and network browser checks.", Prerequisites: []string{"running loopback frontend", "Playwright driver v1.61.0", "Chromium browser"}, Arguments: []string{"[--root PATH]", "[--json]"}, ExitCodes: commonExitCodes, MachineReadable: true, Availability: "implemented"},
-		{Name: "test-coverage", Purpose: "Run unit tests and write a coverage profile beneath the artifact root.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
+		{Name: "test-coverage", Purpose: "Run unit tests, write a coverage profile beneath the artifact root, and refuse below a --min-coverage floor (CODEFLUX_MIN_COVERAGE overrides when the flag is absent; the flag wins when both are set).", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]", "[--min-coverage PERCENT]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-fast", Purpose: "Run unit and pure package tests.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-integration", Purpose: "Run current and integration-tagged package tests.", Prerequisites: []string{"Go"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
 		{Name: "test-race", Purpose: "Run Go race tests on a supported host.", Prerequisites: []string{"Go race detector support"}, Arguments: []string{"[--root PATH]"}, ExitCodes: commonExitCodes, MachineReadable: false, Availability: "implemented"},
@@ -158,6 +159,17 @@ func parseCommandInvocation(args []string) (commandInvocation, error) {
 			invocation.Database = args[index]
 		case strings.HasPrefix(argument, "--database="):
 			invocation.Database = strings.TrimPrefix(argument, "--database=")
+		case argument == "--min-coverage":
+			index++
+			if index >= len(args) || args[index] == "" {
+				return commandInvocation{}, fmt.Errorf("--min-coverage requires a value")
+			}
+			invocation.MinCoverage = args[index]
+		case strings.HasPrefix(argument, "--min-coverage="):
+			invocation.MinCoverage = strings.TrimPrefix(argument, "--min-coverage=")
+			if invocation.MinCoverage == "" {
+				return commandInvocation{}, fmt.Errorf("--min-coverage requires a value")
+			}
 		case strings.HasPrefix(argument, "-"):
 			return commandInvocation{}, fmt.Errorf("unknown option %q", argument)
 		default:

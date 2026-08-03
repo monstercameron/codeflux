@@ -66,6 +66,31 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-046
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- enforceable coverage floor
+Request-or-TODO: REPO-026, REPO-027, REPO-028
+Outcome: The measured baseline is 62.6% untagged and 63.6% with the integration
+  tag. Against that, the 80% floor is unreachable and would be bypassed, so the
+  floor becomes a ratchet: coverageFloorPercent, with a test that reads the
+  value as of the last commit touching the file and refuses a decrease.
+  codeflux-dev test-coverage gains --min-coverage, and pre-push delegates to it
+  rather than keeping a second implementation
+Affected-behavior: test-coverage can now fail. Without the flag or
+  CODEFLUX_MIN_COVERAGE it still asserts nothing, preserving the bare CI
+  invocation
+Compatibility-or-migration: The hook's default floor changes from an unreachable
+  80 to the ratchet value; a test keeps the shell default and the Go constant in
+  step
+Verification: Tests run against an isolated module with deterministic 50%
+  coverage, covering below-floor, at-floor, env-only, flag-beats-env, unenforced
+  by default, and a failing suite refused without a percentage printed. Four
+  functions were hand-mutated and each corresponding test confirmed failing
+Known-limitations: ci.yml still invokes test-coverage bare, so CI does not
+  enforce the ratchet yet. Filed as REPO-027a
+Dev-Log: DL-20260802-056
+
 Change-ID: CL-20260802-045
 Commit: pending
 Date: 2026-08-02
@@ -89,6 +114,21 @@ Known-limitations: Two of the ticket's assumptions did not survive measurement.
   since 42 of ~80 files use one helper; filed as REPO-030a, and it remains the
   largest cost in test-fast at ~135s
 Dev-Log: DL-20260802-055
+
+Change-ID: CL-20260802-044
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- stage dependency entry for the new stage
+Request-or-TODO: PIPE-058, PIPE-020
+Outcome: The acceptance-oracle stage gains its entry in the requirements table,
+  requiring the instructions stage alone. Two lanes landing together left the
+  table without an entry for stage 38, which its own coverage validation
+  refused -- the failure mode it was designed to produce
+Affected-behavior: None. Declaration only
+Compatibility-or-migration: None
+Verification: go test ./internal/pipeline/ green
+Known-limitations: None
+Dev-Log: DL-20260802-054
 
 Change-ID: CL-20260802-043
 Commit: pending
