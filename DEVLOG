@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-075
+Date: 2026-08-02
+Status: Wired and browser-driven against a fixture
+Change-ID: CL-20260802-065
+Commit: pending
+Request-or-TODO: REPO-036
+Goal: Let the interface ask the question the server already answers
+Assumptions: A working, tested server capability is worth wiring rather than
+  deleting
+Decisions: Built the results list from primitives.Button so keyboard and ARIA
+  come from the primitive. Hand-rolling either is how a control ends up looking
+  operable and not being.
+  Made an unloaded match say so rather than do nothing. Search covers the whole
+  graph while the view holds a bounded slice, so a silent no-op would be
+  indistinguishable from a broken control -- and that is the failure mode a user
+  cannot diagnose.
+  Reused the dead LinkedChatNodeID as FocusNodeID instead of adding a parallel
+  select-and-centre path. It had no callers and was already the mechanism a
+  search result needs.
+  Built a standalone fixture to verify in a browser, because no live graph is
+  reachable today. Verifying against nothing, or against a projection test,
+  would have been the two ways to report this done without knowing it works
+Files-or-schemas: web/frontend/graphcanvas/authoritative.go, search.go and a new
+  searchfixture; web/client graph resource and mounted-graph files
+Validation: Real typing and keystrokes; loading, populated and empty states;
+  Tab to a result, Enter to activate, aria-pressed asserted, viewport centred.
+  Screenshots opened and judged rather than merely captured
+Failures-or-discarded-approaches: Deleting the RPC, rejected above
+Known-limitations: The fixture is three nodes in memory, not a real run's graph.
+  Exercising this against real data is blocked behind REPO-044
+Next-safe-step: REPO-044, then the mounted check can cover this for real
+
 Dev-Log: DL-20260802-074
 Date: 2026-08-02
 Status: Read path landed; PIPE-006a and PIPE-044 unblocked

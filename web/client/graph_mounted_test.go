@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/graphlayout"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
 )
 
@@ -25,6 +26,21 @@ func TestSelectedGraphResourceScopeRequiresAuthoritativeProjectAndTask(t *testin
 	scope, err := selectedGraphResourceScope(thread)
 	if err != nil || scope.ProjectID != projectID || scope.TaskID != taskID {
 		t.Fatalf("scope = %#v, %v", scope, err)
+	}
+}
+
+func TestMountedGraphHasPlacementFindsOnlyLoadedNodes(t *testing.T) {
+	loaded, _ := domain.NewNodeID()
+	notLoaded, _ := domain.NewNodeID()
+	layout := graphlayout.Layout{Nodes: []graphlayout.Placement{{NodeID: loaded}}}
+	if !mountedGraphHasPlacement(layout, loaded) {
+		t.Fatal("expected a loaded node ID to be found")
+	}
+	if mountedGraphHasPlacement(layout, notLoaded) {
+		t.Fatal("expected a node ID outside the loaded layout to be reported absent")
+	}
+	if mountedGraphHasPlacement(layout, domain.NodeID{}) {
+		t.Fatal("expected a zero node ID to be reported absent")
 	}
 }
 

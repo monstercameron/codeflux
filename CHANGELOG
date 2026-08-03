@@ -27,6 +27,14 @@ The Change-Log trailer is the binding that always works; the hash is a
 convenience, and where the two disagree -- after a rebase, squash, or
 cherry-pick, all of which change the hash -- the trailer is right.
 
+One entry is a standing exception. CL-20260802-018 was swept into checkpoint
+commit 92f1eed under the checkpoint's own message, so its commit carries no
+Change-Log trailer at all and git log --grep="Change-Log: CL-20260802-018"
+returns nothing. Rewriting a released commit to add the trailer is forbidden, so
+this cannot be repaired. For that one entry the back-filled Commit field is the
+sole working binding, and the entry itself repeats this note. The commit-msg
+hook added by CL-20260802-041 prevents a second occurrence.
+
 Entry fields
 ------------
 Change-ID:
@@ -42,6 +50,39 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-065
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- graph search in the browser client
+Request-or-TODO: REPO-036
+Outcome: The graph surface gains a search box. The SearchGraph RPC was real,
+  implemented and tested server-side with no way for the interface to call it --
+  the server answered a question nothing could ask. Deleting a working
+  capability was the worse of the two resolutions the ticket offered.
+  The results list is built from primitives.Button, so keyboard handling and
+  ARIA come from the primitive rather than being hand-rolled. Search is
+  debounced by supersession with a stale-response guard. Selecting a result
+  centres and selects a node already in the loaded slice, and says so plainly
+  when the match is not loaded -- search covers the server's whole graph while
+  the view holds a bounded slice, and silently doing nothing there would read as
+  a broken control.
+  The dead LinkedChatNodeID field is reused as FocusNodeID rather than adding a
+  second select-and-centre mechanism beside it; it had no call sites and is
+  exactly the effect a search result needs
+Affected-behavior: A new control on the graph surface, with loading, empty and
+  populated states
+Compatibility-or-migration: None
+Verification: Driven in a real browser with typing and keystrokes against a
+  purpose-built fixture, because no live task graph is currently reachable --
+  see REPO-041 and REPO-044. Loading state appeared, two results returned, Tab
+  reached a result button, Enter activated it, the node reported aria-pressed,
+  and the viewport centred. A zero-match query was driven too. Screenshots were
+  opened and judged
+Known-limitations: Verified against a three-node in-memory fixture rather than a
+  real run's graph, because none exists yet. The check that would exercise it
+  against real data is blocked behind REPO-044
+Dev-Log: DL-20260802-075
+
 Change-ID: CL-20260802-064
 Commit: pending
 Date: 2026-08-02
@@ -1296,7 +1337,13 @@ Outcome: codeflux start now defaults to 127.0.0.1:47311 instead of
 Affected-behavior: codeflux start binds 47311 by default. A second coordinator
   cannot start while the first holds the port; that is the intended behaviour
 Compatibility-or-migration: Anything that assumed a random port and read it from
-  the printed URL still works, since the URL is still printed
+  the printed URL still works, since the URL is still printed.
+  This entry also carries a permanent binding exception, recorded under
+  REPO-020a. It was swept into checkpoint commit 92f1eed with no Change-Log
+  trailer, so git log --grep="Change-Log: CL-20260802-018" returns nothing and
+  cannot be repaired without rewriting a released commit. The Commit field above
+  is the only working binding for this entry; see the Commit binding section of
+  this file's preamble for the general rule it is exempted from
 Verification: gofmt clean on the touched files; go build of cmd/codeflux and
   internal/coordinator exits 0; go test ./cmd/codeflux/... passes. The existing
   CLI tests pass --address explicitly, so the default change does not touch them

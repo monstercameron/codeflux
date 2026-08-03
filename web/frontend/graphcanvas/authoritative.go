@@ -20,14 +20,20 @@ import (
 )
 
 type AuthoritativeProps struct {
-	Revision            graph.Revision
-	Layout              graphlayout.Layout
-	TaskState           domain.TaskState
-	Mode                graph.Mode
-	ModeUserSelected    bool
-	SelectedNodeID      domain.NodeID
-	CurrentNodeID       domain.NodeID
-	LinkedChatNodeID    domain.NodeID
+	Revision         graph.Revision
+	Layout           graphlayout.Layout
+	TaskState        domain.TaskState
+	Mode             graph.Mode
+	ModeUserSelected bool
+	SelectedNodeID   domain.NodeID
+	CurrentNodeID    domain.NodeID
+	// FocusNodeID imperatively selects and centers a node already present in
+	// Layout, once, on each new value: it is how a caller outside this
+	// component's own interaction state — a chat citation, a chosen graph
+	// search result — brings a specific node into view. It cannot place a
+	// node Layout does not contain; the caller is responsible for knowing
+	// that and saying so, this component only silently no-ops.
+	FocusNodeID         domain.NodeID
 	ComparisonAvailable bool
 	ResponsiveMode      string
 	VisualMode          primitives.Mode
@@ -43,6 +49,21 @@ type AuthoritativeProps struct {
 	OnModeChange        func(graph.Mode)
 	OnViewportChange    func(Viewport)
 	OnCompareRevision   func()
+	// SearchQuery, SearchResults, SearchLoading, and SearchStatus describe an
+	// in-progress or completed authoritative graph search (SearchGraph), which
+	// answers across the server's graph rather than only the bounded slice
+	// this view has currently loaded. OnSearchQueryChange reports every
+	// keystroke; the caller owns debouncing and the request itself.
+	// OnSearchResultSelect reports a chosen match by node ID. The caller
+	// decides how to bring it into view: if it is already part of the
+	// current Layout, selecting and centering it is enough; if it is not,
+	// nothing here can locate it on screen, and the caller must say so.
+	SearchQuery          string
+	SearchResults        []graph.Node
+	SearchLoading        bool
+	SearchStatus         string
+	OnSearchQueryChange  func(string)
+	OnSearchResultSelect func(domain.NodeID)
 }
 
 func validateAuthoritativeProps(props AuthoritativeProps) error {
@@ -157,7 +178,7 @@ func authoritativeSVG(props AuthoritativeProps) ui.Node {
 		return nil
 	}, strconv.FormatBool(props.ModeUserSelected)+"|"+string(props.Mode)+"|"+string(props.TaskState))
 	ui.UseEffect(func() func() {
-		linked := props.LinkedChatNodeID
+		linked := props.FocusNodeID
 		if linked.IsZero() || !hasAuthoritativePlacement(props.Layout, linked) {
 			return nil
 		}
@@ -172,7 +193,7 @@ func authoritativeSVG(props AuthoritativeProps) ui.Node {
 		}
 		ui.PostAsync(func() { focusGraphNode(linked.String()) })
 		return nil
-	}, props.LinkedChatNodeID.String()+"|"+props.Revision.Metadata().ID().String()+"|"+authoritativeLayoutIdentity(props.Layout))
+	}, props.FocusNodeID.String()+"|"+props.Revision.Metadata().ID().String()+"|"+authoritativeLayoutIdentity(props.Layout))
 
 	startPan := func(event ui.Event) {
 		if pointerButton(event) != 0 {
@@ -292,6 +313,7 @@ func authoritativeSVG(props AuthoritativeProps) ui.Node {
 				}),
 			),
 			modeTabs,
+			authoritativeSearchBox(props),
 		),
 		authoritativeModePanels(modeValue, graphViewport),
 		canvasLegend(props),
@@ -646,7 +668,7 @@ func selectedNodeAnnouncement(revision graph.Revision, selectedID domain.NodeID)
 }
 
 func initialAuthoritativeSelection(props AuthoritativeProps) domain.NodeID {
-	for _, candidate := range []domain.NodeID{props.SelectedNodeID, props.LinkedChatNodeID, props.CurrentNodeID} {
+	for _, candidate := range []domain.NodeID{props.SelectedNodeID, props.FocusNodeID, props.CurrentNodeID} {
 		if hasAuthoritativePlacement(props.Layout, candidate) {
 			return candidate
 		}

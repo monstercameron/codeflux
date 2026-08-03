@@ -72,6 +72,38 @@ func expandGraphResource(ctx context.Context, opener graphResourceClientOpener, 
 	return decodeGraphResource(response.GetGraph(), scope)
 }
 
+// searchGraphResource asks the coordinator's SearchGraph RPC for the graph
+// nodes a text query names, scoped to the current revision, and decodes the
+// response the same way GetGraphSlice and ExpandGraph are decoded: the
+// server returns a full GraphSliceView, so a search hit set is itself a
+// small, self-consistent bounded graph resource with its own layout, not a
+// bare list of identities.
+func searchGraphResource(ctx context.Context, opener graphResourceClientOpener, scope graphResourceScope, revisionID domain.GraphRevisionID, mode taskgraph.Mode, text string, maxResults int, continuation string) (graphResource, error) {
+	if err := validateGraphResourceInputs(opener, scope, mode); err != nil {
+		return graphResource{}, err
+	}
+	if revisionID.IsZero() || strings.TrimSpace(text) == "" {
+		return graphResource{}, errGraphResourceScopeUnavailable
+	}
+	lease, err := opener(ctx)
+	if err != nil {
+		return graphResource{}, err
+	}
+	if lease.client == nil || lease.close == nil {
+		return graphResource{}, errGraphResourceBridgeUnavailable
+	}
+	defer lease.close()
+	response, err := lease.client.SearchGraph(ctx, &codefluxv1.SearchGraphRequest{
+		ProjectId: graphProjectIdentity(scope.ProjectID), TaskId: graphTaskIdentity(scope.TaskID),
+		GraphRevisionId: graphRevisionIdentity(revisionID), Mode: string(mode), Query: strings.TrimSpace(text),
+		MaxResults: uint32(maxResults), ContinuationCursor: continuation,
+	})
+	if err != nil {
+		return graphResource{}, err
+	}
+	return decodeGraphResource(response.GetGraph(), scope)
+}
+
 func loadGraphNodeResource(ctx context.Context, opener graphResourceClientOpener, scope graphResourceScope, revisionID domain.GraphRevisionID, nodeID domain.NodeID) (graphNodeResource, error) {
 	if opener == nil || scope.ProjectID.IsZero() || scope.TaskID.IsZero() || revisionID.IsZero() || nodeID.IsZero() {
 		return graphNodeResource{}, errGraphResourceScopeUnavailable

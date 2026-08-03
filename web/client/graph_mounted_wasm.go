@@ -47,6 +47,11 @@ func useMountedGraph(
 	actionStatus := ui.UseState("")
 	override := ui.UseState(graphResource{})
 	overridePresent := ui.UseState(false)
+	searchQuery := ui.UseState("")
+	searchResults := ui.UseState([]taskgraph.Node{})
+	searchLoading := ui.UseState(false)
+	searchStatus := ui.UseState("")
+	searchFocusNodeID := ui.UseState(domain.NodeID{})
 
 	dependency := "unavailable"
 	if scopeErr == nil {
@@ -105,6 +110,56 @@ func useMountedGraph(
 				}
 			})
 		})
+	}
+	// runSearch asks the authoritative SearchGraph RPC for the nodes a query
+	// names. It searches the server's graph, not only this view's currently
+	// loaded slice, so a result can name a node the canvas has never drawn.
+	runSearch := func(query string) {
+		searchQuery.Set(query)
+		trimmed := strings.TrimSpace(query)
+		if trimmed == "" {
+			searchResults.Set(nil)
+			searchStatus.Set("")
+			searchLoading.Set(false)
+			return
+		}
+		searchLoading.Set(true)
+		searchStatus.Set("")
+		revisionID := current.Revision.Metadata().ID()
+		ui.SafeGo("search authoritative graph", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), mountedGraphTimeout)
+			result, err := searchGraphResource(ctx, openBrowserGraphResourceClient, scope, revisionID, requestedMode.Get(), trimmed, 20, "")
+			cancel()
+			ui.PostAsync(func() {
+				if searchQuery.Get() != query {
+					return // a later keystroke superseded this response
+				}
+				searchLoading.Set(false)
+				if err != nil {
+					searchResults.Set(nil)
+					searchStatus.Set("The graph search could not be completed.")
+					return
+				}
+				nodes := result.Revision.Nodes()
+				searchResults.Set(nodes)
+				if len(nodes) == 0 {
+					searchStatus.Set(fmt.Sprintf("No graph node matches %q.", trimmed))
+				} else {
+					searchStatus.Set("")
+				}
+			})
+		})
+	}
+	// selectSearchResult brings a chosen match into focus when it is already
+	// part of the currently loaded bounded slice. It cannot place a match the
+	// loaded Layout has never drawn, so it says that plainly instead of doing
+	// nothing.
+	selectSearchResult := func(nodeID domain.NodeID) {
+		if !mountedGraphHasPlacement(current.Layout, nodeID) {
+			searchStatus.Set("That match is not in the currently loaded graph view. Try Fit, or expand from a nearby node, then search again.")
+			return
+		}
+		searchFocusNodeID.Set(nodeID)
 	}
 	runExpansion := func(nodeID domain.NodeID, traversal string, hops int) {
 		if actionBusy.Get() {
@@ -179,6 +234,7 @@ func useMountedGraph(
 		Revision: current.Revision, Layout: current.Layout, TaskState: taskState,
 		Mode: requestedMode.Get(), ModeUserSelected: modeUserSelected.Get(),
 		SelectedNodeID: selectedNode.Get(), CurrentNodeID: mountedGraphCurrentNode(current),
+		FocusNodeID:         searchFocusNodeID.Get(),
 		ComparisonAvailable: comparisonAvailable,
 		OnSelectNode:        loadDetail,
 		OnModeChange: func(mode taskgraph.Mode) {
@@ -189,7 +245,13 @@ func useMountedGraph(
 			requestedMode.Set(mode)
 			overridePresent.Set(false)
 		},
-		OnCompareRevision: func() { compare(current.Revision.Metadata().ID()) },
+		OnCompareRevision:    func() { compare(current.Revision.Metadata().ID()) },
+		SearchQuery:          searchQuery.Get(),
+		SearchResults:        searchResults.Get(),
+		SearchLoading:        searchLoading.Get(),
+		SearchStatus:         searchStatus.Get(),
+		OnSearchQueryChange:  runSearch,
+		OnSearchResultSelect: selectSearchResult,
 	}
 	inspector := mountedGraphInspector(
 		selectedNode.Get(), selectedDetail.Get(), detailReady.Get(), detailLoading.Get(),
