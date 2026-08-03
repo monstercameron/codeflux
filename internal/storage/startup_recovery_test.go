@@ -1,7 +1,8 @@
+//go:build integration
+
 package storage
 
 import (
-	"context"
 	"testing"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -339,33 +340,5 @@ func TestRecoverUnownedTaskRunsExcludesSafeAndOwnedStates(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func setTaskRunStates(
-	t *testing.T,
-	repositories *Repositories,
-	taskID domain.TaskID,
-	runID domain.RunID,
-	taskState domain.TaskState,
-	runState domain.RunState,
-) {
-	t.Helper()
-	if _, err := repositories.database.sql.ExecContext(
-		context.Background(),
-		`UPDATE tasks SET state = ? WHERE id = ?`,
-		taskState,
-		taskID,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := repositories.database.sql.ExecContext(
-		context.Background(),
-		`UPDATE runs SET state = ? WHERE id = ? AND task_id = ?`,
-		runState,
-		runID,
-		taskID,
-	); err != nil {
-		t.Fatal(err)
 	}
 }

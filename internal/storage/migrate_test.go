@@ -1,3 +1,5 @@
+//go:build integration
+
 package storage
 
 import (
@@ -231,22 +233,6 @@ func TestMigrationRejectsSourceChecksumMismatch(t *testing.T) {
 	if _, err := database.Migrate(context.Background(), options); !errors.Is(err, ErrMigrationChecksum) {
 		t.Fatalf("checksum error = %v, want mismatch", err)
 	}
-}
-
-func openMigrationTestDatabase(t *testing.T) *Database {
-	t.Helper()
-	database, err := Open(context.Background(), OpenOptions{
-		Path: filepath.Join(t.TempDir(), "codeflux.sqlite3"),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := database.Close(context.Background()); err != nil {
-			t.Errorf("close migration database: %v", err)
-		}
-	})
-	return database
 }
 
 func migrationTestOptions(

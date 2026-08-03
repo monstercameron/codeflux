@@ -1,3 +1,5 @@
+//go:build integration
+
 package storage
 
 import (
@@ -5,8 +7,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"codeflux.dev/codeflux/internal/domain"
 )
 
 func TestContextManifestRepositoryRoundTripIsOrderedAndImmutable(t *testing.T) {
@@ -105,49 +105,5 @@ func TestContextManifestRepositoryValidatesAccountingAndLookup(t *testing.T) {
 	}
 	if _, err := repositories.GetContextManifest(t.Context(), strings.Repeat("8", 64)); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing manifest error = %v", err)
-	}
-}
-
-func validContextManifestInput(repositoryID domain.RepositoryID) RecordContextManifest {
-	content := "package service\n\nfunc Greet() string { return \"hi\" }"
-	history := strings.Repeat("a", 40)
-	return RecordContextManifest{
-		ID:                  strings.Repeat("1", 64),
-		RepositoryID:        repositoryID,
-		RepositoryRevision:  strings.Repeat("2", 40),
-		MapRevision:         strings.Repeat("3", 64),
-		RequirementSHA256:   strings.Repeat("4", 64),
-		SelectionPolicy:     1,
-		MaxFiles:            8,
-		MaxBytes:            16 << 10,
-		MaxEstimatedTokens:  4 << 10,
-		UsedFiles:           2,
-		UsedBytes:           len(content) + len(history),
-		UsedEstimatedTokens: 22,
-		Items: []ContextManifestItem{
-			{
-				Path:            "service/service.go",
-				Kind:            "source",
-				StartLine:       1,
-				EndLine:         3,
-				ContentRedacted: content,
-				ContentSHA256:   strings.Repeat("5", 64),
-				Reasons:         []string{"explicit-path", "exact-symbol-term:Greet"},
-				Trust:           contextManifestTrust,
-				EstimatedTokens: 12,
-			},
-			{
-				Path:            "service/service.go",
-				Kind:            "history",
-				ContentRedacted: history,
-				ContentSHA256:   strings.Repeat("6", 64),
-				Reasons:         []string{"recent-history-for-selected-path"},
-				Trust:           contextManifestTrust,
-				EstimatedTokens: 10,
-			},
-		},
-		Exclusions: []ContextManifestExclusion{
-			{Path: ".env", Reason: "likely-secret-path"},
-		},
 	}
 }

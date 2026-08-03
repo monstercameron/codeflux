@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-081
+Date: 2026-08-02
+Status: Eleven files tagged; fixtures extracted
+Change-ID: CL-20260802-071
+Commit: pending
+Request-or-TODO: REPO-030a
+Goal: Let internal/storage's heavy tests leave test-fast without breaking the
+  files that share their helpers
+Assumptions: A file that cannot be shown to be slow does not get tagged
+Decisions: Built the full dependency map before moving anything -- 168
+  declarations across 83 files, 79 with real cross-file consumers -- because
+  tagging is file-granular and a shared helper disappearing breaks the untagged
+  build silently.
+  Took the tagging threshold from a measured natural break rather than a round
+  number: the heaviest untagged file is 8.9s and the lightest tagged is 11.0s.
+  Checked each extracted helper for transitive dependencies on other
+  heavy-file-only symbols before moving it
+Files-or-schemas: eleven _test.go files tagged, one new untagged
+  shared_fixtures_test.go
+Validation: Selection counts before and after, and the arithmetic connecting
+  them to the exact test functions moved
+Failures-or-discarded-approaches: The first dependency extraction mis-split
+  two-token type, const and var declarations. The tell was twelve unrelated
+  symbols all reporting an identical nineteen-file usage list -- a result too
+  uniform to be real. Redone with unambiguous delimiters
+Known-limitations: The threshold will need revisiting as files grow
+Next-safe-step: None
+
 Dev-Log: DL-20260802-080
 Date: 2026-08-02
 Status: Binding and keys landed; ordering and embeddings still blocked

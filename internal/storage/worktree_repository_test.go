@@ -1,10 +1,10 @@
+//go:build integration
+
 package storage
 
 import (
 	"errors"
 	"testing"
-
-	"codeflux.dev/codeflux/internal/domain"
 )
 
 func TestWorktreeBindingRepositoryLifecycle(t *testing.T) {
@@ -264,13 +264,4 @@ func TestListActiveWorktreeBindingsValidatesBound(t *testing.T) {
 			t.Fatalf("worktree page limit %d was accepted", limit)
 		}
 	}
-}
-
-func testWorkspaceID(t *testing.T, number int) domain.WorkspaceID {
-	t.Helper()
-	id, err := domain.ParseWorkspaceID("wsp_" + testUUID(number))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return id
 }

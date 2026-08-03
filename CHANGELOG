@@ -50,6 +50,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-071
+Commit: pending
+Date: 2026-08-02
+Type: Change -- storage test suite separation
+Request-or-TODO: REPO-030a
+Outcome: internal/storage was the largest remaining cost in test-fast and could
+  not be tagged because its test files shared fixtures almost all-to-all. Ten
+  shared helpers move verbatim into an untagged shared_fixtures_test.go, and
+  eleven measured-heavy files move behind the integration tag. Untagged wall
+  clock drops from 238.8s to 178.2s, and the package keeps 293 of its 343 tests
+  under test-fast, so no unit-test collapse
+Affected-behavior: test-fast runs fewer storage tests and is faster;
+  test-integration runs everything it did
+Compatibility-or-migration: None
+Verification: Selection counts are the evidence -- 2635 untagged against 2718
+  tagged, a delta of 83, being 50 from this change plus REPO-030's existing 33.
+  Both suites pass tagged and untagged
+Known-limitations: The threshold sits at a measured natural break -- heaviest
+  untagged file 8.9s, lightest tagged 11.0s -- rather than a round number, so it
+  will need revisiting as files grow
+Dev-Log: DL-20260802-081
+
 Change-ID: CL-20260802-070
 Commit: pending
 Date: 2026-08-02

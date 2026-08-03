@@ -1,3 +1,5 @@
+//go:build integration
+
 package storage
 
 import (
@@ -511,26 +513,6 @@ func TestPropertySessionSequencesRemainContiguous(t *testing.T) {
 	}
 }
 
-func createSessionEventFixture(
-	t *testing.T,
-	base int,
-) (*Repositories, Task, domain.SessionID) {
-	t.Helper()
-	repositories, task := createTaskFixture(t, base)
-	sessionID := testSessionID(t, base+4)
-	session, err := repositories.CreateSession(context.Background(), CreateSession{
-		ID:       sessionID,
-		ThreadID: task.ThreadID,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if session.ID != sessionID || session.ThreadID != task.ThreadID {
-		t.Fatalf("session = %#v", session)
-	}
-	return repositories, task, sessionID
-}
-
 func sessionMessageEvent(
 	sessionID domain.SessionID,
 	task Task,
@@ -579,15 +561,6 @@ func sessionTaskTransition(
 			To:   to,
 		}},
 	}
-}
-
-func testSessionID(t *testing.T, number int) domain.SessionID {
-	t.Helper()
-	id, err := domain.ParseSessionID("ses_" + testUUID(number))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return id
 }
 
 type commitObservingPublisher struct {

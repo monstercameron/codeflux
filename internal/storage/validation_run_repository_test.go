@@ -1,3 +1,5 @@
+//go:build integration
+
 package storage
 
 import (
@@ -8,9 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/validation"
 )
 
@@ -120,38 +120,4 @@ func fileIdentity(t *testing.T, path string) string {
 	}
 	sum := sha256.Sum256(content)
 	return hex.EncodeToString(sum[:])
-}
-
-func validationRunIntentFixture(t *testing.T, taskID domain.TaskID, runID domain.RunID, number int, diff, key string) validation.RunIntent {
-	t.Helper()
-	id := testValidationID(t, number)
-	intent, err := validation.SealRunIntent(validation.RunIntent{
-		ID: id, TaskID: taskID, RunID: runID,
-		ProfileName: validation.ProfileProtected, ProfileVersion: validation.ProfileVersionV1,
-		ProfileDigest: strings.Repeat("d", 64), CheckID: "targeted-test-fixture",
-		CheckClass: validation.CheckTargetedTest, Required: true,
-		WorktreeRevision: strings.Repeat("e", 40), DiffIdentity: diff,
-		CommandDefinitionJSON: `{"arguments":["go","test","./..."]}`,
-		CommandFingerprint:    strings.Repeat("f", 64),
-		Executable:            validation.ExecutableIdentity{Path: "C:/tool/go.exe", SHA256: strings.Repeat("1", 64)},
-		Timeout:               5 * time.Minute, IdempotencyKey: key,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return intent
-}
-
-func validationRunResultFixture(t *testing.T, id domain.ValidationID, diff string) validation.RunResult {
-	t.Helper()
-	result, err := validation.SealRunResult(validation.RunResult{
-		ValidationRunID: id, State: domain.ValidationStatePassed, ExitCode: 0,
-		Duration: 1200 * time.Millisecond, ParserName: "go-test-v1", ParseSucceeded: true,
-		ParsedResultJSON:   `{"packages":["codeflux.dev/fixture"],"tests":["TestFixture"]}`,
-		RawRedactedSummary: "ok codeflux.dev/fixture", ObservedDiffIdentity: diff,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result
 }
