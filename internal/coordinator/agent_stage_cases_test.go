@@ -249,3 +249,38 @@ func TestAFormatStringDoesNotCountAsAnInput(t *testing.T) {
 		t.Error("an assertion message counted as ordinary input text")
 	}
 }
+
+// TestAnOrdinaryPositiveValueIsAnyOrdinaryPositiveValue covers the third place
+// the same defect appeared: nothing about 42 says forty-two.
+//
+// Ladder rung 3 is FizzBuzz. Its tests call the function with 1, 3, 5 and 15,
+// which is every ordinary positive value that rung has any reason to use, and
+// it spent five of its six attempts being asked for 42 by name.
+func TestAnOrdinaryPositiveValueIsAnyOrdinaryPositiveValue(t *testing.T) {
+	source := `func TestFizzBuzz(t *testing.T) {
+		for _, n := range []int{1, 3, 5, 15} {
+			printFizzBuzz(n)
+		}
+		printFizzBuzz(0)
+		printFizzBuzz(-7)
+	}`
+	for _, shape := range []string{"42", "0", "1", "-1"} {
+		candidate := atomCase{Shape: shape, Class: caseStraightforward}
+		if !caseIsTried(source, []string{"TestFizzBuzz"}, candidate) {
+			t.Errorf("a suite covering the property left %s untried", shape)
+		}
+	}
+}
+
+// TestDigitsInsideAnIdentifierAreNotAValueTried guards the leniency: finding an
+// ordinary positive value in int8 or buffer256 would satisfy the case in a
+// suite that never passes one.
+func TestDigitsInsideAnIdentifierAreNotAValueTried(t *testing.T) {
+	source := `var x int8; var buffer256 [256]byte; _ = x`
+	if testSourceHasIntegerShape(`type int8 buffer256 sha1`, integerShapeOrdinaryPositiv) {
+		t.Error("digits inside an identifier counted as a value the suite tried")
+	}
+	if !testSourceHasIntegerShape(source, integerShapeOrdinaryPositiv) {
+		t.Error("the array length 256 is a real literal and was not counted")
+	}
+}

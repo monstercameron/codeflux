@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -386,6 +387,17 @@ func caseIsTried(testSource string, tests []string, candidate atomCase) bool {
 	// same structure with its own values satisfies them. A scalar shape has
 	// no invented part and is still matched literally: "nil", `""` and 0 mean
 	// exactly themselves.
+	// A plain integer shape has an invented part too, and it is the whole of it.
+	// Nothing about 42 says forty-two; it says "an ordinary positive value", and
+	// a FizzBuzz test calling the function with 7 has tried one. Ladder rung 3
+	// spent five of its six attempts being asked for 42 by name.
+	//
+	// math.MaxInt and math.MinInt are left to the literal match below. Those are
+	// not invented: they name the ends of the range, and no other value answers
+	// the question they ask.
+	if wanted, isInteger := integerShapeSignature(candidate.Shape); isInteger {
+		return testSourceHasIntegerShape(testSource, wanted)
+	}
 	// A quoted string shape has the same invented part a composite literal has.
 	// Nothing about `"héllo wörld"` says those words; it says "text with
 	// characters outside ASCII". Matching the text asked a run to guess the
@@ -504,6 +516,90 @@ func isIdentifierByte(character byte) bool {
 	default:
 		return false
 	}
+}
+
+// integerShapeKind is the property a synthesised integer case asks about.
+//
+// Zero and one are their own kinds because the cases say so: zero is neither
+// positive nor a count, and one is the smallest useful value and where
+// off-by-one lives. Everything above one is the same question — an ordinary
+// positive value — and any of them answers it.
+type integerShapeKind string
+
+const (
+	integerShapeZero            integerShapeKind = "zero"
+	integerShapeOne             integerShapeKind = "one"
+	integerShapeNegative        integerShapeKind = "negative"
+	integerShapeOrdinaryPositiv integerShapeKind = "ordinary-positive"
+)
+
+// integerShapeSignature reads a shape written as a plain decimal integer.
+//
+// It reports false for anything else, so math.MaxInt, math.MinInt and the
+// prose case describing an input the contract excludes are untouched.
+func integerShapeSignature(shape string) (integerShapeKind, bool) {
+	trimmed := strings.TrimSpace(shape)
+	value, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return "", false
+	}
+	switch {
+	case value == 0:
+		return integerShapeZero, true
+	case value == 1:
+		return integerShapeOne, true
+	case value < 0:
+		return integerShapeNegative, true
+	default:
+		return integerShapeOrdinaryPositiv, true
+	}
+}
+
+// testSourceHasIntegerShape reports whether the tests use an integer with the
+// same property.
+func testSourceHasIntegerShape(testSource string, wanted integerShapeKind) bool {
+	for _, value := range integerLiteralsIn(testSource) {
+		found, _ := integerShapeSignature(strconv.Itoa(value))
+		if found == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+// integerLiteralsIn returns every decimal integer literal in the source.
+//
+// A run of digits touching an identifier character is not a literal: the 8 in
+// int8 and the 256 in buffer256 are parts of names, and counting them would
+// find an ordinary positive value in a suite that never passes one.
+func integerLiteralsIn(source string) []int {
+	var values []int
+	for index := 0; index < len(source); {
+		if source[index] < '0' || source[index] > '9' {
+			index++
+			continue
+		}
+		start := index
+		for index < len(source) && source[index] >= '0' && source[index] <= '9' {
+			index++
+		}
+		if start > 0 && isIdentifierByte(source[start-1]) && source[start-1] != '-' {
+			continue
+		}
+		if index < len(source) && isIdentifierByte(source[index]) {
+			continue
+		}
+		text := source[start:index]
+		if start > 0 && source[start-1] == '-' {
+			text = "-" + text
+		}
+		value, err := strconv.Atoi(text)
+		if err != nil {
+			continue
+		}
+		values = append(values, value)
+	}
+	return values
 }
 
 // stringShapeKind is the property a synthesised string case asks about, once

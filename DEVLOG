@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-119
+Date: 2026-08-03
+Status: The literal-matching defect is closed for slices, strings and integers
+Change-ID: CL-20260803-109
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction; rung 3 observed in a terminal
+Goal: Stop a gate inventing a value and then charging a run for not guessing it
+Decisions: Bucketed integers into zero, one, negative and ordinary-positive.
+  The cases say why: zero is neither positive nor a count, one is the smallest
+  useful value, and everything above one asks the same question.
+  Left math.MaxInt and math.MinInt on the literal match. They mean themselves.
+  Excluded digit runs touching an identifier, so int8 and buffer256 do not
+  report an ordinary positive value in a suite that never passes one
+Files-or-schemas: internal/coordinator/agent_stage_cases.go and its test
+Validation: Build, vet, six case-matching tests
+Failures-or-discarded-approaches: Watching rung 3 to the attempt ceiling. It
+  was on attempt 7 of 36 on the top rung of the model ladder against a demand
+  no correct test could meet, so it was stopped by PID rather than left to
+  spend
+Known-limitations: The pathological integer cases still ask an iterating
+  function for math.MaxInt. The instruction permits a refusal as the answer,
+  and SuiteBudgetSeconds bounds the hang, but whether that case belongs on a
+  function whose loop is bounded by its argument is not yet decided
+Next-safe-step: Re-run rung 3 with the fix and watch which gate it reaches next
+
 Dev-Log: DL-20260803-118
 Date: 2026-08-03
 Status: String cases are answerable by a correct test for the first time

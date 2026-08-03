@@ -50,6 +50,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-109
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- an ordinary positive value is any ordinary positive value
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: The third place the same defect appeared, and the one that showed it
+  does more than refuse good work. The integer case for "an ordinary positive
+  value" is written as 42, and 42 was matched as text.
+  Ladder rung 3 is FizzBuzz. Its tests call the function with 1, 3, 5 and 15 --
+  every ordinary positive value that rung has a reason to use -- and the gate
+  reported the case untried. The run then did what it was asked and wrote a
+  test for 42 specifically, could not make its own assertion over forty-two
+  lines of output pass, and spent attempts 3, 4 and 5 fighting it before
+  escalating to the most expensive model on the ladder for attempts 6 and 7.
+  A gate demanding an arbitrary value does not merely refuse correct work. It
+  manufactures incorrect work, and then charges for the attempts.
+  math.MaxInt and math.MinInt keep being matched literally. Those are not
+  invented: they name the ends of the range, and nothing else answers them.
+Verification: Build, vet, two new tests, including one that digits inside int8
+  and buffer256 are not counted as a value the suite tried
+Dev-Log: DL-20260803-119
+
 Change-ID: CL-20260803-108
 Commit: pending
 Date: 2026-08-03
