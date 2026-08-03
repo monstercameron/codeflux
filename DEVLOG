@@ -51,6 +51,36 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-053
+Date: 2026-08-02
+Status: Rule registered; lint green
+Change-ID: CL-20260802-043
+Commit: pending
+Request-or-TODO: REPO-034
+Goal: Stop the next provider-backed test being written the way the last one was,
+  which spent real money on 250 model runs from any plain go test ./...
+Assumptions: Reaching for a real provider key is the only thing that costs
+  money. Mentioning a key-shaped name is not
+Decisions: Matched the provider-key resolution helper rather than raw
+  os.Getenv on key-shaped names, which is what the ticket's own wording said and
+  what two false positives forced. The first version flagged a redaction fixture
+  that merely prints OPENAI_API_KEY, and then internal/worker/environment_test.go,
+  which sets a synthetic key into a child process and reads it back to assert it
+  is empty after credential stripping. Gating that one would have made a
+  credential-leak security test skip by default -- a worse outcome than the
+  spend the rule guards against. Both cases are named in the rule's header so
+  the next person to widen it sees the cost
+Files-or-schemas: cmd/codeflux-dev/provider_key_gate.go and its test,
+  cmd/codeflux-dev/checks.go registration
+Validation: Nine cases including a gate placed after the access, a
+  package-qualified call, and the three real files that must pass. lint green
+Failures-or-discarded-approaches: Two false-positive rounds, above. Both were
+  caught by running the rule against the real repository rather than only
+  against fixtures, which is the argument for doing that
+Known-limitations: A test reaching a real key without going through the helper
+  is not caught; no such route exists today
+Next-safe-step: None; the ticket is closed
+
 Dev-Log: DL-20260802-052
 Date: 2026-08-02
 Status: Rule registered; lint green

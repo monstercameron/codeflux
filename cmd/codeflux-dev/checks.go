@@ -77,10 +77,13 @@ func runRepositoryChecks(ctx context.Context, root string) error {
 	if err := checkAtomDeclarations(root, tracked); err != nil {
 		return err
 	}
-	if err := checkPrototypeScopeManifest(); err != nil {
+	if err := checkLedgerIdentifierCollisions(root); err != nil {
 		return err
 	}
-	if err := checkLedgerIdentifierCollisions(root); err != nil {
+	if err := checkProviderKeyTestsAreGated(root, tracked); err != nil {
+		return err
+	}
+	if err := checkPrototypeScopeManifest(); err != nil {
 		return err
 	}
 	if err := checkAtomDocumentationObligations(root, tracked); err != nil {

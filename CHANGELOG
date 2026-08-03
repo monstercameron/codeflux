@@ -66,6 +66,25 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-043
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- repository lint rule
+Request-or-TODO: REPO-034
+Outcome: lint refuses a _test.go function that calls ReadProviderKey without an
+  explicit environment opt-in ahead of it: a read of a distinct non-provider-key
+  variable and a t.Skip inside an if, the shape CODEFLUX_LADDER establishes.
+  Decides REPO-034's open question as no -- a provider-backed test may not exist
+  without an opt-in. The rule matches the provider-key resolution helper only,
+  not raw environment reads of key-shaped names
+Affected-behavior: codeflux-dev lint gains a check. No product behavior changed
+Compatibility-or-migration: None
+Verification: Nine cases, including a gate placed after the access (still
+  fires), a package-qualified call, and the three real files that must pass
+Known-limitations: A test reaching a real key by a route that does not go
+  through the helper is not caught. That route does not exist today
+Dev-Log: DL-20260802-053
+
 Change-ID: CL-20260802-042
 Commit: pending
 Date: 2026-08-02
