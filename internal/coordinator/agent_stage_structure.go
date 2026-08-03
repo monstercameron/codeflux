@@ -38,6 +38,14 @@ type producedFunction struct {
 	// handle, which is the difference between a function that can fail
 	// visibly and one that can only fail silently.
 	ReturnsError bool
+	// StartLine and EndLine bound the declaration in its file, in the
+	// worktree's current content — StartLine from the doc comment when one is
+	// attached, so an edit to only the comment still falls inside the span.
+	// This is what change attribution (PIPE-111a) maps a changed line range
+	// onto: a declaration is attributed to a run when some changed line falls
+	// anywhere in [StartLine, EndLine].
+	StartLine int
+	EndLine   int
 }
 
 // readProducedFunctions parses everything the run wrote.
@@ -46,11 +54,28 @@ type producedFunction struct {
 // worth asking about it — what calls what, what reaches outside itself, how
 // deeply it loops — is a question about structure, and a regular expression
 // answers those wrongly in ways that are hard to notice.
+//
+// It enumerates files through producedGoFiles, which reads `git status` —
+// uncommitted edits only. That is the correct, unchanged behaviour for every
+// caller outside this pipeline's attribution machinery. A caller that already
+// knows the attributed file list (PIPE-111) must call parseProducedFunctions
+// directly with that list instead, or it inherits producedGoFiles' blindness
+// to a run that has committed to its own worktree.
 func readProducedFunctions(worktree string) ([]producedFunction, error) {
 	files, err := producedGoFiles(worktree)
 	if err != nil {
 		return nil, err
 	}
+	return parseProducedFunctions(worktree, files)
+}
+
+// parseProducedFunctions parses declarations from exactly the given files,
+// which readProducedFunctions factors out so an attribution-aware caller can
+// supply its own, more accurate file list (PIPE-111/PIPE-111a) instead of
+// producedGoFiles' git-status view.
+func parseProducedFunctions(
+	worktree string, files []string,
+) ([]producedFunction, error) {
 	fileSet := token.NewFileSet()
 	var functions []producedFunction
 	declared := map[string]bool{}
@@ -62,8 +87,14 @@ func readProducedFunctions(worktree string) ([]producedFunction, error) {
 	var parsed []pending
 
 	for _, file := range files {
+		// parser.ParseComments is required here, not only in documentedNames'
+		// own separate parse: a declaration's span has to start at its doc
+		// comment, when one is attached, or an edit that only changes the
+		// comment would fall outside the declaration attribution is computed
+		// against (PIPE-111a).
 		tree, parseErr := parser.ParseFile(
-			fileSet, filepath.Join(worktree, file), nil, parser.SkipObjectResolution)
+			fileSet, filepath.Join(worktree, file), nil,
+			parser.SkipObjectResolution|parser.ParseComments)
 		if parseErr != nil {
 			return nil, fmt.Errorf("%s: %w", file, parseErr)
 		}
@@ -113,6 +144,12 @@ func readProducedFunctions(worktree string) ([]producedFunction, error) {
 		// is a question about the body, not about what its neighbours in the
 		// same file happen to need.
 		function.Pure = !callsAnythingImpure(item.body)
+		declarationStart := item.body.Pos()
+		if item.body.Doc != nil {
+			declarationStart = item.body.Doc.Pos()
+		}
+		function.StartLine = fileSet.Position(declarationStart).Line
+		function.EndLine = fileSet.Position(item.body.End()).Line
 		functions = append(functions, function)
 	}
 	sort.Slice(functions, func(first, second int) bool {
@@ -432,15 +469,33 @@ func checkControlFlow(worktree string) stageOutcome {
 // implies. It is a label rather than a proof: deriving a true bound in general
 // is not possible, and the honest thing is to record what the shape says and
 // let a measurement disagree with it later.
-func checkComplexity(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+//
+// Labels are reported for the declarations this run is answerable for
+// (PIPE-113): a pre-existing function nobody touched carries a bound this run
+// did not derive and should not be advertised as this run's evidence, even as
+// a label. scope fails toward inclusion when attribution could not be
+// established, so a run whose attribution failed to compute sees the old,
+// whole-worktree behaviour rather than a silently narrowed one.
+func checkComplexity(worktree string, attribution changeAttribution) stageOutcome {
+	// Enumerated from attribution's own file set, not producedGoFiles'
+	// git-status view: a run that has committed to its own worktree leaves
+	// git status clean, and readProducedFunctions would silently find
+	// nothing rather than correctly narrowing to what changed (PIPE-111's
+	// design caution).
+	functions, err := attributedFunctions(worktree, attribution)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
+	scope := attributeDeclarations(functions, attribution)
 	labels := map[string]string{}
 	deepest := 0
+	touched := 0
 	for _, function := range functions {
 		if isTestScaffolding(function) {
+			continue
+		}
+		touched++
+		if !scope.Contains(function.Name) {
 			continue
 		}
 		labels[function.Name] = complexityLabel(function.LoopDepth)
@@ -448,8 +503,17 @@ func checkComplexity(worktree string) stageOutcome {
 			deepest = function.LoopDepth
 		}
 	}
-	if len(labels) == 0 {
+	if touched == 0 {
 		return skipped("the run produced no function to measure")
+	}
+	if len(labels) == 0 {
+		// The run produced functions, but none of them is one this run is
+		// answerable for — every candidate is pre-existing code in a touched
+		// file. That is a legitimate zero (PIPE-124's shape, applied here),
+		// distinct from having nothing to measure at all.
+		return skipped(
+			"none of the produced functions is a declaration this run changed, " +
+				"so there is nothing this run is answerable for measuring")
 	}
 	// The gate requires a bound that measured growth across input sizes agrees
 	// with. Nothing here runs the produced code at two sizes and compares, so

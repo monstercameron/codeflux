@@ -88,20 +88,35 @@ func iteratesOverCases(function *ast.FuncDecl) bool {
 // not rewrite anything, it reports what a rewrite would target, and it says so
 // plainly. An optimiser that changed code before the tests were known to
 // detect a mistake would be a defect generator wearing a useful name.
-func checkSimplification(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+//
+// Candidates are drawn only from the declarations this run is answerable for
+// (PIPE-113): a pre-existing tangled function nobody touched is not a
+// simplification this run owes, and naming it here would ask a future
+// attempt to rewrite code its own task never mentioned. attribution fails
+// toward inclusion when it could not be established.
+//
+// Functions are enumerated from attribution's own file set, not
+// producedGoFiles' git-status view: a run that has committed to its own
+// worktree leaves git status clean, and the old enumeration would silently
+// find nothing rather than correctly narrowing to what changed (PIPE-111's
+// design caution).
+func checkSimplification(worktree string, attribution changeAttribution) stageOutcome {
+	functions, err := attributedFunctions(worktree, attribution)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
+	scope := attributeDeclarations(functions, attribution)
 	// A function with many decision points is doing more than one thing. The
 	// threshold is loose on purpose: the aim is to name the genuinely tangled,
 	// not to have an opinion about every function.
 	const tangled = 8
 	var candidates []string
+	attributedCount := 0
 	for _, function := range functions {
-		if isTestScaffolding(function) {
+		if isTestScaffolding(function) || !scope.Contains(function.Name) {
 			continue
 		}
+		attributedCount++
 		if function.Branches >= tangled {
 			candidates = append(candidates, fmt.Sprintf(
 				"%s (%d decision points)", function.Name, function.Branches))
@@ -109,11 +124,16 @@ func checkSimplification(worktree string) stageOutcome {
 	}
 	sort.Strings(candidates)
 	evidence := map[string]any{
-		"functions": len(functions), "worth_simplifying": candidates,
+		"functions": attributedCount, "worth_simplifying": candidates,
 		"rewritten": false,
 	}
 	if len(functions) == 0 {
 		return skipped("the run produced nothing to simplify")
+	}
+	if attributedCount == 0 {
+		return skipped(
+			"none of the produced functions is a declaration this run changed, " +
+				"so there is nothing this run is answerable for simplifying")
 	}
 	// The gate says the atom is rewritten to be simpler where it can be. No
 	// rewrite is performed, so this stage may not report satisfied: doing so

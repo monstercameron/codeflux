@@ -19,16 +19,42 @@ import (
 // written against the current behaviour would ever fail on them.
 type antiPattern struct {
 	Where string
-	What  string
-	Why   string
+	// File and Line are Where's parts, kept apart rather than parsed back out
+	// of it, so a caller can check a finding against a changed line range
+	// (PIPE-113) without re-parsing the display string.
+	File string
+	Line int
+	What string
+	Why  string
+}
+
+// findingLocation is where one finder placed an antiPattern, before What and
+// Why are known — split out so a finder can be handed the position and decide
+// the message, without re-deriving the position itself.
+type findingLocation struct {
+	Where string
+	File  string
+	Line  int
 }
 
 // findAntiPatterns inspects everything the run produced.
+//
+// It enumerates files through producedGoFiles' git-status view. An
+// attribution-aware caller that already has the correct, base-revision file
+// list should call findAntiPatternsInFiles directly instead (PIPE-113),
+// since producedGoFiles goes blind to anything this run has committed to its
+// own worktree.
 func findAntiPatterns(worktree string) ([]antiPattern, error) {
 	files, err := producedGoFiles(worktree)
 	if err != nil {
 		return nil, err
 	}
+	return findAntiPatternsInFiles(worktree, files)
+}
+
+// findAntiPatternsInFiles is findAntiPatterns restricted to exactly the
+// given files.
+func findAntiPatternsInFiles(worktree string, files []string) ([]antiPattern, error) {
 	fileSet := token.NewFileSet()
 	var found []antiPattern
 	for _, file := range files {
@@ -40,8 +66,11 @@ func findAntiPatterns(worktree string) ([]antiPattern, error) {
 		if parseErr != nil {
 			continue
 		}
-		at := func(node ast.Node) string {
-			return fmt.Sprintf("%s:%d", file, fileSet.Position(node.Pos()).Line)
+		at := func(node ast.Node) findingLocation {
+			line := fileSet.Position(node.Pos()).Line
+			return findingLocation{
+				Where: fmt.Sprintf("%s:%d", file, line), File: file, Line: line,
+			}
 		}
 		found = append(found, findSwallowedErrors(tree, at)...)
 		found = append(found, findMutableGlobals(tree, at)...)
@@ -69,7 +98,7 @@ func findAntiPatterns(worktree string) ([]antiPattern, error) {
 // indistinguishable from success to everything downstream.
 func findSwallowedErrors(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	ast.Inspect(tree, func(node ast.Node) bool {
@@ -77,16 +106,18 @@ func findSwallowedErrors(
 			comparesAgainstNilError(branch.Cond) && branch.Body != nil {
 			switch {
 			case len(branch.Body.List) == 0:
+				location := at(branch)
 				found = append(found, antiPattern{
-					Where: at(branch),
-					What:  "an error is noticed and the handler is empty",
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "an error is noticed and the handler is empty",
 					Why: "the failure is detected and then discarded, which is " +
 						"worse than not checking: the code looks careful",
 				})
 			case isBareReturn(branch.Body.List):
+				location := at(branch)
 				found = append(found, antiPattern{
-					Where: at(branch),
-					What:  "an error is noticed and the function returns without it",
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "an error is noticed and the function returns without it",
 					Why: "the caller cannot tell this apart from success, so a " +
 						"failure becomes a wrong answer rather than a report",
 				})
@@ -101,9 +132,10 @@ func findSwallowedErrors(
 				}
 				if len(assign.Rhs) == 1 {
 					if _, isCall := assign.Rhs[0].(*ast.CallExpr); isCall {
+						location := at(assign)
 						found = append(found, antiPattern{
-							Where: at(assign),
-							What:  "a returned value is discarded with _",
+							Where: location.Where, File: location.File, Line: location.Line,
+							What: "a returned value is discarded with _",
 							Why: "if that value is an error, the only report of " +
 								"a failure has been thrown away at the point it " +
 								"was produced",
@@ -147,7 +179,7 @@ func isBareReturn(statements []ast.Stmt) bool {
 // property the house style asks code not to have.
 func findMutableGlobals(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	for _, declaration := range tree.Decls {
@@ -169,9 +201,10 @@ func findMutableGlobals(
 				if declaresSentinel(value) {
 					continue
 				}
+				location := at(name)
 				found = append(found, antiPattern{
-					Where: at(name),
-					What:  "package-level variable " + name.Name,
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "package-level variable " + name.Name,
 					Why: "anything in the package can change it, so a function's " +
 						"result depends on what ran before it; make it a " +
 						"constant or pass it in",
@@ -185,7 +218,7 @@ func findMutableGlobals(
 // findUncheckedAssertions reports type assertions that panic on being wrong.
 func findUncheckedAssertions(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	ast.Inspect(tree, func(node ast.Node) bool {
@@ -198,9 +231,10 @@ func findUncheckedAssertions(
 		for _, value := range assign.Rhs {
 			if assertion, isAssertion := value.(*ast.TypeAssertExpr); isAssertion &&
 				assertion.Type != nil {
+				location := at(assertion)
 				found = append(found, antiPattern{
-					Where: at(assertion),
-					What:  "a type assertion with no second return value",
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "a type assertion with no second return value",
 					Why: "it panics when the value is not that type, turning a " +
 						"wrong assumption into a crash instead of a decision",
 				})
@@ -214,7 +248,7 @@ func findUncheckedAssertions(
 // findPanicsOutsideMain reports library code that takes the process down.
 func findPanicsOutsideMain(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	for _, declaration := range tree.Decls {
@@ -229,9 +263,10 @@ func findPanicsOutsideMain(
 			}
 			name, isName := call.Fun.(*ast.Ident)
 			if isName && name.Name == "panic" {
+				location := at(call)
 				found = append(found, antiPattern{
-					Where: at(call),
-					What:  "panic inside " + function.Name.Name,
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "panic inside " + function.Name.Name,
 					Why: "a function that panics cannot be recovered from by its " +
 						"caller; return an error and let the caller decide",
 				})
@@ -249,7 +284,7 @@ func findPanicsOutsideMain(
 // as a loop variable named for the very type it ranged over.
 func findShadowedNames(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	declared := map[string]bool{}
 	for _, declaration := range tree.Decls {
@@ -275,9 +310,10 @@ func findShadowedNames(
 		}
 		name, isName := loop.Value.(*ast.Ident)
 		if isName && declared[name.Name] {
+			location := at(name)
 			found = append(found, antiPattern{
-				Where: at(name),
-				What:  "the loop variable " + name.Name + " hides a name declared in this file",
+				Where: location.Where, File: location.File, Line: location.Line,
+				What: "the loop variable " + name.Name + " hides a name declared in this file",
 				Why: "inside the loop that name means something else than it " +
 					"does outside it, which is a reader's mistake waiting to happen",
 			})
@@ -290,7 +326,7 @@ func findShadowedNames(
 // findUntypedParameters reports signatures that give up on types.
 func findUntypedParameters(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	for _, declaration := range tree.Decls {
@@ -301,9 +337,10 @@ func findUntypedParameters(
 		for _, field := range function.Type.Params.List {
 			rendered := renderType(field.Type)
 			if rendered == "interface{}" || rendered == "any" {
+				location := at(field)
 				found = append(found, antiPattern{
-					Where: at(field),
-					What:  "a parameter typed " + rendered,
+					Where: location.Where, File: location.File, Line: location.Line,
+					What: "a parameter typed " + rendered,
 					Why: "the compiler can no longer say what a caller may pass, " +
 						"so the mistake moves from build time to run time",
 				})
@@ -316,7 +353,7 @@ func findUntypedParameters(
 // findFlagParameters reports boolean arguments that make call sites unreadable.
 func findFlagParameters(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	var found []antiPattern
 	for _, declaration := range tree.Decls {
@@ -336,8 +373,9 @@ func findFlagParameters(
 			booleans += count
 		}
 		if booleans >= 2 {
+			location := at(function)
 			found = append(found, antiPattern{
-				Where: at(function),
+				Where: location.Where, File: location.File, Line: location.Line,
 				What: fmt.Sprintf("%s takes %d boolean parameters",
 					function.Name.Name, booleans),
 				Why: "a call site reads f(x, true, false) and says nothing about " +
@@ -352,7 +390,7 @@ func findFlagParameters(
 // findDeepNesting reports bodies indented past the point of being followable.
 func findDeepNesting(
 	tree *ast.File,
-	at func(ast.Node) string,
+	at func(ast.Node) findingLocation,
 ) []antiPattern {
 	const tooDeep = 4
 	var found []antiPattern
@@ -362,8 +400,9 @@ func findDeepNesting(
 			continue
 		}
 		if depth := nestingDepth(function.Body, 0); depth > tooDeep {
+			location := at(function)
 			found = append(found, antiPattern{
-				Where: at(function),
+				Where: location.Where, File: location.File, Line: location.Line,
 				What: fmt.Sprintf("%s nests %d levels deep",
 					function.Name.Name, depth),
 				Why: "the condition that reaches the innermost statement can no " +
@@ -395,23 +434,65 @@ func nestingDepth(node ast.Node, depth int) int {
 }
 
 // checkAntiPatterns is the stage.
-func checkAntiPatterns(worktree string) stageOutcome {
-	found, err := findAntiPatterns(worktree)
+//
+// It used to fail the gate for any anti-pattern in any file the run touched
+// at all, which held a run answerable for a shape somebody else wrote in the
+// same file and never went near. attribution narrows that to the line the
+// finding actually sits on (PIPE-113): a finding on a changed line is this
+// run's problem and fails the gate; a finding on an untouched line, in a file
+// the run otherwise changed, is recorded as context so it is not lost, but it
+// no longer blocks a run for code it did not write.
+func checkAntiPatterns(worktree string, attribution changeAttribution) stageOutcome {
+	// Scanned from attribution's own file set when established, rather than
+	// from producedGoFiles directly: producedGoFiles reads `git status`,
+	// which only sees uncommitted edits and goes blind the moment a run
+	// commits to its own worktree — silently finding nothing to report
+	// instead of narrowing correctly (PIPE-111's design caution).
+	files, err := attributionOrProducedFiles(worktree, attribution)
+	if err != nil {
+		return broke("the produced source could not be listed: "+err.Error(), nil)
+	}
+	found, err := findAntiPatternsInFiles(worktree, files)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	listed := make([]string, 0, len(found))
+	var attributed, preexisting []antiPattern
 	for _, pattern := range found {
-		listed = append(listed,
-			fmt.Sprintf("%s: %s", pattern.Where, pattern.What))
+		if attribution.TouchesLine(pattern.File, pattern.Line) {
+			attributed = append(attributed, pattern)
+			continue
+		}
+		preexisting = append(preexisting, pattern)
 	}
-	evidence := map[string]any{"findings": listed, "count": len(found)}
-	if len(found) == 0 {
+	describe := func(patterns []antiPattern) []string {
+		listed := make([]string, 0, len(patterns))
+		for _, pattern := range patterns {
+			listed = append(listed,
+				fmt.Sprintf("%s: %s", pattern.Where, pattern.What))
+		}
+		return listed
+	}
+	attributedListed := describe(attributed)
+	preexistingListed := describe(preexisting)
+	evidence := map[string]any{
+		"findings": attributedListed, "count": len(attributed),
+		"pre_existing_context":    preexistingListed,
+		"pre_existing_count":      len(preexisting),
+		"attribution_established": attribution.Established,
+	}
+	if len(attributed) == 0 {
+		if len(preexisting) > 0 {
+			return held(fmt.Sprintf(
+				"no anti-pattern appears on a line this run changed; %d "+
+					"pre-existing finding(s) elsewhere in the same file(s) are "+
+					"recorded as context, not a gate failure: %s",
+				len(preexisting), strings.Join(preexistingListed, "; ")), evidence)
+		}
 		return held("no known anti-pattern appears in the produced source",
 			evidence)
 	}
-	return broke(fmt.Sprintf("%d anti-pattern(s): %s",
-		len(found), strings.Join(listed, "; ")), evidence)
+	return broke(fmt.Sprintf("%d anti-pattern(s) on a line this run changed: %s",
+		len(attributed), strings.Join(attributedListed, "; ")), evidence)
 }
 
 // declaresSentinel reports whether a package-level var is one Go has no better

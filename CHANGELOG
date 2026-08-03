@@ -50,6 +50,39 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-068
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- work is judged against what the run changed
+Request-or-TODO: PIPE-111, PIPE-111a, PIPE-112, PIPE-113, PIPE-114, PIPE-115,
+  PIPE-116
+Outcome: Four gates judged the whole repository rather than the run's own
+  changes, so on a repository with existing code a run touching one function was
+  held answerable for every declaration in every file it opened. Attribution is
+  derived from the base revision in the durable worktree binding, and
+  completeness, anti-patterns, complexity, simplification, mutation and coverage
+  are all scoped to it.
+  A worse defect was found on the way: every check enumerated produced files
+  through git status --porcelain, which sees only uncommitted edits. The moment
+  a run commits to its own worktree -- the documented operating mode -- that
+  went completely blind rather than merely over-broad
+Affected-behavior: The six rescoped checks report on the run's own work. Each
+  fails toward inclusion when attribution cannot be established
+Compatibility-or-migration: None. PIPE-115's unestablished marker is cleared
+  because the scoping defect it named is fixed; the gate's "branch coverage"
+  wording against a statement-coverage measurement is recorded as a pre-existing
+  gap rather than silently conflated
+Verification: Every test carries an explicit contrasting run -- unestablished
+  attribution, or a constructed wide-open attribution simulating the old
+  file-level scoping -- and asserts the defect reproduces on the same fixture
+  before asserting the fix. PIPE-116's twelve-function fixture repository with a
+  real pre-existing anti-pattern and completeness gap is what makes the rest
+  believable: a clean-slate fixture has nothing pre-existing to disagree about
+Known-limitations: Zero attribution and failed attribution are distinguished by
+  an explicit flag rather than by an empty map, and the fail-open direction is
+  deliberate -- under-attributing would silently shrink what every gate examines
+Dev-Log: DL-20260802-078
+
 Change-ID: CL-20260802-067
 Commit: pending
 Date: 2026-08-02

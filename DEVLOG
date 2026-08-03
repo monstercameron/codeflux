@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-078
+Date: 2026-08-02
+Status: Six checks rescoped; fixture proves it
+Change-ID: CL-20260802-068
+Commit: pending
+Request-or-TODO: PIPE-111 through PIPE-116
+Goal: Judge a run on what it changed, not on the repository it opened
+Assumptions: The base revision the worktree was cut at is the honest reference
+  point, not HEAD at check time
+Decisions: One diff against the base rather than two, because comparing the base
+  to the working tree folds together what the run has committed to its own
+  worktree and what is still uncommitted -- and the run does commit there.
+  Failed attribution to fail toward inclusion, and zero attribution to exclude,
+  held apart by an explicit flag rather than by whether a map is empty. Under-
+  attributing would quietly shrink what every gate examines, which is the same
+  class of defect this milestone keeps repairing.
+  Split file enumeration so test-evidence lookups walk the whole worktree: a
+  test proving a declaration works may live in a file the run never touched, and
+  scoping that lookup would have manufactured false gaps
+Files-or-schemas: a new agent_stage_attribution.go and its test, a new twelve-
+  function fixture repository, and the six rescoped checks
+Validation: Every test asserts the old defect reproduces on the same fixture
+  before asserting the fix
+Failures-or-discarded-approaches: Two real bugs were caught by that contrasting
+  method, including the git-status blindness, which forced the design's shape
+Known-limitations: The gate text says branch coverage and the check measures
+  statement coverage. Pre-existing, recorded at the code, not silently conflated
+Next-safe-step: PIPE-127 to PIPE-130, which scope mutation to these lines
+
 Dev-Log: DL-20260802-077
 Date: 2026-08-02
 Status: Implemented; one line of wiring outstanding

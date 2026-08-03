@@ -88,7 +88,12 @@ func (execution *AgentExecution) findUnkilledMutants(
 	ctx context.Context,
 	worktree string,
 ) []adversarialFinding {
-	outcome := execution.checkMutations(ctx, worktree)
+	// This caller has no task-scoped attribution to hand in (it is reached
+	// with only a worktree path), so it passes the zero value, which
+	// checkMutations treats as "attribution not established" and falls back
+	// to its prior whole-file behaviour (PIPE-114) rather than silently
+	// mutating nothing.
+	outcome := execution.checkMutations(ctx, worktree, changeAttribution{})
 	survivors, present := outcome.Evidence["survivors"].([]string)
 	if !present || len(survivors) == 0 {
 		return nil

@@ -213,7 +213,7 @@ func Simple() int { return 1 }
 				"lib.go": testCase.source,
 			})
 
-			outcome := checkSimplification(worktree)
+			outcome := checkSimplification(worktree, changeAttribution{})
 			if outcome.Held {
 				t.Error("atom-optimization reported satisfied while performing " +
 					"no rewrite, which claims the gate's action")
@@ -260,7 +260,7 @@ func Nested(values []int) int {
 `,
 	})
 
-	outcome := checkComplexity(worktree)
+	outcome := checkComplexity(worktree, changeAttribution{})
 	if outcome.Held {
 		t.Error("atom-complexity reported satisfied without measuring growth, " +
 			"which claims agreement the check never established")

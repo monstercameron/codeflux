@@ -37,12 +37,21 @@ var mutations = []mutation{
 	{From: " || ", To: " && ", Why: "disjunction became conjunction"},
 }
 
-// checkMutations measures whether the tests can detect a defect at all.
+// checkMutations measures whether the tests can detect a defect in what this
+// run changed.
 //
 // Every other check in the flow asks whether the tests pass. This asks the
 // question underneath it: if the code were wrong, would anybody know? A suite
 // that passes against deliberately broken code is not evidence of anything,
 // and until this ran there was no way to tell that suite apart from a good one.
+//
+// Mutations are restricted to attribution's changed line ranges (PIPE-114): a
+// mutant planted in pre-existing code the run never touched measures whether
+// somebody else's tests catch somebody else's defects, which is not this
+// run's claim to make and not a score this run can be held to. When
+// attribution could not be established, every produced source line is
+// eligible, which is the prior whole-file behaviour and the correct
+// fail-toward-inclusion default.
 //
 // Each mutation is applied to one produced source file, the suite is run, and
 // the file is put back. A mutation the suite fails on is caught; one it passes
@@ -50,8 +59,15 @@ var mutations = []mutation{
 func (execution *AgentExecution) checkMutations(
 	ctx context.Context,
 	worktree string,
+	attribution changeAttribution,
 ) stageOutcome {
-	files, err := producedGoFiles(worktree)
+	// Scanned from attribution's own file set when established, rather than
+	// from producedGoFiles directly: producedGoFiles reads `git status`,
+	// which only sees uncommitted edits and goes blind the moment a run
+	// commits to its own worktree, which would otherwise report nothing
+	// worth mutating instead of narrowing correctly (PIPE-111's design
+	// caution).
+	files, err := attributionOrProducedFiles(worktree, attribution)
 	if err != nil {
 		return broke("the produced source could not be read: "+err.Error(), nil)
 	}
@@ -77,35 +93,45 @@ func (execution *AgentExecution) checkMutations(
 		if readErr != nil {
 			continue
 		}
+		lines := strings.Split(string(original), "\n")
 		for _, candidate := range mutations {
 			if applied >= maximumMutations {
 				break
 			}
-			body := string(original)
-			if !strings.Contains(body, candidate.From) {
+			// Only the first occurrence on an attributed line is changed, in
+			// line order. Mutating every occurrence at once would produce a
+			// program broken in so many ways that catching it says nothing
+			// about which test caught what; mutating an occurrence on a line
+			// this run did not change would score somebody else's code.
+			targetLine := firstAttributedLine(lines, file, candidate.From, attribution)
+			if targetLine == -1 {
 				continue
 			}
-			// Only the first occurrence is changed. Mutating every one at once
-			// would produce a program broken in so many ways that catching it
-			// says nothing about which test caught what.
-			mutated := strings.Replace(body, candidate.From, candidate.To, 1)
-			if mutated == body {
+			mutatedLine := strings.Replace(
+				lines[targetLine], candidate.From, candidate.To, 1)
+			if mutatedLine == lines[targetLine] {
 				continue
 			}
+			originalLine := lines[targetLine]
+			lines[targetLine] = mutatedLine
+			mutated := strings.Join(lines, "\n")
 			if writeErr := os.WriteFile(path, []byte(mutated), 0o600); writeErr != nil {
+				lines[targetLine] = originalLine
 				continue
 			}
 			applied++
 			if execution.suiteRejects(ctx, worktree) {
 				caught++
 			} else {
-				survivors = append(survivors,
-					fmt.Sprintf("%s: %s", file, candidate.Why))
+				survivors = append(survivors, fmt.Sprintf(
+					"%s:%d: %s", file, targetLine+1, candidate.Why))
 			}
-			// The file is restored before the next mutation regardless of the
+			// The line is restored before the next mutation regardless of the
 			// outcome. Leaving a mutation in place would ship deliberately
 			// broken code, which is the one failure this check must not cause.
-			if restoreErr := os.WriteFile(path, original, 0o600); restoreErr != nil {
+			lines[targetLine] = originalLine
+			restored := strings.Join(lines, "\n")
+			if restoreErr := os.WriteFile(path, []byte(restored), 0o600); restoreErr != nil {
 				return broke("a mutation could not be undone, so the worktree "+
 					"may hold deliberately broken code: "+restoreErr.Error(), nil)
 			}
@@ -113,14 +139,19 @@ func (execution *AgentExecution) checkMutations(
 	}
 
 	if applied == 0 {
+		if attribution.Established {
+			return skipped(
+				"none of this run's changed lines held anything worth mutating")
+		}
 		return skipped("the produced source held nothing worth mutating")
 	}
 	score := float64(caught) / float64(applied) * 100
 	evidence := map[string]any{
-		"mutations_applied": applied,
-		"mutations_caught":  caught,
-		"score_percent":     score,
-		"survivors":         survivors,
+		"mutations_applied":       applied,
+		"mutations_caught":        caught,
+		"score_percent":           score,
+		"survivors":               survivors,
+		"attribution_established": attribution.Established,
 	}
 	// A suite that catches nothing is worthless; one that catches most is
 	// doing its job. The threshold is deliberately low, because the point of
@@ -137,6 +168,30 @@ func (execution *AgentExecution) checkMutations(
 	return held(fmt.Sprintf(
 		"the tests caught %d of %d deliberate defects (%.0f%%)",
 		caught, applied, score), evidence)
+}
+
+// firstAttributedLine returns the zero-based index of the first line in
+// lines that both contains pattern and falls on a line attribution says this
+// run changed, in line order — or -1 when no such line exists.
+//
+// Pulled out of checkMutations as its own pure function (PIPE-114) so the
+// scoping rule that keeps a mutation out of pre-existing code can be proven
+// directly, without paying for a `go build`/`go test` cycle per case: the
+// rule under test is which line gets picked, not whether the suite catches
+// the mutation once it is applied there.
+func firstAttributedLine(
+	lines []string, file, pattern string, attribution changeAttribution,
+) int {
+	for index, line := range lines {
+		lineNumber := index + 1
+		if !attribution.TouchesLine(file, lineNumber) {
+			continue
+		}
+		if strings.Contains(line, pattern) {
+			return index
+		}
+	}
+	return -1
 }
 
 // suiteRejects reports whether the repository's tests fail as they stand.

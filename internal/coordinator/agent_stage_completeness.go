@@ -74,9 +74,25 @@ func (gaps completenessGaps) Instruction() string {
 // reports on. That stage names anything worth a second look; this one only
 // asks for a rewrite where the function is genuinely unreadable, because
 // sending an agent back to restructure working code has a cost and a risk.
+//
+// attribution restricts every gap to declarations this run is answerable for
+// (PIPE-112): a pre-existing untested or undocumented function nobody
+// touched is not work this run left unfinished, and sending it back to write
+// a test or a comment for a function it never opened is exactly the
+// mis-scoped refinement loop this ticket exists to stop. Attribution fails
+// toward inclusion when it could not be established, so a run whose base
+// revision is unknown is held to the old, whole-worktree standard rather than
+// a silently narrowed one.
+//
+// Files are enumerated from attribution's own changed-file set — the
+// mechanism PIPE-111 replaces producedGoFiles' git-status view with — rather
+// than from producedGoFiles directly, because producedGoFiles only sees
+// uncommitted edits and goes blind the moment a run commits to its own
+// worktree, silently reporting nothing owed instead of narrowing correctly.
 func findCompletenessGaps(
 	worktree string,
 	settings pipeline.Settings,
+	attribution changeAttribution,
 ) (completenessGaps, error) {
 	// The threshold for asking to split a function is looser than the one the
 	// optimisation stage reports on: that stage names anything worth a second
@@ -85,10 +101,15 @@ func findCompletenessGaps(
 	// has a cost and a risk.
 	unreadable := settings.TangleThreshold + 4
 
-	functions, err := readProducedFunctions(worktree)
+	files, err := attributionOrProducedFiles(worktree, attribution)
 	if err != nil {
 		return completenessGaps{}, err
 	}
+	functions, err := parseProducedFunctions(worktree, files)
+	if err != nil {
+		return completenessGaps{}, err
+	}
+	scope := attributeDeclarations(functions, attribution)
 	// The same rule the verification stage uses: a test that names the
 	// function, not any identifier of that name anywhere in a test file.
 	//
@@ -97,17 +118,32 @@ func findCompletenessGaps(
 	// verification stage reported the function unproven. The run was told its
 	// work was finished and the record said otherwise, which is the one thing
 	// the ledger exists to prevent.
-	naming, err := testsNaming(worktree)
+	//
+	// Naming evidence is searched across every Go file currently in the
+	// worktree, not only the attributed or changed set: a test that proves a
+	// declaration is a file this run had no reason to touch — an existing
+	// test file whose coverage already reaches the new code, for instance —
+	// and restricting the search to changed files would misreport a real,
+	// pre-existing test as absent, sending a run back to duplicate one that
+	// already exists.
+	evidenceFiles, err := repositoryGoFiles(worktree)
 	if err != nil {
 		return completenessGaps{}, err
 	}
-	documented, err := documentedNames(worktree)
+	naming, err := testsNamingInFiles(worktree, evidenceFiles)
+	if err != nil {
+		return completenessGaps{}, err
+	}
+	documented, err := documentedNamesInFiles(worktree, files)
 	if err != nil {
 		return completenessGaps{}, err
 	}
 
 	var gaps completenessGaps
 	for _, function := range functions {
+		if !scope.Contains(function.Name) {
+			continue
+		}
 		if settings.RequireTests && needsOwnTest(function) &&
 			len(naming[function.Name]) == 0 {
 			gaps.UntestedAtoms = append(gaps.UntestedAtoms, function.Name)
@@ -132,11 +168,23 @@ func findCompletenessGaps(
 // A doc comment is one attached to the declaration, which is where Go tooling
 // looks and where a reader finds it. A comment floating elsewhere in the file
 // documents nothing in particular.
+//
+// It enumerates files through producedGoFiles' git-status view. An
+// attribution-aware caller that already has the correct, base-revision file
+// list should call documentedNamesInFiles directly instead (PIPE-112).
 func documentedNames(worktree string) (map[string]bool, error) {
 	files, err := producedGoFiles(worktree)
 	if err != nil {
 		return nil, err
 	}
+	return documentedNamesInFiles(worktree, files)
+}
+
+// documentedNamesInFiles is documentedNames restricted to exactly the given
+// files.
+func documentedNamesInFiles(
+	worktree string, files []string,
+) (map[string]bool, error) {
 	documented := map[string]bool{}
 	fileSet := token.NewFileSet()
 	for _, file := range files {

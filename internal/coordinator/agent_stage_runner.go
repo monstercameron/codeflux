@@ -44,6 +44,20 @@ func (execution *AgentExecution) examineStructure(
 		return
 	}
 
+	// Derived once, from the base revision the worktree was created at
+	// (PIPE-111/PIPE-111a), and threaded into every stage below that has been
+	// re-scoped to answer only for what this run actually changed rather than
+	// for everything a real repository's pre-existing code happens to expose.
+	// Every re-scoped stage below takes the raw changed-line attribution and
+	// derives its own declaration-level scope internally where it needs one,
+	// so each stage enumerates files from attribution's own set rather than
+	// from producedGoFiles' git-status view, which goes blind the moment a
+	// run commits to its own worktree. Attribution fails toward including
+	// everything when it could not be established, so a run whose base
+	// revision is unknown is held to the old, whole-worktree standard rather
+	// than a silently narrowed one.
+	attribution, _ := execution.resolveAttribution(ctx, scope)
+
 	// Structure, from the source itself. These hold whether or not the tests
 	// pass, because they are statements about what was written rather than
 	// about what it does.
@@ -53,8 +67,9 @@ func (execution *AgentExecution) examineStructure(
 	ledger.decide(ctx, pipeline.StageMolecules, checkMolecules(worktree))
 	// control-flow is decided after the obligations exist, so it discharges
 	// them rather than answering before they were raised.
-	ledger.decide(ctx, pipeline.StageAntiPatterns, checkAntiPatterns(worktree))
-	ledger.decide(ctx, pipeline.StageAtomComplexity, checkComplexity(worktree))
+	ledger.decide(ctx, pipeline.StageAntiPatterns, checkAntiPatterns(worktree, attribution))
+	ledger.decide(ctx, pipeline.StageAtomComplexity,
+		checkComplexity(worktree, attribution))
 	ledger.decide(ctx, pipeline.StageContracts, describeContracts(worktree))
 	ledger.decide(ctx, pipeline.StageAtomDocumentation, checkAtomDocumentation(worktree))
 	ledger.decide(ctx, pipeline.StageAtomPropertyTests, checkPropertyTests(worktree))
@@ -90,7 +105,7 @@ func (execution *AgentExecution) examineStructure(
 	ledger.decide(ctx, pipeline.StageMoleculeVerification,
 		dischargeMoleculeVerification(ctx, worktree, obligations))
 	ledger.decide(ctx, pipeline.StagePathCoverage,
-		checkFunctionCoverage(ctx, worktree))
+		checkFunctionCoverage(ctx, worktree, attribution))
 
 	if !verified {
 		// What is left genuinely does need a passing suite: a mutation score
@@ -125,7 +140,7 @@ func (execution *AgentExecution) examineStructure(
 	// Mutation runs last of these: it is the most expensive, and it is the one
 	// whose answer decides how much the others were worth.
 	ledger.decide(ctx, pipeline.StageAtomMutation,
-		execution.checkMutations(ctx, worktree))
+		execution.checkMutations(ctx, worktree, attribution))
 
 	// Optimization comes after mutation, which is the ordering
 	// TestAnAtomIsOptimisedOnlyOnceItsTestsCanCatchAMistake exists to enforce
@@ -138,5 +153,5 @@ func (execution *AgentExecution) examineStructure(
 	// exactly why the ordering is worth fixing now: the day a rewrite lands,
 	// the sequence is already right rather than being discovered to be wrong.
 	ledger.decide(ctx, pipeline.StageAtomOptimization,
-		checkSimplification(worktree))
+		checkSimplification(worktree, attribution))
 }
