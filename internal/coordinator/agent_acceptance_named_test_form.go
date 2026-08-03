@@ -3,8 +3,8 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
+	"time"
 )
 
 // namedTestExample is an acceptance example that names a test which must pass
@@ -89,7 +89,15 @@ func parseOneNamedTest(body string) (namedTestExample, bool) {
 //
 // Each is run on its own rather than as one -run alternation, so a failure
 // names the example that failed rather than the set.
-func runNamedTestExamples(
+//
+// PIPE-131: this is repository test code -- a TestMain, an init, the test
+// function itself -- running with this coordinator's authority. Before this,
+// it ran through a direct exec.CommandContext call with the coordinator's
+// full environment inherited; it now runs through the mediated boundary,
+// which gives it the same minimal, credential-scrubbed environment (plus
+// the toolchain names the Go build itself needs) every other mediated
+// subprocess gets.
+func (execution *AgentExecution) runNamedTestExamples(
 	ctx context.Context,
 	worktree string,
 	examples []namedTestExample,
@@ -118,17 +126,22 @@ func runNamedTestExamples(
 		// Anchored on both sides. An unanchored pattern would let
 		// TestParseRejects satisfy a requirement that named TestParse.
 		pattern := "^" + example.Name + "$"
-		arguments := []string{"test", "-count=1"}
+		arguments := []string{"go", "test", "-count=1"}
 		if example.Tags != "" {
 			arguments = append(arguments, "-tags", example.Tags)
 		}
 		arguments = append(arguments, "-run", pattern, example.Package)
-		command := exec.CommandContext(ctx, "go", arguments...)
-		command.Dir = moduleRoot
-		output, err := command.CombinedOutput()
-		if err != nil {
+		result, runErr := execution.runMediatedVerificationCommand(
+			ctx, worktree, moduleRoot, "named-test", arguments, "",
+			10*time.Minute, goToolchainEnvironmentNames)
+		if runErr != nil {
+			failures = append(failures, fmt.Sprintf(
+				"%s could not be run: %v", label, runErr))
+			continue
+		}
+		if !result.Succeeded {
 			failures = append(failures, fmt.Sprintf("%s did not pass: %s",
-				label, failingLineOf(string(output))))
+				label, failingLineOf(result.Combined)))
 			continue
 		}
 		// A -run pattern that matches nothing exits zero and prints
@@ -136,9 +149,8 @@ func runNamedTestExamples(
 		// the test ran. Without this a misspelled name satisfies the example
 		// while checking nothing, which is the failure mode an acceptance
 		// example exists to prevent.
-		rendered := string(output)
-		if strings.Contains(rendered, "no tests to run") ||
-			strings.Contains(rendered, "no test files") {
+		if strings.Contains(result.Combined, "no tests to run") ||
+			strings.Contains(result.Combined, "no test files") {
 			failures = append(failures, fmt.Sprintf(
 				"%s matched no test, so nothing was checked", label))
 			continue

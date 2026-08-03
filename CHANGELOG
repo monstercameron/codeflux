@@ -50,6 +50,45 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-082
+Commit: pending
+Date: 2026-08-02
+Type: Security -- verification subprocesses go through the mediated boundary
+Request-or-TODO: PIPE-131, PIPE-132, PIPE-133
+Outcome: Acceptance runs, adversarial probes and mutation suite runs shelled out
+  directly, so a TestMain, an init, or any produced command ran with the
+  coordinator's own authority and no approval. All three now go through
+  ClassifyAuthority and ExecuteAuthorizedTool.
+  The shared call builds its request under a synthetic per-call identity rather
+  than the run's real task and policy, because this is the coordinator's own
+  verification decision and not a model's request; conflating the two would let
+  a model's granted authority widen what verification may do.
+  What this does and does not achieve is stated rather than implied. It stops
+  the coordinator's credential reaching a produced program, a go test binary, or
+  repository test code, because the environment is stripped before the child
+  starts. It does not stop that process opening a socket or writing to an
+  absolute path outside the worktree; nothing in this codebase confines a
+  running process's syscalls, and the word sandbox appears nowhere
+Affected-behavior: Verification is slower by a measured amount and no longer
+  passes the coordinator's environment to repository code
+Compatibility-or-migration: AuthorizedToolRequest gains a Stdin field; nothing
+  had piped stdin through the mediated boundary and acceptance examples and
+  hostile probes need it. Public stage signatures are unchanged
+Verification: Three discriminating tests, one per call site, each passing under
+  mediation and failing without it. The abuse case runs repository test code
+  attempting all three escapes at once and reruns the identical fixture
+  unmediated: the credential payload is empty under mediation and carries the
+  real key without it
+Known-limitations: PIPE-132 and PIPE-133 are partial and stay open. Network
+  reach and writes outside the worktree are not refused; the abuse case logs
+  both as observed rather than asserting a containment that does not exist.
+  Filed as PIPE-132a and PIPE-133a.
+  Cost measured rather than estimated: ResolveExecutableIdentity hashes the
+  whole go.exe on every mediated call, 107ms isolated against 34us for LookPath,
+  giving 4.25s to 4.82s over eight calls in the mutation stage. It was left
+  alone because it is shared by every mediated command repository-wide
+Dev-Log: DL-20260802-092
+
 Change-ID: CL-20260802-081
 Commit: pending
 Date: 2026-08-02

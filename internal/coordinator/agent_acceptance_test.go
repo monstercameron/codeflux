@@ -171,8 +171,10 @@ func TestAProducedProgramCanActuallyBeStarted(t *testing.T) {
 // TestABinaryThatWillNotStartIsNotReportedAsSurviving keeps the probe from
 // issuing a pass for a program it never launched.
 func TestABinaryThatWillNotStartIsNotReportedAsSurviving(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "was-never-built")
-	findings := probeOneCommand(t.Context(), "./cmd/ghost", missing)
+	worktree := t.TempDir()
+	missing := filepath.Join(worktree, "was-never-built")
+	execution := &AgentExecution{}
+	findings := execution.probeOneCommand(t.Context(), worktree, "./cmd/ghost", missing)
 	if len(findings) == 0 {
 		t.Fatal("a binary that does not exist was reported as having survived " +
 			"every hostile input")

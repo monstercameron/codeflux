@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -388,7 +387,7 @@ func (execution *AgentExecution) checkAcceptance(
 	// state, so requiring a runnable command before looking at them would put
 	// the general form behind the specific one.
 	named := parseNamedTestExamples(requirement)
-	namedPassed, namedFailures := runNamedTestExamples(ctx, worktree, named)
+	namedPassed, namedFailures := execution.runNamedTestExamples(ctx, worktree, named)
 
 	if len(examples) == 0 {
 		switch {
@@ -407,7 +406,7 @@ func (execution *AgentExecution) checkAcceptance(
 		return skipped("no executable acceptance example was supplied, so " +
 			"there is nothing for the built program to reproduce"), nil
 	}
-	commands, err := producedCommands(ctx, worktree, acceptanceBuildTags(examples))
+	commands, err := execution.producedCommands(ctx, worktree, acceptanceBuildTags(examples))
 	if err != nil || len(commands) == 0 {
 		return broke("the run produced no runnable command to check against "+
 			"its examples", nil), nil
@@ -447,22 +446,34 @@ func (execution *AgentExecution) checkAcceptance(
 		return broke("the module this run's commands build from could not "+
 			"be found: "+moduleErr.Error(), nil), nil
 	}
-	buildArguments := []string{"build"}
+	buildArguments := []string{"go", "build"}
 	if tags := acceptanceBuildTags(examples); tags != "" {
 		buildArguments = append(buildArguments, "-tags", tags)
 	}
 	buildArguments = append(buildArguments, "-o", binary, command)
-	build := exec.CommandContext(ctx, "go", buildArguments...)
-	build.Dir = moduleRoot
-	if output, buildErr := build.CombinedOutput(); buildErr != nil {
+	// PIPE-131: built through the mediated boundary rather than a direct
+	// exec.CommandContext call. The build is our own fixed argument array
+	// naming the repository's own toolchain, so it is not the untrusted part
+	// of this step -- what the produced program does once it runs, below,
+	// is -- but running it through the same boundary keeps every subprocess
+	// this stage starts on one audited, credential-scrubbed path rather than
+	// two.
+	buildResult, buildErr := execution.runMediatedVerificationCommand(
+		ctx, worktree, moduleRoot, "acceptance-build", buildArguments, "",
+		5*time.Minute, goToolchainEnvironmentNames)
+	switch {
+	case buildErr != nil:
 		return broke("the program does not build on its own: "+
-			failingLineOf(string(output)), nil), nil
+			buildErr.Error(), nil), nil
+	case !buildResult.Succeeded:
+		return broke("the program does not build on its own: "+
+			failingLineOf(buildResult.Combined), nil), nil
 	}
 
 	var failures []string
 	passed := 0
 	for index, example := range examples {
-		actual, runErr := runAcceptanceExample(ctx, binary, example)
+		actual, runErr := execution.runAcceptanceExample(ctx, worktree, binary, example)
 		switch {
 		case runErr != nil:
 			failures = append(failures, fmt.Sprintf(
@@ -489,25 +500,35 @@ func (execution *AgentExecution) checkAcceptance(
 }
 
 // runAcceptanceExample runs the program once and returns what it printed.
-func runAcceptanceExample(
+//
+// PIPE-131: this is the call that matters most to route through the
+// mediated boundary. The binary was built from this run's own worktree, but
+// its arguments and standard input are an acceptance example straight out
+// of requirement text nobody has reviewed as safe, and its own source is
+// whatever the run produced. Running it unmediated handed it the
+// coordinator's full environment, including any provider credential in it,
+// with no timeout enforcement beyond the ad-hoc context this function built
+// itself. Through the mediated boundary it gets the minimal, credential-
+// scrubbed environment every other subprocess tool call gets, launched from
+// inside the worktree rather than the coordinator's own working directory,
+// which nothing here pinned before.
+func (execution *AgentExecution) runAcceptanceExample(
 	ctx context.Context,
+	worktree string,
 	binary string,
 	example acceptanceExample,
 ) (string, error) {
-	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	run := exec.CommandContext(deadline, binary, example.Arguments...)
-	if example.Stdin != "" {
-		run.Stdin = strings.NewReader(example.Stdin)
-	}
-	output, err := run.CombinedOutput()
-	if deadline.Err() != nil {
-		return "", fmt.Errorf("it did not finish within 30s")
-	}
-	if err != nil && len(output) == 0 {
+	arguments := append([]string{binary}, example.Arguments...)
+	result, err := execution.runMediatedVerificationCommand(
+		ctx, worktree, worktree, "acceptance-example", arguments,
+		example.Stdin, 30*time.Second, nil)
+	if err != nil {
 		return "", err
 	}
-	return normalizeAcceptanceOutput(string(output)), nil
+	if result.TimedOut {
+		return "", fmt.Errorf("it did not finish within 30s")
+	}
+	return normalizeAcceptanceOutput(result.Combined), nil
 }
 
 // normalizeAcceptanceOutput compares what a program printed, not how the

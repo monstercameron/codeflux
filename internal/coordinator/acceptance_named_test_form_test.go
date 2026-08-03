@@ -84,7 +84,7 @@ func TestAnswerRejects(t *testing.T) {
 	})
 
 	t.Run("a passing named test is reported as passed", func(t *testing.T) {
-		passed, failures := runNamedTestExamples(t.Context(), worktree,
+		passed, failures := (&AgentExecution{}).runNamedTestExamples(t.Context(), worktree,
 			[]namedTestExample{{Package: "./...", Name: "TestAnswer"}})
 		if len(failures) != 0 {
 			t.Fatalf("a passing test reported failures: %v", failures)
@@ -95,7 +95,7 @@ func TestAnswerRejects(t *testing.T) {
 	})
 
 	t.Run("a failing named test is reported as failed", func(t *testing.T) {
-		_, failures := runNamedTestExamples(t.Context(), worktree,
+		_, failures := (&AgentExecution{}).runNamedTestExamples(t.Context(), worktree,
 			[]namedTestExample{{Package: "./...", Name: "TestAnswerRejects"}})
 		if len(failures) != 1 {
 			t.Fatalf("a failing test was not reported: %v", failures)
@@ -105,7 +105,7 @@ func TestAnswerRejects(t *testing.T) {
 	t.Run("a name that matches nothing is a failure, not a pass", func(t *testing.T) {
 		// A -run pattern matching nothing exits zero, so a misspelled name
 		// would otherwise satisfy the example without running anything.
-		_, failures := runNamedTestExamples(t.Context(), worktree,
+		_, failures := (&AgentExecution{}).runNamedTestExamples(t.Context(), worktree,
 			[]namedTestExample{{Package: "./...", Name: "TestNoSuchThing"}})
 		if len(failures) != 1 {
 			t.Fatalf("a name matching no test was accepted: %v", failures)
@@ -119,7 +119,7 @@ func TestAnswerRejects(t *testing.T) {
 		// TestAnswer must not be satisfied by TestAnswerRejects, which is the
 		// prefix-matching mistake an unanchored -run would make. Naming the
 		// passing test must not drag in the failing one.
-		passed, failures := runNamedTestExamples(t.Context(), worktree,
+		passed, failures := (&AgentExecution{}).runNamedTestExamples(t.Context(), worktree,
 			[]namedTestExample{{Package: "./...", Name: "TestAnswer"}})
 		if len(failures) != 0 || len(passed) != 1 {
 			t.Fatalf("an anchored name pulled in its prefix sibling: passed=%v failures=%v",

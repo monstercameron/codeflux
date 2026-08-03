@@ -40,6 +40,16 @@ type AuthorizedToolRequest struct {
 	// consulted it, so every crash and recovery claim rested on a ledger that
 	// never entered the code it described.
 	Faults FaultInjector
+	// Stdin, when non-empty, is piped to the command's standard input.
+	//
+	// PIPE-131: no cataloged model-issued tool sends the model's own bytes to
+	// a process's standard input, so this had no caller before an acceptance
+	// example's `stdin:` field and an adversarial probe's hostile input
+	// needed one. It is bounded and timed out exactly like every other part
+	// of this call -- there is no separate byte budget or deadline for it --
+	// so routing standard input through the mediated boundary opens no
+	// capability the boundary did not already have to account for.
+	Stdin string
 }
 
 // FaultInjector reports an injected fault at one named boundary.
@@ -174,6 +184,9 @@ func ExecuteAuthorizedTool(
 	command.Env = environment
 	command.Stdout = stdoutLive
 	command.Stderr = stderrLive
+	if authorized.Stdin != "" {
+		command.Stdin = strings.NewReader(authorized.Stdin)
+	}
 	prepareProcessTree(command)
 
 	// The last point before the command becomes real. A fault here must leave

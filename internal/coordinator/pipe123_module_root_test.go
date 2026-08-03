@@ -114,7 +114,8 @@ func TestPIPE123_ProducedCommandsReportsANonRootModuleRelativeToIt(t *testing.T)
 		"backend/cmd/greet/main.go": "package main\n\nimport \"fmt\"\n\n" +
 			"func main() {\n\tfmt.Println(\"hi\")\n}\n",
 	})
-	commands, err := producedCommands(t.Context(), worktree, "")
+	execution := &AgentExecution{}
+	commands, err := execution.producedCommands(t.Context(), worktree, "")
 	if err != nil {
 		t.Fatalf("producedCommands: %v", err)
 	}

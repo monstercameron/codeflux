@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-092
+Date: 2026-08-02
+Status: One closed, two partial and left open on purpose
+Change-ID: CL-20260802-082
+Commit: pending
+Request-or-TODO: PIPE-131, PIPE-132, PIPE-133
+Goal: Stop repository code running with the coordinator's authority
+Assumptions: Routing through the mediated executor is the whole of PIPE-131 and
+  only part of PIPE-132 -- checked against the ticket text rather than assumed
+Decisions: Used a synthetic per-call identity instead of the run's real task and
+  policy. Verification is a decision the coordinator makes about the model's
+  output; borrowing the model's own grant would let the thing being checked
+  widen the check.
+  Kept the four public stage signatures unchanged so no call site in another
+  lane's files had to move mid-wave.
+  Left ResolveExecutableIdentity's unconditional binary hashing alone. It is the
+  dominant per-call cost and it is shared by every mediated command in the
+  repository, so narrowing it here would be a repository-wide security change
+  smuggled in under a stage ticket
+Files-or-schemas: agent_acceptance.go, agent_acceptance_named_test_form.go,
+  agent_adversarial.go, agent_stage_mutation.go, a new
+  agent_verification_exec.go, internal/executor/command.go, a new
+  pipe131_mediation_test.go
+Validation: Three per-call-site discrimination tests, the launch-directory
+  refusal with its unmediated counter-proof, and the three-way abuse case
+Failures-or-discarded-approaches: None discarded. The cost figure came from
+  actually reverting the mutation call sites to raw exec.Command, timing, and
+  restoring them, rather than from reasoning about the overhead
+Known-limitations: A launched process is not confined. It can reach the network
+  and write anywhere the user can. That is the gap between a credential that
+  cannot be stolen and repository code that cannot do harm
+Next-safe-step: PIPE-132a -- a job object with restricted rights, or comparable
+  per-process confinement -- which is what PIPE-133a then has something to assert
+
 Dev-Log: DL-20260802-091
 Date: 2026-08-02
 Status: Five closed; one marker deliberately left standing

@@ -7,10 +7,19 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+)
+
+// mutationBuildTimeout and mutationSuiteTimeout bound the mediated build and
+// test-suite commands checkMutations runs once per sampled mutant. The
+// suite gets the longer budget because a repository's full `go test ./...`
+// legitimately takes far longer than compiling it.
+const (
+	mutationBuildTimeout = 5 * time.Minute
+	mutationSuiteTimeout = 10 * time.Minute
 )
 
 // operatorMutationRule names the replacement token and the plain-language
@@ -365,20 +374,37 @@ func firstAttributedLine(
 // only an exit code, and today's score conflates them. Checking the build in
 // isolation first is what lets checkMutations tell "never ran" apart from
 // "ran and survived."
+//
+// PIPE-131: mediated rather than a direct exec.CommandContext call. This
+// runs against a worktree that, moments earlier, checkMutations spliced a
+// deliberately broken operator into -- the build itself is trusted (it is
+// this package's own fixed argument array), but a mutated build can still
+// trigger arbitrary compiler-directive or generated-code paths in a
+// repository this run does not control the contents of, and the tests this
+// step's sibling runs next are unreviewed repository code by definition.
 func (execution *AgentExecution) worktreeBuilds(ctx context.Context, worktree string) bool {
-	command := exec.CommandContext(ctx, "go", "build", "./...")
-	command.Dir = worktree
-	_, err := command.CombinedOutput()
-	return err == nil
+	result, err := execution.runMediatedVerificationCommand(
+		ctx, worktree, worktree, "mutation-build",
+		[]string{"go", "build", "./..."}, "",
+		mutationBuildTimeout, goToolchainEnvironmentNames)
+	return err == nil && result.Succeeded
 }
 
 // suiteRejects reports whether the repository's tests fail as they stand.
+//
+// PIPE-131: mediated rather than a direct exec.CommandContext call. This is
+// the one call in this file that runs repository test code directly --
+// every TestMain, every init, every test function in the module -- against
+// a worktree currently holding a deliberately introduced defect, so it gets
+// the same minimal, credential-scrubbed environment every mediated
+// subprocess gets rather than this coordinator's own full environment.
 func (execution *AgentExecution) suiteRejects(
 	ctx context.Context,
 	worktree string,
 ) bool {
-	command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
-	command.Dir = worktree
-	_, err := command.CombinedOutput()
-	return err != nil
+	result, err := execution.runMediatedVerificationCommand(
+		ctx, worktree, worktree, "mutation-suite",
+		[]string{"go", "test", "-count=1", "./..."}, "",
+		mutationSuiteTimeout, goToolchainEnvironmentNames)
+	return err != nil || !result.Succeeded
 }

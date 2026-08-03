@@ -14,6 +14,19 @@ import (
 	"time"
 )
 
+// producedCommandsListTimeout bounds the mediated `go list` this package
+// uses to find the run's own runnable packages.
+const producedCommandsListTimeout = 2 * time.Minute
+
+// adversarialBuildTimeout bounds a mediated build of one produced command
+// before it is probed.
+const adversarialBuildTimeout = 5 * time.Minute
+
+// adversarialProbeTimeout bounds one mediated hostile run of a built
+// program, matching the fixed 10s budget every hostile input got before
+// PIPE-131.
+const adversarialProbeTimeout = 10 * time.Second
+
 // hostileRun is one way of using a program that nobody intended.
 type hostileRun struct {
 	name      string
@@ -50,7 +63,7 @@ func (execution *AgentExecution) probeProducedCommands(
 ) (findings []string, probed int, err error) {
 	// The adversarial probe has no example set to read a tags: value from, so
 	// it probes only what builds under the default constraints.
-	commands, err := producedCommands(ctx, worktree, "")
+	commands, err := execution.producedCommands(ctx, worktree, "")
 	if err != nil {
 		return nil, 0, err
 	}
@@ -69,42 +82,58 @@ func (execution *AgentExecution) probeProducedCommands(
 
 	for _, command := range commands {
 		binary := filepath.Join(binaries, builtBinaryName(filepath.Base(command)))
-		build := exec.CommandContext(ctx, "go", "build", "-o", binary, command)
-		build.Dir = moduleRoot
-		if output, buildErr := build.CombinedOutput(); buildErr != nil {
+		// PIPE-131: mediated rather than a direct exec.CommandContext call.
+		// The build itself names only this package's own fixed arguments and
+		// the run's own module; it is what runs next, probeOneCommand, that
+		// matters most, but every subprocess this stage starts now goes
+		// through the one audited path.
+		buildResult, buildErr := execution.runMediatedVerificationCommand(
+			ctx, worktree, moduleRoot, "adversarial-build",
+			[]string{"go", "build", "-o", binary, command}, "",
+			adversarialBuildTimeout, goToolchainEnvironmentNames)
+		if buildErr != nil || !buildResult.Succeeded {
+			text := buildResult.Combined
+			if buildErr != nil {
+				text = buildErr.Error()
+			}
 			findings = append(findings, fmt.Sprintf(
 				"%s: does not build on its own: %s", command,
-				strings.TrimSpace(string(output))))
+				strings.TrimSpace(text)))
 			continue
 		}
 		probed++
-		findings = append(findings, probeOneCommand(ctx, command, binary)...)
+		findings = append(findings,
+			execution.probeOneCommand(ctx, worktree, command, binary)...)
 	}
 	return findings, probed, nil
 }
 
 // probeOneCommand runs one built program against every hostile input.
-func probeOneCommand(
+//
+// PIPE-131: the program being probed here is, on a real repository, code
+// this run never wrote -- the adversarial stage builds and probes every
+// produced command, and hostileRuns' arguments and standard input are fixed
+// strings this package chose, but the program consuming them is whatever
+// the repository's own main does with them. Routing the run through the
+// mediated boundary gives it the minimal, credential-scrubbed environment
+// and the worktree-confined launch directory every mediated command gets,
+// in place of the coordinator's full, unfiltered environment and whatever
+// directory the coordinator process itself happened to be running from.
+func (execution *AgentExecution) probeOneCommand(
 	ctx context.Context,
+	worktree string,
 	name string,
 	binary string,
 ) []string {
 	var findings []string
 	for _, hostile := range hostileRuns {
-		deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
-		run := exec.CommandContext(deadline, binary, hostile.arguments...)
-		if hostile.stdin != "" {
-			run.Stdin = strings.NewReader(hostile.stdin)
-		}
-		output, err := run.CombinedOutput()
-		timedOut := deadline.Err() != nil
-		cancel()
+		arguments := append([]string{binary}, hostile.arguments...)
+		result, err := execution.runMediatedVerificationCommand(
+			ctx, worktree, worktree, "adversarial-probe", arguments,
+			hostile.stdin, adversarialProbeTimeout, nil)
 
 		switch {
-		case timedOut:
-			findings = append(findings, fmt.Sprintf(
-				"%s given %s: did not terminate within 10s", name, hostile.name))
-		case couldNotStart(err):
+		case err != nil && couldNotStart(err):
 			// A binary that will not start has not survived anything. This was
 			// falling through to the silent-success arm, so a probe that never
 			// executed one instruction of the program reported that it
@@ -114,10 +143,17 @@ func probeOneCommand(
 			findings = append(findings, fmt.Sprintf(
 				"%s could not be started at all, so nothing was probed: %v",
 				name, err))
-		case strings.Contains(string(output), "panic:"):
+		case err != nil:
+			findings = append(findings, fmt.Sprintf(
+				"%s given %s: could not be run: %v", name, hostile.name, err))
+		case result.TimedOut:
+			findings = append(findings, fmt.Sprintf(
+				"%s given %s: did not terminate within %s",
+				name, hostile.name, adversarialProbeTimeout))
+		case strings.Contains(result.Combined, "panic:"):
 			findings = append(findings, fmt.Sprintf(
 				"%s given %s: panicked", name, hostile.name))
-		case err == nil && strings.TrimSpace(string(output)) == "":
+		case result.Succeeded && strings.TrimSpace(result.Combined) == "":
 			// Nothing printed and a zero exit. A caller cannot tell this apart
 			// from having done the job, which is the whole problem: the
 			// program's silence is indistinguishable from success.
@@ -137,7 +173,9 @@ func probeOneCommand(
 // internal/, so every check built on this list quietly probed nothing and
 // reported that there was nothing to probe. It also counted a cmd/
 // subdirectory holding a library as a command, which then failed to build.
-func producedCommands(ctx context.Context, worktree string, tags string) ([]string, error) {
+func (execution *AgentExecution) producedCommands(
+	ctx context.Context, worktree string, tags string,
+) ([]string, error) {
 	// Which directories this run actually wrote in. Asking the toolchain for
 	// every main package in the module finds the ones that were already there,
 	// and a repository that ships a placeholder main is the ordinary case
@@ -166,7 +204,7 @@ func producedCommands(ctx context.Context, worktree string, tags string) ([]stri
 	if err != nil {
 		return nil, err
 	}
-	listArguments := []string{"list", "-f", "{{if eq .Name \"main\"}}{{.Dir}}{{end}}"}
+	listArguments := []string{"go", "list", "-f", "{{if eq .Name \"main\"}}{{.Dir}}{{end}}"}
 	if tags != "" {
 		// A command guarded by a build tag (PIPE-123) is not a main package
 		// under the default constraints at all, so it would otherwise never
@@ -176,15 +214,23 @@ func producedCommands(ctx context.Context, worktree string, tags string) ([]stri
 		listArguments = append(listArguments, "-tags", tags)
 	}
 	listArguments = append(listArguments, "./...")
-	listing := exec.CommandContext(ctx, "go", listArguments...)
-	listing.Dir = moduleRoot
-	output, err := listing.CombinedOutput()
+	// PIPE-131: mediated rather than a direct exec.CommandContext call. `go
+	// list` does not execute the packages it inspects, so this is the
+	// lowest-risk of the three calls this file makes, but it is still a
+	// subprocess this stage starts, and there is no reason to leave it as
+	// the one exception to an otherwise-mediated file.
+	result, err := execution.runMediatedVerificationCommand(
+		ctx, worktree, moduleRoot, "produced-commands-list", listArguments, "",
+		producedCommandsListTimeout, goToolchainEnvironmentNames)
 	if err != nil {
+		return nil, fmt.Errorf("the runnable packages could not be listed: %v", err)
+	}
+	if !result.Succeeded {
 		return nil, fmt.Errorf("the runnable packages could not be listed: %s",
-			strings.TrimSpace(string(output)))
+			strings.TrimSpace(result.Combined))
 	}
 	var commands []string
-	for _, line := range strings.Split(string(output), "\n") {
+	for _, line := range strings.Split(result.Combined, "\n") {
 		directory := strings.TrimSpace(line)
 		if directory == "" {
 			continue
