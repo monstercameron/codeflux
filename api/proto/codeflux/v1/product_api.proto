@@ -637,6 +637,76 @@ message OpenInEditorResponse {
   SafePath path = 2;
 }
 
+// PipelineStageService reads the pipeline stage ledger one task attempt
+// produced: internal/coordinator's own record of how far the delivery flow
+// actually got, stage by stage, distinct from the generic SessionEvent
+// stream that reports live plan/tool/approval activity but carries no stage
+// number or per-stage timing (PIPE-006b).
+//
+// It is a plain on-demand read rather than a durable session event. The
+// ledger's rows are immutable and already fully written by the time a caller
+// could subscribe to them -- RecordPipelineStageResult persists a stage before
+// this surface could ever announce it -- and they are addressed by task and
+// attempt rather than delivered in a live per-session order, which matches
+// the pull-based GetDiffSummary/GetValidationReport/GetEvidenceReport shape
+// in this file rather than SessionEvent's push-based one. A live progress
+// view of a run in flight is a different concern, already served by the
+// existing tool/plan session events; this surface is the retrospective,
+// evidence-grade record a review or audit reads afterward.
+service PipelineStageService {
+  // ListPipelineStages returns one task attempt's recorded flow, in stage
+  // order. The result is bounded by the flow's own fixed, schema-enforced
+  // length; it is not paginated.
+  rpc ListPipelineStages(ListPipelineStagesRequest) returns (ListPipelineStagesResponse);
+}
+
+// PipelineStageView is one recorded stage of the delivery flow: its position,
+// its name, its verdict, and how long it took to reach.
+//
+// It intentionally does not carry the stage's gate text or evidence payload;
+// this surface answers "how far did this attempt get and how long did each
+// stage take", not "what did each stage produce".
+message PipelineStageView {
+  // stage_number is the stage's position in the flow. It is not the stage's
+  // identity -- inserting a stage shifts every number after it -- so a reader
+  // comparing stages across product versions should match on stage_name.
+  uint32 stage_number = 1;
+  string stage_name = 2;
+  // state is one of "satisfied", "failed", "skipped", "blocked", or
+  // "not-implemented".
+  string state = 3;
+  // finished_at is when this stage was recorded. It is always known: every
+  // recorded stage has a finish time, tracked or not.
+  google.protobuf.Timestamp finished_at = 4;
+  // elapsed_measured reports whether this stage's start was actually tracked.
+  // A stage recorded with no tracked start reports its finish time as its
+  // start too, which is indistinguishable from a genuinely instantaneous
+  // stage unless this flag travels with elapsed. A client must not read a
+  // zero elapsed as "instant" when this is false.
+  bool elapsed_measured = 5;
+  // elapsed is the wall-clock span from the previous stage's own record to
+  // this one -- not this stage's own processing time, and not meaningful
+  // concurrently with a future pipeline that runs stages in parallel. It is
+  // meaningful only when elapsed_measured is true; a client must not display
+  // it otherwise.
+  google.protobuf.Duration elapsed = 6;
+}
+
+message ListPipelineStagesRequest {
+  StableIdentity task_id = 1;
+  // attempt selects one run's ledger. Zero selects attempt one, matching
+  // storage.ListPipelineStages's own default; this request does not resolve
+  // "the latest attempt" on a caller's behalf.
+  uint64 attempt = 2;
+}
+
+message ListPipelineStagesResponse {
+  repeated PipelineStageView stages = 1;
+  // attempt echoes the attempt the stages were actually read for, so a caller
+  // that sent zero can see which attempt it got.
+  uint64 attempt = 2;
+}
+
 // MemoryService reads governed project memory.
 //
 // The surface is read-only. Memory artifacts are created by the coordinator

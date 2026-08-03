@@ -609,6 +609,18 @@ func StartApplication(
 	if err != nil {
 		return nil, err
 	}
+	// The pipeline stage ledger was written by every run and readable by
+	// nothing outside internal/coordinator: no RPC and no session-event kind
+	// exposed a stage's number, name, state, or timing, so the flow's
+	// per-stage verdicts were invisible to any interface (PIPE-006b).
+	pipelineStages, err := NewPipelineStageReadService(repositories)
+	if err != nil {
+		return nil, err
+	}
+	pipelineStageService, err := transport.NewPipelineStageService(pipelineStages)
+	if err != nil {
+		return nil, err
+	}
 	application.taskServer = grpc.NewServer(
 		grpc.UnaryInterceptor(
 			application.transport.UnaryInterceptor(),
@@ -627,6 +639,7 @@ func StartApplication(
 	codefluxv1.RegisterGraphServiceServer(application.taskServer, graphService)
 	codefluxv1.RegisterReviewServiceServer(application.taskServer, reviewService)
 	codefluxv1.RegisterMemoryServiceServer(application.taskServer, memoryService)
+	codefluxv1.RegisterPipelineStageServiceServer(application.taskServer, pipelineStageService)
 	// The workspace service was declared in the API and never registered, so
 	// every call to it returned Unimplemented: the repository picker, the
 	// workspace state, and the inspection surface were all unreachable against

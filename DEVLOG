@@ -25,6 +25,45 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-074
+Date: 2026-08-02
+Status: Read path landed; PIPE-006a and PIPE-044 unblocked
+Change-ID: CL-20260802-064
+Commit: pending
+Request-or-TODO: PIPE-006b
+Goal: Give the pipeline stage ledger a reader
+Assumptions: Evidence nobody can read is not evidence
+Decisions: Chose an RPC over a session event on the shape of the data rather
+  than on convenience -- immutable rows, already durable, addressed by task and
+  attempt, read retrospectively by a reviewer rather than watched live. Live
+  progress is a real but different concern that the existing tool and plan
+  events already serve.
+  Added an explicit elapsed_measured bit instead of inferring it. Inference from
+  timestamp equality is exactly wrong here: a stage that genuinely took zero
+  microseconds and a stage whose start was never tracked are indistinguishable
+  that way, and the ledger's whole purpose is to not overstate what it knows.
+  Decided the bit at write time, since that is the only point that knows why the
+  timestamps match.
+  Left elapsed unset rather than zero on the wire when unmeasured, so a client
+  reading only that field cannot quietly treat "not measured" as "instant".
+  Named the field elapsed rather than duration, matching TaskView.elapsed, and
+  documented at the proto that it is wall clock from the previous stage's record
+  rather than the check's own processing time
+Files-or-schemas: api/proto and its regenerated output,
+  internal/storage/pipeline_stage_repository.go and a new test,
+  migrations/000036_pipeline_stage_elapsed_measured.sql,
+  internal/transport/pipeline_stage_service.go and test,
+  internal/coordinator/pipeline_stage_reader.go and test, application.go
+Validation: build, gofmt, generate-check, migration-check, the storage package
+  in full, the transport package, a SQLite end-to-end gRPC test, TestAUDIT008,
+  and lint -- all clean
+Failures-or-discarded-approaches: The session-event design, above. Also rejected
+  inferring measured-ness in the transport layer, which would have put the
+  judgement furthest from the knowledge
+Known-limitations: No latest-attempt resolution, deliberately
+Next-safe-step: PIPE-006a can render this, once PIPE-042 supplies the skip ratio
+  PIPE-044 needs
+
 Dev-Log: DL-20260802-073
 Date: 2026-08-02
 Status: Closing at the decision site

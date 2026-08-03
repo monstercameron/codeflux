@@ -1783,6 +1783,148 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	PipelineStageService_ListPipelineStages_FullMethodName = "/codeflux.v1.PipelineStageService/ListPipelineStages"
+)
+
+// PipelineStageServiceClient is the client API for PipelineStageService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// PipelineStageService reads the pipeline stage ledger one task attempt
+// produced: internal/coordinator's own record of how far the delivery flow
+// actually got, stage by stage, distinct from the generic SessionEvent
+// stream that reports live plan/tool/approval activity but carries no stage
+// number or per-stage timing (PIPE-006b).
+//
+// It is a plain on-demand read rather than a durable session event. The
+// ledger's rows are immutable and already fully written by the time a caller
+// could subscribe to them -- RecordPipelineStageResult persists a stage before
+// this surface could ever announce it -- and they are addressed by task and
+// attempt rather than delivered in a live per-session order, which matches
+// the pull-based GetDiffSummary/GetValidationReport/GetEvidenceReport shape
+// in this file rather than SessionEvent's push-based one. A live progress
+// view of a run in flight is a different concern, already served by the
+// existing tool/plan session events; this surface is the retrospective,
+// evidence-grade record a review or audit reads afterward.
+type PipelineStageServiceClient interface {
+	// ListPipelineStages returns one task attempt's recorded flow, in stage
+	// order. The result is bounded by the flow's own fixed, schema-enforced
+	// length; it is not paginated.
+	ListPipelineStages(ctx context.Context, in *ListPipelineStagesRequest, opts ...grpc.CallOption) (*ListPipelineStagesResponse, error)
+}
+
+type pipelineStageServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPipelineStageServiceClient(cc grpc.ClientConnInterface) PipelineStageServiceClient {
+	return &pipelineStageServiceClient{cc}
+}
+
+func (c *pipelineStageServiceClient) ListPipelineStages(ctx context.Context, in *ListPipelineStagesRequest, opts ...grpc.CallOption) (*ListPipelineStagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPipelineStagesResponse)
+	err := c.cc.Invoke(ctx, PipelineStageService_ListPipelineStages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PipelineStageServiceServer is the server API for PipelineStageService service.
+// All implementations must embed UnimplementedPipelineStageServiceServer
+// for forward compatibility.
+//
+// PipelineStageService reads the pipeline stage ledger one task attempt
+// produced: internal/coordinator's own record of how far the delivery flow
+// actually got, stage by stage, distinct from the generic SessionEvent
+// stream that reports live plan/tool/approval activity but carries no stage
+// number or per-stage timing (PIPE-006b).
+//
+// It is a plain on-demand read rather than a durable session event. The
+// ledger's rows are immutable and already fully written by the time a caller
+// could subscribe to them -- RecordPipelineStageResult persists a stage before
+// this surface could ever announce it -- and they are addressed by task and
+// attempt rather than delivered in a live per-session order, which matches
+// the pull-based GetDiffSummary/GetValidationReport/GetEvidenceReport shape
+// in this file rather than SessionEvent's push-based one. A live progress
+// view of a run in flight is a different concern, already served by the
+// existing tool/plan session events; this surface is the retrospective,
+// evidence-grade record a review or audit reads afterward.
+type PipelineStageServiceServer interface {
+	// ListPipelineStages returns one task attempt's recorded flow, in stage
+	// order. The result is bounded by the flow's own fixed, schema-enforced
+	// length; it is not paginated.
+	ListPipelineStages(context.Context, *ListPipelineStagesRequest) (*ListPipelineStagesResponse, error)
+	mustEmbedUnimplementedPipelineStageServiceServer()
+}
+
+// UnimplementedPipelineStageServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPipelineStageServiceServer struct{}
+
+func (UnimplementedPipelineStageServiceServer) ListPipelineStages(context.Context, *ListPipelineStagesRequest) (*ListPipelineStagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPipelineStages not implemented")
+}
+func (UnimplementedPipelineStageServiceServer) mustEmbedUnimplementedPipelineStageServiceServer() {}
+func (UnimplementedPipelineStageServiceServer) testEmbeddedByValue()                              {}
+
+// UnsafePipelineStageServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PipelineStageServiceServer will
+// result in compilation errors.
+type UnsafePipelineStageServiceServer interface {
+	mustEmbedUnimplementedPipelineStageServiceServer()
+}
+
+func RegisterPipelineStageServiceServer(s grpc.ServiceRegistrar, srv PipelineStageServiceServer) {
+	// If the following call panics, it indicates UnimplementedPipelineStageServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PipelineStageService_ServiceDesc, srv)
+}
+
+func _PipelineStageService_ListPipelineStages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPipelineStagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PipelineStageServiceServer).ListPipelineStages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PipelineStageService_ListPipelineStages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PipelineStageServiceServer).ListPipelineStages(ctx, req.(*ListPipelineStagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PipelineStageService_ServiceDesc is the grpc.ServiceDesc for PipelineStageService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PipelineStageService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "codeflux.v1.PipelineStageService",
+	HandlerType: (*PipelineStageServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListPipelineStages",
+			Handler:    _PipelineStageService_ListPipelineStages_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "codeflux/v1/product_api.proto",
+}
+
+const (
 	MemoryService_ListMemoryArtifacts_FullMethodName = "/codeflux.v1.MemoryService/ListMemoryArtifacts"
 	MemoryService_GetMemoryArtifact_FullMethodName   = "/codeflux.v1.MemoryService/GetMemoryArtifact"
 )

@@ -42,6 +42,43 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-064
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- the pipeline stage ledger becomes readable
+Request-or-TODO: PIPE-006b
+Outcome: PipelineStageService.ListPipelineStages exposes one task attempt's
+  recorded flow -- stage number, name, verdict, and elapsed timing with an
+  explicit measured signal. Nothing outside internal/coordinator could read
+  pipeline_stage_records before this, so the evidence the whole Pipeline
+  Refinement milestone produces had no reader at all.
+  An RPC rather than a durable session event: the rows are immutable and fully
+  written before any interface could announce them, they are addressed by task
+  and attempt rather than delivered in one session's live order, and the session
+  snapshot is correctness-bearing base state rather than a stage-by-stage audit
+  trail. An event would have bought live per-stage animation at the cost of
+  threading a payload through every write site and multiplying session-event
+  volume by up to 38 per attempt for data already durable in SQL.
+  Migration 000036 adds elapsed_measured, because StartedAt and FinishedAt alone
+  cannot distinguish an untracked start from a genuinely instant stage -- both
+  store identical equal timestamps. The bit is decided once at write time, in
+  the only place that knows why the two are equal, and the handler leaves
+  elapsed unset rather than an explicit zero when unmeasured
+Affected-behavior: A new authenticated, bounded read surface. No existing
+  behavior changes
+Compatibility-or-migration: Forward migration 000036 adds one column;
+  migration-check accepts it and generate-check accepts the regenerated protobuf
+Verification: Proven to discriminate twice. Sabotaging the storage write to
+  infer measured-ness from timestamp inequality made the re-read assertion fail;
+  sabotaging the handler to always set elapsed made the wire test fail. Both
+  reverted and re-verified. A further test proves the LIMIT 128 read bound does
+  not clip a real 38-stage flow, and TestAUDIT008 confirms the new service is
+  registered and refuses an unauthenticated call
+Known-limitations: attempt=0 resolves to attempt 1, matching
+  NextPipelineAttempt's convention. There is no "latest attempt" concept
+  anywhere in the product and this surface does not invent one
+Dev-Log: DL-20260802-074
+
 Change-ID: CL-20260802-063
 Commit: pending
 Date: 2026-08-02
