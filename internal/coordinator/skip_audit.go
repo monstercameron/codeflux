@@ -177,25 +177,16 @@ func classifySkipAuditEntry(record storage.PipelineStageRecord) SkipAuditEntry {
 		Classification: SkipUnimplemented,
 		Reason:         record.DetailRedacted,
 	}
-	check, bound := pipeline.CheckFor(record.Stage)
-	if !bound {
-		return entry
-	}
-	if !check.MaySatisfy {
-		if ticket, resolved := pipeline.Section33Resolved[record.Stage]; resolved {
-			entry.Classification = SkipPrincipledDecline
-			entry.Reason = ticket + ": " + record.DetailRedacted
-		} else {
-			entry.Classification = SkipNoCheckByDesign
-			entry.Reason = "no check performs this stage by design: " + record.DetailRedacted
-		}
-		return entry
-	}
-	if record.State == pipeline.StateSkipped {
-		entry.Classification = SkipPrincipledDecline
-		if check.Unestablished != "" {
-			entry.Reason = check.Unestablished + ": " + record.DetailRedacted
-		}
+	// One implementation, shared with the browser, which recomputes this from
+	// the wire because the classification is not carried on it. Two copies
+	// drifted apart the day the second was written; see pipeline.ClassifyDecline.
+	class, ticket := pipeline.ClassifyDecline(record.Stage, record.State)
+	entry.Classification = SkipAuditClassification(class)
+	switch {
+	case ticket != "":
+		entry.Reason = ticket + ": " + record.DetailRedacted
+	case class == pipeline.DeclineNoCheckByDesign:
+		entry.Reason = "no check performs this stage by design: " + record.DetailRedacted
 	}
 	return entry
 }

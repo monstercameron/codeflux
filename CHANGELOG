@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-075
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- one classification rule instead of two
+Request-or-TODO: PIPE-042, PIPE-006a
+Outcome: pipeline.ClassifyDecline becomes the single implementation of the
+  skip-audit classification, called by the coordinator when it writes the audit
+  and by the browser when it recomputes from the wire.
+  Two copies existed for a few hours and disagreed immediately. The coordinator
+  classified a stage with no declared check as unimplemented; the browser folded
+  that case in with may-not-satisfy and answered no-check-by-design, or
+  principled-decline when the stage appeared in Section33Resolved. The same
+  ledger therefore classified differently depending on who read it -- and in the
+  direction that flatters, since a stage the flow gained without a performer
+  would have been shown to a reader as a deliberate design decision
+Affected-behavior: The browser and the coordinator now agree. The coordinator's
+  own answers are unchanged; the browser's change on the unbound case
+Compatibility-or-migration: None
+Verification: The unbound case is pinned by a test that names why it matters,
+  and a second test separates a §33-resolved decline, a by-design stage and an
+  unimplemented one
+Known-limitations: The classification is still not on the wire, so the browser
+  recomputes it from shared static tables rather than reading it. That is why
+  two implementations existed at all, and carrying it on the wire would remove
+  the need entirely
+Dev-Log: DL-20260802-085
+
 Change-ID: CL-20260802-074
 Commit: pending
 Date: 2026-08-02

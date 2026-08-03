@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-085
+Date: 2026-08-02
+Status: Rule unified; drift removed the day it appeared
+Change-ID: CL-20260802-075
+Commit: pending
+Request-or-TODO: PIPE-042, PIPE-006a
+Goal: Stop the skip-audit classification having two answers
+Assumptions: Two copies of a rule kept in step by discipline is the failure mode
+  this repository has now met four times in one session
+Decisions: Hoisted the rule into internal/pipeline rather than teaching the
+  browser to import the coordinator, which would drag SQLite into a wasm build,
+  or duplicating it more carefully. The rule is pure -- stage number, state, and
+  two static tables -- so it belongs beside the tables it reads.
+  Took the parameters as a stage number and a state rather than either caller's
+  record type, so neither side has to depend on the other's storage or wire
+  shape.
+  Returned the governing ticket separately from the class, because a reader
+  wants both: the class says what kind of gap it is, the ticket says who owns
+  closing it
+Files-or-schemas: internal/pipeline/decline.go and its test,
+  internal/coordinator/skip_audit.go, web/frontend/pipelineledger/model.go
+Validation: The unbound case is pinned with a comment explaining that a stage
+  without a performer must not read as a deliberate design decision
+Failures-or-discarded-approaches: None. The disagreement was found by reading
+  the two implementations side by side while reviewing the lane's report, not by
+  a failing test -- nothing would have caught it
+Known-limitations: The wire still does not carry the classification
+Next-safe-step: Carry it on the wire and delete the recomputation
+
 Dev-Log: DL-20260802-084
 Date: 2026-08-02
 Status: Surface built; populated state unverified in a browser
