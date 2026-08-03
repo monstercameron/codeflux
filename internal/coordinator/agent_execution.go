@@ -1000,6 +1000,16 @@ func (execution *AgentExecution) Run(
 		if held, _ := revalidateAfterWrite(ctx, scope.worktree); !held {
 			restoredFromCheckpoint = checkpoint.restore(scope.worktree)
 			if restoredFromCheckpoint {
+				// Everything the run believed about the previous tree is now
+				// about a tree that no longer exists. Clearing the flags rather
+				// than reasoning around them: a stale fact that survives a
+				// restore is indistinguishable from a current one, and the
+				// whole point of the restore is that the worktree changed.
+				narrator.ranValidation = false
+				narrator.validationFailed = false
+				narrator.filesChangedSinceValidation = false
+				narrator.lastTestFingerprint = ""
+				narrator.lastFailure = ""
 				assembled = execution.assemble(ctx, scope.worktree)
 				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 					"The last attempts left the work failing, so it was put back "+
@@ -1267,6 +1277,8 @@ func (execution *AgentExecution) Run(
 	report := terminalReport(terminalFacts{
 		status:           string(finished.TaskState),
 		reason:           finished.Reason,
+		floorHeld:        compiles && verified,
+		gatesHeld:        clean,
 		verifiedRevision: checkpoint.digest,
 		verifiedBecause:  checkpoint.reason,
 		currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
@@ -1997,8 +2009,18 @@ func providerOutcomeOf(err error) string {
 
 // terminalFacts is everything a reader needs to know how a run ended.
 type terminalFacts struct {
-	status                string
-	reason                string
+	status string
+	reason string
+	// floorHeld, gatesHeld and currentIsVerified are three separate questions
+	// that one boolean used to answer badly.
+	//
+	// Does the tree that exists now build, pass its tests and do what was
+	// asked; did every required gate hold; and is this tree the one the
+	// checkpoint verified. Rung 5 restored a verified revision and then
+	// reported "the work was never verified" — true of the gates, false of the
+	// tree, and stated as though it were both.
+	floorHeld             bool
+	gatesHeld             bool
 	verifiedRevision      string
 	verifiedBecause       string
 	currentIsVerified     bool
@@ -2040,6 +2062,28 @@ func terminalReport(facts terminalFacts) string {
 		fmt.Fprintf(&report, " — %s", facts.reason)
 	}
 	report.WriteString(".\n")
+	// Three facts, stated separately, because one boolean answered them badly.
+	//
+	// Whether the tree that exists now passes the completion floor, whether
+	// every required gate held, and whether this tree is the one the checkpoint
+	// verified are three different questions. Rung 5 restored a verified
+	// revision and reported "the work was never verified" — true of the gates,
+	// false of the tree, and said as though it were both.
+	switch {
+	case facts.floorHeld:
+		report.WriteString(
+			"The worktree builds, passes its tests, and reproduces the " +
+				"acceptance examples.\n")
+	case facts.verifiedRevision != "":
+		report.WriteString(
+			"The worktree does not currently pass the completion floor, " +
+				"though a revision of this work did.\n")
+	}
+	if !facts.gatesHeld {
+		report.WriteString(
+			"Not every required gate held; what is outstanding is listed " +
+				"below.\n")
+	}
 	if facts.verifiedRevision == "" {
 		report.WriteString(
 			"No revision of this work was ever verified, so there is nothing " +

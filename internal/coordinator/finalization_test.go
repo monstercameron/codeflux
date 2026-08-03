@@ -118,3 +118,28 @@ func TestTheTerminalRecordDoesNotContradictItself(t *testing.T) {
 		t.Errorf("a run with nothing verified did not say so:\n%s", empty)
 	}
 }
+
+// TestTheRecordSeparatesTheThreeFacts covers the distinction rung 5 collapsed:
+// whether the tree passes the floor, whether every gate held, and whether the
+// tree is the verified one are three questions, not one.
+func TestTheRecordSeparatesTheThreeFacts(t *testing.T) {
+	restored := terminalReport(terminalFacts{
+		status:            "failed",
+		reason:            "a stage the flow requires did not hold",
+		floorHeld:         true,
+		gatesHeld:         false,
+		verifiedRevision:  "28c3375abe72",
+		verifiedBecause:   "compiled, tests passed, acceptance matched",
+		currentIsVerified: true,
+		unresolved:        "3 case(s) untried",
+	})
+	if !strings.Contains(restored, "builds, passes its tests") {
+		t.Errorf("a tree that passes the floor was not said to:\n%s", restored)
+	}
+	if !strings.Contains(restored, "Not every required gate held") {
+		t.Errorf("outstanding gates were not reported:\n%s", restored)
+	}
+	if strings.Contains(restored, "No revision of this work was ever verified") {
+		t.Errorf("a restored verified revision was reported as none:\n%s", restored)
+	}
+}

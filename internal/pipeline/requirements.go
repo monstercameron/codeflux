@@ -183,10 +183,24 @@ var Requirements = []Requirement{
 	// Phase C — molecules.
 
 	{StageCompositionObligations, []Number{
-		// A composition's obligations are stated over finished parts. The
-		// atom phase is not finished until its atoms are documented, which is
-		// the phase boundary phases.go already draws.
-		StageAtomDocumentation,
+		// A composition's obligations are stated over finished parts, and what
+		// makes a part finished is that it is verified — not that it is
+		// documented.
+		//
+		// This required StageAtomDocumentation, on the reasoning that the atom
+		// phase ends where phases.go draws it. That was true while
+		// documentation was asked of the model during the run. It is now
+		// derived from measured facts after verification, and it is advisory:
+		// a coverage percentage and a registry row do not make a program
+		// correct. Leaving the edge in place meant an advisory stage blocked
+		// four hard ones — composition obligations, molecule tests, molecules,
+		// and molecule verification — so a run with a perfectly good
+		// composition was told nothing about it because a comment was missing.
+		//
+		// A hard gate may not depend on an advisory one. The dependency that
+		// survives is the real one: obligations are stated over atoms that
+		// have been shown to work.
+		StageAtomVerification,
 	}},
 
 	{StageMoleculeTests, []Number{

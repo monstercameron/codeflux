@@ -50,6 +50,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-123
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a restore is honest, and an advisory stage stops gating hard ones
+Request-or-TODO: Rung 5 trace analysis, 2026-08-03, items 1 to 3
+Outcome: A restore now clears everything the run believed about the tree it
+  replaced -- whether validation ran, whether it failed, whether files moved
+  since, the last suite fingerprint, the last failure -- rather than reasoning
+  around stale flags. A stale fact that survives a restore is
+  indistinguishable from a current one, and the whole point of the restore is
+  that the worktree changed.
+  The terminal record states three facts separately where one boolean used to
+  answer all three badly: whether the tree that exists now passes the
+  completion floor, whether every required gate held, and whether this tree is
+  the one the checkpoint verified. Rung 5 restored a verified revision and
+  reported "the work was never verified" -- true of the gates, false of the
+  tree, and said as though it were both.
+  A hard stage may no longer depend on an advisory one. Composition
+  obligations required atom documentation, which was reasonable while
+  documentation was asked of the model during the run and is not now that it
+  is derived after verification and classified advisory. The edge blocked four
+  hard stages -- composition obligations, molecule tests, molecules, molecule
+  verification -- so a run with a perfectly good composition was told nothing
+  about it because a comment was missing. The dependency that survives is the
+  real one: obligations are stated over atoms shown to work.
+Verification: Build, vet, gofmt, the finalization suite and the pipeline suite
+Dev-Log: DL-20260803-133
+
 Change-ID: CL-20260803-122
 Commit: pending
 Date: 2026-08-03

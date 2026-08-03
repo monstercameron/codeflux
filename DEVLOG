@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-133
+Date: 2026-08-03
+Status: The three rung-5 blockers are closed; rung 5 is being rerun
+Change-ID: CL-20260803-123
+Commit: pending
+Request-or-TODO: The rung 5 trace analysis, items 1 to 3
+Goal: Make a restored run's record true, and stop enhancements gating
+  correctness
+Decisions: Cleared the narrator's validation state on restore rather than
+  adding a condition to each reader. Every reader would have needed the same
+  condition, and the one that was forgotten is the one that lies.
+  Kept the atom-documentation prerequisite for atom-registration. Advisory
+  depending on advisory is fine; the rule is that hard must not depend on
+  advisory.
+  Stated the three facts as three lines rather than choosing a better single
+  status. A single status has to pick which of the three to be about, and the
+  reader needs all three
+Files-or-schemas: agent_execution.go, internal/pipeline/requirements.go,
+  finalization_test.go
+Validation: Build, vet, gofmt, coordinator finalization tests, pipeline suite
+Failures-or-discarded-approaches: None
+Known-limitations: Items 4 to 10 of the analysis remain: evidence-bundle
+  counting, cyclic regression detection, best-checkpoint ranking, acceptance
+  carried into every sendback, whole-file rewrite protection, identical-edit
+  rejection, and hard terminal gates surfaced in-loop
+Next-safe-step: Rung 5 again, watching for a restored run that reaches
+  awaiting-review and a composition phase that is no longer blocked
+
 Dev-Log: DL-20260803-132
 Date: 2026-08-03
 Status: Rung 5 passes; its record now agrees with itself
