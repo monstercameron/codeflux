@@ -1381,6 +1381,8 @@ const FunctionalStyleDirective = `Write in a functional style.
 - Prefer returning new values to mutating existing ones. Build and return a result rather than filling in a variable declared above.
 - Carry failure as a value that flows through the computation and is handled at the edge. Never discard an error, and never let a failure exit silently.
 - Compose the pipeline out of those functions rather than inlining the steps into one body.
+- Give the program a testable seam and test that, not main. Put the work in a function taking an io.Reader and an io.Writer and returning an error, and let main do nothing but wire os.Stdin, os.Stdout and os.Args to it and report failure. Tests then pass a strings.Reader and a bytes.Buffer, which cannot deadlock.
+- Never reassign os.Stdin or os.Stdout in a test. Swapping them for an os.Pipe and then reading to EOF blocks forever unless the write end is closed first, and a deferred close runs too late — that is a hang, not a failure, and it stops the run rather than reporting anything. The built program is already run against the acceptance examples, so a test never needs to fake standard input.
 - This is a house style, not a licence to invent machinery: use plain Go, and do not add abstractions the task does not need.`
 
 // validationDetail says what the run's own verification actually did.
