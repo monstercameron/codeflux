@@ -50,6 +50,49 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-090
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- an admission point with backpressure, and the caller it lacks
+Request-or-TODO: PIPE-066, PIPE-067, PIPE-068, PIPE-069, PIPE-070, PIPE-071
+Outcome: Model requests had no concurrency ceiling and no jitter. There is now
+  one admission point per retry executor -- a resizable semaphore wrapping every
+  physical attempt -- with a configured maximum rather than a ceiling that falls
+  out of the graph's shape, and sustained rate limiting narrows it monotonically
+  for the remainder of the run instead of retrying at full width into a limit.
+  Backoff already honoured Retry-After and grew exponentially; what it lacked
+  was jitter, which the section explicitly requires. Equal jitter over half the
+  interval is added behind an injectable source.
+  The finding that governs how to read all of this: the production model path
+  does not go through this package at all. The only implementation of the
+  model interface issues a bare http.Client.Do against the Responses API with no
+  retry, no backoff, no Retry-After handling and no admission control, and the
+  only production caller of the retry executor and the budgeted execution
+  service is the run-live smoke gate, which issues one serial request.
+  So this is real infrastructure on the port that exists, and it is not in the
+  path a real run spends money through
+Affected-behavior: None for a real run, for the reason above. The run-live gate
+  now jitters its backoff
+Compatibility-or-migration: MaximumConcurrency defaults to 4 and validates 1-64.
+  One pre-existing test asserting an exact sleep schedule is pinned with a fixed
+  random source and a comment rather than deleted
+Verification: The concurrency tests launch more goroutines than the ceiling and
+  assert observed peak equals it exactly -- removing the acquire takes them from
+  two to six. The rate-limit test drives a scripted 429 server with and without
+  Retry-After and asserts the schedule, the ceiling dropping by exactly one per
+  limited attempt, the ledger wording, and that no attempt records failed
+  because of a rate limit
+Known-limitations: PIPE-066, PIPE-069 and PIPE-070 stay open. The first two
+  because nothing in a real run calls the port; the third because budget
+  enforcement genuinely exists already -- a revision-CAS reservation taken
+  before execution, which does prevent two concurrent stages both believing they
+  are under the cap -- but it lives at the ledger level, and pricing and storage
+  types do not belong in a package deliberately free of both. No budget logic
+  was invented to manufacture a closure. PIPE-072 is a frontend change. Filed as
+  PIPE-066a, which is the largest gap between what this section claims and what
+  a run does
+Dev-Log: DL-20260802-100
+
 Change-ID: CL-20260802-089
 Commit: pending
 Date: 2026-08-02

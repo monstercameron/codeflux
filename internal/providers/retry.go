@@ -4,17 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strings"
 	"time"
 )
 
 const (
-	defaultMaximumProviderAttempts  = 3
-	defaultProviderRetryDelay       = 250 * time.Millisecond
-	defaultMaximumProviderBackoff   = 5 * time.Second
-	defaultMaximumProviderRetryWait = 15 * time.Second
-	defaultAttemptObserverTimeout   = 5 * time.Second
+	defaultMaximumProviderAttempts      = 3
+	defaultProviderRetryDelay           = 250 * time.Millisecond
+	defaultMaximumProviderBackoff       = 5 * time.Second
+	defaultMaximumProviderRetryWait     = 15 * time.Second
+	defaultAttemptObserverTimeout       = 5 * time.Second
+	defaultMaximumProviderConcurrency   = 4
+	maximumSupportedProviderConcurrency = 64
 )
 
 var (
@@ -30,8 +33,18 @@ type RetryPolicy struct {
 	MaximumBackoff        time.Duration
 	MaximumCumulativeWait time.Duration
 	ObserverTimeout       time.Duration
-	Now                   func() time.Time
-	Sleep                 func(context.Context, time.Duration) error
+	// MaximumConcurrency is the configured ceiling on physical provider
+	// requests in flight at once through this executor's single admission
+	// point. It defaults to defaultMaximumProviderConcurrency rather than to
+	// unbounded, so the ceiling is always a setting and never an accident of
+	// however wide the caller's own fan-out happens to be.
+	MaximumConcurrency int
+	Now                func() time.Time
+	Sleep              func(context.Context, time.Duration) error
+	// Random returns a value in [0, 1) used to jitter computed backoff delays.
+	// It is injectable so a test can assert an exact schedule; production
+	// callers leave it nil and get a real random source.
+	Random func() float64
 }
 
 // AttemptDisposition is the persisted outcome of one physical request attempt.
@@ -124,10 +137,15 @@ type RetryResult struct {
 }
 
 // RetryExecutor owns bounded retry without changing provider, model, version,
-// logical request, or idempotency identity.
+// logical request, or idempotency identity. It is also the single admission
+// point every physical attempt passes through: one *RetryExecutor holds one
+// *AdmissionController, so every caller that shares this executor instance
+// (as production does, through providerExecutionService) shares its
+// concurrency ceiling rather than each caller imposing its own.
 type RetryExecutor struct {
-	policy   RetryPolicy
-	recorder AttemptRecorder
+	policy    RetryPolicy
+	recorder  AttemptRecorder
+	admission *AdmissionController
 }
 
 // MaximumAttempts returns the normalized physical-attempt limit enforced by
@@ -138,6 +156,16 @@ func (executor *RetryExecutor) MaximumAttempts() int {
 		return 0
 	}
 	return executor.policy.MaximumAttempts
+}
+
+// ConcurrencyCeiling returns the admission point's current configured
+// maximum concurrency. It narrows under sustained rate limiting (PIPE-069)
+// and never widens back within one executor's lifetime.
+func (executor *RetryExecutor) ConcurrencyCeiling() int {
+	if executor == nil || executor.admission == nil {
+		return 0
+	}
+	return executor.admission.Ceiling()
 }
 
 // NewRetryExecutor validates a retry policy and requires an attempt recorder so
@@ -161,6 +189,9 @@ func NewRetryExecutor(
 	if policy.ObserverTimeout == 0 {
 		policy.ObserverTimeout = defaultAttemptObserverTimeout
 	}
+	if policy.MaximumConcurrency == 0 {
+		policy.MaximumConcurrency = defaultMaximumProviderConcurrency
+	}
 	switch {
 	case policy.MaximumAttempts < 1 || policy.MaximumAttempts > 10:
 		return nil, errors.New("provider maximum attempts is outside supported bounds")
@@ -176,6 +207,9 @@ func NewRetryExecutor(
 	case policy.ObserverTimeout < time.Millisecond ||
 		policy.ObserverTimeout > time.Minute:
 		return nil, errors.New("provider attempt observer timeout is outside supported bounds")
+	case policy.MaximumConcurrency < 1 ||
+		policy.MaximumConcurrency > maximumSupportedProviderConcurrency:
+		return nil, errors.New("provider maximum concurrency is outside supported bounds")
 	case recorder == nil:
 		return nil, errors.New("provider attempt recorder is required")
 	}
@@ -185,7 +219,14 @@ func NewRetryExecutor(
 	if policy.Sleep == nil {
 		policy.Sleep = sleepWithContext
 	}
-	return &RetryExecutor{policy: policy, recorder: recorder}, nil
+	if policy.Random == nil {
+		policy.Random = rand.Float64
+	}
+	admission, err := NewAdmissionController(policy.MaximumConcurrency)
+	if err != nil {
+		return nil, fmt.Errorf("build provider admission point: %w", err)
+	}
+	return &RetryExecutor{policy: policy, recorder: recorder, admission: admission}, nil
 }
 
 // Execute runs one immutable logical request with bounded, attributable
@@ -214,7 +255,17 @@ func (executor *RetryExecutor) Execute(
 		if err := executor.prepare(ctx, physical); err != nil {
 			return result, err
 		}
+		// Every physical attempt is admitted through the one shared ceiling
+		// before it reaches the provider (PIPE-066). The slot is held only for
+		// the provider call itself, not the backoff sleep that may follow, so a
+		// request backing off does not hold capacity another logical request
+		// could use.
+		release, admitErr := executor.admission.Acquire(ctx)
+		if admitErr != nil {
+			return result, fmt.Errorf("admit physical provider attempt: %w", admitErr)
+		}
 		outcome := attempt(ctx, physical)
+		release()
 		outcome = normalizeAttemptOutcome(outcome)
 		finishedAt := executor.policy.Now().UTC()
 		result.Attempts = number
@@ -227,6 +278,13 @@ func (executor *RetryExecutor) Execute(
 			result.CumulativeWait,
 			outcome,
 		)
+		// PIPE-069: a rate-limit or overload response is sustained pressure the
+		// provider itself reported, not a transient blip, so the admission
+		// point narrows for the remainder of this executor's life rather than
+		// retrying the next logical request at full width into the same limit.
+		if disposition == AttemptRetryScheduled && isProviderBackpressureFailure(outcome.Err) {
+			executor.admission.Narrow(executor.admission.Ceiling() - 1)
+		}
 		record := AttemptRecord{
 			PhysicalAttempt:    physical,
 			FinishedAt:         finishedAt,
@@ -419,7 +477,17 @@ func (executor *RetryExecutor) decide(
 	return AttemptRetryScheduled, delay, nil
 }
 
+// backoff computes the exponential base for a failed attempt and jitters it,
+// so that many logical requests failing at once do not all wake and retry on
+// the same tick and drive the provider straight back into the limit that just
+// backed them off.
 func (executor *RetryExecutor) backoff(failedAttempt int) time.Duration {
+	return executor.jitter(executor.deterministicBackoff(failedAttempt))
+}
+
+// deterministicBackoff is the pre-jitter exponential schedule: it doubles
+// from InitialDelay and saturates at MaximumBackoff.
+func (executor *RetryExecutor) deterministicBackoff(failedAttempt int) time.Duration {
 	delay := executor.policy.InitialDelay
 	for index := 1; index < failedAttempt; index++ {
 		if delay >= executor.policy.MaximumBackoff/2 {
@@ -431,6 +499,25 @@ func (executor *RetryExecutor) backoff(failedAttempt int) time.Duration {
 		return executor.policy.MaximumBackoff
 	}
 	return delay
+}
+
+// jitter applies equal jitter to base: the result is uniformly distributed
+// over [base/2, base]. Equal rather than full jitter, so a narrowed admission
+// ceiling is never chased by attempts that jittered all the way down to
+// near-zero wait and reproduced the same burst that caused the narrowing.
+func (executor *RetryExecutor) jitter(base time.Duration) time.Duration {
+	if base <= 0 {
+		return base
+	}
+	half := base / 2
+	fraction := executor.policy.Random()
+	if fraction < 0 {
+		fraction = 0
+	}
+	if fraction >= 1 {
+		fraction = 1
+	}
+	return half + time.Duration(float64(half)*fraction)
 }
 
 func (executor *RetryExecutor) prepare(
@@ -456,6 +543,16 @@ func (executor *RetryExecutor) complete(
 		return fmt.Errorf("complete physical provider attempt: %w", err)
 	}
 	return nil
+}
+
+// isProviderBackpressureFailure reports whether err is the provider itself
+// signalling it is overloaded — a 429 or an overload response — rather than
+// an ordinary transient transport failure. Only this narrower class narrows
+// the admission ceiling: a generic transport hiccup says nothing about the
+// provider's rate limit and narrowing on it would shrink concurrency for a
+// problem backoff alone already answers.
+func isProviderBackpressureFailure(err error) bool {
+	return errors.Is(err, ErrRateLimited) || errors.Is(err, ErrUnavailable)
 }
 
 func retryableProviderFailure(err error) bool {

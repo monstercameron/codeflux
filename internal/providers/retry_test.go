@@ -34,6 +34,10 @@ func TestRetryExecutorPreservesLogicalIdentityAndRecordsPhysicalAttempts(t *test
 			clock.Advance(delay)
 			return nil
 		},
+		// Jitter is exercised in its own test; pinning it to the top of its
+		// range here keeps this test's sleep schedule an exact, readable
+		// assertion against the deterministic exponential base.
+		Random: func() float64 { return 1 },
 	}, AttemptRecorderFunctions{
 		Prepare: func(_ context.Context, attempt PhysicalAttempt) error {
 			mu.Lock()

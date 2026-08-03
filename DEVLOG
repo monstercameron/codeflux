@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-100
+Date: 2026-08-02
+Status: Three closed, three open on a caller gap, one out of scope
+Change-ID: CL-20260802-090
+Commit: pending
+Request-or-TODO: PIPE-066 through PIPE-072
+Goal: Stop fan-out exceeding what a provider tolerates
+Assumptions: That the retry executor was the path a run uses -- wrong, and
+  finding out is the most useful thing this lane did
+Decisions: Reported the bypass rather than routing around it. Wiring the real
+  model through this port means editing a package outside the grant, and a lane
+  that quietly reached across ownership to make its own tickets closeable would
+  have produced a worse outcome than an accurate open ticket.
+  Did not create an internal/agentloop package to match a grant that named one.
+  It does not exist -- the real loop is internal/agent under that import alias --
+  and an empty package with no consumer is worse than a corrected grant.
+  Left PIPE-070 open rather than moving budget enforcement into the providers
+  package. The check that exists is correct and the layering that keeps pricing
+  out of this package is deliberate; relocating it to claim a ticket would trade
+  a real boundary for a checkbox.
+  Pinned the schedule-asserting test with a fixed random source instead of
+  deleting it, so the old guarantee is still guarded alongside the new jitter
+Files-or-schemas: internal/providers/retry.go, retry_test.go, new admission.go
+  and admission_test.go
+Validation: Providers suite at count=3 with no flakes; the coordinator's
+  seventeen provider-execution tests to confirm its consumer did not regress;
+  engine canary at 10.65s against a 3.8s baseline with six lanes on the machine
+  and this code not on that path
+Failures-or-discarded-approaches: None
+Known-limitations: The port has no caller in a real run
+Next-safe-step: PIPE-066a, which makes the other three enforceable
+
 Dev-Log: DL-20260802-099
 Date: 2026-08-02
 Status: Open; the seeding works and the checks do not
