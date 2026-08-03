@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-112
+Date: 2026-08-03
+Status: Two phases of the review landed; the verdict type is not yet built
+Change-ID: CL-20260803-102
+Commit: pending
+Request-or-TODO: Architectural review of the rung 5 and rung 10 traces
+Goal: Stop several places each deriving readiness and getting different answers
+Decisions: Passed the ledger's own clean answer into completion rather than
+  letting completion recompute it. The rule the review states is the one this
+  codebase was missing: a model outcome is a proposal, and only the reconciled
+  ledger may declare a run ready.
+  Made the instruction say what is known rather than go silent. An instruction
+  that omitted the suite's state entirely would have been honest and less
+  useful; the next attempt uses that context
+Files-or-schemas: agent_execution_completion.go, agent_execution.go, a new
+  validation_preamble.go and its test, three instruction builders,
+  agent_outstanding.go
+Validation: Build, vet and the preamble tests
+Failures-or-discarded-approaches: None
+Known-limitations: The typed attempt verdict and the gate priority order are
+  not built. Without them a cancelled tool is still distinguished from a failed
+  one only by the state the executor reports, not by a rule that says a
+  cancelled command cannot pass whatever its output says
+Next-safe-step: The verdict type, then rungs 3 and 4
+
 Dev-Log: DL-20260803-111
 Date: 2026-08-03
 Status: Rung 10 reached; its own program does not terminate

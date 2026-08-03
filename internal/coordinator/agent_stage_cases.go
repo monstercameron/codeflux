@@ -672,7 +672,7 @@ func describesRatherThanQuotes(shape string) bool {
 // thirty-nine cases at once writes a few and leaves the rest, and the ones it
 // leaves are not the ones it judged least important — they are the ones at the
 // bottom of a long list.
-func untriedCaseInstruction(owed map[string][]atomCase) string {
+func untriedCaseInstruction(owed map[string][]atomCase, testsPassed bool) string {
 	names := make([]string, 0, len(owed))
 	for name := range owed {
 		names = append(names, name)
@@ -681,7 +681,7 @@ func untriedCaseInstruction(owed map[string][]atomCase) string {
 
 	var instruction strings.Builder
 	instruction.WriteString(
-		"The code compiles and its tests pass, but these inputs are never " +
+		validationPreamble(testsPassed) + "these inputs are never " +
 			"tried. Each one is derived from the function's own signature, so " +
 			"every one of them is a value a caller can pass today.\n\n")
 	for _, name := range names {

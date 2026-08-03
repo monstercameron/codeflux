@@ -124,9 +124,23 @@ func (execution *AgentExecution) completeRunIfPossible(
 	steps []agentloop.PlanStep,
 	compiles bool,
 	verified bool,
+	// clean is whether every stage the flow requires actually held. It is the
+	// third of three, and it was the missing one.
+	//
+	// Readiness was reconstructed here from compiles and verified alone, while
+	// the caller had already computed whether the ledger was clean and used it
+	// to decide the delivery stages — and then did not pass it. A run with a
+	// failed or blocked required stage could therefore be moved to
+	// awaiting-review by this function while its own ledger recorded the
+	// failure, which is the run and the record disagreeing about whether the
+	// work is ready.
+	//
+	// A model outcome is a proposal. Only the reconciled ledger says a run is
+	// ready, so this takes that answer rather than deriving its own.
+	clean bool,
 ) {
 	if execution.completion == nil || execution.completionValidations == nil ||
-		execution.completionGate == nil || !compiles || !verified {
+		execution.completionGate == nil || !compiles || !verified || !clean {
 		return
 	}
 	stepIDs := make([]string, 0, len(steps))

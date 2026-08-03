@@ -93,7 +93,7 @@ func TestPIPE106_TheInstructionCapsFindingsPerKindAndDisclosesTheOmittedCount(t 
 		})
 	}
 
-	instruction := adversarialInstruction(findings)
+	instruction := adversarialInstruction(findings, true)
 	shown := 0
 	for index := 0; index < total; index++ {
 		if strings.Contains(instruction, fmt.Sprintf("untried edge number %02d", index)) {
@@ -118,7 +118,7 @@ func TestPIPE106_FewerFindingsThanTheCapAreAllShownAndNothingIsDisclosed(t *test
 	findings := []adversarialFinding{
 		{Kind: findingDefect, Where: "f", What: "one defect", Lineage: findingLineageAntiPattern},
 	}
-	instruction := adversarialInstruction(findings)
+	instruction := adversarialInstruction(findings, true)
 	if !strings.Contains(instruction, "one defect") {
 		t.Fatal("the single finding must be shown")
 	}

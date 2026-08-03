@@ -650,7 +650,9 @@ func (execution *AgentExecution) Run(
 		// adversarial review already learned: a run shown a third of the
 		// picture fixes a third of it, and the part it is not shown is the part
 		// it is free to break.
-		outstanding := execution.outstandingWork(ctx, scope, caseRounds)
+		outstanding := execution.outstandingWork(ctx, scope, caseRounds,
+			narrator.ranValidation && !narrator.validationFailed &&
+				!narrator.filesChangedSinceValidation)
 		if outstanding.any() && progress.lastAttempt() {
 			// Out of attempts with work still owed. Saying so is the whole
 			// point: the run used to fall through here and report
@@ -718,7 +720,9 @@ func (execution *AgentExecution) Run(
 				// escalated up the model ladder nor decomposed -- the one
 				// stall the rest of the loop is built to catch was invisible
 				// to it from exactly this gate.
-				sendBack("adversarial-review", adversarialInstruction(findings),
+				sendBack("adversarial-review", adversarialInstruction(findings,
+					narrator.ranValidation && !narrator.validationFailed &&
+						!narrator.filesChangedSinceValidation),
 					"a review found it weaker than it looks")
 				continue
 			}
@@ -902,7 +906,8 @@ func (execution *AgentExecution) Run(
 	// state, moves the task into awaiting-review. A run whose own validation
 	// did not pass, or whose code does not compile, is left running with the
 	// reason said above rather than completed on a weaker check.
-	execution.completeRunIfPossible(ctx, scope, taskID, runID, plan, steps, compiles, verified)
+	execution.completeRunIfPossible(
+		ctx, scope, taskID, runID, plan, steps, compiles, verified, clean)
 	return nil
 }
 

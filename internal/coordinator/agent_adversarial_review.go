@@ -658,10 +658,10 @@ const maximumFindingsPerKindInInstruction = 8
 // one and runs out of attempts. Within a kind, findings arrive pre-ranked by
 // expected defect cost (PIPE-106); this function preserves that order rather
 // than re-sorting.
-func adversarialInstruction(findings []adversarialFinding) string {
+func adversarialInstruction(findings []adversarialFinding, testsPassed bool) string {
 	var report strings.Builder
 	report.WriteString(
-		"The code compiles and its tests pass. A review found it is still " +
+		validationPreamble(testsPassed) + "a review found it is still " +
 			"weaker than it looks:\n")
 
 	grouped := map[findingKind][]adversarialFinding{}

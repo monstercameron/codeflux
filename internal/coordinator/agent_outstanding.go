@@ -46,6 +46,10 @@ func (execution *AgentExecution) outstandingWork(
 	ctx context.Context,
 	scope agentScope,
 	caseRounds int,
+	// testsPassed is whether the run's own suite is actually known to have
+	// passed. Three instruction builders used to assert that it had, whether or
+	// not anything established it — see validationPreamble.
+	testsPassed bool,
 ) outstanding {
 	var work outstanding
 	var parts []string
@@ -70,7 +74,7 @@ func (execution *AgentExecution) outstandingWork(
 			work.gate = "completeness"
 			work.because = "the work was not finished"
 		}
-		parts = append(parts, gaps.Instruction())
+		parts = append(parts, gaps.Instruction(testsPassed))
 		summaries = append(summaries, fmt.Sprintf(
 			"%d function(s) have no test, %d have no doc comment, %d are doing "+
 				"too much",
@@ -110,7 +114,7 @@ func (execution *AgentExecution) outstandingWork(
 				work.gate = "atom-case-synthesis"
 				work.because = "inputs it was meant to try were never tried"
 			}
-			parts = append(parts, untriedCaseInstruction(owed))
+			parts = append(parts, untriedCaseInstruction(owed, testsPassed))
 			summaries = append(summaries, fmt.Sprintf(
 				"%d function(s) have inputs nothing tries", len(owed)))
 			work.askedForCases = true

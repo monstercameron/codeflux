@@ -39,7 +39,7 @@ func (gaps completenessGaps) Empty() bool {
 // It names the functions rather than describing the shortfall, because an
 // agent told "improve your test coverage" will add a test somewhere, and one
 // told "neighbors and traversable have no test" will test those two.
-func (gaps completenessGaps) Instruction() string {
+func (gaps completenessGaps) Instruction(testsPassed bool) string {
 	var parts []string
 	if len(gaps.UntestedAtoms) > 0 {
 		parts = append(parts, fmt.Sprintf(
@@ -64,7 +64,7 @@ func (gaps completenessGaps) Instruction() string {
 				"behaviour identical so the existing tests still pass.",
 			strings.Join(gaps.TangledFunctions, ", ")))
 	}
-	return "The code compiles and its tests pass, but the work is not " +
+	return validationPreamble(testsPassed) + "the work is not " +
 		"finished:\n\n" + strings.Join(parts, "\n\n")
 }
 

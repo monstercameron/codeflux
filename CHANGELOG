@@ -50,6 +50,44 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-102
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the ledger decides readiness, and instructions stop asserting what
+  nobody checked
+Request-or-TODO: Architectural review of the rung 5 and rung 10 traces
+Outcome: A review of two ladder traces named one flaw behind several defects
+  this session had been fixing one at a time: many gates, and no single
+  authoritative layer reconciling them before a run is called ready. Two parts
+  of that were verifiable here and are closed.
+  Readiness was reconstructed inside completeRunIfPossible from compiles and
+  verified alone, while the caller had already computed whether the ledger was
+  clean, used it to decide the delivery stages, and then did not pass it. A run
+  with a failed or blocked required stage could therefore be moved to
+  awaiting-review by that function while its own ledger recorded the failure.
+  It now takes the ledger's answer rather than deriving its own.
+  Three instruction builders opened with the fixed words "The code compiles and
+  its tests pass, but". That is a claim, and it was made whether or not
+  anything established it. On ladder rung 10 the produced program looped
+  forever, its test run was cancelled, and the model was then told its tests
+  passed and asked to improve its coverage -- reasoning from a premise the run
+  had every reason to know was false. The preamble now states what is known:
+  compiling is established by the assembly stage and may still be said, and
+  passing is said only when it happened
+Affected-behavior: A run whose ledger is not clean no longer reaches
+  awaiting-review. An instruction whose suite was not proven says so
+Compatibility-or-migration: The three builders take the validation state
+  explicitly rather than assuming it
+Verification: Two tests on the preamble, including the control that a suite
+  which did pass is still stated plainly, because saying less when nothing is
+  known must not become saying less when something is
+Known-limitations: The review's wider proposal -- one typed attempt verdict
+  replacing scattered booleans, and a strict gate priority so a cancelled tool
+  can never be read as a failure of the code -- is not implemented. What is
+  implemented is the readiness predicate and the wording; the verdict type is
+  the right next step and is larger than one change
+Dev-Log: DL-20260803-112
+
 Change-ID: CL-20260803-101
 Commit: pending
 Date: 2026-08-03
