@@ -2,6 +2,8 @@ package coordinator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -364,8 +366,22 @@ func (engine engineFixture) request(t *testing.T, body string) domain.MessageID 
 	if _, err := engine.repositories.AppendMessage(
 		context.Background(), storage.AppendMessage{
 			ID: messageID, ThreadID: engine.threadID, Role: storage.MessageRoleUser,
-			BodyRedacted:   body,
-			IdempotencyKey: "engine-request",
+			BodyRedacted: body,
+			// Keyed on the request itself, not a constant.
+			//
+			// It was "engine-request" for every message, so the second rung of
+			// a shared ladder collided with the first: "idempotency key
+			// belongs to different message content", refused before the rung
+			// began. Shared mode is the only mode in which atoms and lessons
+			// accumulate across tasks, so the compounding-effort thesis could
+			// not be exercised at all — and the recall stage's report that the
+			// project held no earlier work was true because no second rung had
+			// ever run.
+			//
+			// Hashing the body gives idempotency its actual meaning here: the
+			// same request twice is one message, and two different requests
+			// are two.
+			IdempotencyKey: "engine-request:" + shortDigest(body),
 		},
 	); err != nil {
 		t.Fatalf("recording the request failed: %v", err)
@@ -423,4 +439,10 @@ func (engine engineFixture) narration() string {
 		return "  (nothing at all)"
 	}
 	return report.String()
+}
+
+// shortDigest is a stable identity for one request body.
+func shortDigest(body string) string {
+	sum := sha256.Sum256([]byte(body))
+	return hex.EncodeToString(sum[:8])
 }
