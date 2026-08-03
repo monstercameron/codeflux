@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-134
+Date: 2026-08-03
+Status: Refinement is transactional; the provider circuit opens on the first
+  exhausted budget
+Change-ID: CL-20260803-124
+Commit: pending
+Request-or-TODO: The rung 5 regression-stall analysis
+Goal: Stop a run destroying work it had already verified
+Decisions: Kept the failed candidate rather than deleting it. It is a
+  hypothesis that has been run, and the next attempt needs the diagnosis as
+  much as it needs the good baseline -- it previously had neither.
+  Told the run its edits were discarded, in the instruction. A run that finds
+  files it does not recognise and no explanation will conclude the tooling ate
+  its work.
+  Discarded only on the completion floor -- build, tests, acceptance. A
+  coverage round that does not improve coverage has not broken anything, and
+  rolling it back would throw away real progress.
+  Separated the two provider policies rather than lowering the threshold for
+  both. A closed socket may be one socket; an exhausted retry budget is already
+  the second strike, reported by the layer whose job was to retry.
+  Applied the two-failure escalation only to gates a run can satisfy and then
+  lose. Escalating on the second coverage round would spend a stronger model on
+  ordinary progress
+Files-or-schemas: new internal/coordinator/discard_refinement.go and its test,
+  agent_execution.go, agent_convergence.go, verified_checkpoint.go
+Validation: Build, vet, gofmt, the discard and checkpoint tests
+Failures-or-discarded-approaches: None
+Known-limitations: The blind-spot refinement is still not test-first: it edits
+  production and tests together, where adding the test against the verified
+  checkpoint first would often show the behaviour already correct. No wall-clock
+  deadline reserve before starting an attempt
+Next-safe-step: Rung 5 again, watching for a discard at the first regression
+
 Dev-Log: DL-20260803-133
 Date: 2026-08-03
 Status: The three rung-5 blockers are closed; rung 5 is being rerun

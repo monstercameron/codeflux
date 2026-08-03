@@ -50,6 +50,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-124
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a failed refinement stops becoming the next refinement's baseline
+Request-or-TODO: Rung 5 regression-stall analysis, 2026-08-03
+Outcome: A refinement is a candidate, not a commit, and every attempt was
+  editing the worktree in place -- so a failed candidate became the next
+  candidate's baseline. Ladder rung 5 had a correct, tested, accepted program
+  at 33.8 seconds, changed its output while adding two blind-spot tests, and
+  then spent attempts three, four and five repairing a descendant of the broken
+  version: losing a function its own tests named, drifting a signature, and
+  referencing an undefined identifier, none of which existed in the program it
+  started from.
+  A refinement that loses the build, the tests or the acceptance examples is
+  now discarded and the verified revision put back before the next attempt. The
+  failed candidate is preserved beside the worktree rather than deleted -- what
+  it tried is a hypothesis that has been run, and it is the most useful thing
+  the next attempt can be told -- and the instruction says plainly that the
+  edits are gone and why, because a run that reads its own files and finds work
+  it does not remember doing will assume the tooling is broken.
+  Nothing is discarded when there is no verified revision to go back to. A run
+  that has never had one has nothing better than what it is holding.
+  Separately, an exhausted retry budget now opens the circuit on its first
+  occurrence. The two-failure rule is right for a raw transport error, which
+  may be one closed socket, and wrong for "retry budget exhausted" -- that is
+  the provider's own retry policy reporting it has already tried and given up.
+  Rung 5 waited 90.8 seconds for the first and began a second attempt that
+  would have cost another ninety, with a verified checkpoint on disk the whole
+  time.
+  A gate that a run had satisfied and then lost now escalates on its second
+  failure rather than its third. A cycle is by definition not consecutive: the
+  failures alternate with the fixes, which is what makes it a cycle and what
+  made it invisible to a consecutive-repeat counter.
+Verification: Build, vet, gofmt, two new discard tests
+Dev-Log: DL-20260803-134
+
 Change-ID: CL-20260803-123
 Commit: pending
 Date: 2026-08-03

@@ -596,3 +596,46 @@ func acceptanceInstruction(
 			"something these examples contradict, the test is wrong.")
 	return report.String()
 }
+
+// acceptanceInvariant is the exact output every refinement must preserve.
+//
+// A send-back names one thing to fix, and a run fixing it rewrites a file. The
+// acceptance examples are what it has no reason to think about while doing so,
+// which is exactly why they are the thing it breaks: ladder rung 5 regressed
+// "bus 50" to "bus: 50" while correcting something else entirely, and paid two
+// attempts to get back to where it had been.
+//
+// Carried in every instruction, byte for byte, with the invisible characters
+// made visible. A run told "the output must match the acceptance examples" has
+// been told nothing it can check; a run shown the exact bytes has.
+func acceptanceInvariant(examples []acceptanceExample) string {
+	if len(examples) == 0 {
+		return ""
+	}
+	var block strings.Builder
+	block.WriteString(
+		"\n\nThis must remain true, whatever else changes. It is not what is " +
+			"being asked for; it is what the work above must not cost:\n")
+	for _, example := range examples {
+		fmt.Fprintf(&block, "  running it with %s must print exactly:\n",
+			describeArguments(example.Arguments))
+		for _, line := range strings.Split(
+			strings.TrimRight(example.Expected, "\n"), "\n",
+		) {
+			fmt.Fprintf(&block, "    |%s|\n", line)
+		}
+	}
+	block.WriteString(
+		"  The bars mark the start and end of each line and are not part of " +
+			"the output. Spacing, punctuation and the final newline are part " +
+			"of it.\n")
+	return block.String()
+}
+
+// describeArguments renders an argument list the way a person would type it.
+func describeArguments(arguments []string) string {
+	if len(arguments) == 0 {
+		return "no arguments"
+	}
+	return "the arguments " + strings.Join(arguments, " ")
+}

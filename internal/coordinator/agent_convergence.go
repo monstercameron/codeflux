@@ -60,6 +60,23 @@ type convergence struct {
 	refunded int
 }
 
+// regressionProneGates are the ones whose second failure means a property was
+// lost rather than never held.
+//
+// Compilation, the suite, and the acceptance examples are all things a run
+// establishes and can then undo. Failing one of them twice is a different
+// situation from grinding against a coverage threshold that has never been met:
+// the first says the run is going round, the second says it is going slowly.
+//
+// The research gates are deliberately absent. A run can legitimately need
+// several rounds to cover its cases, and escalating on the second would spend a
+// stronger model on ordinary progress.
+var regressionProneGates = map[string]bool{
+	"assembly":          true,
+	"integration-tests": true,
+	"acceptance":        true,
+}
+
 // newConvergence starts a run at the bottom of its ladder.
 func newConvergence(settings pipeline.Settings) *convergence {
 	return &convergence{settings: settings, rung: settings.FirstRung()}
@@ -230,7 +247,24 @@ func (tracker *convergence) record(gate string, failure string) verdict {
 	print := gate + "\x00" + failureFingerprint(failure)
 	tracker.seen[print]++
 	tracker.repeats = tracker.seen[print]
-	if tracker.repeats < tracker.settings.StallBeforeEscalation {
+	// Losing a property twice is a cycle, not a coincidence.
+	//
+	// The stall threshold is three, which is right for a gate a run is grinding
+	// against and wrong for one it had already satisfied. A run whose
+	// acceptance examples passed and then stopped passing has undone its own
+	// work, and a run that does that twice is going round rather than forward.
+	// Ladder rung 5 lost and regained its acceptance output across four
+	// attempts on the lowest rung, and by the tracker's count nothing had
+	// repeated often enough to be a stall.
+	//
+	// Counted per gate over the whole run rather than consecutively, because a
+	// cycle is by definition not consecutive: the failures alternate with the
+	// fixes, which is what makes it a cycle and what made it invisible.
+	threshold := tracker.settings.StallBeforeEscalation
+	if regressionProneGates[gate] && threshold > 2 {
+		threshold = 2
+	}
+	if tracker.repeats < threshold {
 		return verdict{}
 	}
 	if next, more := tracker.settings.NextRung(tracker.rung); more {

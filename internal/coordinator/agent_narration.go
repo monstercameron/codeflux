@@ -101,6 +101,12 @@ func (narrator *narratingExecutor) ExecuteTool(
 			unchanged = fingerprint == narrator.lastTestFingerprint
 		}
 	}
+	// The tree as it stands before a write, so a write that changes nothing can
+	// be told from one that does.
+	beforeWrite := ""
+	if executor.ToolName(name) == executor.ToolApplyEdit && narrator.worktree != "" {
+		beforeWrite = producedTreeDigest(narrator.worktree)
+	}
 
 	result, err := narrator.inner.ExecuteTool(ctx, request)
 	if err != nil {
@@ -176,6 +182,25 @@ func (narrator *narratingExecutor) ExecuteTool(
 			result.StdoutRedacted + "\n" + result.StderrRedacted)
 		narrator.lastTestFailed =
 			completed != domain.CommandExecutionStateSucceeded
+	}
+	// A write of the bytes that were already there is not a change.
+	//
+	// It costs a suite run, because it marks the last validation stale; it
+	// costs the model a turn; and it reads to the run as progress. Ladder rung
+	// 5 wrote an identical main.go twice in one attempt. Saying so is the
+	// remedy — the model believes it edited something, and the only way it
+	// finds out otherwise is an identical failure two steps later.
+	if executor.ToolName(name) == executor.ToolApplyEdit &&
+		completed == domain.CommandExecutionStateSucceeded &&
+		beforeWrite != "" && beforeWrite == producedTreeDigest(narrator.worktree) {
+		tracef("tool", "%-12s %-10s %s", name, "no-op",
+			"the file already held exactly these bytes")
+		result.StdoutRedacted = strings.TrimSpace(result.StdoutRedacted) +
+			noOpWriteNote()
+		narrator.execution.publishTool(narrator.ctx, narrator.scope,
+			events.KindToolCompleted, executionID, name, string(completed),
+			summary+" — changed nothing")
+		return result, nil
 	}
 	if executor.ToolName(name) == executor.ToolApplyEdit &&
 		completed == domain.CommandExecutionStateSucceeded {
@@ -821,6 +846,18 @@ func succeedingLineOf(text string) string {
 		return firstOther
 	}
 	return strings.TrimSpace(firstLineOf(text))
+}
+
+// noOpWriteNote tells a run that the file already held what it just wrote.
+//
+// The model believes it edited something. Without this the only way it finds
+// out otherwise is an identical failure two steps later, which reads as the
+// edit not having worked rather than as the edit not having differed.
+func noOpWriteNote() string {
+	return "\n\n[codeflux] This write changed nothing: the file already held " +
+		"exactly these bytes. Nothing has moved, so re-running the tests will " +
+		"produce the same result. Read the file and decide what actually needs " +
+		"to differ."
 }
 
 // unchangedTestNote tells a run that its last edit changed nothing.

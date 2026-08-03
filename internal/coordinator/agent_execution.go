@@ -470,6 +470,24 @@ func (execution *AgentExecution) Run(
 			repeatedInfrastructureFailures = 1
 		}
 		lastInfrastructureOutcome, lastInfrastructureTree = outcome, here
+		// An exhausted retry budget is already the second strike.
+		//
+		// The two-failure rule is right for a raw transport error, which may be
+		// one closed socket. It is wrong for "retry budget exhausted", which is
+		// the provider's own retry policy reporting that it has already tried
+		// and given up: repeating the whole attempt asks the same question of
+		// the same unavailable provider and pays another full timeout to hear
+		// the same answer.
+		//
+		// Ladder rung 5 waited 90.8 seconds for the first, then began a second
+		// attempt that would have cost another ninety before the circuit could
+		// open — with a verified checkpoint sitting on disk the whole time.
+		if outcome == "retry-budget-exhausted" && checkpoint.taken {
+			providerCircuitOpen = outcome
+			tracef("infra", "circuit open on the first exhausted retry budget; "+
+				"finalising from verified revision %s", checkpoint.digest)
+			return
+		}
 		if repeatedInfrastructureFailures >= 2 && checkpoint.taken {
 			providerCircuitOpen = outcome
 			tracef("infra", "circuit open after %d identical failure(s); "+
@@ -478,8 +496,18 @@ func (execution *AgentExecution) Run(
 		}
 	}
 
+	// The acceptance examples every instruction carries, so a run correcting
+	// one thing cannot quietly break the one thing that defines done.
+	acceptanceGuard := acceptanceInvariant(
+		parseAcceptanceExamples(scope.requirement))
+
 	sendBack := func(gate string, instruction string, because string) {
 		tracef("sendback", "gate=%s because=%s", gate, because)
+		// Appended rather than woven in, so it reads as a constraint on the
+		// instruction rather than as another item in it.
+		if acceptanceGuard != "" && !strings.Contains(instruction, "must remain true") {
+			instruction += acceptanceGuard
+		}
 		// Every refusal is something this project has now learned. Written
 		// down here rather than at the end, because a run that dies later
 		// still learned it, and a lesson only a surviving run records is a
@@ -788,7 +816,8 @@ func (execution *AgentExecution) Run(
 			sendBack("integration-tests",
 				"the tests do not pass. Fix this before anything else; it is "+
 					"the only thing being asked for in this attempt:\n\n"+
-					testFailure,
+					testFailure+
+					discardRefinement(checkpoint, scope.worktree, narrator),
 				"its tests do not pass")
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d: the tests do not pass (%s). Fixing that first.",
@@ -811,7 +840,8 @@ func (execution *AgentExecution) Run(
 			sendBack("acceptance",
 				"it does not do what was asked. Fix this before anything else; "+
 					"it is the only thing being asked for in this attempt:\n\n"+
-					acceptanceInstruction(acceptanceExamples, acceptanceFailures),
+					acceptanceInstruction(acceptanceExamples, acceptanceFailures)+
+					discardRefinement(checkpoint, scope.worktree, narrator),
 				"it did not do what was asked")
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d: %s Fixing that first.",

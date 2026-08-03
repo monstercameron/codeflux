@@ -212,7 +212,7 @@ func skipFromCheckpoint(relative string) bool {
 	}
 	first := strings.Split(filepath.ToSlash(relative), "/")[0]
 	switch first {
-	case ".git", ".verified":
+	case ".git", ".verified", ".discarded":
 		return true
 	}
 	// Built binaries are reproduced by building. Copying one is slow, and a
