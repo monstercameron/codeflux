@@ -50,6 +50,43 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-070
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- recall binds, and matches on the contract rather than the name
+Request-or-TODO: PIPE-050, PIPE-051, PIPE-051a
+Outcome: Recall used to list names that happened to match and oblige nobody.
+  Every contract now leaves recallKnownAtoms with a decision: reuse, naming the
+  matching function, its artifact and the contract hash that matched it, or
+  write, carrying a justification. bindRecallDecisions fails the stage naming
+  any contract left undecided, which is what makes it binding.
+  The match is now a contract hash -- SHA-256 over the name-erased parameter and
+  result type vector, ReturnsError, and sorted deduplicated effects -- replacing
+  a substring search for "func <name>(" that found a renamed atom never and a
+  same-named different atom always.
+  The signature-shape key exists and is deliberately incapable of a verdict: it
+  is read in exactly one place, to produce a candidate count for a write
+  decision's prose. Similarity can narrow, and structurally cannot admit
+Affected-behavior: The recall stage can now fail. A contract with no decision is
+  a stage failure rather than a silent omission
+Compatibility-or-migration: The contract hash lives in a new
+  internal/retrieval/recallkey package rather than internal/retrieval, because
+  that package's own gate test fails the build if it imports internal/atomdoc --
+  a guard protecting the M21 discovery gate, whose purpose this mechanism does
+  not share. The guard was run before and after to confirm that reading
+Verification: Proven to discriminate by replacing the contract-hash lookup with
+  a name-only key, reproducing the exact prior defect: the rename test and the
+  same-name-different-contract test both failed with those symptoms, then passed
+  again on revert. TestAUDIT026 passes unmodified, confirming the vector branch
+  is untouched
+Known-limitations: Recall still runs after assembly and the tests, so it reports
+  on code already written; moving it means restructuring Run, whose file was
+  held by another lane, and StageRecall keeps its unestablished marker honestly.
+  PIPE-051b stays blocked: AUDIT-026's miss measurement cannot run without a
+  reviewed real-run fallback, and none exists. No end-to-end reuse is
+  demonstrated, because the registry is empty until PIPE-048 lands
+Dev-Log: DL-20260802-080
+
 Change-ID: CL-20260802-069
 Commit: pending
 Date: 2026-08-02

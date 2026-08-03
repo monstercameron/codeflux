@@ -25,6 +25,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-080
+Date: 2026-08-02
+Status: Binding and keys landed; ordering and embeddings still blocked
+Change-ID: CL-20260802-070
+Commit: pending
+Request-or-TODO: PIPE-050, PIPE-051, PIPE-051a
+Goal: Make the mechanism the project's central bet rests on actually oblige
+  something
+Assumptions: A search whose result nobody must answer to has not been performed
+  in any sense that matters
+Decisions: Made an undecided contract a stage failure rather than an omission.
+  The old shape listed names and obliged nobody, so a run could pass the stage
+  having reused nothing and explained nothing.
+  Kept the shape key structurally unable to produce a verdict rather than
+  documenting that it should not. AGENTS.md says similarity never establishes
+  permission; a comment saying so is weaker than a design where the value only
+  ever reaches prose.
+  Put the contract hash in a sibling package rather than defeating
+  internal/retrieval's own import guard. That guard exists to stop the M21
+  discovery gate reading documentation semantics; this is the pipeline's recall
+  stage, a different mechanism, so the honest move was to sit beside the guard
+  rather than argue with it.
+  Stopped at agent_execution.go rather than editing a held file, and left
+  StageRecall's unestablished marker in place rather than clearing a marker for
+  a gate that is still not established
+Files-or-schemas: internal/coordinator/agent_stage_recall.go and its test,
+  agent_stage_delivery.go, internal/retrieval/recallkey and its test
+Validation: The discrimination probe above; the retrieval gate test before and
+  after the package move; TestAUDIT026 unmodified
+Failures-or-discarded-approaches: Putting the hash inside internal/retrieval,
+  abandoned once its gate test explained why that package may not read
+  documentation semantics
+Known-limitations: Recall still runs after the code is written; the registry is
+  empty so no reuse has been demonstrated end to end; PIPE-051b is blocked on a
+  measurement that needs a reviewed real-run fallback nobody has produced
+Next-safe-step: PIPE-048, which fills the registry recall searches
+
 Dev-Log: DL-20260802-079
 Date: 2026-08-02
 Status: Six classes emitted

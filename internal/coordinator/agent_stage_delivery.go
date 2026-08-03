@@ -3,8 +3,6 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/pipeline"
@@ -55,64 +53,9 @@ func describeContracts(worktree string) stageOutcome {
 		})
 }
 
-// recallKnownAtoms reports what this run could have reused.
-//
-// Reuse is the reason atoms are documented at all: a run that rebuilds a
-// function the project already has spends tokens producing something it owned.
-// The registry is the artifacts of earlier runs, so a first run recalls
-// nothing and says so, and the answer only becomes interesting once the
-// project has a history.
-func (execution *AgentExecution) recallKnownAtoms(
-	ctx context.Context,
-	scope agentScope,
-	worktree string,
-) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
-	if err != nil {
-		return broke("the produced source could not be parsed: "+err.Error(), nil)
-	}
-	wanted := map[string]bool{}
-	for _, function := range functions {
-		if !isTestScaffolding(function) {
-			wanted[function.Name] = true
-		}
-	}
-	if len(wanted) == 0 {
-		return skipped("the run needed no atom, so there was nothing to recall")
-	}
-	// Earlier work means earlier: the artifacts this run has already stored
-	// are excluded. Without that, a run matches against the file it wrote
-	// moments ago and reports that everything it needed already existed —
-	// which is true, and is the least useful true thing it could say.
-	known, err := execution.repositories.ListProjectSourceArtifactsExcludingTask(
-		ctx, scope.projectID, scope.taskID, 200)
-	if err != nil {
-		return broke("the project's earlier work could not be read: "+
-			err.Error(), nil)
-	}
-	var reusable []string
-	for name := range wanted {
-		for _, artifact := range known {
-			if strings.Contains(string(artifact.Content), "func "+name+"(") {
-				reusable = append(reusable, name)
-				break
-			}
-		}
-	}
-	sort.Strings(reusable)
-	evidence := map[string]any{
-		"functions_needed":   len(wanted),
-		"already_in_project": reusable,
-		"artifacts_searched": len(known),
-	}
-	if len(known) == 0 {
-		return held("the project holds no earlier work, so nothing could be "+
-			"reused and nothing was rebuilt unnecessarily", evidence)
-	}
-	return held(fmt.Sprintf(
-		"%d function(s) needed; %d already exist elsewhere in the project",
-		len(wanted), len(reusable)), evidence)
-}
+// recallKnownAtoms moved to agent_stage_recall.go (PIPE-050/PIPE-051): the
+// recall stage is now bound rather than advisory, and it belongs beside the
+// keys it matches on.
 
 // assembleEvidence gathers everything the run can show for itself.
 //
