@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-126
+Date: 2026-08-03
+Status: The highest-leverage orchestration fix is in
+Change-ID: CL-20260803-116
+Commit: pending
+Request-or-TODO: The rung 3 trace analysis
+Goal: Let a run that has already produced a verified result stop
+Decisions: Required both an unchanged failure category and an unchanged tree
+  hash before counting a repeat. Either changing means the run got somewhere,
+  and a breaker that trips on progress is worse than none.
+  Required an existing checkpoint before opening the circuit. A run with
+  nothing verified has nothing to finalise from, and stopping early there would
+  turn a recoverable outage into a lost run.
+  Dropped the callee by position rather than by shape. No heuristic
+  distinguishes the name "run" from the verb.
+  Kept measured defects blocking. They are facts about the suite, not opinions
+  about the code, and making them advisory would be the false green everything
+  else here exists to prevent
+Files-or-schemas: agent_execution.go, agent_adversarial_review.go and its test
+Validation: Build, vet, gofmt, nine coordinator tests
+Failures-or-discarded-approaches: Lowercasing before testing whether a word is
+  an identifier, which destroyed the camel-case signal that was the only thing
+  distinguishing runCommand from prose
+Known-limitations: No deadline reservation before a provider call, so a run can
+  still start work it cannot finish inside the enclosing test's budget. Case
+  synthesis is still signature-derived rather than contract-derived. No UTF-8
+  end-to-end test
+Next-safe-step: Rung 3 in a terminal, watching for the circuit breaker and the
+  terminal record
+
 Dev-Log: DL-20260803-125
 Date: 2026-08-03
 Status: Both unsatisfiable gates observed on rung 3 are closed

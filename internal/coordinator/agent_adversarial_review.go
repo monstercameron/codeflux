@@ -811,3 +811,96 @@ func mainReportsAndExits(
 		Lineage:       findingLineageSwallowedError,
 	}}
 }
+
+// findingFingerprint is what a finding is about, with the names taken out.
+//
+// "main calls run, which can fail" and "main calls runCommand, which can fail"
+// are one criticism, and counting them as two lets a rename reset the
+// repetition count that decides whether a run is stalling. Rung 3 was sent back
+// three times for what a reader would call the same objection.
+//
+// The lineage and the kind are kept because they are what the finding is; the
+// function names inside the prose are removed because they are what it happens
+// to be about this time.
+func findingFingerprint(finding adversarialFinding) string {
+	words := strings.Fields(finding.What)
+	kept := make([]string, 0, len(words))
+	skipNext := false
+	for _, word := range words {
+		trimmed := strings.Trim(word, ".,;:\"'()")
+		if trimmed == "" {
+			continue
+		}
+		// The word after "calls" is the callee, and the callee is exactly what
+		// differs between two statements of one criticism. It cannot be caught
+		// by looking at the word itself: "run" is a name here and a common verb
+		// everywhere else, and no amount of shape analysis tells them apart.
+		// Its position does.
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if strings.EqualFold(trimmed, "calls") {
+			skipNext = true
+			continue
+		}
+		// Everything else that is plainly a name rather than prose: a dotted
+		// selector, an inner capital, an underscore.
+		if looksLikeIdentifier(trimmed) {
+			continue
+		}
+		kept = append(kept, strings.ToLower(trimmed))
+	}
+	return string(finding.Lineage) + "|" + finding.Where + "|" +
+		strings.Join(kept, " ")
+}
+
+// looksLikeIdentifier reports whether a word is a name rather than prose.
+//
+// Deliberately crude: a dotted selector, an inner capital, or an underscore.
+// Missing one leaves two statements of a criticism looking different, which is
+// the behaviour this replaces rather than a new failure.
+func looksLikeIdentifier(word string) bool {
+	if strings.Contains(word, ".") || strings.Contains(word, "_") {
+		return true
+	}
+	for index := 1; index < len(word); index++ {
+		if word[index] >= 'A' && word[index] <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+// advisoryFindings are the ones a run may finish without fixing.
+//
+// A demonstrated defect the tests were run against is not advisory: it is a
+// measured fact that the suite misses something. Everything else is a rule's
+// opinion, and after one honest attempt at repair a run that builds, passes its
+// tests and matches its acceptance examples should finish and carry the opinion
+// as a note rather than spend its remaining budget on it.
+//
+// This is the completion floor and the refinement ceiling kept apart. Crossing
+// the floor makes a run recoverably successful; failing to reach the ceiling
+// makes it successful with advisories.
+func advisoryFindings(findings []adversarialFinding) []adversarialFinding {
+	var advisory []adversarialFinding
+	for _, finding := range findings {
+		if finding.EvidenceLevel == findingEvidenceMeasured {
+			continue
+		}
+		advisory = append(advisory, finding)
+	}
+	return advisory
+}
+
+// blockingFindings are the ones worth another attempt.
+func blockingFindings(findings []adversarialFinding) []adversarialFinding {
+	var blocking []adversarialFinding
+	for _, finding := range findings {
+		if finding.EvidenceLevel == findingEvidenceMeasured {
+			blocking = append(blocking, finding)
+		}
+	}
+	return blocking
+}

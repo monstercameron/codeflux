@@ -50,6 +50,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-116
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a run that has converged is allowed to finish
+Request-or-TODO: Trace analysis of the rung 3 run, 2026-08-03
+Outcome: The implementation loop had converged; the orchestration loop had not.
+  Rung 3 captured three verified checkpoints inside 135 seconds and then spent
+  272 more seconds waiting out identical provider failures without touching the
+  worktree. It possessed a verified result and treated unavailable refinement
+  capacity as a reason not to finish.
+  A circuit breaker now closes that. Two identical infrastructure failures --
+  same category, same tree hash -- against an existing verified checkpoint end
+  refinement and finalise from the checkpoint. A different category or a
+  changed tree resets the count, because either means something happened
+  between the failures.
+  Findings are fingerprinted with their identifiers removed, so "main calls
+  run, which can fail" and "main calls runCommand, which can fail" are one
+  criticism rather than two. The callee is dropped by position rather than by
+  shape: "run" is a name in that sentence and a common verb everywhere else,
+  and nothing about the word itself tells them apart.
+  Completion and refinement are now separate thresholds. A measured defect --
+  one the tests were actually run against and did not catch -- still blocks. A
+  mechanical rule's opinion, once attempted and raised again, is carried as an
+  advisory and the run finishes.
+  Every exit path emits a terminal record: the status, the verified revision
+  and why it was verified, whether the worktree is that revision, attempts
+  split between productive and lost-to-the-provider, unresolved work, and the
+  advisories carried rather than fixed.
+  The adversarial instruction stopped claiming the tests were unproven. It read
+  the narrator's flags and told the model its tests "have not been shown to
+  pass" in the same run whose trace says a checkpoint was captured because they
+  had; the suite is re-run on that exact tree a few lines earlier, so the fact
+  is known rather than inferred.
+Verification: Build, vet, gofmt, three new tests plus the six from CL-115
+Dev-Log: DL-20260803-126
+
 Change-ID: CL-20260803-115
 Commit: pending
 Date: 2026-08-03

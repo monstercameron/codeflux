@@ -70,3 +70,73 @@ func TestAMainThatCannotFailOwesNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestARenamedFunctionIsTheSameCriticism covers the fingerprint.
+//
+// "main calls run, which can fail" and "main calls runCommand, which can fail"
+// are one objection, and counting them as two lets a rename reset the
+// repetition count that decides whether a run is stalling.
+func TestARenamedFunctionIsTheSameCriticism(t *testing.T) {
+	first := adversarialFinding{
+		Kind: findingDefect, Where: "main",
+		What:    "calls run, which can fail, but returns no error of its own",
+		Lineage: findingLineageSwallowedError,
+	}
+	second := first
+	second.What = "calls runCommand, which can fail, but returns no error of its own"
+	if findingFingerprint(first) != findingFingerprint(second) {
+		t.Errorf("a rename produced a different criticism:\n  %s\n  %s",
+			findingFingerprint(first), findingFingerprint(second))
+	}
+
+	different := first
+	different.What = "ignores the value strconv.Atoi returns"
+	different.Lineage = findingLineageAntiPattern
+	if findingFingerprint(first) == findingFingerprint(different) {
+		t.Error("two different criticisms collapsed into one fingerprint")
+	}
+}
+
+// TestOnlyAMeasuredDefectBlocks keeps the completion floor and the refinement
+// ceiling apart: a demonstrated defect is a fact about the suite, a mechanical
+// rule's output is an opinion about the code.
+func TestOnlyAMeasuredDefectBlocks(t *testing.T) {
+	findings := []adversarialFinding{
+		{Where: "run", What: "a mutant survived", EvidenceLevel: findingEvidenceMeasured},
+		{Where: "main", What: "an opinion", EvidenceLevel: findingEvidenceMechanicalRule},
+		{Where: "run", What: "an untried input", EvidenceLevel: findingEvidenceSynthesizedCase},
+	}
+	if got := blockingFindings(findings); len(got) != 1 {
+		t.Errorf("%d finding(s) block, wanted only the measured one", len(got))
+	}
+	if got := advisoryFindings(findings); len(got) != 2 {
+		t.Errorf("%d advisory finding(s), wanted the two opinions", len(got))
+	}
+}
+
+// TestATerminalReportNamesTheVerifiedRevision is the fact a reader most needs
+// and which no ending used to state.
+func TestATerminalReportNamesTheVerifiedRevision(t *testing.T) {
+	report := terminalReport(terminalFacts{
+		status:                "provider-unavailable-after-verified-result",
+		verifiedRevision:      "23b6905d36cc",
+		verifiedBecause:       "compiled, tests passed, acceptance matched",
+		currentIsVerified:     true,
+		attempts:              7,
+		infrastructureRetries: 3,
+		advisories: []adversarialFinding{
+			{Where: "main", What: "an opinion"},
+		},
+	})
+	for _, wanted := range []string{
+		"provider-unavailable-after-verified-result",
+		"23b6905d36cc",
+		"The worktree is that revision",
+		"lost to the provider rather than spent on the work",
+		"1 advisory finding(s)",
+	} {
+		if !strings.Contains(report, wanted) {
+			t.Errorf("the terminal report never says %q:\n%s", wanted, report)
+		}
+	}
+}

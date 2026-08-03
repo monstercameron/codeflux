@@ -396,8 +396,24 @@ func (execution *AgentExecution) Run(
 	// could act on it, and rung 5 recorded twenty-one untried cases it was
 	// never once asked about. A stage that can only accuse is worse than no
 	// stage: a reader cannot tell an unfixed defect from an unaskable one.
+	// The last state of the worktree that was known good, kept beside it so
+	// nothing the run does can see or edit its own safety net.
+	checkpoint := newVerifiedCheckpoint(scope.worktree)
+
 	caseRounds := 0
 	documentationRounds := 0
+	// The circuit breaker's state: how many identical infrastructure failures
+	// have happened in a row, against what, and whether it has opened.
+	// attemptedFindings remembers which criticisms this run has already been
+	// sent back for, and carriedAdvisories the ones it will finish with rather
+	// than keep spending attempts on.
+	attemptedFindings := map[string]bool{}
+	var carriedAdvisories []adversarialFinding
+	reviewRounds := 0
+	repeatedInfrastructureFailures := 0
+	lastInfrastructureOutcome := ""
+	lastInfrastructureTree := ""
+	providerCircuitOpen := ""
 	// unfinished is what the run still owed when it ran out of attempts, so
 	// the completion message can say so instead of claiming to be done.
 	unfinished := ""
@@ -433,6 +449,31 @@ func (execution *AgentExecution) Run(
 		failure = instruction
 		sentBackBecause = "the provider did not answer"
 		progress.refund()
+		// The circuit breaker.
+		//
+		// Waiting out a third ninety-second provider timeout learns nothing the
+		// first two did not already establish, and a run that has a verified
+		// checkpoint is spending that time refusing to finish work it has
+		// already done. Rung 3 reached its third checkpoint at 135 seconds and
+		// then spent 272 more seconds on identical provider failures without
+		// touching the worktree.
+		//
+		// Identical means the same failure category against the same tree. A
+		// different category is a different fact, and a changed tree means the
+		// run got somewhere between the failures, so both reset the count.
+		here := producedTreeDigest(scope.worktree)
+		if outcome == lastInfrastructureOutcome && here == lastInfrastructureTree {
+			repeatedInfrastructureFailures++
+		} else {
+			repeatedInfrastructureFailures = 1
+		}
+		lastInfrastructureOutcome, lastInfrastructureTree = outcome, here
+		if repeatedInfrastructureFailures >= 2 && checkpoint.taken {
+			providerCircuitOpen = outcome
+			tracef("infra", "circuit open after %d identical failure(s); "+
+				"finalising from verified revision %s",
+				repeatedInfrastructureFailures, checkpoint.digest)
+		}
 	}
 
 	sendBack := func(gate string, instruction string, because string) {
@@ -545,16 +586,13 @@ func (execution *AgentExecution) Run(
 	// Computed once rather than per attempt. What the project knows does not
 	// change while this run is working, and re-reading it every attempt would
 	// spend a query to be told the same thing.
-	// The last state of the worktree that was known good, kept beside it so
-	// nothing the run does can see or edit its own safety net.
-	checkpoint := newVerifiedCheckpoint(scope.worktree)
-
 	preflight := execution.runMemoryPreflight(ctx, scope)
 	execution.say(ctx, scope, events.KindMessageFinal,
 		"Memory preflight: "+preflight.summary()+".")
 
 	ledger.sealPreAttemptStages()
-	for attempt := 1; progress.moreAttempts() && awaitingApproval == ""; attempt++ {
+	for attempt := 1; progress.moreAttempts() && awaitingApproval == "" &&
+		providerCircuitOpen == ""; attempt++ {
 		progress.beginAttempt()
 		tracef("attempt", "%d begins on rung %s", attempt, progress.currentRung())
 		if attempt > 1 {
@@ -783,9 +821,44 @@ func (execution *AgentExecution) Run(
 		// risk-selected checks already do exactly that -- but it may not
 		// delete the critic outright the way this flag used to.
 		if !progress.lastAttempt() && !reviewed {
-			if findings, reviewErr := execution.reviewAdversariallyForRisk(
-				ctx, scope.worktree, scope.riskLevel,
-			); reviewErr == nil && len(findings) > 0 {
+			findings, reviewErr := execution.reviewAdversariallyForRisk(
+				ctx, scope.worktree, scope.riskLevel)
+			if reviewErr != nil {
+				findings = nil
+			}
+			// A criticism already made and already attempted is not made again.
+			// Fingerprinted with the identifiers removed, so renaming the
+			// function a finding is about cannot present the same objection as
+			// a new one — rung 3 was sent back three times for what a reader
+			// would call one criticism.
+			var fresh []adversarialFinding
+			for _, finding := range findings {
+				print := findingFingerprint(finding)
+				if attemptedFindings[print] {
+					carriedAdvisories = append(carriedAdvisories, finding)
+					continue
+				}
+				attemptedFindings[print] = true
+				fresh = append(fresh, finding)
+			}
+			// What is left after the repeats are removed may be only opinions.
+			// A run that builds, passes its tests and matches its acceptance
+			// examples has crossed the completion floor, and spending its
+			// remaining budget on a rule's opinion it has already tried once to
+			// satisfy is what left rung 3 stalling past 447 seconds with a
+			// verified result in hand.
+			//
+			// A measured defect is never advisory: the tests were actually run
+			// against it and did not catch it, which is a fact about the suite
+			// rather than an opinion about the code.
+			if reviewRounds > 0 && len(blockingFindings(fresh)) == 0 {
+				carriedAdvisories = append(
+					carriedAdvisories, advisoryFindings(fresh)...)
+				fresh = nil
+			}
+			findings = fresh
+			if len(findings) > 0 {
+				reviewRounds++
 				defects := 0
 				for _, finding := range findings {
 					if finding.Kind == findingDefect {
@@ -817,9 +890,13 @@ func (execution *AgentExecution) Run(
 				// escalated up the model ladder nor decomposed -- the one
 				// stall the rest of the loop is built to catch was invisible
 				// to it from exactly this gate.
-				sendBack("adversarial-review", adversarialInstruction(findings,
-					narrator.ranValidation && !narrator.validationFailed &&
-						!narrator.filesChangedSinceValidation),
+				// True, not inferred. The suite was re-run on this exact tree a
+				// few lines above and passed; reading the narrator's flags here
+				// instead produced an instruction telling the model its tests
+				// "have not been shown to pass" in the same run whose trace
+				// says a checkpoint was captured because they did.
+				sendBack("adversarial-review",
+					adversarialInstruction(findings, true),
 					"a review found it weaker than it looks")
 				continue
 			}
@@ -884,6 +961,13 @@ func (execution *AgentExecution) Run(
 	// checkpoint keeps what it ended with, and one that never reached a
 	// checkpoint has nothing to go back to.
 	restoredFromCheckpoint := false
+	if providerCircuitOpen != "" {
+		execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+			"The provider stopped answering (%s) and the worktree had not "+
+				"changed between attempts, so refinement stopped rather than "+
+				"waiting it out. Finishing from revision %s, which %s.",
+			providerCircuitOpen, checkpoint.digest, checkpoint.reason))
+	}
 	if checkpoint.taken {
 		if held, _ := revalidateAfterWrite(ctx, scope.worktree); !held {
 			restoredFromCheckpoint = checkpoint.restore(scope.worktree)
@@ -898,6 +982,27 @@ func (execution *AgentExecution) Run(
 	}
 	tracef("checkpoint", "restored=%t verified_revision=%s",
 		restoredFromCheckpoint, checkpoint.digest)
+
+	// The terminal record, emitted on every exit path.
+	//
+	// A run that stopped because the provider went away, because it ran out of
+	// attempts, or because it finished, all used to end with whatever the last
+	// message happened to be. A reader then has to reconstruct what was
+	// actually achieved from a trace, and the one fact they most need — is
+	// there a verified revision, and is it the one on disk — was never stated
+	// anywhere.
+	execution.say(ctx, scope, events.KindMessageFinal,
+		terminalReport(terminalFacts{
+			status:           terminalStatus(providerCircuitOpen, checkpoint, unfinished),
+			verifiedRevision: checkpoint.digest,
+			verifiedBecause:  checkpoint.reason,
+			currentIsVerified: checkpoint.taken && (restoredFromCheckpoint ||
+				producedTreeDigest(scope.worktree) == checkpoint.digest),
+			advisories:            carriedAdvisories,
+			attempts:              attempts,
+			infrastructureRetries: repeatedInfrastructureFailures,
+			unresolved:            unfinished,
+		}))
 
 	// The assembly gate. A run that cannot produce something that builds has
 	// not produced a program, whatever else it did, and everything downstream
@@ -1784,4 +1889,81 @@ func providerOutcomeOf(err error) string {
 	default:
 		return "unavailable"
 	}
+}
+
+// terminalFacts is everything a reader needs to know how a run ended.
+type terminalFacts struct {
+	status                string
+	verifiedRevision      string
+	verifiedBecause       string
+	currentIsVerified     bool
+	advisories            []adversarialFinding
+	attempts              int
+	infrastructureRetries int
+	unresolved            string
+}
+
+// terminalStatus names the ending in the vocabulary a reader can act on.
+//
+// The three endings are genuinely different decisions. A run that finished with
+// a verified revision and some opinions left over is work someone can review; a
+// run that lost its provider after verifying something is work someone can
+// review and a machine to look at; a run with nothing verified is neither.
+func terminalStatus(
+	circuitOpen string, checkpoint *verifiedCheckpoint, unfinished string,
+) string {
+	switch {
+	case circuitOpen != "" && checkpoint.taken:
+		return "provider-unavailable-after-verified-result"
+	case circuitOpen != "":
+		return "provider-unavailable-with-nothing-verified"
+	case checkpoint.taken && unfinished != "":
+		return "completed-with-advisories"
+	case checkpoint.taken:
+		return "completed"
+	default:
+		return "stopped-with-nothing-verified"
+	}
+}
+
+// terminalReport renders the ending as something a person reads once and knows
+// where they stand.
+func terminalReport(facts terminalFacts) string {
+	var report strings.Builder
+	fmt.Fprintf(&report, "Final status: %s.\n", facts.status)
+	if facts.verifiedRevision == "" {
+		report.WriteString(
+			"No revision of this work was ever verified, so there is nothing " +
+				"here that is known to build, pass its tests and do what was " +
+				"asked.\n")
+	} else {
+		fmt.Fprintf(&report,
+			"Verified revision %s, which %s.\n",
+			facts.verifiedRevision, facts.verifiedBecause)
+		if facts.currentIsVerified {
+			report.WriteString("The worktree is that revision.\n")
+		} else {
+			report.WriteString(
+				"The worktree is NOT that revision: later work changed it and " +
+					"was not verified.\n")
+		}
+	}
+	fmt.Fprintf(&report, "Attempts: %d", facts.attempts)
+	if facts.infrastructureRetries > 0 {
+		fmt.Fprintf(&report, ", of which %d were lost to the provider rather "+
+			"than spent on the work", facts.infrastructureRetries)
+	}
+	report.WriteString(".\n")
+	if facts.unresolved != "" {
+		fmt.Fprintf(&report, "Unresolved: %s\n", facts.unresolved)
+	}
+	if len(facts.advisories) > 0 {
+		fmt.Fprintf(&report,
+			"%d advisory finding(s), carried rather than fixed — none of them "+
+				"is a demonstrated defect:\n", len(facts.advisories))
+		for _, advisory := range facts.advisories {
+			fmt.Fprintf(&report, "  - %s: %s\n", advisory.Where, advisory.What)
+		}
+	}
+	return strings.TrimRight(report.String(), "\n")
 }
