@@ -537,7 +537,7 @@ func composerOverrideControls(props Props, disabled bool) ui.Node {
 		primitives.Button(primitives.ButtonProps{
 			ID: "composer-options", Label: "Options", LeadingIcon: primitives.IconOptions,
 			AccessibleLabel: "Show policy, budget, model, and effort options",
-			Quiet:           true, Disabled: props.OnOptionsOpen == nil, Mode: props.Mode,
+			Quiet:           true, Disabled: disabled || props.OnOptionsOpen == nil, Mode: props.Mode,
 			OnClick: props.OnOptionsOpen,
 		}),
 		primitives.Modal(primitives.ModalProps{
@@ -560,7 +560,7 @@ func composerTaskControls(props Props, busy, disabled bool) ui.Node {
 		primitives.Button(primitives.ButtonProps{
 			ID: "composer-task-controls-trigger", Label: "Task controls",
 			LeadingIcon: primitives.IconTool, AccessibleLabel: "Show task controls",
-			Quiet: true, Disabled: props.OnTaskControlsOpen == nil, Mode: props.Mode,
+			Quiet: true, Disabled: disabled || props.OnTaskControlsOpen == nil, Mode: props.Mode,
 			OnClick: props.OnTaskControlsOpen,
 		}),
 		primitives.Modal(primitives.ModalProps{

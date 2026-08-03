@@ -66,6 +66,27 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-053
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- accessibility defect in the composer
+Request-or-TODO: REPO-040
+Outcome: The composer's "Options" and "Task controls" trigger buttons now honour
+  the disabled parameter every sibling control already respected. They stayed
+  natively enabled while their containing section reported aria-disabled=true,
+  so a keyboard user tabbing through a disabled composer landed on them
+Affected-behavior: Tabbing through a disabled composer no longer stops on two
+  controls that cannot be used. The tab sequence after them is no longer shifted
+Compatibility-or-migration: None
+Verification: keyboard-full-shell-forward-reverse-visible-focus passes. The
+  defect was reproduced first by a raw single Tab press from "Open task review"
+  landing on #composer-options every time, independent of any snapshot timing
+Known-limitations: The check could not see this: Playwright's keyboardTabStops
+  honours ARIA-disabled ancestry and a real browser's Tab key does not, so an
+  accessibility check modelling ARIA more faithfully than the browser misses the
+  defects that reach a keyboard user
+Dev-Log: DL-20260802-063
+
 Change-ID: CL-20260802-052
 Commit: pending
 Date: 2026-08-02

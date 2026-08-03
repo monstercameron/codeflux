@@ -51,6 +51,37 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-063
+Date: 2026-08-02
+Status: Fixed and verified by reproduction
+Change-ID: CL-20260802-053
+Commit: pending
+Request-or-TODO: REPO-040
+Goal: Make tab stop 26 reachable, and find out why it was not
+Assumptions: A stop the check reports as reachable-but-not-focused is a defect
+  in one of the two, and which one matters
+Decisions: Treated it as a product defect first, per AGENTS.md's keyboard rule,
+  and it was one. The composer's Options and Task controls triggers ignored the
+  disabled parameter their siblings respect, so they stayed natively focusable
+  while the containing section reported aria-disabled true.
+  The reason the check could not see it is the part worth keeping: Playwright's
+  keyboardTabStops honours ARIA-disabled ancestry; a real browser's Tab key does
+  not. An accessibility check that models ARIA more faithfully than the browser
+  will miss exactly the defects that reach a keyboard user, and the symptom is
+  an index desync rather than an obviously missing stop
+Files-or-schemas: web/frontend/composer/component.go, two lines
+Validation: The check passes. Before fixing, a raw single Tab press from "Open
+  task review" landed on #composer-options every time, independent of snapshot
+  timing, which is what established this as real rather than a flake
+Failures-or-discarded-approaches: First attempt assumed a settling race and
+  added a stability-poll helper around the tab-stop snapshot. It was wrong, it
+  reintroduced a deprecated fixed wait that another lane had just removed under
+  REPO-018, and it turned lint red. Removed entirely once the composer fix
+  proved sufficient; the file is byte-identical to its original state
+Known-limitations: Other checks may be hiding behind the same ARIA-versus-native
+  divergence. Nothing has audited for that
+Next-safe-step: None for this ticket
+
 Dev-Log: DL-20260802-062
 Date: 2026-08-02
 Status: Fixed; suite still red for a different reason
