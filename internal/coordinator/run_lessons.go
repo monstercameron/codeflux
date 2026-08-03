@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
@@ -136,11 +137,15 @@ func (execution *AgentExecution) lessonContextItems(
 	if execution == nil || execution.repositories == nil {
 		return nil
 	}
+	// Read wider than will be shown, then rank. Taking the newest eight puts
+	// whatever failed most recently in front of a run it may have nothing to
+	// do with, which is how a lessons list becomes noise a run learns to skip.
 	lessons, err := execution.repositories.ListProjectLessons(
-		ctx, scope.projectID, maximumLessonsInContext)
+		ctx, scope.projectID, maximumLessonsInContext*5)
 	if err != nil || len(lessons) == 0 {
 		return nil
 	}
+	lessons = rankLessonsForRequirement(lessons, scope.requirement)
 	var body strings.Builder
 	body.WriteString(
 		"Earlier runs in this project were sent back for these reasons. They " +
@@ -152,4 +157,84 @@ func (execution *AgentExecution) lessonContextItems(
 	return []agentloop.RepositoryContextItem{
 		agentContextItem("lessons-from-earlier-runs", body.String()),
 	}
+}
+
+// rankLessonsForRequirement puts the lessons most likely to matter to this
+// request first.
+//
+// The match is deliberately fuzzy and deliberately cheap: shared meaningful
+// words between the lesson and the requirement. A run asked to parse JSON
+// should be shown what went wrong the last time something parsed JSON here
+// before it is shown a lesson about doc comments, and neither this nor any
+// available index can do better than word overlap without a model call, which
+// is not worth making to sort a list of eight.
+//
+// Recency breaks ties rather than driving the order. Newest-first alone put
+// whatever failed most recently in front of a run it may have nothing to do
+// with, and a list a run learns to skip is worse than no list, because it
+// costs context on every attempt and teaches the run to ignore the section.
+//
+// Lessons that share no words are kept, at the back. Several are general
+// enough to apply to anything -- build before you claim to be finished, never
+// discard an error -- and dropping them for scoring zero would lose exactly
+// the ones that are always true.
+func rankLessonsForRequirement(
+	lessons []storage.ProjectLesson, requirement string,
+) []storage.ProjectLesson {
+	wanted := meaningfulWords(requirement)
+	if len(wanted) == 0 || len(lessons) < 2 {
+		return lessons
+	}
+	type scored struct {
+		lesson storage.ProjectLesson
+		score  int
+		order  int
+	}
+	ranked := make([]scored, 0, len(lessons))
+	for index, lesson := range lessons {
+		overlap := 0
+		for word := range meaningfulWords(lesson.Statement) {
+			if wanted[word] {
+				overlap++
+			}
+		}
+		ranked = append(ranked, scored{lesson: lesson, score: overlap, order: index})
+	}
+	sort.SliceStable(ranked, func(first, second int) bool {
+		if ranked[first].score != ranked[second].score {
+			return ranked[first].score > ranked[second].score
+		}
+		return ranked[first].order < ranked[second].order
+	})
+	out := make([]storage.ProjectLesson, 0, len(ranked))
+	for _, item := range ranked {
+		out = append(out, item.lesson)
+	}
+	return out
+}
+
+// meaningfulWords reduces text to the words worth matching on.
+//
+// Short words and the handful that appear in every requirement carry no
+// signal, and counting them would score every lesson equally, which is the
+// same as not ranking at all.
+func meaningfulWords(text string) map[string]bool {
+	skip := map[string]bool{
+		"the": true, "and": true, "that": true, "this": true, "with": true,
+		"from": true, "into": true, "for": true, "not": true, "its": true,
+		"which": true, "when": true, "what": true, "each": true, "every": true,
+		"than": true, "then": true, "them": true, "they": true, "have": true,
+		"has": true, "was": true, "are": true, "one": true, "run": true,
+		"code": true, "test": true, "tests": true, "write": true,
+	}
+	words := map[string]bool{}
+	for _, raw := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+	}) {
+		if len(raw) < 4 || skip[raw] {
+			continue
+		}
+		words[raw] = true
+	}
+	return words
 }
