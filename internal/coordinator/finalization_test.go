@@ -15,7 +15,7 @@ import (
 // downstream knew how to finish a run that had not passed everything.
 func TestARefinementGateDoesNotBlockCompletion(t *testing.T) {
 	for _, advisory := range []pipeline.Number{
-		pipeline.StagePathCoverage,
+		pipeline.StageNonFunctional,
 		pipeline.StageAtomDocumentation,
 		pipeline.StageAtomRegistration,
 		pipeline.StageMoleculeRegistration,
@@ -26,11 +26,18 @@ func TestARefinementGateDoesNotBlockCompletion(t *testing.T) {
 	}
 	// The floor itself must never be advisory. If any of these were, a program
 	// that does not build could be reported as awaiting review.
+	//
+	// Path coverage belongs here rather than with the advisories. Uncovered
+	// lines are repairable and are now asked for inside the attempt loop, so
+	// making them advisory would mean discovering at finalisation something the
+	// run had attempts left to fix — which is the one shape of failure the
+	// refinement loop exists to prevent.
 	for _, blocking := range []pipeline.Number{
 		pipeline.StageAssembly,
 		pipeline.StageIntegrationTests,
 		pipeline.StageEndToEndTests,
 		pipeline.StageAtomVerification,
+		pipeline.StagePathCoverage,
 	} {
 		if advisoryStages[blocking] {
 			t.Errorf("stage %d was made advisory; it is the completion floor",

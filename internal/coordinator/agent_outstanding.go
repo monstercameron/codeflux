@@ -29,6 +29,9 @@ type outstanding struct {
 	// askedForDocumentation records whether this instruction asked for the
 	// atom schema, which is asked at most once per run.
 	askedForDocumentation bool
+	// askedForCoverage records whether this instruction named uncovered lines,
+	// so the caller can count the round it has spent.
+	askedForCoverage bool
 	// owedCases is how many synthesised cases were still untried when this was
 	// computed, so the next round can tell whether the run is closing the gap
 	// or standing still. See the case ladder in outstandingWork.
@@ -52,6 +55,9 @@ func (execution *AgentExecution) outstandingWork(
 	// documentationRounds is how many times this run has already been asked
 	// for the atom schema. It is asked once; see the block that uses it.
 	documentationRounds int,
+	// coverageRounds is how many times this run has already been shown its
+	// uncovered lines.
+	coverageRounds int,
 	// testsPassed is whether the run's own suite is actually known to have
 	// passed. Three instruction builders used to assert that it had, whether or
 	// not anything established it — see validationPreamble.
@@ -152,6 +158,36 @@ func (execution *AgentExecution) outstandingWork(
 	// Asked last, and only for leaf functions, because it is the most
 	// expensive instruction in the set — nineteen fields per atom — and a run
 	// still failing to compile has more urgent problems than being findable.
+	// Uncovered changed lines, while there are still attempts to fix them.
+	//
+	// This was measured only after the loop, in examineStructure, so a run
+	// converged, finished, and was then told that five of its thirty-nine
+	// changed lines are executed by nothing. Rung 2 did exactly that. A
+	// repairable failure discovered during finalisation is the one shape of
+	// failure the refinement loop exists to prevent, and it had no way of
+	// knowing: nothing asked.
+	//
+	// Bounded like the case ladder, and for the same reason. Coverage of
+	// generated code has a floor below which the remaining lines are error
+	// branches nothing can reach without contorting the program, and a run that
+	// has spent four rounds on it is not going to find the fifth.
+	const coverageRoundBackstop = 3
+	if len(parts) == 0 && coverageRounds < coverageRoundBackstop {
+		if uncovered := uncoveredChangedLines(
+			ctx, scope.worktree, attribution,
+		); len(uncovered) > 0 {
+			work.gate = "path-coverage"
+			work.because = "some of what it wrote is executed by nothing"
+			work.askedForCoverage = true
+			parts = append(parts, uncoveredLineInstruction(uncovered))
+			summaries = append(summaries, fmt.Sprintf(
+				"%d changed line(s) no test executes", len(uncovered)))
+		} else {
+			satisfied = append(satisfied,
+				"Every line this run wrote is executed by a test.")
+		}
+	}
+
 	// Only once everything else holds, and only once.
 	//
 	// This used to be asked alongside the delivery gates, and the two fought:
@@ -235,4 +271,45 @@ func wasOrWere(count int) string {
 		return "is"
 	}
 	return "are"
+}
+
+// uncoveredChangedLines names the lines this run wrote that nothing executes.
+//
+// It reuses the stage's own measurement rather than a second one of its own,
+// so the refinement loop and the terminal ledger cannot disagree about what is
+// covered — which is the failure mode that put this check after the loop in the
+// first place.
+func uncoveredChangedLines(
+	ctx context.Context, worktree string, attribution changeAttribution,
+) []string {
+	outcome := checkFunctionCoverage(ctx, worktree, attribution)
+	if outcome.Held || outcome.Skipped || outcome.Evidence == nil {
+		return nil
+	}
+	raw, present := outcome.Evidence["uncovered_changed_lines"]
+	if !present {
+		return nil
+	}
+	lines, ok := raw.([]string)
+	if !ok {
+		return nil
+	}
+	return lines
+}
+
+// uncoveredLineInstruction asks for a test that reaches each line.
+//
+// It names the lines rather than the percentage. A run told "coverage is 87%"
+// has to work out which lines the number is about before it can do anything;
+// a run told "main.go:41 is executed by nothing" already knows.
+func uncoveredLineInstruction(uncovered []string) string {
+	return fmt.Sprintf(
+		"These lines were written by this run and are executed by no test: "+
+			"%s.\n\nAdd a test that reaches each one. Where a line is an error "+
+			"branch, make the error happen rather than deleting the branch: a "+
+			"path nothing exercises is a path nothing has ever shown to work. "+
+			"If a line genuinely cannot be reached — a defensive check for a "+
+			"state the types forbid — say so in a comment on that line and "+
+			"leave it.",
+		strings.Join(uncovered, ", "))
 }

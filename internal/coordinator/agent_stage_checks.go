@@ -371,6 +371,29 @@ type nonFunctionalBaselines interface {
 // is a check people learn to ignore.
 const nonFunctionalTolerance = 1.5
 
+// nonFunctionalFloor is the absolute slack a suite gets on top of the ratio.
+//
+// A ratio alone measures noise when the baseline is small. A generated
+// program's suite runs in a few hundred milliseconds, and at that scale a
+// background process, a cold file cache or a thermal step moves the number by
+// more than half — ladder rung 2 failed this gate at 591ms against a 372ms
+// baseline, which is not a regression, it is Tuesday.
+//
+// The limit is therefore the larger of the ratio and a flat allowance. On a
+// suite that takes a minute the ratio dominates and this changes nothing; on a
+// suite that takes a third of a second the allowance dominates and the gate
+// stops reporting weather as a defect.
+const nonFunctionalFloor = 500 * time.Millisecond
+
+// nonFunctionalLimit is how long a suite may take before it counts as slower.
+func nonFunctionalLimit(baseline time.Duration) time.Duration {
+	scaled := time.Duration(float64(baseline) * nonFunctionalTolerance)
+	if floor := baseline + nonFunctionalFloor; floor > scaled {
+		return floor
+	}
+	return scaled
+}
+
 // checkNonFunctional measures the suite and compares it with the repository's
 // recorded baseline.
 //
@@ -457,7 +480,7 @@ func checkNonFunctional(
 			baseline.HostPlatform, host), evidence)
 	}
 
-	limit := time.Duration(float64(baseline.Elapsed) * nonFunctionalTolerance)
+	limit := nonFunctionalLimit(baseline.Elapsed)
 	evidence["limit_ms"] = limit.Milliseconds()
 	if elapsed > limit {
 		return broke(fmt.Sprintf(

@@ -239,8 +239,24 @@ func effectsOf(function producedFunction) []string {
 // N" would sweep in whatever gets added next, and the decision that a gate is
 // advisory is a judgement about that gate, made once, in writing.
 var advisoryStages = map[pipeline.Number]bool{
-	pipeline.StagePathCoverage:         true,
+	// A wall-clock measurement on a developer machine, where a background
+	// build moves the number more than most changes do.
+	pipeline.StageNonFunctional: true,
+	// Registry metadata. Useful, and not a property of whether the program is
+	// correct.
 	pipeline.StageAtomDocumentation:    true,
 	pipeline.StageAtomRegistration:     true,
 	pipeline.StageMoleculeRegistration: true,
+}
+
+// severityOf names a stage's severity for the trace.
+//
+// Printed beside every decision, because a reader watching a run go past
+// cannot otherwise tell a failure that will stop the work from one that will
+// be carried as a note, and the two look identical in a log.
+func severityOf(stage pipeline.Number) string {
+	if advisoryStages[stage] {
+		return "advisory"
+	}
+	return "hard"
 }

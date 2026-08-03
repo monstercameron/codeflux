@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-130
+Date: 2026-08-03
+Status: Blockers 1, 2 and 4 closed; 5 (registration) is next
+Change-ID: CL-20260803-120
+Commit: pending
+Request-or-TODO: The process-refinement analysis, items 1 to 4
+Goal: Stop losing runs to recoverable errors and stop discovering repairable
+  failures at finalisation
+Decisions: Bounded the absorbed loop errors at two. One is enough to survive a
+  transient bookkeeping mismatch; an error that repeats is not recoverable by
+  repetition.
+  Moved path coverage from advisory to hard, and into the loop. Advisory was
+  the right answer while it was only measurable after the loop; once it is
+  asked for while attempts remain, carrying it as an advisory would mean
+  finishing with something the run could have fixed.
+  Gave the perf gate an absolute floor rather than loosening the ratio.
+  Loosening the ratio would have hidden a real regression on a long suite; the
+  floor only affects the scale where the ratio was measuring noise.
+  Reused the stage's own coverage measurement in the loop rather than writing a
+  second one, so the refinement loop and the terminal ledger cannot disagree
+  about what is covered
+Files-or-schemas: agent_execution.go, agent_outstanding.go,
+  agent_stage_checks.go and its test, agent_stage_delivery.go, trace.go,
+  finalization_test.go
+Validation: Build, vet, gofmt, four coordinator tests
+Failures-or-discarded-approaches: None
+Known-limitations: Items 5 to 12 remain -- atom registration reaching
+  atom_names, the code-reuse canary, influence recording, memory observability,
+  narration filtered by run, the acceptance/extraction loop, lesson quality,
+  and the end-to-end invariant
+Next-safe-step: Rung 5 alone, in a terminal
+
 Dev-Log: DL-20260803-129
 Date: 2026-08-03
 Status: Rungs 1 and 2 pass in a shared root; rung 3 aborted on a defect of mine

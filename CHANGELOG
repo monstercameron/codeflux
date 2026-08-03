@@ -50,6 +50,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-120
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the three blockers: fatal loop errors, late gates, and a noise gate
+Request-or-TODO: Process-refinement analysis, 2026-08-03, items 1 to 4
+Outcome: A loop error this code had no name for ended the run outright. Two
+  named errors were absorbed and everything else was fatal, which put "the loop
+  refused a tool result whose identity it could not match" in the same category
+  as "the database will not open". Rung 3 died on exactly that, having already
+  written a working program and needing one more attempt to add a missing
+  import; thirty-seven stages were recorded as never performed because of one
+  refused turn. Unrecognised loop errors now cost an attempt, bounded at two,
+  after which the run ends with the error -- which is correct for a machine
+  that is actually broken.
+  Path coverage was measured only after the attempt loop, so a run converged,
+  finished, and was then told that five of its thirty-nine changed lines are
+  executed by nothing. Rung 2 did exactly that. Uncovered lines are now named
+  inside the loop, while attempts remain, with the lines listed rather than a
+  percentage: a run told "coverage is 87%" has to work out which lines the
+  number is about before it can act. Bounded at three rounds, because coverage
+  of generated code has a floor below which the remaining lines are error
+  branches nothing reaches without contorting the program.
+  The non-functional gate stopped reporting weather as a defect. A ratio alone
+  measures noise when the baseline is small: rung 2 failed at 591ms against a
+  372ms baseline. The limit is now the larger of the 1.5x ratio and the
+  baseline plus half a second, so a minute-long suite is unaffected and a
+  third-of-a-second suite stops crying wolf. It also joins the advisory set,
+  where a wall-clock measurement on a developer machine belongs.
+  Severity is printed beside every stage decision. A reader watching a run
+  could not otherwise tell a failure that stops the work from one carried as a
+  note, and the two look identical in a log.
+Verification: Build, vet, gofmt, the finalization and non-functional tests
+Dev-Log: DL-20260803-130
+
 Change-ID: CL-20260803-119
 Commit: pending
 Date: 2026-08-03

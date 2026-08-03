@@ -97,8 +97,11 @@ func traceStage(stage pipeline.Number, state pipeline.State, detail string) {
 	if declared, found := pipeline.StageByNumber(stage); found {
 		name, gate = declared.Name, declared.Gate
 	}
-	tracef("stage", "%2d %-26s %-16s %s",
-		int(stage), name, state, traceOneLine(detail, 130))
+	// The severity is printed beside every decision. A reader watching a run go
+	// past cannot otherwise tell a failure that will stop the work from one
+	// that will be carried as a note, and the two look identical in a log.
+	tracef("stage", "%2d %-26s %-16s %-8s %s",
+		int(stage), name, state, severityOf(stage), traceOneLine(detail, 120))
 	if state != pipeline.StateSatisfied && gate != "" {
 		tracef("gate", "   %-26s wanted: %s", "", traceOneLine(gate, 130))
 	}

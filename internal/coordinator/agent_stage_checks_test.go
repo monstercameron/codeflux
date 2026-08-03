@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // writeWorktree lays out a small module to run the stage checks against.
@@ -267,5 +268,26 @@ func TestComplexityFollowsLoopNesting(t *testing.T) {
 					complexityLabel(function.LoopDepth))
 			}
 		}
+	}
+}
+
+// TestASubsecondSuiteIsNotJudgedByRatioAlone covers the noise floor.
+//
+// Ladder rung 2 failed this gate at 591ms against a 372ms baseline, which is
+// not a regression: at that scale a background process or a cold file cache
+// moves the number by more than half.
+func TestASubsecondSuiteIsNotJudgedByRatioAlone(t *testing.T) {
+	if limit := nonFunctionalLimit(372 * time.Millisecond); limit <= 591*time.Millisecond {
+		t.Errorf("a 372ms baseline allows only %s, so 591ms reads as a "+
+			"regression", limit)
+	}
+	// On a suite where the ratio means something, the ratio still governs.
+	if limit := nonFunctionalLimit(60 * time.Second); limit != 90*time.Second {
+		t.Errorf("a 60s baseline allows %s, wanted the 1.5x ratio", limit)
+	}
+	// And a genuine collapse is still caught.
+	if limit := nonFunctionalLimit(400 * time.Millisecond); limit >= 5*time.Second {
+		t.Errorf("a 400ms baseline allows %s, which would hide a real "+
+			"regression", limit)
 	}
 }

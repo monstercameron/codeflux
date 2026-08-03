@@ -402,6 +402,7 @@ func (execution *AgentExecution) Run(
 
 	caseRounds := 0
 	documentationRounds := 0
+	coverageRounds := 0
 	// The circuit breaker's state: how many identical infrastructure failures
 	// have happened in a row, against what, and whether it has opened.
 	// attemptedFindings remembers which criticisms this run has already been
@@ -410,6 +411,7 @@ func (execution *AgentExecution) Run(
 	attemptedFindings := map[string]bool{}
 	var carriedAdvisories []adversarialFinding
 	reviewRounds := 0
+	unrecognisedLoopErrors := 0
 	repeatedInfrastructureFailures := 0
 	lastInfrastructureOutcome := ""
 	lastInfrastructureTree := ""
@@ -705,6 +707,29 @@ func (execution *AgentExecution) Run(
 			continue
 		}
 		if runErr != nil {
+			// A loop error this does not recognise costs an attempt, not the
+			// run — up to a point.
+			//
+			// Two named errors were absorbed here and everything else ended the
+			// run outright, which put "the loop refused a tool result whose
+			// identity it could not match" in the same category as "the
+			// database will not open". Ladder rung 3 died on exactly that,
+			// having already written a working program and needing one more
+			// attempt to add a missing import; thirty-seven stages were
+			// recorded as never performed because of one refused turn.
+			//
+			// Bounded, because an error that repeats is not recoverable by
+			// repetition. Past the bound the run ends with the error, which is
+			// the correct outcome for a machine that is actually broken.
+			unrecognisedLoopErrors++
+			if unrecognisedLoopErrors <= maximumUnrecognisedLoopErrors {
+				sendBack("assembly", loopRefusalInstruction(runErr),
+					"the loop refused the attempt")
+				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+					"Attempt %d was refused by the loop: %s. Trying again.",
+					attempt, runErr.Error()))
+				continue
+			}
 			execution.say(ctx, scope, events.KindMessageFinal,
 				"The run stopped: "+runErr.Error())
 			return runErr
@@ -907,7 +932,7 @@ func (execution *AgentExecution) Run(
 		// record what the agent's own tool calls did, and the agent's last act
 		// is almost always a write.
 		outstanding := execution.outstandingWork(
-			ctx, scope, caseRounds, documentationRounds, true)
+			ctx, scope, caseRounds, documentationRounds, coverageRounds, true)
 		if outstanding.any() && progress.lastAttempt() {
 			// Out of attempts with work still owed. Saying so is the whole
 			// point: the run used to fall through here and report
@@ -922,6 +947,9 @@ func (execution *AgentExecution) Run(
 			}
 			if outstanding.askedForDocumentation {
 				documentationRounds++
+			}
+			if outstanding.askedForCoverage {
+				coverageRounds++
 			}
 			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
@@ -2038,4 +2066,28 @@ func terminalReport(facts terminalFacts) string {
 		}
 	}
 	return strings.TrimRight(report.String(), "\n")
+}
+
+// maximumUnrecognisedLoopErrors bounds how many times a run absorbs a loop
+// error it has no name for.
+//
+// Two is enough to survive a transient bookkeeping mismatch and few enough that
+// a genuinely broken machine still ends the run rather than spending its whole
+// budget rediscovering that it is broken.
+const maximumUnrecognisedLoopErrors = 2
+
+// loopRefusalInstruction is what the next attempt is told when the loop refused
+// the last one for a reason of its own.
+//
+// It names the refusal and then says the only thing that reliably helps: do the
+// same work in a plainer way. The refusals in this class are about the shape of
+// a turn -- two writes to one file, a result whose identity does not match a
+// call -- and the model cannot inspect that shape, so telling it the mechanism
+// would be telling it something it cannot act on.
+func loopRefusalInstruction(refusal error) string {
+	return "The last attempt was refused before any of its work was recorded: " +
+		refusal.Error() + "\n\nNothing was rolled back; every file the earlier " +
+		"attempts wrote is still in the worktree exactly as they left it. " +
+		"Continue from there. Make one change at a time, write each file once, " +
+		"and run the tests after the write rather than alongside it."
 }
