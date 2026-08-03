@@ -50,6 +50,49 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-099
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a mislabelled write no longer costs an attempt, and stages can be
+  re-decided without paying for a run
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: A tool call names the plan step it belongs to, and the loop refused
+  the whole turn when the named step did not own the path. On ladder rung 5
+  that discarded two of six attempts -- a third of the budget -- because the
+  model attributed a write of main.go to the step that names main_test.go. The
+  plan was not being violated: the file was one the plan itself asked for by a
+  call that misfiled itself. When exactly one executable step names the path,
+  the call is bound to that step instead. A path no step names, a path several
+  name, and a step already closed are all still refused.
+  The consequence of refusing was worse than a lost attempt. The turn that
+  would have updated a test after its function was renamed was discarded, and
+  the worktree was left with main.go defining aggregate and main_test.go
+  calling aggregateTotals -- a suite that did not compile, which then failed
+  six stages that were all reporting it correctly.
+  A successful test run summarised as its first output line, which for `go test
+  ./...` in a module whose root holds no tests is "? pkg [no test files]" -- a
+  sentence that reads as "nothing ran" for a run whose tests had just passed.
+  It was misread as a failure twice in one day, once while diagnosing an
+  unrelated defect. An ok line is preferred now, then any line that is not a
+  package notice.
+  RecheckWorktree decides every stage that reads only the worktree, against a
+  worktree an earlier run produced, with no model call. Iterating on a gate
+  meant paying for the generation half again every time; a one-line fix to a
+  check cost a full paid run to evaluate, and several of them for a defect that
+  only appears at stage seven
+Affected-behavior: A mislabelled but unambiguous write is bound rather than
+  refused. Passing runs read as passing
+Compatibility-or-migration: RecheckWorktree is additive and decides fifteen of
+  the forty-one stages. The rest need a run's own context and are absent from
+  its result rather than guessed at
+Verification: Four tests on the step binding, three of them controls that keep
+  the contract intact. Two on the summary. The recheck was exercised against
+  rung 5's own worktree and diagnosed in two seconds what a paid run had taken
+  three minutes to show
+Known-limitations: The recheck cannot decide the stages that need a plan,
+  acceptance examples, attribution or a provider, and says so by omitting them
+Dev-Log: DL-20260803-109
+
 Change-ID: CL-20260803-098
 Commit: pending
 Date: 2026-08-03

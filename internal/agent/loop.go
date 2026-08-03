@@ -379,7 +379,27 @@ func (loop *ExecutionLoop) Run(
 				plan.Steps[stepIndex],
 				decoded.request,
 			); err != nil {
-				return LoopOutcome{}, err
+				// The model labelled the call with the wrong step. If exactly
+				// one other executable step names this very path, the label is
+				// the only thing wrong and the plan is not being violated: the
+				// file is one the plan asked for, written by a call that
+				// misfiled itself.
+				//
+				// Refusing the turn instead discarded everything in it. On
+				// ladder rung 5 that cost two of six attempts — a third of the
+				// run's budget — for a mislabelled step on a file the plan
+				// itself named. The contract is unchanged: a path no step
+				// names, or one that several name, is still refused.
+				corrected, ok := stepOwningPath(plan, decoded.request)
+				if !ok {
+					return LoopOutcome{}, err
+				}
+				stepIndex = corrected
+				if err := validateToolStepCompatibility(
+					plan.Steps[stepIndex], tool,
+				); err != nil {
+					return LoopOutcome{}, err
+				}
 			}
 			authorization, err := loop.dependencies.Authority.RouteTool(
 				ctx,
@@ -1502,4 +1522,39 @@ func validSHA256(value string) bool {
 		}
 	}
 	return true
+}
+
+// stepOwningPath finds the one executable plan step that names a tool call's
+// path.
+//
+// It reports false unless exactly one step matches. Zero means the plan never
+// asked for this file and the call is reaching outside the contract. Several
+// means the plan is ambiguous about who owns it, and guessing there would
+// attribute work to a step by luck — which is the failure the step scope
+// exists to prevent, not one worth trading for convenience.
+func stepOwningPath(plan PlanProjection, request executor.ToolRequest) (int, bool) {
+	path, found := requestArgument(request, "path")
+	if !found {
+		return 0, false
+	}
+	matched, count := 0, 0
+	for index, step := range plan.Steps {
+		if !stepKindRequiresExpectedFiles(step.Kind) {
+			continue
+		}
+		if step.State == StepImplemented || step.State == StepValidated ||
+			step.State == StepFailed || step.State == StepSkipped {
+			continue
+		}
+		for _, expected := range step.ExpectedFiles {
+			if path == expected || strings.HasPrefix(path, expected+"/") {
+				matched, count = index, count+1
+				break
+			}
+		}
+	}
+	if count != 1 {
+		return 0, false
+	}
+	return matched, true
 }

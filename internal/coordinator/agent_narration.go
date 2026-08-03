@@ -90,7 +90,9 @@ func (narrator *narratingExecutor) ExecuteTool(
 		return result, err
 	}
 	summary := detail
-	if outcome := strings.TrimSpace(firstLineOf(result.StdoutRedacted)); outcome != "" {
+	if outcome := strings.TrimSpace(
+		succeedingLineOf(result.StdoutRedacted),
+	); outcome != "" {
 		summary += " — " + outcome
 	}
 	if result.State != "succeeded" {
@@ -738,4 +740,40 @@ func boundLine(line string) string {
 		return line[:bound] + "…"
 	}
 	return line
+}
+
+// succeedingLineOf is the line worth quoting from a command that worked.
+//
+// It is the mirror of failingLineOf and exists for the same reason. Go prints
+// a package's status before it prints the package that matters, so a passing
+// `go test ./...` in a module whose root holds no tests summarised as
+// "? codeflux.test/workspace [no test files]" — which reads as "nothing ran"
+// for a run whose tests had just passed. That sentence was misread as a
+// failure twice on 2026-08-03, once by a person reading a timeline and once
+// while diagnosing a different defect entirely.
+//
+// An "ok" line is preferred, then any line that is not a package-has-no-tests
+// notice, and the first line is the fallback so a command with nothing else to
+// say still says something.
+func succeedingLineOf(text string) string {
+	var firstOther string
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "ok ") || strings.HasPrefix(trimmed, "ok\t") {
+			return trimmed
+		}
+		if strings.HasPrefix(trimmed, "?") {
+			continue
+		}
+		if firstOther == "" {
+			firstOther = trimmed
+		}
+	}
+	if firstOther != "" {
+		return firstOther
+	}
+	return strings.TrimSpace(firstLineOf(text))
 }

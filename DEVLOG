@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-109
+Date: 2026-08-03
+Status: Rung 5 traced end to end; two of its six wasted attempts explained
+Change-ID: CL-20260803-099
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Stop the platform wasting a run's budget on its own brittleness
+Decisions: Corrected the step label rather than relaxing the scope. The plan
+  stays a contract -- every write must still be a file the plan named -- and
+  only the attribution is repaired, and only when it is unambiguous. Several
+  steps naming one path is refused precisely because guessing there attributes
+  work by luck, which is the failure the scope exists to prevent.
+  Built the recheck around the checks that need only a worktree, and left the
+  others out. Reporting a stage this cannot decide would make the tool the
+  same kind of overclaim the ledger was built to stop
+Files-or-schemas: internal/agent/loop.go and a new ownership test,
+  agent_narration.go, a new recheck.go and its dev command
+Validation: The agent package suite; the two summary tests; the recheck run
+  against rung 5's worktree
+Failures-or-discarded-approaches: None
+Known-limitations: Fifteen of forty-one stages are re-decidable this way
+Next-safe-step: Re-run rung 5 and confirm the worktree stays consistent
+
 Dev-Log: DL-20260803-108
 Date: 2026-08-03
 Status: Rung one green; rung two down to gates it can now be told about
