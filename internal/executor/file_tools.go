@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"sort"
@@ -187,12 +189,58 @@ func listWorktreeDirectory(target string) (string, error) {
 	return strings.Join(names, "\n"), nil
 }
 
+// goSourceIsWellFormed reports whether content parses as a Go source file,
+// and if not, why.
+//
+// Only the parse is checked, not whether the code is correct or compiles:
+// undefined names, type errors and unused imports are the compiler's business
+// and the flow's, and refusing them here would make this tool an opinion about
+// code rather than a guard on the file.
+func goSourceIsWellFormed(path, content string) error {
+	// testdata is excluded by the same convention the Go toolchain uses: a
+	// file under it is deliberately outside the build, and a fixture that does
+	// not parse is sometimes exactly the point.
+	slashed := filepath.ToSlash(path)
+	if !strings.HasSuffix(slashed, ".go") ||
+		slashed == "testdata" ||
+		strings.HasPrefix(slashed, "testdata/") ||
+		strings.Contains(slashed, "/testdata/") {
+		return nil
+	}
+	if _, err := parser.ParseFile(
+		token.NewFileSet(), path, content, parser.SkipObjectResolution,
+	); err != nil {
+		return fmt.Errorf(
+			"this is a .go file and the content does not parse as Go: %s. "+
+				"Write the file's source exactly, with no surrounding prose, "+
+				"markdown fence, diff marker or heading", err)
+	}
+	return nil
+}
+
 // writeWorktreeFile writes one file, creating the directories it needs.
 func writeWorktreeFile(target, content string) (string, error) {
 	if len(content) > maximumFileToolBytes {
 		return "", fmt.Errorf(
 			"the content is %d bytes, past the %d-byte write limit",
 			len(content), maximumFileToolBytes)
+	}
+	// A .go file that is not Go is refused here rather than written and
+	// discovered by the build.
+	//
+	// Observed on ladder rung 2 twice in one run: the model wrote a file
+	// beginning with an asterisk and the build failed with "expected
+	// 'package', found '*'". Each occurrence cost a whole attempt — a write, a
+	// build, a send-back and a full rewrite — and one of them was the last
+	// attempt the run had, so the flow recorded every structural stage as
+	// blocked because the module did not build.
+	//
+	// The content is refused, never repaired. Stripping a fence or a heading
+	// here would hide the defect from the run that caused it and leave the
+	// model no reason to stop producing it; the error says exactly what is
+	// wrong and what to write instead, in the same round.
+	if err := goSourceIsWellFormed(target, content); err != nil {
+		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return "", errors.New("the containing directory could not be created")

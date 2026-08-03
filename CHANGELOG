@@ -50,6 +50,49 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-097
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- refuse non-Go in a .go file, and stop demanding a test twice
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: Two more defects found by climbing rung two, both costing whole
+  attempts of a run that was otherwise converging.
+  The write tool wrote whatever it was handed and reported the byte count. On
+  one run the model twice wrote a file whose first character was an asterisk,
+  the build failed with "expected 'package', found '*'", and each occurrence
+  cost a write, a build, a send-back and a full rewrite. One landed on the
+  run's last attempt, so every structural stage recorded blocked because the
+  module did not build. A .go write is now parsed before it lands and refused
+  with a message the model can act on in the same round.
+  Only the parse is checked. Code that will not compile, names something
+  undefined, or carries an unused import is still written, because that is the
+  compiler's business and the flow's; refusing it here would turn a guard on
+  the file into an opinion about the code. The content is refused rather than
+  repaired: stripping a fence would hide the defect from the run that caused it
+  and leave the model no reason to stop producing it. Files under testdata are
+  exempt by the same convention the Go toolchain uses.
+  Separately, the case gate counted an empty slice and a nil slice as two
+  demands. A function that ranges over a slice cannot tell []string{} from a
+  nil []string -- both have length zero and both yield nothing -- so a run that
+  wrote {name: "empty", args: nil} was told the empty input was never tried and
+  sent back to write the test it had already written
+Affected-behavior: A malformed .go write fails at the tool with a specific
+  reason instead of at the build with a parse error attributed to the run. The
+  case gate stops asking for a duplicate test
+Compatibility-or-migration: None
+Verification: The write guard is proven against four real shapes of malformed
+  output -- a markdown heading, a fenced block, a diff marker and prose before
+  the source -- with a control admitting code that parses but will not compile,
+  and a control for the testdata and non-Go exemptions. The nil equivalence is
+  proven both ways: nil covers the empty case, and says nothing about the
+  single-element or duplicate cases
+Known-limitations: The nil scan is textual and asks whether the suite ever
+  supplies nil, not whether it supplies it to this parameter. Resolving that
+  properly means the call graph, which is the mutation stage's job, and the
+  failure mode of being shallow here is far cheaper than telling a run to
+  rewrite a test it already has
+Dev-Log: DL-20260803-107
+
 Change-ID: CL-20260803-096
 Commit: pending
 Date: 2026-08-03

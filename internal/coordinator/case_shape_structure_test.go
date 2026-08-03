@@ -115,3 +115,49 @@ func TestScalarCaseShapesAreStillMatchedLiterally(t *testing.T) {
 		}
 	}
 }
+
+// TestAnEmptySliceCaseIsSatisfiedByNil is the equivalence the gate was missing.
+//
+// A function that ranges over a slice cannot tell []string{} from a nil
+// []string: both have length zero and both yield nothing. The synthesiser
+// emits both forms because both are worth naming in the instruction, but
+// counting them as two demands told a run that had already covered the empty
+// input to write the same test again.
+//
+// Observed on ladder rung 2: the model wrote `{name: "empty", args: nil}`,
+// which is the empty case, and the gate reported []string{} as never tried.
+func TestAnEmptySliceCaseIsSatisfiedByNil(t *testing.T) {
+	tests := []string{"TestParseIntegers"}
+	withNil := `
+		func TestParseIntegers(t *testing.T) {
+			for _, tt := range []struct{ args []string }{
+				{args: nil},
+				{args: []string{"12", "-3", "0"}},
+			} {
+				_ = tt
+			}
+		}`
+	candidate := atomCase{Shape: `[]string{}`, Class: caseEdge}
+	if !caseIsTried(withNil, tests, candidate) {
+		t.Error("a suite that passes nil has tried the empty input")
+	}
+
+	// The equivalence is for the empty case only. A nil somewhere in the
+	// suite must not excuse the single-element or duplicate cases, or the
+	// gate would agree with almost anything.
+	for _, shape := range []string{`[]string{"a"}`, `[]string{"a", "a", "a"}`} {
+		if caseIsTried(withNil, tests, atomCase{Shape: shape, Class: caseEdge}) {
+			t.Errorf("nil says nothing about %s, which is still untried", shape)
+		}
+	}
+}
+
+// TestNilInsideAnIdentifierIsNotTheKeyword pins the scan.
+func TestNilInsideAnIdentifierIsNotTheKeyword(t *testing.T) {
+	tests := []string{"TestParse"}
+	source := `func TestParse(t *testing.T) { nilable := 1; _ = nilable }`
+	candidate := atomCase{Shape: `[]string{}`, Class: caseEdge}
+	if caseIsTried(source, tests, candidate) {
+		t.Error("nil inside nilable is not the keyword and must not count")
+	}
+}

@@ -387,6 +387,16 @@ func caseIsTried(testSource string, tests []string, candidate atomCase) bool {
 	// no invented part and is still matched literally: "nil", `""` and 0 mean
 	// exactly themselves.
 	if wanted, isComposite := compositeShapeSignature(candidate.Shape); isComposite {
+		// An empty composite and nil are one demand, not two. A function that
+		// ranges over a slice cannot tell []string{} from a nil []string —
+		// both have length zero and both yield nothing — so a suite that
+		// passes nil has tried the empty input. The synthesiser emits both
+		// forms because both are worth naming in the instruction; counting
+		// them separately asked the run to write the same test twice, and a
+		// run that had covered the case was told it had not.
+		if wanted.cardinality == "none" && mentionsNilArgument(testSource) {
+			return true
+		}
 		return testSourceHasCompositeShape(testSource, wanted)
 	}
 	return strings.Contains(testSource, candidate.Shape)
@@ -440,6 +450,51 @@ func untriedCases(worktree string) (map[string][]atomCase, error) {
 		}
 	}
 	return owed, nil
+}
+
+// mentionsNilArgument reports whether the tests pass nil anywhere.
+//
+// Deliberately shallow, in the same way this whole check is: it asks whether
+// the suite ever supplies nil, not whether it supplies it to this parameter.
+// The alternative is resolving argument positions through the call graph,
+// which is what the mutation stage is for, and the failure mode of being
+// shallow here is counting an empty case as covered by a nil somewhere else —
+// far cheaper than telling a run to write a test it has already written.
+func mentionsNilArgument(testSource string) bool {
+	for index := 0; index < len(testSource); {
+		found := strings.Index(testSource[index:], "nil")
+		if found < 0 {
+			return false
+		}
+		at := index + found
+		before := byte(' ')
+		if at > 0 {
+			before = testSource[at-1]
+		}
+		after := byte(' ')
+		if at+3 < len(testSource) {
+			after = testSource[at+3]
+		}
+		if !isIdentifierByte(before) && !isIdentifierByte(after) {
+			return true
+		}
+		index = at + 3
+	}
+	return false
+}
+
+// isIdentifierByte reports whether a byte can appear inside a Go identifier,
+// so "nil" inside "nilable" is not read as the keyword.
+func isIdentifierByte(character byte) bool {
+	switch {
+	case character >= 'a' && character <= 'z',
+		character >= 'A' && character <= 'Z',
+		character >= '0' && character <= '9',
+		character == '_':
+		return true
+	default:
+		return false
+	}
 }
 
 // compositeShapeSignature is what a composite literal is being asked for,

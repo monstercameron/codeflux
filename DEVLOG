@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-107
+Date: 2026-08-03
+Status: Rung two reaches the same gates rung one passes
+Change-ID: CL-20260803-097
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Make rung two pass every stage before moving to rung three
+Decisions: Put the Go check at the write rather than adding a repair step. A
+  tool that quietly fixes its input teaches the caller nothing and hides how
+  often the caller is wrong.
+  Checked only that the source parses. The line between "this is not a Go file"
+  and "this Go file is wrong" is the line between a guard and an opinion, and
+  the compiler already holds the second one.
+  Exempted testdata rather than allowing an override, because the exemption is
+  a convention the toolchain already defines and an override would be a way
+  around the guard.
+  Read the model's actual test before deciding the empty-slice case was a
+  defect. It had written args: nil, which is the case; the gate wanted the
+  other spelling of the same thing
+Files-or-schemas: internal/executor/file_tools.go and a new guard test,
+  internal/coordinator/agent_stage_cases.go and its case-shape test
+Validation: Twelve subtests across the guard's three boundaries; the case
+  equivalence both ways. Rung two reached attempt nine with the case gate
+  satisfied and failed instead on a genuine test failure, which is the flow
+  reporting the run correctly rather than refusing it
+Failures-or-discarded-approaches: None
+Known-limitations: The nil scan does not resolve argument positions
+Next-safe-step: Rung two's remaining gate, then rung three
+
 Dev-Log: DL-20260803-106
 Date: 2026-08-03
 Status: Rung one green; rung two reaches every stage
