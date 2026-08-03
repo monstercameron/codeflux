@@ -218,12 +218,24 @@ func goSourceIsWellFormed(path, content string) error {
 	// attempts and got a column number each time.
 	if opening := firstMeaningfulSourceLine(content); opening != "" &&
 		!strings.HasPrefix(opening, "package ") {
+		// A patch is named as a patch, because that is the mistake being made
+		// and "not source at all" does not tell a model which of its habits to
+		// drop. Rung 6 sent "*** Begin Patch" three times in a row.
+		if looksLikeAPatch(opening) {
+			return fmt.Errorf(
+				"this tool has no patch mode: it takes one file's complete "+
+					"new contents, and what arrived begins %q. Send the whole "+
+					"file, from its package clause to its last line, as it "+
+					"should be after the change. Read the file first if you "+
+					"need the parts you are not changing",
+				traceableOpening(opening))
+		}
 		return fmt.Errorf(
 			"this is a .go file and its first line is %q. A Go file begins "+
 				"with a package clause. What arrived is not source at all — a "+
-				"fence, a diff, a marker, or a placeholder — so write the "+
-				"file's complete text, starting at \"package\", with nothing "+
-				"around it", traceableOpening(opening))
+				"fence, a marker, or a placeholder — so write the file's "+
+				"complete text, starting at \"package\", with nothing around "+
+				"it", traceableOpening(opening))
 	}
 	if _, err := parser.ParseFile(
 		token.NewFileSet(), path, content, parser.SkipObjectResolution,
@@ -334,4 +346,24 @@ func redactFileToolText(
 	}
 	result.text = redacted.Text
 	return result, nil
+}
+
+// looksLikeAPatch reports whether content is a diff or an apply-patch envelope
+// rather than a file.
+//
+// Named openings only. Guessing from content would misread a Go file that
+// happens to start oddly, and the openings that matter are few and unambiguous:
+// the unified-diff hunk header, its file headers, and the envelope markers the
+// major patch formats use.
+func looksLikeAPatch(opening string) bool {
+	for _, marker := range []string{
+		"@@", "*** Begin Patch", "*** End Patch", "*** Update File",
+		"*** Add File", "*** Delete File", "--- ", "+++ ", "diff --git",
+		"Index: ", "<<<<<<<",
+	} {
+		if strings.HasPrefix(opening, marker) {
+			return true
+		}
+	}
+	return false
 }

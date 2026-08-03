@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-142
+Date: 2026-08-03
+Status: The largest remaining source of churn in rung 6 is closed
+Change-ID: CL-20260803-132
+Commit: pending
+Request-or-TODO: The rung 6 trace
+Goal: Stop the write tool asking for something it will not accept
+Decisions: Fixed the description rather than adding another rule about
+  malformed writes. Four refusals in a row is not a model that will not listen;
+  it is a contract that says one thing and enforces another, and the contract
+  was wrong.
+  Detected patches from named openings only. Guessing from content would
+  misread a Go file that happens to start oddly, and the openings that matter
+  are few and unambiguous
+Files-or-schemas: internal/executor/protocol.go, file_tools.go and its tests,
+  go_source_write_guard_test.go
+Validation: Build, vet, gofmt, the executor suite
+Failures-or-discarded-approaches: None
+Known-limitations: The tool still takes whole files. Supporting patches
+  properly would suit the model's evident preference and is a larger change
+  than this: it needs a patch applier, hunk matching, and a policy for a hunk
+  that does not apply
+Next-safe-step: Rung 6 again, then 3 and 4, which have not been re-run since
+  their blocking defects were fixed
+
 Dev-Log: DL-20260803-141
 Date: 2026-08-03
 Status: Rung 6 passes its behaviour check and does not converge; the trace now

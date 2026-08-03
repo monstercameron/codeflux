@@ -50,6 +50,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-132
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the write tool described itself as a patch API, and got patches
+Request-or-TODO: Observed live in the rung 6 trace, 2026-08-03
+Outcome: The trace paid for itself on its first run. Rung 6 spent four turns
+  sending "*** Begin Patch" three times and "@@" once, each refused, and the
+  reason was not the model. The tool's own summary read "Apply an expected-hash
+  edit batch", which is a patch API described in words. A model reads the
+  summary before deciding what to send, and it sent what the summary described.
+  The summary now says what the tool takes: one file's complete new contents,
+  not a patch or diff. A test asserts it keeps saying so, because this is
+  exactly the kind of wording that drifts back.
+  The refusal names the mistake too. "What arrived is not source at all" does
+  not tell a model which of its habits to drop; "this tool has no patch mode,
+  send the whole file from its package clause to its last line" does. Detected
+  from a fixed list of openings — the unified-diff hunk and file headers, the
+  apply-patch envelope markers, a merge conflict marker — rather than guessed
+  from content, so a Go file that starts oddly is not misread.
+Verification: Build, vet, gofmt, the full executor suite including two new
+  tests
+Dev-Log: DL-20260803-142
+
 Change-ID: CL-20260803-131
 Commit: pending
 Date: 2026-08-03

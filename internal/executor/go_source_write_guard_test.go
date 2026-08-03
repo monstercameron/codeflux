@@ -36,10 +36,19 @@ func TestWritingNonGoIntoAGoFileIsRefused(t *testing.T) {
 				t.Fatal("a .go file that does not parse as Go must be refused " +
 					"at the write, not discovered by the build one attempt later")
 			}
-			if !strings.Contains(err.Error(), "does not parse as Go") {
+			// Two shapes of refusal, both acceptable and each better for what
+			// it covers: content that is not source at all is named by its
+			// opening, and content that is nearly source is named by the
+			// parser. What matters is that both say what to write instead.
+			message := err.Error()
+			if !strings.Contains(message, "does not parse as Go") &&
+				!strings.Contains(message, "begins with a package clause") &&
+				!strings.Contains(message, "no patch mode") {
 				t.Errorf("the refusal should say what is wrong, got %q", err)
 			}
-			if !strings.Contains(err.Error(), "no surrounding prose") {
+			if !strings.Contains(message, "no surrounding prose") &&
+				!strings.Contains(message, "complete text") &&
+				!strings.Contains(message, "complete new contents") {
 				t.Errorf("the refusal should say what to write instead, got %q", err)
 			}
 		})

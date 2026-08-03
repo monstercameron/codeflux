@@ -122,7 +122,12 @@ func ToolCatalog() []ToolDescriptor {
 		{Name: ToolListDirectory, SchemaVersion: ToolSchemaVersion, Summary: "List one bounded task directory", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
 		{Name: ToolSearchText, SchemaVersion: ToolSchemaVersion, Summary: "Search bounded repository text", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
 		{Name: ToolSearchSymbol, SchemaVersion: ToolSchemaVersion, Summary: "Search the revision-bound symbol map", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
-		{Name: ToolApplyEdit, SchemaVersion: ToolSchemaVersion, Summary: "Apply an expected-hash edit batch", DefaultAuthority: AuthorityTaskWrite, Effects: []SideEffect{EffectTaskWorktreeWrite}},
+		// The summary is what a model reads before deciding what to send, and
+		// "apply an expected-hash edit batch" reads like a patch API. It got
+		// what it asked for: ladder rung 6 sent "*** Begin Patch" three times
+		// and "@@" once across four turns, each refused, each a wasted turn.
+		// The tool takes a whole file, so the summary says a whole file.
+		{Name: ToolApplyEdit, SchemaVersion: ToolSchemaVersion, Summary: "Write one file's complete new contents (not a patch or diff)", DefaultAuthority: AuthorityTaskWrite, Effects: []SideEffect{EffectTaskWorktreeWrite}},
 		{Name: ToolInspectDiff, SchemaVersion: ToolSchemaVersion, Summary: "Inspect the exact task diff", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
 		{Name: ToolRunCommand, SchemaVersion: ToolSchemaVersion, Summary: "Run one mediated argument-array command", DefaultAuthority: AuthorityPrivileged, Effects: []SideEffect{EffectSubprocess}},
 		{Name: ToolGitStatus, SchemaVersion: ToolSchemaVersion, Summary: "Inspect task Git status", DefaultAuthority: AuthorityAutomaticRead, Effects: []SideEffect{EffectRepositoryRead}},
