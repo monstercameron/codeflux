@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +11,9 @@ import (
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/executor"
 	"codeflux.dev/codeflux/internal/fingerprint"
+	"codeflux.dev/codeflux/internal/providers"
 	"codeflux.dev/codeflux/internal/storage"
 	"codeflux.dev/codeflux/internal/transport"
 )
@@ -28,27 +31,48 @@ import (
 // lands on disk, tool results and a plan are recorded, and the task reaches a
 // terminal reviewable state rather than sitting in running.
 func TestAUDIT020_ARequirementReachesAwaitingReviewThroughTheRealApplication(t *testing.T) {
-	// Known to fail today, which is the finding rather than a flake.
-	//
-	// RepairCompletionService.PrepareCompletion is what moves a task to
-	// awaiting-review, and it has no production caller. A run therefore does
-	// the work, records its plan and tool results, and stays in running for
-	// ever. The test is gated rather than deleted so the defect stays
-	// reproducible on demand without holding the shared suite red; remove the
-	// gate in the change that wires completion.
-	if os.Getenv("CODEFLUX_AUDIT020") != "1" {
-		t.Skip("AUDIT-020: no production caller constructs RepairCompletionService, " +
-			"so a run never reaches awaiting-review. Set CODEFLUX_AUDIT020=1 to " +
-			"reproduce.")
-	}
+	// The gate is removed (2026-08-02): completion is wired —
+	// buildAgentExecutionCompletion constructs RepairCompletionService in
+	// buildAgentExecution, and AgentExecution.Run calls
+	// completeRunIfPossible at the end of every run — and this
+	// reproduction now passes in single-digit seconds, not the 480+ second
+	// hang the previous attempt left behind. See TODOS.md AUDIT-020 for the
+	// measured evidence and what actually caused the earlier hang: not the
+	// re-run "go test ./..." the first attempt suspected, but a
+	// tool-request ID mismatch between agentToolJournal and
+	// AgentExecutionPersistence that made every run's first plan-step
+	// transition fail its durable consistency trigger and left the run
+	// polling forever for a file that could never be written.
 
 	const requirement = "Create cmd/report/main.go so the program prints a report line."
+	// Both functions carry a doc comment on purpose: the loop's own
+	// completeness gate (agent_stage_completeness.go) refuses to call
+	// implementation complete over an undocumented function, and this
+	// fixture's model is scripted rather than real, so it cannot respond to
+	// that feedback the way a real model would. Content that would earn a
+	// "go back for this" round elsewhere in the test suite (see
+	// agent_convergence_test.go's "1 function has no doc comment: main")
+	// would leave this fixture cycling through its retry ladder forever
+	// instead of reaching awaiting-review.
 	const program = "package main\n\nimport \"fmt\"\n\n" +
+		"// main prints the report line this task was asked for.\n" +
 		"func main() {\n\tfmt.Println(\"report\")\n}\n"
+	const programTest = "package main\n\nimport \"testing\"\n\n" +
+		"// TestReport calls main to confirm the program runs without a panic.\n" +
+		"func TestReport(t *testing.T) {\n\tmain()\n}\n"
 
 	engine := startEngineFixture(t, &scriptedEngineModel{
 		turns: []func(agentloop.ModelInput) agentloop.ModelTurn{
+			// A real requirement's plan names an edit step per file
+			// (agentPlanSteps/withTestsFor adds a companion test file
+			// automatically) and a verify step that runs the project's own
+			// tests. completeRunIfPossible only attempts completion once the
+			// run's own required validation already passed (compiles &&
+			// verified), so the scripted run has to actually call the test
+			// tool — writing the file alone is not enough for this test.
 			writeFile("cmd/report/main.go", program),
+			writeFile("cmd/report/main_test.go", programTest),
+			runFinalTests,
 		},
 	})
 	ctx := context.Background()
@@ -124,19 +148,32 @@ func TestAUDIT020_ARequirementReachesAwaitingReviewThroughTheRealApplication(t *
 	// and tool results are recorded, so the only thing outstanding is a state
 	// transition. Waiting half an hour for one would turn a clear defect into
 	// a hung suite.
+	//
+	// "Validating" is deliberately not a stopping condition here, only
+	// "running" is: completion is two durable steps (TransitionRunToValidation,
+	// then PrepareCompletion), not one, so a task legitimately passes through
+	// validating on its way to awaiting-review. Breaking on "not running"
+	// caught that transient window under load — a slower machine (this
+	// package's full suite sharing a host with concurrent work) stretches it
+	// long enough for a 250ms poll to sample the task mid-transition — and
+	// reported the transient state as the final one, which is a race in this
+	// test, not a defect in the run it is observing.
 	final := domain.TaskState("")
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		final = taskStateFor(t, engine.repositories, created.TaskID)
-		if final != domain.TaskStateRunning {
-			break
+		switch final {
+		case domain.TaskStateRunning, domain.TaskStateValidating:
+			time.Sleep(250 * time.Millisecond)
+			continue
 		}
-		time.Sleep(250 * time.Millisecond)
+		break
 	}
 	switch final {
 	case domain.TaskStateAwaitingReview, domain.TaskStateCompleted:
 	default:
-		t.Fatalf("the task finished in %q; a completed run must be reviewable", final)
+		t.Fatalf("the task finished in %q; a completed run must be reviewable.\nThe run said:\n%s",
+			final, engine.narration())
 	}
 	t.Logf("task %s reached %s", created.TaskID, final)
 }
@@ -152,4 +189,25 @@ func taskStateFor(
 		t.Fatalf("replaying the task: %v", err)
 	}
 	return replay.State
+}
+
+// runFinalTests is one scripted turn that runs the project's own test
+// command, attributed to whichever open step accepts it — the plan's verify
+// step, in every fixture that uses it.
+//
+// engine_refinement_test.go declares an equivalent runTests, but it is built
+// only under the "integration" tag and so is not available to this file's
+// ordinary build.
+func runFinalTests(input agentloop.ModelInput) agentloop.ModelTurn {
+	arguments, _ := json.Marshal(map[string]string{
+		"executable": "go", "arg1": "test", "arg2": "./...",
+	})
+	callID, _ := domain.NewEventID()
+	return agentloop.ModelTurn{ToolCalls: []agentloop.ModelToolCall{{
+		Call: providers.ToolCall{
+			ID: callID.String(), Name: string(executor.ToolTest),
+			Arguments: arguments,
+		},
+		PlanStepID: stepAccepting(input, executor.ToolTest),
+	}}}
 }

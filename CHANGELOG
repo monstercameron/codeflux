@@ -50,6 +50,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-078
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- a run can finally be reviewed
+Request-or-TODO: AUDIT-020
+Outcome: RepairCompletionService had no production caller, so no run ever left
+  running and the whole diff, validation, evidence, repair and rollback journey
+  was unreachable. Completion is now constructed and called, and a run reaches
+  awaiting-review through the real application. The CODEFLUX_AUDIT020 gate is
+  removed.
+  The earlier attempt's hang was NOT the final go test ./... this ticket
+  suspected. A completion path that re-runs nothing still hung. The real cause
+  was a failed write wearing a hang's clothes: PersistPlanStepTransition
+  referenced tool requests by a hashed ID while the production journal stores
+  raw IDs, so every run's first plan-step transition failed a consistency
+  trigger, Run returned early, and the test polled for a file that could never
+  appear.
+  Five further defects surfaced en route, each with a constraint failure as
+  evidence: a validation-profile naming rule, a dangling command-execution
+  reference, a manual plan-step promotion conflicting with storage's own, a
+  summary field round-tripping into a failure column, and no production code
+  anywhere transitioning a run from starting to running
+Affected-behavior: A finished run becomes reviewable. This is the change that
+  makes a real code-generation attempt collectable rather than merely runnable
+Compatibility-or-migration: TransitionRunToValidation bridges the starting to
+  running step itself, scoped to that call site and documented as narrow rather
+  than general. AUDIT-020a carries the real fix
+Verification: The engine canary is 3.8s baseline against 3.87s now, and the
+  AUDIT-020 test reaches awaiting-review in 9-12s over repeated runs. Full
+  coordinator and storage package suites green over two consecutive runs
+Known-limitations: A flake in the new test was found and fixed -- its wait loop
+  treated the transient validating state as terminal, which a loaded machine
+  could sample mid-transition. Reproduced twice before the fix and passed twice
+  after, so it is a race in the test rather than in the run
+Dev-Log: DL-20260802-088
+
 Change-ID: CL-20260802-077
 Commit: pending
 Date: 2026-08-02

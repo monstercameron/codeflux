@@ -1215,6 +1215,203 @@ func (repositories *Repositories) RecordRepairAttemptOutcome(
 	return value, err
 }
 
+// TransitionRunToValidation is one durable input.
+type TransitionRunToValidation struct {
+	EventID              domain.EventID
+	TaskID               domain.TaskID
+	RunID                domain.RunID
+	ExpectedTaskRevision uint64
+	ExpectedRunRevision  uint64
+	IdempotencyKey       string
+}
+
+// TransitionedRunToValidation reports the exact revisions after the move.
+type TransitionedRunToValidation struct {
+	TaskRevision uint64
+	RunRevision  uint64
+}
+
+// TransitionRunToValidation atomically moves a running task and its run into
+// validation, the durable precondition RecordCompletionCandidate requires.
+//
+// Nothing else produces this state (AUDIT-020): the agent execution loop runs
+// to completion entirely inside "running", and RecordCompletionCandidate
+// refuses every candidate until both the task and its run have left it.
+// Without an explicit caller for this, "running" was a state nothing could
+// ever be recorded as leaving on the completion path, which is the same shape
+// of gap RepairCompletionService.PrepareCompletion's own missing caller was.
+//
+// A second, narrower gap sits directly upstream and this function bridges it
+// rather than assuming it away: StartPreparedTask inserts a run at state
+// "starting" (execution_preflight_repository.go), and confirmed by symbol
+// search, no production code anywhere transitions a run's own durable state
+// to "running" afterward — domain.RunStateRunning is referenced only by the
+// domain package's own declaration and by tests. The *task* reliably reaches
+// "running" (StartPreparedTask sets it directly); the *run* does not. Rather
+// than widen this ticket into fixing the general worker-acknowledgment gap —
+// a separate, larger concern belonging to whatever should mark a run started,
+// not to a completion call site — this function reads the run's actual
+// current state and, if it is still "starting", applies the one further
+// transition domain.RunState already declares valid (starting -> running)
+// before applying running -> validating. Both steps go through
+// domain.ValidateRunTransition; neither bypasses the declared state machine,
+// and a run in any other state is refused exactly as before.
+func (repositories *Repositories) TransitionRunToValidation(
+	ctx context.Context,
+	input TransitionRunToValidation,
+) (TransitionedRunToValidation, error) {
+	switch {
+	case input.EventID.IsZero():
+		return TransitionedRunToValidation{}, errors.New("event ID must not be empty")
+	case input.TaskID.IsZero():
+		return TransitionedRunToValidation{}, errors.New("task ID must not be empty")
+	case input.RunID.IsZero():
+		return TransitionedRunToValidation{}, errors.New("run ID must not be empty")
+	}
+	if err := validateBounded(
+		"run validation transition idempotency key",
+		input.IdempotencyKey, 255,
+	); err != nil {
+		return TransitionedRunToValidation{}, err
+	}
+	if err := domain.ValidateTaskTransition(domain.TaskTransition{
+		From: domain.TaskStateRunning, To: domain.TaskStateValidating,
+	}); err != nil {
+		return TransitionedRunToValidation{}, err
+	}
+	if err := domain.ValidateRunTransition(
+		domain.RunStateRunning, domain.RunStateValidating,
+	); err != nil {
+		return TransitionedRunToValidation{}, err
+	}
+	if err := domain.ValidateRunTransition(
+		domain.RunStateStarting, domain.RunStateRunning,
+	); err != nil {
+		return TransitionedRunToValidation{}, err
+	}
+	var result TransitionedRunToValidation
+	err := repositories.database.RunInTransaction(ctx, func(transaction *Transaction) error {
+		existing, found, err := findTaskEventByIdempotency(
+			ctx, transaction, input.TaskID, input.IdempotencyKey,
+		)
+		if err != nil {
+			return err
+		}
+		if found {
+			if existing.ID != input.EventID ||
+				existing.EventType != "task.state-transition" ||
+				!sameRunID(existing.RunID, &input.RunID) {
+				return typedError(
+					ErrConflict, "transition run to validation",
+					errors.New("idempotency key belongs to a different transition"),
+				)
+			}
+			var taskRevision, runRevision uint64
+			if err := transaction.sql.QueryRowContext(ctx,
+				`SELECT revision FROM tasks WHERE id = ?`, input.TaskID,
+			).Scan(&taskRevision); err != nil {
+				return classify("read idempotent task revision", err)
+			}
+			if err := transaction.sql.QueryRowContext(ctx,
+				`SELECT revision FROM runs WHERE id = ?`, input.RunID,
+			).Scan(&runRevision); err != nil {
+				return classify("read idempotent run revision", err)
+			}
+			result = TransitionedRunToValidation{
+				TaskRevision: taskRevision, RunRevision: runRevision,
+			}
+			return nil
+		}
+		now, micros := repositories.timestamp()
+		payload, err := json.Marshal(struct {
+			From domain.TaskState `json:"from"`
+			To   domain.TaskState `json:"to"`
+		}{From: domain.TaskStateRunning, To: domain.TaskStateValidating})
+		if err != nil {
+			return err
+		}
+		if err := transitionTaskWithinAgentRecord(
+			ctx, transaction, input.TaskID, input.RunID,
+			input.ExpectedTaskRevision,
+			domain.TaskStateRunning, domain.TaskStateValidating,
+			input.EventID, input.IdempotencyKey, string(payload), now, micros,
+		); err != nil {
+			return err
+		}
+		// The run's actual current state and revision, read fresh inside this
+		// transaction rather than trusted from the caller: input.ExpectedRunRevision
+		// is still honoured below as the optimistic-concurrency floor, but which
+		// literal state string that revision is currently paired with is a fact
+		// only this read establishes.
+		var currentRunState domain.RunState
+		var currentRunRevision uint64
+		if err := transaction.sql.QueryRowContext(ctx,
+			`SELECT state, revision FROM runs WHERE id = ? AND task_id = ?`,
+			input.RunID, input.TaskID,
+		).Scan(&currentRunState, &currentRunRevision); err != nil {
+			return classify("read run for validation transition", err)
+		}
+		if currentRunRevision != input.ExpectedRunRevision {
+			return typedError(
+				ErrStaleRevision, "transition run to validation",
+				errors.New("run revision changed"),
+			)
+		}
+		if currentRunState == domain.RunStateStarting {
+			bridgeResult, bridgeErr := transaction.sql.ExecContext(ctx,
+				`UPDATE runs
+				 SET state = ?, revision = revision + 1, updated_at_unix_micros = ?
+				 WHERE id = ? AND task_id = ? AND state = ? AND revision = ?`,
+				domain.RunStateRunning, micros, input.RunID, input.TaskID,
+				domain.RunStateStarting, currentRunRevision,
+			)
+			if bridgeErr != nil {
+				return repositoryWriteError(
+					"bridge run to running before validation", bridgeErr,
+				)
+			}
+			if affected, _ := bridgeResult.RowsAffected(); affected != 1 {
+				return typedError(
+					ErrStaleRevision, "bridge run to running before validation",
+					errors.New("run state or revision changed"),
+				)
+			}
+			currentRunState = domain.RunStateRunning
+			currentRunRevision++
+		}
+		if currentRunState != domain.RunStateRunning {
+			return typedError(
+				ErrConstraint, "transition run to validation",
+				fmt.Errorf(
+					"run is %q, not running or startable into it", currentRunState,
+				),
+			)
+		}
+		runResult, err := transaction.sql.ExecContext(ctx,
+			`UPDATE runs
+			 SET state = ?, revision = revision + 1, updated_at_unix_micros = ?
+			 WHERE id = ? AND task_id = ? AND state = ? AND revision = ?`,
+			domain.RunStateValidating, micros, input.RunID, input.TaskID,
+			domain.RunStateRunning, currentRunRevision,
+		)
+		if err != nil {
+			return repositoryWriteError("transition run to validation", err)
+		}
+		if affected, _ := runResult.RowsAffected(); affected != 1 {
+			return typedError(
+				ErrStaleRevision, "transition run to validation",
+				errors.New("run state or revision changed"),
+			)
+		}
+		result = TransitionedRunToValidation{
+			TaskRevision: input.ExpectedTaskRevision + 1,
+			RunRevision:  currentRunRevision + 1,
+		}
+		return nil
+	})
+	return result, err
+}
+
 // RecordCompletionCandidate atomically creates the candidate and its task
 // transition event. The run remains validating until the user's decision.
 func (repositories *Repositories) RecordCompletionCandidate(

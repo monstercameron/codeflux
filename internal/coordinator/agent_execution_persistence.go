@@ -60,12 +60,11 @@ func (persistence *AgentExecutionPersistence) PersistToolStart(
 		record.Authorization.PolicySHA256 == "" {
 		return errors.New("agent tool authorization attribution is incomplete")
 	}
-	requestID := persistedAgentToolRequestID(record.RunID.String(), record.RequestID)
 	decisionID := record.Authorization.DecisionID
 	_, err := persistence.repository.RecordAgentToolRequest(
 		ctx,
 		storage.RecordAgentToolRequest{
-			ID:                    requestID,
+			ID:                    record.RequestID,
 			TaskID:                record.TaskID,
 			RunID:                 record.RunID,
 			PlanRevision:          record.PlanRevision,
@@ -105,7 +104,6 @@ func (persistence *AgentExecutionPersistence) PersistToolResult(
 	if err != nil {
 		return err
 	}
-	requestID := persistedAgentToolRequestID(record.RunID.String(), record.RequestID)
 	_, err = persistence.repository.RecordAgentToolResult(
 		ctx,
 		storage.RecordAgentToolResult{
@@ -114,7 +112,7 @@ func (persistence *AgentExecutionPersistence) PersistToolResult(
 				record.RunID.String(),
 				record.RequestID,
 			),
-			ToolRequestID:      requestID,
+			ToolRequestID:      record.RequestID,
 			State:              state,
 			ResultRedactedJSON: string(encoded),
 			ResultSHA256:       record.ResultSHA256,
@@ -145,10 +143,21 @@ func (persistence *AgentExecutionPersistence) PersistPlanStepTransition(
 	}
 	var toolRequestID *string
 	if record.ToolRequestID != "" {
-		value := persistedAgentToolRequestID(
-			record.RunID.String(),
-			record.ToolRequestID,
-		)
+		// The tool request this transition names is identified by the exact ID
+		// its own ToolJournal stored it under (record.ToolRequestID, unchanged).
+		// This type does not invent a different one: the durable consistency
+		// trigger on agent_plan_step_transitions requires tool_request_id to
+		// match a row in agent_tool_requests for the same task, run, plan
+		// revision, step, and model request, and the run's actual ToolJournal
+		// — agentToolJournal in production — writes agent_tool_requests under
+		// the tool call's own raw request ID. A transformed ID here would
+		// reference a row that does not exist and the transition would be
+		// refused, which is exactly what happened before this was fixed
+		// (AUDIT-020): PersistPlanStepTransition hashed the ID while the
+		// active journal stored the raw one, so the very first plan-step
+		// transition of every run failed its consistency trigger and the run
+		// silently stopped before writing anything.
+		value := record.ToolRequestID
 		toolRequestID = &value
 	}
 	identityParts := []string{
@@ -181,10 +190,6 @@ func (persistence *AgentExecutionPersistence) PersistPlanStepTransition(
 		},
 	)
 	return err
-}
-
-func persistedAgentToolRequestID(runID, requestID string) string {
-	return agentExecutionKey("agent-tool-request-", runID, requestID)
 }
 
 func agentExecutionKey(prefix string, values ...string) string {

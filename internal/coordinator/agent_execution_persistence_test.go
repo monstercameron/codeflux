@@ -98,11 +98,18 @@ func TestAgentExecutionPersistenceMapsRedactedRuntimeRecords(t *testing.T) {
 		t.Fatalf("stored tool request = %#v", request)
 	}
 	storedTransition := repository.transitions[0]
+	// The transition must name the tool request by the exact ID its own
+	// ToolJournal stored it under (AUDIT-020): a transformed ID would
+	// reference a row agent_tool_requests does not have under that key, and
+	// the durable consistency trigger on agent_plan_step_transitions would
+	// refuse it. request.ID is what PersistToolStart above actually stored
+	// (record.RequestID, unchanged), so the transition must match it exactly.
 	if storedTransition.From != storage.PlanStepPending ||
 		storedTransition.To != storage.PlanStepInProgress ||
 		storedTransition.ModelRequestID != modelRequestID ||
 		storedTransition.ToolRequestID == nil ||
-		*storedTransition.ToolRequestID != request.ID {
+		*storedTransition.ToolRequestID != request.ID ||
+		request.ID != start.RequestID {
 		t.Fatalf("stored plan transition = %#v", storedTransition)
 	}
 	storedResult := repository.results[0]

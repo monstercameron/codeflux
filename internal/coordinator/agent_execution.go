@@ -47,6 +47,19 @@ type AgentExecution struct {
 	// default and none of them visible; gathering them into one declared value
 	// is what lets an interface show them and a person change them.
 	settings pipeline.Settings
+	// completion is what moves a finished run out of "running" into
+	// "awaiting-review" (AUDIT-020). It is nil when the coordinator could not
+	// construct it — no repositories or no redaction pipeline, most often a
+	// test fixture — and Run leaves a task running rather than panicking over
+	// a surface it was never given.
+	completion *RepairCompletionService
+	// completionValidations and completionGate are completion's own
+	// dependencies that Run must reach into directly: the validation runner is
+	// told this run's own validation already passed immediately before
+	// ValidateAndRepair is called, and the gate is marked ready only once that
+	// call has actually produced passing evidence.
+	completionValidations *agentExecutionValidationRunner
+	completionGate        *agentExecutionCompletionGate
 }
 
 // WithSettings replaces every choice the flow leaves open.
@@ -321,10 +334,31 @@ func (execution *AgentExecution) Run(
 	// is a dependency it is constructed with, and reaching in to swap it would
 	// leave the journal naming the model that produced the earlier turns as
 	// though it had produced the later ones too.
+	//
+	// AUDIT-020: PlanSteps is durable, not the no-op journal the loop's other
+	// optional ports still use. Every step transition the loop makes is what
+	// RepairCompletionService.PrepareCompletion's evidence chain later reads
+	// back through ListPlanStepStates, so this is the one port here that has
+	// to be real for a run to ever become reviewable.
+	//
+	// AgentExecutionPersistence already existed, fully implemented and tested,
+	// with no production caller of its own — the same defect class as
+	// PrepareCompletion itself. It also implements ToolJournal, but that half
+	// is not reused here: journal (agentToolJournal, below) additionally plans
+	// each tool's model request before recording the tool against it, which
+	// this type does not do, so swapping the tool journal too would break
+	// attribution rather than fix it. Only PersistPlanStepTransition is used,
+	// through the narrower PlanStepStore port.
+	var planSteps agentloop.PlanStepStore = agentNoDurableJournal{}
+	if persistence, persistenceErr := NewAgentExecutionPersistence(
+		execution.repositories,
+	); persistenceErr == nil {
+		planSteps = persistence
+	}
 	buildLoop := func(model agentloop.FixedModel) (*agentloop.ExecutionLoop, error) {
 		return agentloop.NewExecutionLoop(agentloop.LoopDependencies{
 			Model: model, Authority: router, Tools: narrator,
-			Journal: journal, PlanSteps: agentNoDurableJournal{},
+			Journal: journal, PlanSteps: planSteps,
 			Checkpoints:             agentNoDurableJournal{},
 			PlanApprovalCheckpoints: agentNoDurableJournal{},
 			Control:                 agentActiveControl{},
@@ -729,6 +763,13 @@ func (execution *AgentExecution) Run(
 			"nothing that failed its own checks is delivered", nil)
 	}
 
+	// The skip audit reads every other stage's row, so it runs after they are
+	// all written and before close() sweeps the flow. Left to the sweep it would
+	// record not-implemented for itself, which is the one verdict it exists to
+	// make impossible to reach by accident (PIPE-042).
+	ledger.decide(ctx, pipeline.StageSkipAudit,
+		checkSkipAudit(ctx, execution.repositories, scope.taskID, ledger.currentAttempt()))
+
 	execution.reportGraphFailure(ctx, scope, recorder)
 	if journalErr := journal.Failure(); journalErr != nil {
 		execution.say(ctx, scope, events.KindMessageFinal,
@@ -745,6 +786,15 @@ func (execution *AgentExecution) Run(
 		"Finished: %s after %d round(s) and %d tool call(s). %s",
 		outcome.Kind, outcome.Rounds, outcome.ToolCalls,
 		completionCaveat(verified)))
+	// AUDIT-020: the completion call site. Everything above this line already
+	// existed; what did not was anything that moved a finished run out of
+	// "running". This records the evidence PrepareCompletion requires from the
+	// validation the run's own loop already ran — it does not run anything
+	// itself — and, only if every declared plan step reached durable validated
+	// state, moves the task into awaiting-review. A run whose own validation
+	// did not pass, or whose code does not compile, is left running with the
+	// reason said above rather than completed on a weaker check.
+	execution.completeRunIfPossible(ctx, scope, taskID, runID, plan, steps, compiles, verified)
 	return nil
 }
 
@@ -968,7 +1018,24 @@ func buildAgentExecution(
 		return nil, err
 	}
 	execution.escalate = buildNamed
-	return execution.WithSettings(settings)
+	built, err := execution.WithSettings(settings)
+	if err != nil {
+		return nil, err
+	}
+	// AUDIT-020: constructed here, at the same site that already refuses to
+	// leave the coordinator half-wired over a missing provider key above.
+	// Completion is genuinely optional in the same sense a model is: a
+	// coordinator built without repositories or a redaction pipeline (a bare
+	// test fixture, most often) runs exactly as it did before this existed,
+	// and Run reports that plainly rather than failing to start over a
+	// surface most callers never touch.
+	if completion, validations, gate, completionErr :=
+		buildAgentExecutionCompletion(repositories, checkpointing); completionErr == nil {
+		built.completion = completion
+		built.completionValidations = validations
+		built.completionGate = gate
+	}
+	return built, nil
 }
 
 // settingsOrDefaults reads the zero value as "the defaults", not "empty".

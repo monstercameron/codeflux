@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-088
+Date: 2026-08-02
+Status: Closed; a run reaches awaiting-review
+Change-ID: CL-20260802-078
+Commit: pending
+Request-or-TODO: AUDIT-020
+Goal: Make a finished run collectable
+Assumptions: The suspicion recorded in the ticket -- that a final full test run
+  caused the hang -- was tested rather than adopted, and it was wrong
+Decisions: Built a completion path that re-runs nothing, reusing the pass/fail
+  fact the loop already established. That both eliminated the suspicion and made
+  the remaining hang diagnosable, because there was no longer any slow work to
+  blame it on.
+  Bisected to the actual cause rather than reasoning about it: a hashed tool
+  request ID against a journal storing raw IDs, failing a consistency trigger on
+  every run's first plan-step transition. The lesson worth keeping is that the
+  symptom was a hang and the defect was a failed write; nothing was slow.
+  Bridged the starting-to-running transition inside TransitionRunToValidation
+  and said in the doc comment that it is narrow rather than general, instead of
+  quietly making it look like the lifecycle is now acknowledged
+Files-or-schemas: agent_execution.go, a recreated
+  agent_execution_completion.go, agent_execution_persistence.go and its test,
+  task_control_checkpoint_adapter.go, requirement_to_review_test.go,
+  internal/storage/agent_execution_repository.go
+Validation: The gate is removed and the test passes without it; engine canary
+  unchanged; both full package suites green twice
+Failures-or-discarded-approaches: The first attempt was backed out entirely for
+  hanging runs. Five further defects were found and fixed on the way, each with
+  a database constraint failure as evidence rather than a hypothesis
+Known-limitations: A run's own durable state is still not acknowledged in
+  general -- AUDIT-020a. AUDIT-013 and AUDIT-015 were never started
+Next-safe-step: AUDIT-020a, then AUDIT-013
+
 Dev-Log: DL-20260802-087
 Date: 2026-08-02
 Status: Four landed; rate measurement deferred and filed

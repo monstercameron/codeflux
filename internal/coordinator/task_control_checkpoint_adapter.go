@@ -186,6 +186,32 @@ func (adapter *LaneACheckpointAdapter) CreateCheckpoint(
 	return err
 }
 
+// CreatePreRepairCheckpoint preserves the exact pre-repair worktree state, the
+// boundary RepairCompletionService.ValidateAndRepair captures before each
+// bounded repair attempt so a failed repair can be rolled back to what
+// validation last saw rather than to whatever state the repair left behind.
+func (adapter *LaneACheckpointAdapter) CreatePreRepairCheckpoint(
+	ctx context.Context,
+	taskID domain.TaskID,
+	runID domain.RunID,
+	planRevision uint64,
+	ordinal uint32,
+	reason string,
+) (domain.CheckpointID, error) {
+	return adapter.capture(
+		ctx,
+		taskID,
+		runID,
+		planRevision,
+		checkpoint.TriggerBeforeRiskyAction,
+		checkpoint.TriggerAttribution{},
+		fmt.Sprintf(
+			"agent/%s/repair/%d/pre-repair-checkpoint",
+			runID.String(), ordinal,
+		),
+	)
+}
+
 // CreateSuccessfulValidationCheckpoint implements the post-validation
 // boundary used by RepairCompletionService.
 func (adapter *LaneACheckpointAdapter) CreateSuccessfulValidationCheckpoint(
@@ -295,4 +321,5 @@ var (
 	_ agentloop.CheckpointStore             = (*LaneACheckpointAdapter)(nil)
 	_ agentloop.PlanApprovedCheckpointStore = (*LaneACheckpointAdapter)(nil)
 	_ SuccessfulValidationCheckpointCreator = (*LaneACheckpointAdapter)(nil)
+	_ PreRepairCheckpointCreator            = (*LaneACheckpointAdapter)(nil)
 )
