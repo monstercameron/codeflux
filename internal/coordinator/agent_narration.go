@@ -14,6 +14,7 @@ import (
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/executor"
+	"codeflux.dev/codeflux/internal/graph"
 	"codeflux.dev/codeflux/internal/redact"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -117,10 +118,10 @@ func (narrator *narratingExecutor) ExecuteTool(
 		narrator.validationFailed =
 			completed != domain.CommandExecutionStateSucceeded
 	}
-	narrator.recordInGraph(request, name, detail,
+	operationNode := narrator.recordInGraph(request, name, detail,
 		completed == domain.CommandExecutionStateSucceeded)
 	narrator.persistProducedFile(request,
-		completed == domain.CommandExecutionStateSucceeded)
+		completed == domain.CommandExecutionStateSucceeded, operationNode)
 	// Each finished tool is also said out loud in the conversation. The tool
 	// events carry the same facts, but nothing renders them yet, and a person
 	// watching a run needs to see it move rather than infer that it did.
@@ -438,18 +439,25 @@ func (agentActiveControl) BindActionContext(
 	return inner, cancel, nil
 }
 
-// recordInGraph draws one finished tool call into the task diagram.
+// recordInGraph draws one finished tool call into the task diagram and
+// returns the operation node it was drawn as, so a caller that later confirms
+// a durable side effect of the same tool call — a stored artifact — can point
+// at the operation that produced it rather than re-deriving it.
 //
 // The file edits and the command are the flow of the work, and the diagram is
-// derived from what actually ran rather than from a description of it.
+// derived from what actually ran rather than from a description of it. A
+// completed run of the test tool is additionally drawn as a validation
+// obligation: the effect node already says a command ran, and this says
+// separately whether the thing that command exists to check was satisfied,
+// which is a different fact the graph's evidence mode depends on.
 func (narrator *narratingExecutor) recordInGraph(
 	request executor.AuthorizedToolRequest,
 	tool, detail string,
 	succeeded bool,
-) {
+) domain.NodeID {
 	recorder := narrator.scope.graph
 	if recorder == nil {
-		return
+		return domain.NodeID{}
 	}
 	// The step comes from the journal, which recorded it when the loop asked
 	// for this tool. The request's own idempotency key was used here, and it
@@ -457,16 +465,22 @@ func (narrator *narratingExecutor) recordInGraph(
 	// claimed a step no plan had and the store refused the whole diagram.
 	attribution, known := narrator.journal.attributionOf(request.Request.ID)
 	if !known {
-		return
+		return domain.NodeID{}
 	}
 	switch executor.ToolName(tool) {
 	case executor.ToolApplyEdit:
-		recorder.recordFileEdit(narrator.ctx, attribution.PlanStepID, detail,
+		return recorder.recordFileEdit(narrator.ctx, attribution.PlanStepID, detail,
+			attribution.PlanRevision, succeeded)
+	case executor.ToolTest:
+		recorder.recordValidation(narrator.ctx, attribution.PlanStepID, detail,
+			attribution.PlanRevision, succeeded)
+		recorder.recordCommand(narrator.ctx, attribution.PlanStepID, detail,
 			attribution.PlanRevision, succeeded)
 	default:
 		recorder.recordCommand(narrator.ctx, attribution.PlanStepID, detail,
 			attribution.PlanRevision, succeeded)
 	}
+	return domain.NodeID{}
 }
 
 // persistProducedFile stores what a successful edit actually wrote.
@@ -479,6 +493,7 @@ func (narrator *narratingExecutor) recordInGraph(
 func (narrator *narratingExecutor) persistProducedFile(
 	request executor.AuthorizedToolRequest,
 	succeeded bool,
+	operationNode domain.NodeID,
 ) {
 	if !succeeded || executor.ToolName(request.Request.Name) != executor.ToolApplyEdit {
 		return
@@ -527,6 +542,18 @@ func (narrator *narratingExecutor) persistProducedFile(
 			events.KindMessageFinal,
 			"The file was written but could not be stored for later reading: "+
 				err.Error())
+		return
+	}
+	// The artifact is only drawn now, after RecordProducedArtifact has
+	// committed: this is the point the stored file genuinely exists, and the
+	// operation node it points back at is the same edit narrator.recordInGraph
+	// already drew for this exact tool call.
+	if recorder := narrator.scope.graph; recorder != nil && !operationNode.IsZero() {
+		if attribution, known := narrator.journal.attributionOf(request.Request.ID); known {
+			recorder.recordArtifact(narrator.ctx, graph.ArtifactChangedFile,
+				operationNode, attribution.PlanStepID, path,
+				attribution.PlanRevision, true)
+		}
 	}
 }
 

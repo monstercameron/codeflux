@@ -104,16 +104,18 @@ func newAgentGraphRecorder(
 	return recorder
 }
 
-// declarePlan records the steps the diagram will hang work from.
+// declarePlan projects the plan region and its steps.
 //
-// It does NOT yet project a plan region. A graph plan region must bind to a
-// durable agent plan revision, and that binding requires the whole requirement,
-// policy, forecast, and budget chain to have been recorded first. This run does
-// not record one, so asking for the region produced a constraint failure and an
-// empty diagram. Until the durable plan is written, every step points at the
-// requirement, which is true: the work was done because that was asked for.
+// By the time this runs, execution.recordDurablePlan has already committed the
+// plan revision — agent_execution.go calls it first and only reaches this
+// method with the result — so the plan region projected here binds to plan
+// history that genuinely exists rather than one drawn ahead of the plan it
+// names. When recordDurablePlan failed, plan.Revision is zero: no durable plan
+// exists to attribute a region to, so none is projected, and every step falls
+// back to pointing at the requirement, which is still true — the work was
+// done because that was asked for.
 func (recorder *agentGraphRecorder) declarePlan(
-	_ context.Context,
+	ctx context.Context,
 	plan durablePlan,
 	steps []graphPlanStep,
 ) {
@@ -122,10 +124,51 @@ func (recorder *agentGraphRecorder) declarePlan(
 	}
 	recorder.planRevision = plan.Revision
 	recorder.planSteps = plan.Steps
-	for _, step := range steps {
-		recorder.steps[step.ID] = recorder.requirement
+	if plan.Revision == 0 || len(steps) == 0 {
+		recorder.planRegion = recorder.requirement
+		return
 	}
-	recorder.planRegion = recorder.requirement
+
+	regionNode, err := domain.NewNodeID()
+	if err != nil {
+		return
+	}
+	requirementEdge, err := domain.NewEdgeID()
+	if err != nil {
+		return
+	}
+	fact := &graph.PlanFact{
+		Revision: plan.Revision, RegionNodeID: regionNode,
+		RegionDisplayName: "The plan", RequirementNodeID: recorder.requirement,
+		RequirementEdgeID: requirementEdge,
+	}
+	stepNodes := make(map[string]domain.NodeID, len(steps))
+	for _, step := range steps {
+		stepNode, err := domain.NewNodeID()
+		if err != nil {
+			return
+		}
+		controlEdge, err := domain.NewEdgeID()
+		if err != nil {
+			return
+		}
+		fact.Steps = append(fact.Steps, graph.PlanStepFact{
+			StepID: step.ID, NodeID: stepNode, ControlEdge: controlEdge,
+			DisplayName: shortGraphLabel(step.Summary, step.ID),
+		})
+		stepNodes[step.ID] = stepNode
+	}
+	recorder.record(ctx, "task.plan-declared", graph.ProjectionEvent{
+		Kind: graph.ProjectionPlanDeclared, Plan: fact,
+	})
+	if !recorder.available {
+		return
+	}
+	recorder.planRegion = regionNode
+	for id, node := range stepNodes {
+		recorder.steps[id] = node
+	}
+	recorder.last = regionNode
 }
 
 // graphPlanStep is one step the diagram shows.
@@ -134,14 +177,17 @@ type graphPlanStep struct {
 	Summary string
 }
 
-// recordFileEdit records one file the agent wrote.
+// recordFileEdit records one file the agent wrote. It returns the node the
+// edit was drawn as, or the zero NodeID when nothing was drawn, so a caller
+// that later needs the artifact this edit produced can name the operation
+// that produced it instead of guessing at the recorder's last-drawn node.
 func (recorder *agentGraphRecorder) recordFileEdit(
 	ctx context.Context,
 	planStepID, path string,
 	revision uint64,
 	succeeded bool,
-) {
-	recorder.recordOperation(ctx, graph.OperationFileEdit,
+) domain.NodeID {
+	return recorder.recordOperation(ctx, graph.OperationFileEdit,
 		planStepID, path, revision, succeeded)
 }
 
@@ -184,24 +230,26 @@ func (recorder *agentGraphRecorder) recordCommand(
 	recorder.last = node
 }
 
-// recordOperation records one operation against its plan step.
+// recordOperation records one operation against its plan step and returns the
+// node it was drawn as, or the zero NodeID when the recorder could not draw
+// it.
 func (recorder *agentGraphRecorder) recordOperation(
 	ctx context.Context,
 	kind graph.OperationKind,
 	planStepID, label string,
 	revision uint64,
 	succeeded bool,
-) {
+) domain.NodeID {
 	if !recorder.available {
-		return
+		return domain.NodeID{}
 	}
 	node, err := domain.NewNodeID()
 	if err != nil {
-		return
+		return domain.NodeID{}
 	}
 	edge, err := domain.NewEdgeID()
 	if err != nil {
-		return
+		return domain.NodeID{}
 	}
 	planNode := recorder.steps[planStepID]
 	if planNode.IsZero() {
@@ -218,6 +266,88 @@ func (recorder *agentGraphRecorder) recordOperation(
 		},
 	})
 	recorder.last = node
+	if !recorder.available {
+		return domain.NodeID{}
+	}
+	return node
+}
+
+// recordValidation records one check of a validation obligation — for this
+// run, the moment the test tool a "verify" plan step demands finishes and its
+// verdict is known. That is deliberately when this is called: recording
+// earlier would assert a pass or fail before either was true, and never
+// recording it would leave the diagram showing files written and commands run
+// but nothing that ever says whether the work was checked.
+func (recorder *agentGraphRecorder) recordValidation(
+	ctx context.Context,
+	planStepID, label string,
+	revision uint64,
+	succeeded bool,
+) {
+	if !recorder.available {
+		return
+	}
+	node, err := domain.NewNodeID()
+	if err != nil {
+		return
+	}
+	edge, err := domain.NewEdgeID()
+	if err != nil {
+		return
+	}
+	predecessor := recorder.steps[planStepID]
+	if predecessor.IsZero() {
+		predecessor = recorder.planRegion
+	}
+	planStepID, revision = recorder.planAttribution(planStepID, revision)
+	recorder.record(ctx, "task.validation-observed", graph.ProjectionEvent{
+		Kind: graph.ProjectionValidationObserved,
+		Validation: &graph.ValidationFact{
+			ObligationNodeID: node, ControlEdge: edge, Predecessor: predecessor,
+			DisplayName:  shortGraphLabel(label, "validation"),
+			State:        graphState(succeeded),
+			PlanRevision: revision, PlanStepID: planStepID,
+		},
+	})
+	// last is deliberately left untouched: an effect drawn for the same tool
+	// call still chains from the operation that preceded it, not from the
+	// obligation node just drawn beside it.
+}
+
+// recordArtifact records one file the agent produced that has actually been
+// stored durably. The fact is projected only after the caller's own durable
+// write has committed — RecordProducedArtifact succeeding is what makes
+// "this artifact exists" true, and drawing the node before that write
+// succeeded would show a result nothing in storage backs.
+func (recorder *agentGraphRecorder) recordArtifact(
+	ctx context.Context,
+	kind graph.ArtifactKind,
+	producer domain.NodeID,
+	planStepID, label string,
+	revision uint64,
+	succeeded bool,
+) {
+	if !recorder.available || producer.IsZero() {
+		return
+	}
+	node, err := domain.NewNodeID()
+	if err != nil {
+		return
+	}
+	edge, err := domain.NewEdgeID()
+	if err != nil {
+		return
+	}
+	planStepID, revision = recorder.planAttribution(planStepID, revision)
+	recorder.record(ctx, "task.artifact-observed", graph.ProjectionEvent{
+		Kind: graph.ProjectionArtifactObserved,
+		Artifact: &graph.ArtifactFact{
+			Kind: kind, NodeID: node, ProvenanceEdge: edge, ProducerNode: producer,
+			DisplayName:  shortGraphLabel(label, string(kind)),
+			State:        graphState(succeeded),
+			PlanRevision: revision, PlanStepID: planStepID,
+		},
+	})
 }
 
 // planAttribution settles which plan a drawn operation is attributed to.

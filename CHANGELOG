@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-069
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- the graph draws six node classes instead of three
+Request-or-TODO: REPO-044
+Outcome: internal/graph implements seven NodeClass values and the only recorder
+  wired into a live run emitted three, so the graph showed edits and commands
+  and never the plan, validation or artifact structure a run genuinely has.
+  Three more are now emitted, each at the point its fact becomes true: the plan
+  region after RecordPlanRevision commits, the validation obligation where the
+  tool's own outcome becomes known, and the artifact result after
+  RecordProducedArtifact returns. A real run now produces six distinct shapes.
+  ApprovalBoundary and RecoveryObserved are deliberately not wired, with their
+  sites named: the approval fact is granted before a task starts, so no per-run
+  recorder exists yet, and recovery resumes a task whose recorder is long gone
+Affected-behavior: The task graph is richer. It remains derived and read-only
+Compatibility-or-migration: None
+Verification: Each emitter disabled in turn, confirming that class and only that
+  class vanishes -- one of which made recordFileEdit fail outright on an edge
+  referencing an unprojected node. A third test proves declarePlan with no
+  durable revision projects nothing at all: an absent node rather than a lying
+  one
+Known-limitations: BranchMatchMerge stays unemitted; it is the class both
+  unwired facts use. The mounted check asserting ten nodes and four shapes still
+  needs a reachable populated graph, which is REPO-041
+Dev-Log: DL-20260802-079
+
 Change-ID: CL-20260802-068
 Commit: pending
 Date: 2026-08-02

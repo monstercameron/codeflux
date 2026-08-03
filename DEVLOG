@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-079
+Date: 2026-08-02
+Status: Six classes emitted
+Change-ID: CL-20260802-069
+Commit: pending
+Request-or-TODO: REPO-044
+Goal: Make the graph show the structure the plan says it shows
+Assumptions: A projector with no emitter is not an optional simplification, it
+  is a silent omission
+Decisions: Wired rather than deleted. Deleting the unemitted classes would have
+  discarded a built and tested projector to match an under-wired caller, which
+  is fixing the wrong end.
+  Emitted each class where its fact becomes true rather than where it was
+  convenient. A plan region drawn before RecordPlanRevision commits, or an
+  artifact drawn before the store confirms it, would be a graph that lies about
+  structure -- worse than an absent node.
+  Projected the validation obligation in addition to the existing effect node
+  for the same tool call, not instead of it: the effect says a command ran, the
+  obligation says whether the requirement it exists to check was satisfied
+Files-or-schemas: internal/coordinator/agent_graph.go, agent_narration.go, and a
+  new agent_graph_test.go
+Validation: Each emitter disabled in turn; the corresponding class vanished and
+  only it. A negative test proves declarePlan with no durable revision projects
+  nothing
+Failures-or-discarded-approaches: Deleting the classes, above
+Known-limitations: ApprovalBoundary and RecoveryObserved need architecture
+  decisions, not ticket details, and their sites are named rather than guessed
+Next-safe-step: REPO-041, which needs a reachable populated graph
+
 Dev-Log: DL-20260802-078
 Date: 2026-08-02
 Status: Six checks rescoped; fixture proves it
