@@ -413,6 +413,11 @@ func (execution *AgentExecution) Run(
 	awaitingApproval := ""
 	sendBack := func(gate string, instruction string, because string) {
 		tracef("sendback", "gate=%s because=%s", gate, because)
+		// Every refusal is something this project has now learned. Written
+		// down here rather than at the end, because a run that dies later
+		// still learned it, and a lesson only a surviving run records is a
+		// lesson the worst runs never contribute.
+		execution.recordRunLesson(ctx, scope, gate, because, instruction)
 		traceBlock("instruct", "what the next attempt is told:", instruction)
 		failure = instruction
 		sentBackBecause = because
@@ -555,6 +560,12 @@ func (execution *AgentExecution) Run(
 					"context: "+selection.Reason)
 		}
 		context := selection.Items
+		// What earlier runs in this project got wrong, before this one starts.
+		// This is the half of the memory loop that was missing: the write path
+		// existed since M21 and its only caller extracted build commands from
+		// an accepted review, which no run reaches, so every memory table was
+		// empty and two ladder rungs independently invented the same deadlock.
+		context = append(context, execution.lessonContextItems(ctx, scope)...)
 		if failure != "" {
 			context = append(context, agentContextItem(
 				"last-test-run-output", failure))

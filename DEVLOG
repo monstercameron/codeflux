@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-113
+Date: 2026-08-03
+Status: The loop is closed end to end for the observation tier
+Change-ID: CL-20260803-103
+Commit: pending
+Request-or-TODO: The memory-loop instruction
+Goal: Stop every run repeating the last one's mistake
+Decisions: Keyed the lesson on the gate rather than on the failure text. The
+  text carries file names and line numbers that differ between runs of the same
+  mistake, so a lesson keyed on it never merges and the context fills with
+  restatements of one idea.
+  Wrote the lesson at send-back rather than at the end of the run. A run that
+  dies later still learned it, and a lesson only surviving runs record is one
+  the worst runs never contribute.
+  Left the fallback as an observation rather than inventing an imperative for a
+  gate this does not recognise. Guessing at a fix produces a confident wrong
+  rule, and a wrong rule in a prompt costs more than a plain observation.
+  Used the automated validation run as the evidence source. A gate failing is
+  something the platform observed; the agent's own account would be
+  self-report, which the store refuses outright and should
+Files-or-schemas: new internal/storage/project_lessons.go, new
+  internal/coordinator/run_lessons.go and its test, agent_execution.go
+Validation: Build, vet, four lesson tests
+Failures-or-discarded-approaches: Reading the existing retrieval path first --
+  ListEligibleMemoryForTask depends on a pre-work gate that is itself unwired,
+  so it would have been a second uncalled subsystem reading a third
+Known-limitations: Semantic overlap across gates is not merged
+Next-safe-step: Watch two consecutive rungs and confirm the second is shown the
+  first's lessons
+
 Dev-Log: DL-20260803-112
 Date: 2026-08-03
 Status: Two phases of the review landed; the verdict type is not yet built

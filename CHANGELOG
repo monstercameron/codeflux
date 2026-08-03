@@ -50,6 +50,45 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-103
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- a run learns from the last one's failures
+Request-or-TODO: Direct instruction, 2026-08-03: the memory system is meant to
+  capture lessons from failures and inject them into later prompts
+Outcome: It was meant to, and it never had. Every memory table in every run of
+  this session was empty: memory_artifacts, memory_artifact_revisions,
+  episode_fact_references, evidence, atom_names, all zero.
+  The write path had worked since M21. Its only production caller extracted
+  build commands at the acceptance decision, gated on the episode being
+  accepted -- and no run is ever accepted, because human-acceptance is
+  correctly blocked on a person looking. The gate that makes memory honest was
+  the gate that made it never happen. The candidacy funnel built earlier today
+  has no production caller either, and the mechanical-rule tier has no domain
+  content type at all.
+  The consequence was concrete rather than theoretical: ladder rung 5 and rung
+  10 independently invented the same os.Stdin pipe deadlock, because nothing
+  carried the first one's lesson to the second.
+  Every send-back now writes an observation and every attempt reads the
+  project's observations back before it starts. A lesson is one imperative --
+  "build the package before reporting the work finished" -- not a narration of
+  what happened, because a run told what happened learns nothing it can act on
+Affected-behavior: A run in a project that has failed before is shown what it
+  failed at, capped at eight lessons
+Compatibility-or-migration: Recorded at the observation tier, whose evidence
+  strength the domain constructor pins at none. One run failing one way is not
+  a law about the project
+Verification: Four tests on lesson shape and merging, including the control
+  that an unrecognised gate is observed rather than given an invented
+  imperative -- a confident wrong rule is worse in a prompt than a plain
+  statement of what happened
+Known-limitations: Overlap collapses only where it is exact. The lesson is
+  keyed on the gate rather than the failure text, so two runs failing to
+  compile produce one lesson, but two different gates describing one underlying
+  mistake still produce two. Merging those needs the mechanical-rule tier,
+  which has no content type
+Dev-Log: DL-20260803-113
+
 Change-ID: CL-20260803-102
 Commit: pending
 Date: 2026-08-03
