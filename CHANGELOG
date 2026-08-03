@@ -66,6 +66,29 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-037
+Commit: pending
+Date: 2026-08-02
+Type: Removal -- a flag reporting a capability that does not exist
+Request-or-TODO: AUDIT-029a
+Outcome: codeflux start no longer accepts --simulate, and
+  ApplicationOptions.SimulateExecution is removed. The flag was parsed, threaded
+  into the coordinator, and printed an "execution is SIMULATED" banner, and no
+  code ever read the value, so a user asking for a simulated run got a real one
+  with a banner claiming otherwise. The flag now exits with a usage error
+Affected-behavior: codeflux start --simulate fails as an unknown flag instead of
+  being accepted and ignored. No other behavior changes; the removed field had
+  no reader
+Compatibility-or-migration: A script passing --simulate now fails rather than
+  silently running for real. That is the intended correction
+Verification: go build ./... clean; gofmt clean; go vet over the three affected
+  packages clean; go test ./cmd/codeflux/ -count=1 green; staticcheck clean.
+  cmd/codeflux/simulate_flag_removed_test.go pins both the refusal and the
+  absence of the symbols from production source
+Known-limitations: There is no simulated-execution mode. Nothing currently asks
+  for one, so no ticket is filed
+Dev-Log: DL-20260802-047
+
 Change-ID: CL-20260802-036
 Commit: pending
 Date: 2026-08-02

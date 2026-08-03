@@ -91,14 +91,6 @@ type ApplicationOptions struct {
 	// AgentWorkingDirectory is where a .env holding a provider key is looked
 	// for. It defaults to the process working directory.
 	AgentWorkingDirectory string
-	// SimulateExecution scripts what an agent would do, for a coordinator that
-	// has no provider configured. The agent loop does not exist yet — the worker
-	// is a heartbeat and report channel with nothing feeding it — so without
-	// this a started task reaches Running and sits there with an empty
-	// timeline. Everything a simulated run produces is stamped SIMULATED,
-	// because it writes real files and real events and the only thing that
-	// makes it not real is that no provider was ever asked anything.
-	SimulateExecution bool
 	// CredentialStore resolves provider secrets. It defaults to the platform
 	// store, which is the only correct choice in production.
 	//

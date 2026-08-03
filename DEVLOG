@@ -51,6 +51,34 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-047
+Date: 2026-08-02
+Status: Flag removed and pinned
+Change-ID: CL-20260802-037
+Commit: pending
+Request-or-TODO: AUDIT-029a
+Goal: Stop codeflux start advertising a simulated-execution mode the coordinator
+  does not have
+Assumptions: A flag that is parsed, banners its own effect, and changes nothing
+  is worse than an absent flag, because the banner is affirmative evidence to
+  the user that something happened
+Decisions: Deleted rather than implemented. Nothing asks for a simulation mode,
+  and building one to justify a flag is the wrong order.
+  Chose a usage error over silent acceptance for the removed flag. A script
+  passing --simulate will now fail loudly rather than quietly performing a real
+  run, which is the failure direction that matters when the flag's whole promise
+  was "do not really do this"
+Files-or-schemas: internal/coordinator/application.go, cmd/codeflux/start.go,
+  cmd/codeflux/simulate_flag_removed_test.go. No schema change
+Validation: go build ./... clean; gofmt clean; go vet over coordinator, storage
+  and cmd/codeflux clean; go test ./cmd/codeflux/ -count=1 green; staticcheck
+  clean. The pin test covers the refusal and a production-source scan for the
+  removed symbols
+Failures-or-discarded-approaches: None. The consumer search found exactly two
+  sites and neither read the value
+Known-limitations: No simulated-execution capability exists
+Next-safe-step: None; this ticket is closed
+
 Dev-Log: DL-20260802-046
 Date: 2026-08-02
 Status: All three Staticcheck passes clean
