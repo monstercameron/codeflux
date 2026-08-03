@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-069
+Date: 2026-08-02
+Status: Upgraded and verified
+Change-ID: CL-20260802-059
+Commit: pending
+Request-or-TODO: REPO-043
+Goal: Close the open HIGH advisory against gRPC
+Assumptions: A loopback-bound server is still worth patching; the advisory's
+  HTTP/2 half does not care that the listener is local
+Decisions: Established which half of the advisory applies before upgrading,
+  rather than after. Nothing here uses xDS, so the RBAC half was never
+  reachable and the HTTP/2 half was the real exposure -- worth knowing so the
+  ticket is neither dismissed wholesale nor overstated.
+  Ran the full frontendserver suite rather than a scoped subset, because that
+  package holds the websocket bridge and the same-origin and loopback checks,
+  which are exactly what an HTTP/2 change could disturb
+Files-or-schemas: go.mod, go.sum
+Validation: build, vet, gofmt, frontendserver suite, transport/session/AUDIT-008
+  tests, lint -- all clean
+Failures-or-discarded-approaches: None; no API breakage to absorb
+Known-limitations: Nothing in the repository catches this class automatically.
+  PIPE-033's dependency-audit stage is where that belongs
+Next-safe-step: PIPE-033
+
 Dev-Log: DL-20260802-068
 Date: 2026-08-02
 Status: Filed, not fixed

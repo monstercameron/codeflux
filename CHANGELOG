@@ -42,6 +42,29 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-059
+Commit: pending
+Date: 2026-08-02
+Type: Security -- dependency upgrade
+Request-or-TODO: REPO-043
+Outcome: google.golang.org/grpc moves from v1.81.0 to v1.82.1, closing the one
+  open HIGH Dependabot advisory (xDS RBAC and HTTP/2 vulnerabilities).
+  google.golang.org/genproto/googleapis/rpc moved with it; golang.org/x/net and
+  google.golang.org/protobuf did not
+Affected-behavior: None observable. No call site changed in the coordinator, the
+  frontend server, or the transport
+Compatibility-or-migration: None. No API this repository uses was removed or
+  deprecated by the upgrade
+Verification: go build ./... and go vet ./... clean; gofmt clean; the full
+  internal/frontendserver suite green, including the websocket bridge,
+  same-origin and loopback security tests; the transport, session and AUDIT-008
+  registered-service tests green; lint exit 0
+Known-limitations: Only the HTTP/2 half of the advisory was ever reachable here
+  -- grep confirmed no xDS usage -- so the upgrade closes a real exposure on the
+  worker protocol and browser bridge rather than a theoretical one, but the xDS
+  half was never a risk and should not be cited as one
+Dev-Log: DL-20260802-069
+
 Change-ID: CL-20260802-058
 Commit: pending
 Date: 2026-08-02
