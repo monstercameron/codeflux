@@ -111,16 +111,16 @@ func TestApplyRetentionExpiresAndCapsVerboseOutput(t *testing.T) {
 	}
 }
 
+// TestMaintenancePoliciesAreExplicit covers the retention policy only.
+//
+// It also asserted DefaultDeletionPolicy's four fields until AUDIT-005a removed
+// that type. The assertion re-stated the declaration's own literal values and
+// nothing executed them, so it could not fail for any reason that mattered:
+// the schema refuses the deletions the policy called "tombstone-then-purge",
+// and the test passed anyway.
 func TestMaintenancePoliciesAreExplicit(t *testing.T) {
 	retention := DefaultRetentionPolicy()
 	if retention.VerboseOutputMaxAge <= 0 || retention.MaxVerboseBytesPerCommand == 0 {
 		t.Fatalf("retention policy = %#v", retention)
-	}
-	deletion := DefaultDeletionPolicy()
-	if deletion.Projects != DeletionModeTombstoneThenPurge ||
-		deletion.Threads != DeletionModeTombstoneThenPurge ||
-		deletion.LearnedArtifacts != DeletionModeHardDeleteLineage ||
-		!deletion.RequireOrphanCheck {
-		t.Fatalf("deletion policy = %#v", deletion)
 	}
 }

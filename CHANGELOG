@@ -66,6 +66,34 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-038
+Commit: pending
+Date: 2026-08-02
+Type: Removal -- a declared capability with no executor
+Request-or-TODO: AUDIT-005a
+Outcome: The unused deletion policy is removed from internal/storage:
+  DeletionMode, both mode constants, DeletionPolicy, and DefaultDeletionPolicy.
+  It declared tombstone-then-purge for projects and threads while nothing
+  performed it and the schema actively refused it -- no migration declares ON
+  DELETE and the DSN enforces foreign keys, so deleting a project with
+  descendants is refused atomically. TestMaintenancePoliciesAreExplicit
+  asserted the declaration's own literal values, so it could not fail for any
+  reason that mattered; it is narrowed to the retention policy. A new guard
+  test fails if a deletion policy is declared again in production source
+  without an executor
+Affected-behavior: None at runtime. Nothing called the removed symbols. What
+  changes is the record: the repository no longer claims deletion semantics it
+  does not implement
+Compatibility-or-migration: None. No schema change. The absence of a project or
+  thread purge path is unchanged and now recorded as AUDIT-005b
+Verification: go build ./... clean; gofmt clean; go test ./internal/storage/
+  -run 'TestAUDIT005|TestMaintenancePolicies' green. The guard test is proven to
+  discriminate: a temporary production reference was detected and named, then
+  removed
+Known-limitations: A user cannot delete their own project or thread through any
+  supported path, and could not before this change either. AUDIT-005b carries it
+Dev-Log: DL-20260802-048
+
 Change-ID: CL-20260802-037
 Commit: pending
 Date: 2026-08-02

@@ -41,37 +41,11 @@ type RetentionResult struct {
 	OversizeOutputChunks uint64
 }
 
-// DeletionMode defines an explicit aggregate deletion lifecycle.
-type DeletionMode string
-
-const (
-	DeletionModeTombstoneThenPurge DeletionMode = "tombstone-then-purge"
-	DeletionModeHardDeleteLineage  DeletionMode = "hard-delete-lineage"
-)
-
-// DeletionPolicy fixes deletion behavior before later semantic tables exist.
-type DeletionPolicy struct {
-	Projects           DeletionMode
-	Threads            DeletionMode
-	LearnedArtifacts   DeletionMode
-	RequireOrphanCheck bool
-}
-
 // DefaultRetentionPolicy returns the bounded local verbose-output policy.
 func DefaultRetentionPolicy() RetentionPolicy {
 	return RetentionPolicy{
 		VerboseOutputMaxAge:       30 * 24 * time.Hour,
 		MaxVerboseBytesPerCommand: 8 * 1024 * 1024,
-	}
-}
-
-// DefaultDeletionPolicy returns the fixed user-data deletion semantics.
-func DefaultDeletionPolicy() DeletionPolicy {
-	return DeletionPolicy{
-		Projects:           DeletionModeTombstoneThenPurge,
-		Threads:            DeletionModeTombstoneThenPurge,
-		LearnedArtifacts:   DeletionModeHardDeleteLineage,
-		RequireOrphanCheck: true,
 	}
 }
 

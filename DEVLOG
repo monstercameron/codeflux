@@ -51,6 +51,43 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-048
+Date: 2026-08-02
+Status: Deletion policy removed; guard test proven to discriminate
+Change-ID: CL-20260802-038
+Commit: pending
+Request-or-TODO: AUDIT-005a
+Goal: Resolve a declared user-data deletion policy that no code executed and the
+  schema contradicted
+Assumptions: A policy type with no executor states intent, not behaviour, and a
+  reader cannot tell the difference from the source
+Decisions: Took the ticket's second alternative and deleted. Implementing a real
+  purge path means a migration, an authority model for an irreversible
+  operation on user data, and a decision about tombstone lifetime -- a feature
+  with its own governing task, not a reconciliation.
+  Removed DeletionModeHardDeleteLineage along with the rest even though it named
+  the one mode that IS executed. DeleteMemoryArtifact reaches that behaviour
+  without consulting the policy struct, so the constant was a label for
+  something that happens elsewhere, which is the same defect in smaller form.
+  The guard test scans production source only. Policing comments too would have
+  deleted the explanation along with the code, and the explanation is what lets
+  the next reader find out why the gap exists rather than re-introducing it
+Files-or-schemas: internal/storage/maintenance.go,
+  internal/storage/maintenance_test.go,
+  internal/storage/deletion_policy_declared_unconsumed_test.go. No schema change
+Validation: go build ./... clean; gofmt clean; go test ./internal/storage/ -run
+  'TestAUDIT005|TestMaintenancePolicies' green. Discrimination proven by adding
+  a temporary production reference, watching the guard name it, and removing it
+Failures-or-discarded-approaches: The first guard scanned every .go file and
+  failed on three test files that name the symbols in prose -- including its own
+  doc comment. Narrowed to production source. Also discarded leaving the type in
+  place with a pin test recording it as unconsumed: that is a third state, and
+  the ticket offered two
+Known-limitations: There is no project or thread deletion path at all. That was
+  true before this change and is now recorded as AUDIT-005b rather than implied
+  by a type that looked like a policy
+Next-safe-step: AUDIT-005b when a user-facing delete is wanted
+
 Dev-Log: DL-20260802-047
 Date: 2026-08-02
 Status: Flag removed and pinned
