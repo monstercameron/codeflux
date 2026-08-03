@@ -237,6 +237,10 @@ var rpcContracts = []RPCContract{
 	rpcQuery("ReviewService/GetDiffSummary", "WorktreeService.GetTaskDiff", "tasks", "worktrees"),
 	rpcQuery("ReviewService/GetValidationReport", "ValidationService.GetValidationReport", "validations", "evidence"),
 	rpcQuery("ReviewService/GetEvidenceReport", "ReviewService.BuildReviewBundle", "tasks", "plans", "validations", "evidence", "worktrees", "graphs"),
+	// The pipeline stage ledger's read path (PIPE-006b). A query: the rows are
+	// immutable and already durable when a run writes them, so this reads
+	// history rather than producing any.
+	rpcQuery("PipelineStageService/ListPipelineStages", "PipelineStageReader.ListPipelineStages", "pipeline-stages"),
 	rpcEffect("ReviewService/AcceptChange", "ReviewService.AcceptChange",
 		"explicit-user-authority", "task/accept/key", "required-task-diff-validation-evidence",
 		[]string{"tasks", "acceptance-decisions", "episodes", "session-events"},

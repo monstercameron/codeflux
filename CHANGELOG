@@ -50,6 +50,28 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-073
+Commit: pending
+Date: 2026-08-02
+Type: Correction -- a regression this session introduced
+Request-or-TODO: PIPE-006b
+Outcome: The RPC contract catalog gains the PipelineStageService row it was
+  never given. CL-20260802-064 added ListPipelineStages as the product's 60th
+  RPC and did not record it, so TestRPCContractCatalogMatchesProductDescriptor
+  failed with "catalog has 59 RPCs; descriptor has 60" from that commit onward.
+  It was committed and pushed in that state. Recorded as a correction rather
+  than folded into an unrelated change, because the catalog exists precisely to
+  make an unrecorded RPC impossible to ship, and it worked -- the test caught
+  it, and it was reported by an unrelated lane rather than noticed by the lane
+  that caused it
+Affected-behavior: None at runtime. The catalog is descriptive
+Compatibility-or-migration: None
+Verification: go test ./internal/coordinator/ -run
+  TestRPCContractCatalogMatchesProductDescriptor green
+Known-limitations: The gap existed across two pushed commits. Nothing else
+  consulted the catalog in between
+Dev-Log: DL-20260802-083
+
 Change-ID: CL-20260802-072
 Commit: pending
 Date: 2026-08-02

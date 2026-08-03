@@ -25,6 +25,27 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-083
+Date: 2026-08-02
+Status: Corrected
+Change-ID: CL-20260802-073
+Commit: pending
+Request-or-TODO: PIPE-006b
+Goal: Record the 60th RPC in the catalog that exists to record them
+Assumptions: None
+Decisions: Filed as its own correction rather than folded into an unrelated
+  commit. The catalog's whole purpose is to make an unrecorded RPC impossible to
+  ship quietly, and burying its repair inside another change would be the same
+  omission in a different place.
+  Worth noting how it surfaced: the lane that added the RPC did not notice, and
+  an unrelated lane reported the failing test while working on something else.
+  The guard did its job; the reporting path was luck
+Files-or-schemas: internal/coordinator/catalog.go
+Validation: The catalog test passes
+Failures-or-discarded-approaches: None
+Known-limitations: The gap spanned two pushed commits
+Next-safe-step: None
+
 Dev-Log: DL-20260802-082
 Date: 2026-08-02
 Status: Cached, and the premise corrected
