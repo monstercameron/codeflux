@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-108
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a string case is matched by its property, not its characters
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: The same defect CL-20260803-107 fixed for slices was still present for
+  strings, and worse there. A string parameter synthesises eight cases, and six
+  of them were matched as exact text: a run had to write "héllo wörld" with
+  that greeting, "a  b	c
+d" with those letters, and strings.Repeat("x",
+  100000) with that character and that count. No correct test would, so every
+  rung taking a string parameter had cases it could not have tried, and stage 7
+  blocks eleven stages behind it.
+  Matching is now on the property each case names -- empty, whitespace only,
+  padded, mixed separators, outside ASCII, far longer than expected, a single
+  character, ordinary -- which is what the case was synthesised to demand. The
+  eight map to eight distinct properties, so nothing collapses into anything
+  else and coverage is not overstated.
+  Format strings and assertion messages are excluded. A suite is full of "%d
+"
+  and "got %v, want %v", and counting those would satisfy the separator and
+  ordinary-text cases in every suite ever written -- a false green in the check
+  whose whole job is to report what was never tried.
+Verification: Build, vet, and four new tests covering the property match, the
+  eight-way distinctness, and the format-string exclusion
+Dev-Log: DL-20260803-118
+
 Change-ID: CL-20260803-107
 Commit: pending
 Date: 2026-08-03

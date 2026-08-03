@@ -386,6 +386,15 @@ func caseIsTried(testSource string, tests []string, candidate atomCase) bool {
 	// same structure with its own values satisfies them. A scalar shape has
 	// no invented part and is still matched literally: "nil", `""` and 0 mean
 	// exactly themselves.
+	// A quoted string shape has the same invented part a composite literal has.
+	// Nothing about `"héllo wörld"` says those words; it says "text with
+	// characters outside ASCII". Matching the text asked a run to guess the
+	// exact greeting this file happens to contain, and asked it to write
+	// strings.Repeat("x", 100000) with that x and that count, so every rung
+	// taking a string parameter had cases it could not have tried.
+	if wanted, isString := stringShapeSignature(candidate.Shape); isString {
+		return testSourceHasStringShape(testSource, wanted)
+	}
 	if wanted, isComposite := compositeShapeSignature(candidate.Shape); isComposite {
 		// An empty composite and nil are one demand, not two. A function that
 		// ranges over a slice cannot tell []string{} from a nil []string —
@@ -495,6 +504,200 @@ func isIdentifierByte(character byte) bool {
 	default:
 		return false
 	}
+}
+
+// stringShapeKind is the property a synthesised string case asks about, once
+// the particular characters the synthesiser chose are discarded.
+//
+// The eight string cases map to eight distinct kinds, so this loses nothing the
+// case ladder was demanding: a test that pads its own word has tried the padded
+// input, and a test that repeats its own character ten thousand times has tried
+// text far longer than expected.
+type stringShapeKind string
+
+const (
+	stringShapeEmpty           stringShapeKind = "empty"
+	stringShapeWhitespaceOnly  stringShapeKind = "whitespace-only"
+	stringShapeNonASCII        stringShapeKind = "non-ascii"
+	stringShapeVeryLong        stringShapeKind = "very-long"
+	stringShapePadded          stringShapeKind = "padded"
+	stringShapeMixedSeparators stringShapeKind = "mixed-separators"
+	stringShapeSingleCharacter stringShapeKind = "single-character"
+	stringShapeOrdinary        stringShapeKind = "ordinary"
+)
+
+// stringShapeSignature reads a shape written as a quoted string, or as a call
+// that builds one far longer than any literal would be written out.
+//
+// It reports false for anything else, so "nil", 0 and 42 keep being matched
+// literally. Those have no invented part: they mean exactly themselves.
+func stringShapeSignature(shape string) (stringShapeKind, bool) {
+	trimmed := strings.TrimSpace(shape)
+	if strings.HasPrefix(trimmed, "strings.Repeat(") ||
+		strings.HasPrefix(trimmed, "bytes.Repeat(") {
+		return stringShapeVeryLong, true
+	}
+	if len(trimmed) < 2 || !strings.HasPrefix(trimmed, `"`) ||
+		!strings.HasSuffix(trimmed, `"`) {
+		return "", false
+	}
+	// One literal, not two side by side: a shape holding an unescaped quote in
+	// the middle is something else, and guessing at it would classify it wrong.
+	inner := trimmed[1 : len(trimmed)-1]
+	if strings.Contains(strings.ReplaceAll(inner, `\"`, ""), `"`) {
+		return "", false
+	}
+	return classifyStringShape(inner), true
+}
+
+// classifyStringShape names the property a string literal's contents have.
+//
+// The order is the order the properties exclude one another: text outside ASCII
+// may also be padded, and a case asking for one is not answered by a test
+// covering the other, so the more specific question is asked first.
+func classifyStringShape(inner string) stringShapeKind {
+	text := strings.ReplaceAll(inner, `\t`, "\t")
+	text = strings.ReplaceAll(text, `\n`, "\n")
+	switch {
+	case text == "":
+		return stringShapeEmpty
+	case strings.TrimSpace(text) == "":
+		return stringShapeWhitespaceOnly
+	case containsNonASCII(text):
+		return stringShapeNonASCII
+	case len(text) >= 1000:
+		return stringShapeVeryLong
+	case text != strings.TrimSpace(text):
+		return stringShapePadded
+	case hasSeparatorBetweenContent(text):
+		return stringShapeMixedSeparators
+	case len([]rune(text)) == 1:
+		return stringShapeSingleCharacter
+	default:
+		return stringShapeOrdinary
+	}
+}
+
+// containsNonASCII reports whether the text holds a character outside the
+// ASCII range, which is where byte length and rune length part company.
+//
+// Written either way. A test may put the character in the file directly, as
+// "héllo", or escape it, as "héllo"; the two produce the same string and
+// a case asking for one is answered by either.
+func containsNonASCII(text string) bool {
+	for index := 0; index < len(text); index++ {
+		if text[index] >= 0x80 {
+			return true
+		}
+		if text[index] != '\\' || index+1 >= len(text) {
+			continue
+		}
+		switch text[index+1] {
+		case 'u', 'U':
+			return true
+		case 'x':
+			// \x80 and above; \x41 is an ASCII letter written the long way.
+			if index+2 < len(text) && text[index+2] >= '8' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasSeparatorBetweenContent reports whether a tab, a newline or a run of
+// spaces separates content from other content.
+//
+// Content on both sides is required so a trailing "\n" in a message does not
+// read as an input with mixed separators. That distinction is the difference
+// between a case genuinely tried and a format string counted by accident.
+func hasSeparatorBetweenContent(text string) bool {
+	for _, separator := range []string{"\t", "\n", "  "} {
+		at := strings.Index(text, separator)
+		if at < 0 {
+			continue
+		}
+		before := strings.TrimSpace(text[:at])
+		after := strings.TrimSpace(text[at+len(separator):])
+		if before != "" && after != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// testSourceHasStringShape reports whether the tests build a string with the
+// same property.
+//
+// Format strings and assertion messages are skipped. A test source is full of
+// "%d\n" and "got %v, want %v", and counting those would satisfy the separator
+// and ordinary-text cases in any suite ever written, which is a false green in
+// the check whose whole job is to report what was never tried.
+func testSourceHasStringShape(testSource string, wanted stringShapeKind) bool {
+	if wanted == stringShapeVeryLong &&
+		(strings.Contains(testSource, "strings.Repeat(") ||
+			strings.Contains(testSource, "bytes.Repeat(")) {
+		return true
+	}
+	for _, literal := range quotedStringLiterals(testSource) {
+		if isFormatOrMessageLiteral(literal) {
+			continue
+		}
+		if classifyStringShape(literal) == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+// quotedStringLiterals returns the contents of every interpreted string literal
+// in the source, with the escapes left as they were written.
+func quotedStringLiterals(source string) []string {
+	var literals []string
+	for index := 0; index < len(source); index++ {
+		if source[index] != '"' {
+			continue
+		}
+		// A rune literal holding a quote is not a string literal.
+		if index > 0 && source[index-1] == '\'' {
+			continue
+		}
+		escaped := false
+		for scan := index + 1; scan < len(source); scan++ {
+			character := source[scan]
+			switch {
+			case escaped:
+				escaped = false
+			case character == '\\':
+				escaped = true
+			case character == '"':
+				literals = append(literals, source[index+1:scan])
+				index = scan
+				scan = len(source)
+			case character == '\n':
+				// An unterminated literal is not one; stop rather than run on
+				// through the rest of the file looking for a closing quote.
+				index = scan
+				scan = len(source)
+			}
+		}
+	}
+	return literals
+}
+
+// isFormatOrMessageLiteral reports whether a literal is printing rather than
+// being fed to the code under test.
+func isFormatOrMessageLiteral(literal string) bool {
+	for index := 0; index+1 < len(literal); index++ {
+		if literal[index] != '%' {
+			continue
+		}
+		next := literal[index+1]
+		if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
+			return true
+		}
+	}
+	return false
 }
 
 // compositeShapeSignature is what a composite literal is being asked for,

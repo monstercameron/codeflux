@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-118
+Date: 2026-08-03
+Status: String cases are answerable by a correct test for the first time
+Change-ID: CL-20260803-108
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Stop demanding a run guess the characters this file happens to contain
+Decisions: Classified into eight kinds and asserted in a test that they stay
+  eight. Two collapsing would mean a test covering one silently satisfies the
+  other, which is coverage reported and not held.
+  Excluded literals holding a percent verb. The property match buys leniency
+  back from the literal match, and a suite's own assertion messages are where
+  that leniency would have been spent first.
+  Required content on both sides of a separator, so a trailing newline in a
+  message is not read as input with mixed separators.
+  Accepted a non-ASCII character written either directly or as an escape. The
+  two produce the same string, and a case asking for one is answered by either
+Files-or-schemas: internal/coordinator/agent_stage_cases.go and its test
+Validation: Build, vet, four new tests
+Failures-or-discarded-approaches: Leaving the literal match and shortening the
+  synthesised strings, which would have made them guessable rather than
+  derivable, and would have kept the defect for the long and the non-ASCII case
+Known-limitations: A literal used as a join separator or a table name can
+  satisfy a case it was not written for. That is leniency in a check that is
+  shallow by design, and it replaces a demand no correct test could meet
+Next-safe-step: Rungs taking a string parameter -- 3 onward
+
 Dev-Log: DL-20260803-117
 Date: 2026-08-03
 Status: Rung 2's recorded worktree now passes every stage but one

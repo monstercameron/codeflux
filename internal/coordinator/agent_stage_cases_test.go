@@ -168,3 +168,84 @@ func TestIntegersCarryAWrongAndAPathologicalCase(t *testing.T) {
 		t.Errorf("neither end of the integer range is tried: %s", overflow)
 	}
 }
+
+// TestADuplicateIsEnoughToCountAsRepetition covers a synthesised case being
+// matched by the property it names rather than by the literal it is written as.
+//
+// Ladder rung 2 wrote []string{"4", "4", "-2"} under the heading "repeated
+// elements" and was refused for holding a third value that was not a
+// duplicate, which failed one stage and blocked eleven behind it.
+func TestADuplicateIsEnoughToCountAsRepetition(t *testing.T) {
+	for _, elements := range [][]string{
+		{"4", "4", "-2"},
+		{"8", "-3", "8"},
+		{"a", "a", "a"},
+	} {
+		if !elementsRepeat(elements) {
+			t.Errorf("%v was not read as holding a repeat", elements)
+		}
+	}
+	for _, elements := range [][]string{
+		{"1", "2", "3"},
+		{"7"},
+		{},
+	} {
+		if elementsRepeat(elements) {
+			t.Errorf("%v was read as holding a repeat", elements)
+		}
+	}
+}
+
+// TestEveryStringCaseAsksADifferentQuestion checks the eight string shapes
+// classify into eight distinct properties.
+//
+// If two collapsed, a test covering one would silently satisfy the other and
+// the case ladder would report coverage it does not have.
+func TestEveryStringCaseAsksADifferentQuestion(t *testing.T) {
+	seen := map[stringShapeKind]string{}
+	for _, candidate := range casesForType("string") {
+		kind, ok := stringShapeSignature(candidate.Shape)
+		if !ok {
+			t.Errorf("%s was not read as a string shape", candidate.Shape)
+			continue
+		}
+		if earlier, clash := seen[kind]; clash {
+			t.Errorf("%s and %s both ask for %s", earlier, candidate.Shape, kind)
+		}
+		seen[kind] = candidate.Shape
+	}
+	if len(seen) != len(casesForType("string")) {
+		t.Errorf("%d string case(s) collapsed into %d propert(ies)",
+			len(casesForType("string")), len(seen))
+	}
+}
+
+// TestAStringCaseIsTriedByATestUsingItsOwnValues is the point of matching on
+// the property: nothing about "héllo wörld" says those words.
+func TestAStringCaseIsTriedByATestUsingItsOwnValues(t *testing.T) {
+	source := `func TestParse(t *testing.T) {
+		cases := []string{"", " ", "x", "  spaced  ", "one\ttwo\nthree",
+			"caf\u00e9 au lait", strings.Repeat("q", 50000), "ordinary text"}
+		_ = cases
+	}`
+	for _, candidate := range casesForType("string") {
+		if !caseIsTried(source, []string{"TestParse"}, candidate) {
+			t.Errorf("a test covering the property left %s untried", candidate.Shape)
+		}
+	}
+}
+
+// TestAFormatStringDoesNotCountAsAnInput guards the leniency the property
+// match buys back: a suite is full of "%d\n", and counting those would satisfy
+// the separator case in every suite ever written.
+func TestAFormatStringDoesNotCountAsAnInput(t *testing.T) {
+	source := `func TestParse(t *testing.T) {
+		t.Errorf("got %v, want %v\n", got, want)
+	}`
+	if testSourceHasStringShape(source, stringShapeMixedSeparators) {
+		t.Error("an assertion message counted as an input with mixed separators")
+	}
+	if testSourceHasStringShape(source, stringShapeOrdinary) {
+		t.Error("an assertion message counted as ordinary input text")
+	}
+}
