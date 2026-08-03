@@ -929,41 +929,6 @@ func composerTaskMenuClass(tokens design.Tokens) string {
 	).String()
 }
 
-func composerDetailsClass(tokens design.Tokens) string {
-	return css.New(css.MinWidth(css.Zero), css.Position.Relative).String()
-}
-
-// composerSummaryClass styles the composer's own disclosures.
-//
-// They open options beside the field they belong to, so they are drawn as part
-// of the well rather than as two more outlined buttons competing with the one
-// control that commits the message.
-func composerSummaryClass(tokens design.Tokens) string {
-	rules := []css.Rule{
-		u.InlineFlex, u.ItemsCenter, u.JustifyCenter,
-		css.Gap(css.Px(tokens.Spacing.XS)),
-		css.MinHeight(css.Px(tokens.Interaction.MinimumPointerTarget)),
-		css.PaddingX(css.Px(tokens.Spacing.SM)),
-		css.Bg(css.Transparent),
-		css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
-		css.Border(css.Px(tokens.Geometry.BorderWidth), css.Transparent),
-		css.Rounded(css.Px(tokens.Geometry.ControlRadius)),
-		css.Font(css.FontStack(tokens.Fonts.UI)),
-		css.FontSize(css.Px(tokens.Typography.Metadata.Size)),
-		css.FontWeight.Semibold,
-		css.Cursor.Pointer,
-	}
-	rules = append(rules, css.Hover(
-		css.Bg(css.Hex(string(tokens.Colors.Surface2))),
-		css.TextColor(css.Hex(string(tokens.Colors.TextPrimary))),
-	)...)
-	rules = append(rules, css.FocusVisible(
-		css.Outline(css.Px(tokens.Geometry.FocusRingWidth), css.Hex(string(tokens.Colors.FocusRing))),
-		css.OutlineOffset(css.Px(tokens.Geometry.FocusRingOffset)),
-	)...)
-	return css.New(rules...).String()
-}
-
 func composerAssistiveClass() string {
 	return css.New(
 		css.Position.Absolute, css.W(css.Px(1)), css.H(css.Px(1)),

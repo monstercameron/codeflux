@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strconv"
 	"strings"
 
 	"codeflux.dev/codeflux/internal/storage"
@@ -317,15 +316,6 @@ func allScenarioNameStrings() []string {
 	return out
 }
 
-func inspectableEntityNames() []string {
-	entities := storage.AllInspectionEntities()
-	names := make([]string, 0, len(entities))
-	for _, entity := range entities {
-		names = append(names, string(entity))
-	}
-	return names
-}
-
 // writeCommandJSON emits one machine-readable object, failing loudly rather
 // than printing a partial document.
 func writeCommandJSON(stdout io.Writer, stderr io.Writer, label string, payload any) int {
@@ -336,10 +326,4 @@ func writeCommandJSON(stdout io.Writer, stderr io.Writer, label string, payload 
 	}
 	fmt.Fprintln(stdout, string(encoded))
 	return exitSuccess
-}
-
-// formatSequence renders a sequence for human output without scientific
-// notation creeping in through %v on a large value.
-func formatSequence(sequence uint64) string {
-	return strconv.FormatUint(sequence, 10)
 }

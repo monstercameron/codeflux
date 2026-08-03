@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -1294,53 +1293,7 @@ func decompositionDetail(uncovered, unasked []string) string {
 	}
 }
 
-// measureCoverage reports how much of the code the passing tests reached.
-func (execution *AgentExecution) measureCoverage(
-	ctx context.Context,
-	worktree string,
-) (float64, error) {
-	command := exec.CommandContext(ctx, "go", "test", "-cover", "./...")
-	command.Dir = worktree
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return 0, errors.New(strings.TrimSpace(string(output)))
-	}
-	// Go prints coverage per package. The lowest is reported rather than the
-	// average: an average lets a well-covered package hide one nothing
-	// touches, and the untouched one is the answer to the question.
-	lowest := -1.0
-	for _, line := range strings.Split(string(output), "\n") {
-		index := strings.Index(line, "coverage: ")
-		if index < 0 {
-			continue
-		}
-		rest := line[index+len("coverage: "):]
-		percent := strings.TrimSpace(strings.SplitN(rest, "%", 2)[0])
-		value, parseErr := strconv.ParseFloat(percent, 64)
-		if parseErr != nil {
-			continue
-		}
-		if lowest < 0 || value < lowest {
-			lowest = value
-		}
-	}
-	if lowest < 0 {
-		return 0, errors.New("no package reported coverage")
-	}
-	return lowest, nil
-}
-
-// coverageDetail states what was measured, or why nothing was.
-func coverageDetail(covered float64, err error) string {
-	if err != nil {
-		return "coverage could not be measured: " + err.Error()
-	}
-	return fmt.Sprintf(
-		"the least-covered package reached %.1f%% statement coverage", covered)
-}
-
-// acceptanceDetail says what the request came with.
-// acceptanceDetail states what the request is judged against.
+// acceptanceDetail states what the request is judged against (PIPE-019).
 func acceptanceDetail(count int) string {
 	if count == 0 {
 		return "the request was recorded as a message; no executable " +

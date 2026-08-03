@@ -1,56 +1,9 @@
 package main
 
 import (
-	"context"
-	"errors"
-
-	codefluxv1 "codeflux.dev/codeflux/api/gen/codeflux/v1"
-	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
 	frontendstate "codeflux.dev/codeflux/web/frontend/state"
 )
-
-var errInvalidSelectedSession = errors.New("frontend bootstrap selected session is invalid")
-
-func selectedSessionIdentity(envelope bootstrapEnvelope) (*codefluxv1.StableIdentity, error) {
-	identity := envelope.SelectedSessionID
-	if identity == nil {
-		return nil, nil
-	}
-	if identity.GetKind() != codefluxv1.StableIdentityKind_STABLE_IDENTITY_KIND_SESSION {
-		return nil, errInvalidSelectedSession
-	}
-	if _, err := domain.ParseSessionID(identity.GetValue()); err != nil {
-		return nil, errInvalidSelectedSession
-	}
-	return &codefluxv1.StableIdentity{Kind: identity.GetKind(), Value: identity.GetValue()}, nil
-}
-
-func startAuthenticatedSession(
-	ctx context.Context,
-	envelope bootstrapEnvelope,
-	connector sessionclient.Connector,
-	observe func(sessionclient.Status),
-	apply func(context.Context, *codefluxv1.SessionEvent) error,
-) (*sessionclient.Client, error) {
-	identity, err := selectedSessionIdentity(envelope)
-	if err != nil || identity == nil {
-		return nil, err
-	}
-	client, err := sessionclient.New(sessionclient.Config{
-		Connector: connector,
-		SessionID: identity,
-		Apply:     apply,
-		Observe:   observe,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := client.Start(ctx); err != nil {
-		return nil, err
-	}
-	return client, nil
-}
 
 func sessionViewForLifecycle(status sessionclient.Status) frontendstate.SessionView {
 	view := frontendstate.SessionView{Bootstrap: frontendstate.BootstrapReady}

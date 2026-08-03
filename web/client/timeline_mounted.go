@@ -291,6 +291,20 @@ func mountedAuthoritativeTimeline(
 			}
 			next, err := fetchOlderTimelinePage(ctx, feedState.Get(), lease)
 			pageBusy.Set(false)
+			if err != nil {
+				// fetchOlderTimelinePage already marks the common failure path
+				// (the remote fetch itself failing) with a retryable SafeError.
+				// But a page-merge failure — e.g. ErrPageScope when the cursor
+				// moved between read and merge — instead returns the in-flight
+				// "loading" feed unchanged, with LoadingOlder still true and no
+				// SafeError. Nothing else ever clears that flag, and the next
+				// pagination attempt would be rejected by BeginOlderMessagePage's
+				// LoadingOlder guard, wedging "load older" permanently with no
+				// visible error. Force a definite failed state here so the error
+				// is never silently dropped and the control never gets stuck.
+				feedState.Set(timeline.FailOlderMessagePage(next))
+				return
+			}
 			feedState.Set(next)
 		})
 	}

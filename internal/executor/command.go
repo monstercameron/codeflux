@@ -414,23 +414,3 @@ func publishProgress(ctx context.Context, sink ToolProgressSink, progress ToolPr
 		_ = sink.PublishToolProgress(ctx, progress)
 	}
 }
-
-func publishRedactedOutput(
-	ctx context.Context,
-	sink ToolProgressSink,
-	requestID string,
-	stream string,
-	content string,
-) {
-	if sink == nil {
-		return
-	}
-	for len(content) != 0 {
-		size := min(len(content), redactedProgressChunkBytes)
-		publishProgress(ctx, sink, ToolProgress{
-			RequestID: requestID, State: "running",
-			Stream: stream, Content: content[:size],
-		})
-		content = content[size:]
-	}
-}

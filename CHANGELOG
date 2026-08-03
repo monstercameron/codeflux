@@ -66,8 +66,42 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
-Change-ID: CL-20260802-035
+Change-ID: CL-20260802-036
 Commit: pending
+Date: 2026-08-02
+Type: Fix -- static analysis findings, and one product defect found among them
+Request-or-TODO: REPO-018
+Outcome: Every Staticcheck finding is cleared under all three passes the gate
+  now runs. 32 unreachable declarations were removed from internal/coordinator,
+  internal/executor, cmd/codeflux-dev, web/client, and web/frontend; two control
+  characters became explicit escapes; a loop became an append; a comparison to a
+  bool constant and a redundant nil check were simplified; and five deprecated
+  fixed-duration waits in the browser suite were replaced with waits on the
+  condition each was really waiting for.
+  One finding was a real user-visible defect rather than a style issue. In
+  web/client/timeline_mounted.go the error from fetching an older timeline page
+  was assigned and never read. On the page-merge failure path the feed came back
+  with LoadingOlder still true and no SafeError, and nothing else clears that
+  flag, so "load older messages" wedged permanently on a spinner with no error
+  shown until the user switched threads. The error is now checked and the feed
+  forced to a definite failed state
+Affected-behavior: The stuck-spinner defect above is fixed. Otherwise no product
+  behavior changed: the removed declarations had no callers under any build
+  target
+Compatibility-or-migration: None. No schema, no generated source, no public API
+Verification: All three Staticcheck passes report zero findings. go build ./...
+  clean; GOOS=js GOARCH=wasm go build ./web/client/... clean; gofmt clean;
+  go test ./web/client/, ./web/frontend/..., ./internal/executor/, and
+  ./cmd/codeflux-dev/ green
+Known-limitations: Three capabilities were removed rather than wired and the
+  repository no longer has them -- graph search in the browser client, the
+  adversarial-review worktree-clean check, and a superseded session-bootstrap
+  path. Each is recorded in TODOS.md so the loss is findable. The browser suite
+  covering the rewritten waits was not confirmed to have been run
+Dev-Log: DL-20260802-046
+
+Change-ID: CL-20260802-035
+Commit: ec92bb7
 Date: 2026-08-02
 Type: Fix -- static analysis gate
 Request-or-TODO: REPO-018
@@ -100,7 +134,7 @@ Known-limitations: A finding in a browser file visible to both targets can be
 Dev-Log: DL-20260802-045
 
 Change-ID: CL-20260802-034
-Commit: pending
+Commit: e488743
 Date: 2026-08-02
 Type: Fix -- repository lint rule
 Request-or-TODO: REPO-031

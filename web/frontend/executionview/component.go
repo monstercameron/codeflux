@@ -691,10 +691,6 @@ func progressBar(tokens design.Tokens, fraction float64, label string) ui.Node {
 	}))
 }
 
-func executionPanelClass(tokens design.Tokens) string {
-	return executionPanelClassFor(tokens, false)
-}
-
 // executionPanelClassFor styles a run panel for the surface it sits on: a card
 // across the workspace, and a plain section inside the observation rail, where
 // another border would be the fourth one in from the edge of the display.

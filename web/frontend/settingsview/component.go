@@ -208,27 +208,6 @@ func stateNode(props Props, subject string) (ui.Node, bool) {
 	}
 }
 
-func policyTerm(term, value string) ui.Node {
-	if value == "" {
-		value = "unknown"
-	}
-	return html.Fragment(
-		html.Tag("dt", html.Props{Text: term}),
-		html.Tag("dd", html.Props{Text: value}),
-	)
-}
-
-func availabilityBadge(mode primitives.Mode, available bool) ui.Node {
-	if available {
-		return primitives.Badge(primitives.BadgeProps{
-			Label: "Credential bound", Status: design.StatusSuccess, Mode: mode,
-		})
-	}
-	return primitives.Badge(primitives.BadgeProps{
-		Label: "Not configured", Status: design.StatusWarning, Mode: mode,
-	})
-}
-
 func reloadLabel(onReload func()) string {
 	if onReload == nil {
 		return ""

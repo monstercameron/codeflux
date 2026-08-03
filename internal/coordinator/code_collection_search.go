@@ -233,8 +233,8 @@ func AtomSchemaSQL() string { return atomSchemaStatement + ";" }
 // column. They are characters no Go declaration or documented sentence
 // contains, so finding one is proof of a match rather than a guess.
 const (
-	atomMatchOpen  = ""
-	atomMatchClose = ""
+	atomMatchOpen  = "\x02"
+	atomMatchClose = "\x03"
 )
 
 // matchedPromise renders the sentence a documentation match landed in.

@@ -132,65 +132,6 @@ func checkSimplification(worktree string) stageOutcome {
 			"to be worth rewriting in any case", evidence)
 }
 
-// stateCompositionObligations says what each composition has to guarantee.
-//
-// A molecule's obligation is not that its parts work; it is that joining them
-// produces the whole answer. Stating it explicitly is what lets a later reader
-// tell a composition that was checked from one that merely compiled, since
-// type compatibility alone is not evidence of safe composition.
-func stateCompositionObligations(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
-	if err != nil {
-		return broke("the produced source could not be parsed: "+err.Error(), nil)
-	}
-	_, molecules := atomsAndMolecules(functions)
-	if len(molecules) == 0 {
-		return skipped("the run composed nothing, so it owes no composition obligation")
-	}
-	obligations := map[string]any{}
-	for _, molecule := range molecules {
-		obligations[molecule.Name] = map[string]any{
-			"discharged_by": molecule.Calls,
-			"guarantee": fmt.Sprintf(
-				"the result of joining %s is the whole answer, not merely a "+
-					"well-typed arrangement of the parts",
-				describeCalls(molecule.Calls)),
-		}
-	}
-	return held(fmt.Sprintf(
-		"%d composition(s) each state what they guarantee and which functions "+
-			"discharge it", len(molecules)),
-		map[string]any{"obligations": obligations})
-}
-
-// stateControlObligations says what the program promises on every path.
-func stateControlObligations(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
-	if err != nil {
-		return broke("the produced source could not be parsed: "+err.Error(), nil)
-	}
-	paths := 0
-	for _, function := range functions {
-		if !isTestScaffolding(function) {
-			paths += function.Branches
-		}
-	}
-	if paths == 0 {
-		return skipped("the program takes no decision, so every run follows one path")
-	}
-	return held(fmt.Sprintf(
-		"%d decision point(s) declared; each must terminate and report its "+
-			"outcome rather than exit silently", paths),
-		map[string]any{
-			"decision_points": paths,
-			"obligations": []string{
-				"every path terminates",
-				"every failure path reports rather than exits silently",
-				"no path is unreachable",
-			},
-		})
-}
-
 // checkControlTests requires the failure paths to be examined, not just the
 // happy one.
 //

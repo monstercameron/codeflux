@@ -486,9 +486,8 @@ func describeDeclaration(
 	if doc == nil {
 		return read
 	}
-	for _, line := range strings.Split(strings.TrimRight(doc.Text(), "\n"), "\n") {
-		read.documentation = append(read.documentation, line)
-	}
+	read.documentation = append(read.documentation,
+		strings.Split(strings.TrimRight(doc.Text(), "\n"), "\n")...)
 	if !atomDirectivePresent(doc) {
 		return read
 	}

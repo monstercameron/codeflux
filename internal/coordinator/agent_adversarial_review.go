@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -352,14 +351,4 @@ func findUntriedCaseFindings(worktree string) []adversarialFinding {
 		}
 	}
 	return findings
-}
-
-// worktreeIsClean reports whether a build survives with no changes pending.
-//
-// It is used after a refinement that was meant to preserve behaviour: an
-// optimisation that leaves the module unbuildable has not optimised anything.
-func worktreeIsClean(ctx context.Context, worktree string) bool {
-	build := exec.CommandContext(ctx, "go", "build", "./...")
-	build.Dir = worktree
-	return build.Run() == nil
 }

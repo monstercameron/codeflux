@@ -1583,16 +1583,6 @@ type detailRow struct {
 	value string
 }
 
-// inspectorSection lists measured facts under one eyebrow.
-//
-// It draws no card and no chevron. The chevron was decoration: nothing
-// collapsed, so the interface offered an affordance it did not have, and three
-// identical boxes made repository facts look as important as spend against a
-// cap. A rule and a label carry the grouping instead.
-func inspectorSection(title string, rows []detailRow, footer ui.Node, tokens design.Tokens) ui.Node {
-	return inspectorSectionWithIcon("", title, rows, footer, tokens)
-}
-
 // inspectorSectionWithIcon lists measured facts under one marked eyebrow.
 func inspectorSectionWithIcon(
 	icon primitives.IconName,
@@ -2574,35 +2564,6 @@ func statusDot(status string) string {
 	default:
 		return "○"
 	}
-}
-
-// contextIcon maps a context chip to its drawn mark.
-//
-// The chips previously carried Unicode glyphs — ▣ ⑂ ✓ ◈ — which rendered at
-// four different weights and pushed their labels out of alignment with each
-// other.
-func contextIcon(kind string) primitives.IconName {
-	switch kind {
-	case "repository":
-		return primitives.IconRepositories
-	case "branch":
-		return primitives.IconBranch
-	case "worktree":
-		return primitives.IconCheck
-	case "model":
-		return primitives.IconModel
-	default:
-		return primitives.IconTasks
-	}
-}
-
-// costReadoutPlaceholder closes the repository-context group.
-//
-// The group ends where the cost readout used to be; this keeps the element
-// list explicit rather than leaving a bare closing brace whose meaning depends
-// on counting parentheses.
-func costReadoutPlaceholder() ui.Node {
-	return html.Span(html.Props{Hidden: true})
 }
 
 // navigationDestination is one rail entry and whether it can be reached.

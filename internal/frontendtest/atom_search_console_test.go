@@ -122,14 +122,14 @@ func TestTheAtomSearchFindsAtomsByWhatTheyPromise(t *testing.T) {
 			t.Fatalf("focus the search: %v", err)
 		}
 		// Typed a character at a time, straddling the debounce, exactly as a
-		// person types.
-		for _, character := range "shoppers" {
-			if err := page.Keyboard().Type(string(character)); err != nil {
-				t.Fatalf("type into the search: %v", err)
-			}
-			page.WaitForTimeout(120)
+		// person types. Keyboard.Type's own per-key delay paces the keystrokes;
+		// no wait is needed here because nothing is being observed yet.
+		if err := page.Keyboard().Type("shoppers", playwright.KeyboardTypeOptions{
+			Delay: playwright.Float(120),
+		}); err != nil {
+			t.Fatalf("type into the search: %v", err)
 		}
-		page.WaitForTimeout(2500)
+		waitForAtomSearchToSettle(t, page)
 		active, err := page.Evaluate(`() => document.activeElement && document.activeElement.id`)
 		if err != nil {
 			t.Fatalf("read the focused element: %v", err)
@@ -153,7 +153,7 @@ func TestTheAtomSearchFindsAtomsByWhatTheyPromise(t *testing.T) {
 		if err := page.Keyboard().Type(" cannot"); err != nil {
 			t.Fatalf("keep typing: %v", err)
 		}
-		page.WaitForTimeout(2500)
+		waitForAtomSearchToSettle(t, page)
 		extended, err := page.Evaluate(`() => document.querySelector('#atom-search').value`)
 		if err != nil {
 			t.Fatalf("read the extended search: %v", err)
@@ -169,12 +169,18 @@ func TestTheAtomSearchFindsAtomsByWhatTheyPromise(t *testing.T) {
 		if err := page.Locator("#atom-search").Fill(""); err != nil {
 			t.Fatalf("clear the search: %v", err)
 		}
-		page.WaitForTimeout(2000)
+		// Let the cleared query settle before firing the next one, so its
+		// answer cannot land mid-sample below and produce a false blank.
+		waitForAtomSearchToSettle(t, page)
 		if err := page.Locator("#atom-search").Fill("retry"); err != nil {
 			t.Fatalf("type the search: %v", err)
 		}
+		// Sampled on a plain Go timer rather than an auto-waiting assertion:
+		// the point of this loop is to observe the list at intervals across
+		// the whole async answer window and catch a transient blank, not to
+		// wait once for a final state.
 		for sample := 0; sample < 24; sample++ {
-			page.WaitForTimeout(100)
+			time.Sleep(100 * time.Millisecond)
 			count, err := page.Locator(`[data-component="atom-row"]`).Count()
 			if err != nil {
 				t.Fatalf("count the rows: %v", err)
@@ -227,6 +233,59 @@ func searchAtoms(t *testing.T, page playwright.Page, query string) []string {
 	}
 	t.Fatalf("the search for %q never settled", query)
 	return nil
+}
+
+// waitForAtomSearchToSettle blocks until the atom list stops showing a
+// pending answer and two consecutive reads agree on what it holds.
+//
+// It exists for moments that only need to know the debounce fired and the
+// coordinator's answer landed and re-rendered the list, without caring what
+// the answer was — the focus- and caret-preservation checks below read DOM
+// state that is only meaningfully exercised once that render has happened,
+// since the bug it guards against only shows up when a re-render replaces
+// the search field out from under the person typing into it.
+//
+// It polls on the same schedule as searchAtoms rather than waiting once for
+// the pending indicator to clear, and for the same reason: a single read can
+// see "not pending" for a stale reason — the last keystroke's own debounce
+// cycle may not have started rendering yet — so settlement is only trusted
+// once it holds across two spaced reads. It also checks both places a
+// pending answer shows: the empty-list message used when the pending search
+// has no prior rows to keep on screen, and the atom-refreshing notice used
+// when it does.
+func waitForAtomSearchToSettle(t *testing.T, page playwright.Page) {
+	t.Helper()
+	const pendingScript = `() => {
+		if (document.querySelector('[data-component="atom-refreshing"]')) {
+			return true;
+		}
+		const list = document.querySelector('[data-component="atom-list"]');
+		return !!list && list.innerText.includes('Looking through every atom');
+	}`
+	deadline := time.Now().Add(30 * time.Second)
+	var settled []string
+	haveBaseline := false
+	for time.Now().Before(deadline) {
+		time.Sleep(400 * time.Millisecond)
+		pending, err := page.Evaluate(pendingScript)
+		if err != nil {
+			t.Fatalf("read the search state: %v", err)
+		}
+		if waiting, _ := pending.(bool); waiting {
+			// A pending answer invalidates any earlier baseline: whatever the
+			// list held before this cannot be compared against what it holds
+			// once this answer lands.
+			haveBaseline = false
+			continue
+		}
+		current := atomRowNames(t, page)
+		if haveBaseline && sameNames(settled, current) {
+			return
+		}
+		settled = current
+		haveBaseline = true
+	}
+	t.Fatalf("the search never settled")
 }
 
 // atomRowNames reads the declaration name out of every listed row.

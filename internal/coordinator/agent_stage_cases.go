@@ -396,54 +396,6 @@ func readTestSource(worktree string) (string, error) {
 	return all.String(), nil
 }
 
-// caseInstruction tells the next attempt which inputs to try, grouped by what
-// kind of assertion each one needs.
-//
-// Grouping by class is the point: an agent handed a flat list writes the same
-// assertion for all of them, which is wrong for most. A wrong input needs a
-// refusal asserted, a pathological one needs survival asserted, and only the
-// straightforward ones have an exact expected value.
-func caseInstruction(untried map[string][]atomCase) string {
-	var report strings.Builder
-	report.WriteString(
-		"Your tests pass, but they only try the inputs you already had in " +
-			"mind. These are implied by the signatures and none is tried:\n")
-
-	names := make([]string, 0, len(untried))
-	for name := range untried {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		fmt.Fprintf(&report, "\n%s:", name)
-		grouped := map[caseClass][]atomCase{}
-		var order []caseClass
-		for _, candidate := range untried[name] {
-			if _, seen := grouped[candidate.Class]; !seen {
-				order = append(order, candidate.Class)
-			}
-			grouped[candidate.Class] = append(grouped[candidate.Class], candidate)
-		}
-		sort.Slice(order, func(first, second int) bool {
-			return order[first].rank() < order[second].rank()
-		})
-		for _, class := range order {
-			fmt.Fprintf(&report, "\n  %s — %s", class, class.assertion())
-			for _, candidate := range grouped[class] {
-				fmt.Fprintf(&report, "\n    - %s (%s)",
-					candidate.Shape, candidate.Why)
-			}
-		}
-	}
-	report.WriteString(
-		"\n\nAdd these as cases in the existing tests, simplest class first. " +
-			"Do not weaken an assertion to make one pass, and do not change " +
-			"behaviour the request asked for. If an input genuinely cannot " +
-			"occur, say so in the test rather than omitting it.")
-	return report.String()
-}
-
 // untriedCases is the corpus a run still owes, for the refinement loop.
 func untriedCases(worktree string) (map[string][]atomCase, error) {
 	functions, err := readProducedFunctions(worktree)

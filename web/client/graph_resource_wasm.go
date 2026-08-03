@@ -72,28 +72,6 @@ func expandGraphResource(ctx context.Context, opener graphResourceClientOpener, 
 	return decodeGraphResource(response.GetGraph(), scope)
 }
 
-func searchGraphResource(ctx context.Context, opener graphResourceClientOpener, scope graphResourceScope, revisionID domain.GraphRevisionID, mode taskgraph.Mode, query string, maxResults int, continuation string) (graphResource, error) {
-	if err := validateGraphResourceInputs(opener, scope, mode); err != nil {
-		return graphResource{}, err
-	}
-	if revisionID.IsZero() || strings.TrimSpace(query) == "" {
-		return graphResource{}, errGraphResourceScopeUnavailable
-	}
-	lease, err := opener(ctx)
-	if err != nil {
-		return graphResource{}, err
-	}
-	if lease.client == nil || lease.close == nil {
-		return graphResource{}, errGraphResourceBridgeUnavailable
-	}
-	defer lease.close()
-	response, err := lease.client.SearchGraph(ctx, &codefluxv1.SearchGraphRequest{ProjectId: graphProjectIdentity(scope.ProjectID), TaskId: graphTaskIdentity(scope.TaskID), GraphRevisionId: graphRevisionIdentity(revisionID), Mode: string(mode), Query: strings.TrimSpace(query), MaxResults: uint32(maxResults), ContinuationCursor: continuation})
-	if err != nil {
-		return graphResource{}, err
-	}
-	return decodeGraphResource(response.GetGraph(), scope)
-}
-
 func loadGraphNodeResource(ctx context.Context, opener graphResourceClientOpener, scope graphResourceScope, revisionID domain.GraphRevisionID, nodeID domain.NodeID) (graphNodeResource, error) {
 	if opener == nil || scope.ProjectID.IsZero() || scope.TaskID.IsZero() || revisionID.IsZero() || nodeID.IsZero() {
 		return graphNodeResource{}, errGraphResourceScopeUnavailable

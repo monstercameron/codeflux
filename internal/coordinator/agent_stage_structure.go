@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -504,20 +503,6 @@ func countPure(functions []producedFunction) int {
 		}
 	}
 	return pure
-}
-
-// worktreeHasGoFiles reports whether there is anything to inspect at all.
-func worktreeHasGoFiles(worktree string) bool {
-	files, err := producedGoFiles(worktree)
-	if err != nil {
-		return false
-	}
-	for _, file := range files {
-		if _, statErr := os.Stat(filepath.Join(worktree, file)); statErr == nil {
-			return true
-		}
-	}
-	return false
 }
 
 // fieldNames renders one parameter or result list as its declared types.

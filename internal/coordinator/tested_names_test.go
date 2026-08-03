@@ -222,7 +222,7 @@ func Simple() int { return 1 }
 				t.Errorf("atom-optimization is neither satisfied nor skipped: %+v",
 					outcome)
 			}
-			if outcome.Evidence == nil || len(outcome.Evidence) == 0 {
+			if len(outcome.Evidence) == 0 {
 				t.Error("the skip carries no evidence, so what the check did " +
 					"find was thrown away")
 			}

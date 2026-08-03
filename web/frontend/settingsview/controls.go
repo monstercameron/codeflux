@@ -244,7 +244,7 @@ func discreteDisabled(props Props, setting FlowSetting) bool {
 // applyDiscrete hands one chosen option to the right handler.
 func applyDiscrete(props Props, setting FlowSetting, option string) {
 	if setting.Kind == FlowSwitch {
-		if props.OnFlowSwitch != nil && discreteSelected(setting, option) != true {
+		if props.OnFlowSwitch != nil && !discreteSelected(setting, option) {
 			props.OnFlowSwitch(setting.Key)
 		}
 		return

@@ -414,22 +414,6 @@ func checkAntiPatterns(worktree string) stageOutcome {
 		len(found), strings.Join(listed, "; ")), evidence)
 }
 
-// antiPatternInstruction tells the next attempt what to fix and why.
-func antiPatternInstruction(found []antiPattern) string {
-	var report strings.Builder
-	report.WriteString(
-		"The code works and is still written in ways that have a known way of " +
-			"going wrong later:\n")
-	for _, pattern := range found {
-		fmt.Fprintf(&report, "\n- %s: %s\n  %s",
-			pattern.Where, pattern.What, pattern.Why)
-	}
-	report.WriteString(
-		"\n\nFix each of these without changing what the program does. The " +
-			"existing tests must still pass unchanged.")
-	return report.String()
-}
-
 // declaresSentinel reports whether a package-level var is one Go has no better
 // way to express.
 //

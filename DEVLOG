@@ -51,12 +51,61 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-046
+Date: 2026-08-02
+Status: All three Staticcheck passes clean
+Change-ID: CL-20260802-036
+Commit: pending
+Request-or-TODO: REPO-018
+Goal: Clear the genuine Staticcheck findings, now that CL-20260802-035 has made
+  the gate report the real ones
+Assumptions: A U1000 finding that survives analysis under the package's own
+  build target is genuinely unreachable, not merely invisible
+Decisions: Deletion was preferred to wiring throughout. Wiring an unused
+  capability is a feature and needs its own governing task; deleting it makes
+  the repository honest immediately and leaves a record of what was removed.
+  Every removal that took a capability with it is named in TODOS.md rather than
+  disappearing quietly.
+  Two removals were checked against product rules before being accepted rather
+  than after. availabilityBadge and costReadoutPlaceholder look like the
+  affordances behind "do not rely on colour alone for status" and "never
+  display unknown cost as zero", so deleting them could have removed a required
+  affordance. Both are superseded: providerRow renders availability through
+  availabilityWord as real text, and costReadout is wired with live Spent and
+  Remaining. The rules are satisfied by the live implementations, which is why
+  the dead ones were safe to remove.
+  The SA4006 in timeline_mounted.go was treated as a defect report, not a lint
+  nit, and it was one
+Files-or-schemas: internal/coordinator (7 files), internal/executor/command.go,
+  cmd/codeflux-dev/devtools.go, internal/frontendtest/atom_search_console_test.go,
+  web/client (6 files), web/frontend (5 files). No schema change
+Validation: All three passes clean -- host over every non-browser package,
+  browser-host with U1000 disabled, and js/wasm with tests disabled.
+  go build ./... clean; GOOS=js GOARCH=wasm go build ./web/client/... clean;
+  gofmt clean; go test ./web/client/, ./web/frontend/..., ./internal/executor/,
+  ./cmd/codeflux-dev/ green
+Failures-or-discarded-approaches: The first attempt at the browser packages was
+  to delete what the host pass reported. Two lanes independently established
+  that 19 of those symbols are called from //go:build js && wasm files and
+  stopped before deleting any of them. That is the reason CL-20260802-035
+  exists and is the substantive result of this ticket -- the ticket as written
+  asked for a deletion that would have broken the shipped frontend
+Known-limitations: Three capabilities were removed rather than wired, and the
+  repository is now missing them: graph search in the browser client, the
+  adversarial-review worktree-clean check, and the tombstone-then-purge
+  deletion policy path if lane J's ticket resolves that way. Each is recorded
+  in TODOS.md. The frontendtest browser suite covering the rewritten waits was
+  not confirmed to have run; that limitation belongs to whoever reports it and
+  is not claimed as verified here
+Next-safe-step: Commit the gate repair and this clearance as separate changes,
+  then establish the coverage baseline REPO-026 asks for
+
 Dev-Log: DL-20260802-045
 Date: 2026-08-02
 Status: Lint analyses browser packages under js/wasm; six newly-visible findings
   handed to the clearance lane
 Change-ID: CL-20260802-035
-Commit: pending
+Commit: ec92bb7
 Request-or-TODO: REPO-018
 Goal: Make Staticcheck analyse each package under a build target it is actually
   compiled for, because the browser packages were being judged under a target
@@ -116,7 +165,7 @@ Dev-Log: DL-20260802-044
 Date: 2026-08-02
 Status: Repository check green; staticcheck still red on REPO-018
 Change-ID: CL-20260802-034
-Commit: pending
+Commit: e488743
 Request-or-TODO: REPO-031
 Goal: Make the atom-comment opening rule read the opening sentence rather than
   the first physical line, so a correctly wrapped Go doc comment stops failing

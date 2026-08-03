@@ -47,8 +47,9 @@ func TestAuthoritativeComposerActionsInvokeEverySupportedCommand(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			props := bindAuthoritativeComposerTaskActions(
-				composer.Props{}, test.task, frontendstate.ConnectionLive, controls, inspect,
+			props := bindAuthoritativeComposerTaskActionsWithCallbacks(
+				composer.Props{}, test.task, frontendstate.ConnectionLive, controls,
+				authoritativeComposerCallbacks{InspectGraph: inspect},
 			)
 			markup := renderAuthoritativeComposer(t, props)
 			for _, action := range test.actions {
@@ -70,9 +71,10 @@ func TestAuthoritativeComposerActionsInvokeEverySupportedCommand(t *testing.T) {
 
 func TestAuthoritativeComposerActionCallbackRejectsActionsOutsideCurrentMatrix(t *testing.T) {
 	inspections := 0
-	props := bindAuthoritativeComposerTaskActions(
+	props := bindAuthoritativeComposerTaskActionsWithCallbacks(
 		composer.Props{}, taskprojection.TaskProjection{State: domain.TaskStatePaused},
-		frontendstate.ConnectionLive, &taskcontrols.Props{}, func() { inspections++ },
+		frontendstate.ConnectionLive, &taskcontrols.Props{},
+		authoritativeComposerCallbacks{InspectGraph: func() { inspections++ }},
 	)
 	props.OnTaskAction(composer.ActionInspectGraph)
 	if inspections != 0 {
@@ -108,10 +110,11 @@ func TestAuthoritativeComposerActionsHonorCommandSettlementsAndConnectionCertain
 				pending.Key = key
 				pending.ExpectedRevision = 7
 			}
-			props := bindAuthoritativeComposerTaskActions(
+			props := bindAuthoritativeComposerTaskActionsWithCallbacks(
 				composer.Props{},
 				taskprojection.TaskProjection{State: domain.TaskStateRunning, PendingCommand: pending},
-				test.connection, controls, func() {},
+				test.connection, controls,
+				authoritativeComposerCallbacks{InspectGraph: func() {}},
 			)
 			markup := renderAuthoritativeComposer(t, props)
 			pauseBlocked := props.View.Task.DisabledReason(composer.ActionPause) != ""
@@ -141,8 +144,9 @@ func TestAuthoritativeComposerActionsKeepUnsupportedAndDeniedActionsDisabled(t *
 			SafeReason: "Pause is denied by the validated policy.",
 		},
 	}
-	props := bindAuthoritativeComposerTaskActions(
-		composer.Props{}, denied, frontendstate.ConnectionLive, controls, func() {},
+	props := bindAuthoritativeComposerTaskActionsWithCallbacks(
+		composer.Props{}, denied, frontendstate.ConnectionLive, controls,
+		authoritativeComposerCallbacks{InspectGraph: func() {}},
 	)
 	if got := props.View.Task.DisabledReason(composer.ActionPause); got != denied.Policy.SafeReason {
 		t.Fatalf("pause reason=%q", got)
@@ -152,9 +156,10 @@ func TestAuthoritativeComposerActionsKeepUnsupportedAndDeniedActionsDisabled(t *
 		State: domain.TaskStateRecoveryRequired, Recovery: taskprojection.RecoverySafeResume,
 	}
 	safeResume := 0
-	props = bindAuthoritativeComposerTaskActions(
+	props = bindAuthoritativeComposerTaskActionsWithCallbacks(
 		composer.Props{}, recovery, frontendstate.ConnectionLive,
-		&taskcontrols.Props{OnSafeResume: func() { safeResume++ }}, nil,
+		&taskcontrols.Props{OnSafeResume: func() { safeResume++ }},
+		authoritativeComposerCallbacks{},
 	)
 	if got := props.View.Task.DisabledReason(composer.ActionSafeResume); got != "" {
 		t.Fatalf("authoritative safe resume disabled: %q", got)
@@ -167,9 +172,10 @@ func TestAuthoritativeComposerActionsKeepUnsupportedAndDeniedActionsDisabled(t *
 
 func TestAuthoritativeComposerActionReasonsAreMountedAccessibly(t *testing.T) {
 	task := taskprojection.TaskProjection{State: domain.TaskStatePaused}
-	props := bindAuthoritativeComposerTaskActions(
+	props := bindAuthoritativeComposerTaskActionsWithCallbacks(
 		composer.Props{}, task, frontendstate.ConnectionDisconnected,
-		&taskcontrols.Props{OnResume: func() {}, OnStop: func() {}, OnBudgetAdjust: func() {}}, nil,
+		&taskcontrols.Props{OnResume: func() {}, OnStop: func() {}, OnBudgetAdjust: func() {}},
+		authoritativeComposerCallbacks{},
 	)
 	markup := renderAuthoritativeComposer(t, props)
 	for _, want := range []string{
@@ -220,9 +226,9 @@ func TestAuthoritativeComposerStopUsesConfirmationBeforeRPC(t *testing.T) {
 		OnStopConfirm: func() { confirmed++ },
 		OnStop:        func() { stopped++ },
 	}
-	props := bindAuthoritativeComposerTaskActions(
+	props := bindAuthoritativeComposerTaskActionsWithCallbacks(
 		composer.Props{}, taskprojection.TaskProjection{State: domain.TaskStateRunning},
-		frontendstate.ConnectionLive, controls, nil,
+		frontendstate.ConnectionLive, controls, authoritativeComposerCallbacks{},
 	)
 	props.OnTaskAction(composer.ActionStop)
 	if confirmed != 1 || stopped != 0 {

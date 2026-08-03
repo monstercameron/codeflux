@@ -10,19 +10,6 @@ import (
 
 type authoritativeComposerCallbacks = taskactionview.Callbacks
 
-func bindAuthoritativeComposerTaskActions(
-	props composer.Props,
-	task taskprojection.TaskProjection,
-	connection frontendstate.ConnectionState,
-	controls *taskcontrols.Props,
-	onInspectGraph func(),
-) composer.Props {
-	return bindAuthoritativeComposerTaskActionsWithCallbacks(
-		props, task, connection, controls,
-		authoritativeComposerCallbacks{InspectGraph: onInspectGraph},
-	)
-}
-
 func bindAuthoritativeComposerTaskActionsWithCallbacks(
 	props composer.Props,
 	task taskprojection.TaskProjection,
