@@ -50,6 +50,48 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-092
+Commit: pending
+Date: 2026-08-02
+Type: Security -- a mediated command's descendants no longer outlive it
+Request-or-TODO: PIPE-132a, PIPE-133a
+Outcome: Every mediated subprocess is now assigned to a Windows job object that
+  kills its members when the handle closes, released on every exit path.
+  The gap this actually closes had not been named anywhere: the pre-existing
+  process-tree kill ran only from the timeout and cancellation branches, so a
+  mediated command that exited successfully -- the ordinary case -- never had
+  its descendants reaped at all. A helper started rather than waited for kept
+  running, unconfined, indefinitely. Closing the job now terminates every
+  process ever assigned to it at any depth, including one that asks to break
+  away, because neither breakaway flag is set.
+  PIPE-133a's two named observations stay open, and forcing them to pass was
+  refused. A job object bounds what outlives a command; it has no bearing on
+  what a still-running process does, and both actions in the original abuse case
+  complete synchronously before mediation is finished with the command. Those
+  two recorded lines are left exactly as they were
+Affected-behavior: A background process a verification command leaves behind is
+  now killed when that command completes. Anything relying on such a process
+  surviving would break, and nothing does
+Compatibility-or-migration: golang.org/x/sys/windows was already a dependency at
+  v0.46.0; no new dependency. A no-op sibling keeps the Unix call sites
+  compiling with behaviour unchanged
+Verification: The discriminating test was verified by disabling confinement and
+  reproducing the failure, then restoring it -- not by assertion. A mediated
+  command spawns a helper that sleeps and then writes a marker and returns
+  immediately; the marker never appears, and an unmediated control proves the
+  same helper does survive without confinement. A third abuse vector was added
+  to PIPE-133's own family rather than rewriting it: a detached helper betting
+  on outliving mediation, which this mechanism does refuse
+Known-limitations: Assignment happens just after the process starts rather than
+  through suspended creation, so there is a small window during which the child
+  runs outside the job. A running mediated process can still open a socket to
+  anywhere and write to any absolute path; closing that needs network filtering
+  or a filesystem jail, which this codebase does not have on Windows.
+  Measured cost by the same disable-and-restore method: the engine canary moves
+  from 3.91-4.13s to 4.13-4.74s, about ten per cent, on a machine six lanes were
+  sharing -- real but not lab-clean
+Dev-Log: DL-20260802-102
+
 Change-ID: CL-20260802-091
 Commit: pending
 Date: 2026-08-02

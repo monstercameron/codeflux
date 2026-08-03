@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -402,5 +403,257 @@ func TestAttemptsCredentialNetworkAndFilesystemEscape(t *testing.T) {
 		t.Fatalf("fixture assumption broken: the unmediated run's write "+
 			"outside the worktree did not even succeed, so the mediated "+
 			"run's identical write proves nothing about the boundary: %v", err)
+	}
+}
+
+// --- PIPE-132a / PIPE-133a: what the Job Object confinement added in
+// internal/executor/process_windows.go actually refuses, and what it does
+// not. ---
+//
+// PIPE-133a asked to turn the two `recorded: ... NOT refused` observations
+// logged above into assertions once PIPE-132a provided something to refuse
+// with. Having built that mechanism, the honest answer is that it cannot:
+// both the network write and the filesystem write above happen
+// synchronously, inside TestAttemptsCredentialNetworkAndFilesystemEscape's
+// own still-running process, before runNamedTestExamples's mediated call is
+// ever done with the command. A Windows Job Object bounds what is still
+// running once the mediated call closes it -- it has no bearing on syscalls
+// a process makes while it is the one thing mediation is still waiting on.
+// There is no mechanism anywhere in this codebase that intercepts a
+// syscall in flight; a Job Object is process-lifetime and process-tree
+// containment, not a network filter or a filesystem ACL. Both log lines
+// above are therefore left exactly as they were: recordings of a real,
+// named limit, not assertions of a containment this boundary does not
+// have.
+//
+// What PIPE-132a's mechanism does refuse, in the same abuse-case family, is
+// below: a detached helper that deliberately does NOT block the mediated
+// command's own exit, betting that it can keep running -- and keep trying
+// the same credential/network/filesystem escape -- after mediation has
+// moved on. That bet fails under mediation and succeeds unmediated, which
+// is exactly the shape of evidence this file already holds every other
+// PIPE-13x claim to.
+
+// TestPIPE133a_ConfinementKillsABackgroundedExfiltrationAttemptAfterSuccess
+// extends the PIPE-133 abuse case with the one dimension PIPE-132a's Job
+// Object confinement actually closes: a helper process the abuse fixture
+// starts and does not wait for, so that the fixture's own test function --
+// and therefore the mediated `go test` process runNamedTestExamples is
+// waiting on -- returns successfully while the helper is still running.
+// Windows-only: processConfinement is a no-op on every other platform (see
+// internal/executor/process_unix.go), so this fixture would show the
+// backgrounded helper surviving under mediation there too, proving nothing
+// platform-specific.
+func TestPIPE133a_ConfinementKillsABackgroundedExfiltrationAttemptAfterSuccess(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("PIPE-132a confinement is a Windows Job Object mechanism; " +
+			"see internal/executor/process_unix.go")
+	}
+
+	// The mediated and raw phases each get their own listener rather than
+	// sharing one. Unlike TestPIPE133 above -- where the dial always
+	// succeeds under mediation too, so the mediated Accept() call is always
+	// consumed -- this test expects the mediated dial to never happen at
+	// all. A shared listener would leave the mediated phase's Accept()
+	// permanently parked waiting for a connection that never arrives, and
+	// that stray goroutine would then race the raw phase's own Accept() for
+	// the raw helper's connection, non-deterministically stealing it.
+	newListener := func() (address string, acceptOnePayload func() <-chan string) {
+		listener, listenErr := net.Listen("tcp", "127.0.0.1:0")
+		if listenErr != nil {
+			t.Fatalf("could not open the loopback listener the fixture dials: %v", listenErr)
+		}
+		t.Cleanup(func() { _ = listener.Close() })
+		return listener.Addr().String(), func() <-chan string {
+			result := make(chan string, 1)
+			go func() {
+				connection, acceptErr := listener.Accept()
+				if acceptErr != nil {
+					result <- ""
+					return
+				}
+				defer connection.Close()
+				_ = connection.SetReadDeadline(time.Now().Add(20 * time.Second))
+				payload, _ := io.ReadAll(connection)
+				result <- string(payload)
+			}()
+			return result
+		}
+	}
+	mediatedAddress, acceptMediatedPayload := newListener()
+	rawAddress, acceptRawPayload := newListener()
+
+	outsideRoot := t.TempDir()
+	mediatedOutside := filepath.Join(outsideRoot, "mediated")
+	rawOutside := filepath.Join(outsideRoot, "raw")
+	for _, directory := range []string{mediatedOutside, rawOutside} {
+		if err := os.MkdirAll(directory, 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The detached helper is a separate compiled binary, not a re-exec of
+	// the test binary itself: go test deletes its own compiled test binary
+	// as soon as the test process exits, and a still-running process
+	// holding that exact file open makes that delete fail with "Access is
+	// denied" on Windows -- a Windows file-locking fact, not a confinement
+	// effect, and it would corrupt this test's result either way. Building
+	// a distinct artifact for the helper to run keeps the thing this test
+	// actually measures -- whether the helper survives to act -- isolated
+	// from that unrelated file-locking behavior.
+	const helperSource = `package main
+
+import (
+	"net"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// A detached helper the abuse-case test starts and never waits for. It
+// sleeps briefly, then makes the same two attempts PIPE-133's synchronous
+// abuse case makes -- reach the network, write outside the worktree -- just
+// asynchronously, betting mediation is done deciding the command has
+// finished before this runs.
+func main() {
+	time.Sleep(2 * time.Second)
+	address, outsideDir := os.Args[1], os.Args[2]
+	if connection, dialErr := net.DialTimeout("tcp", address, 5*time.Second); dialErr == nil {
+		_, _ = connection.Write([]byte("backgrounded-exfiltration"))
+		connection.Close()
+	}
+	_ = os.WriteFile(filepath.Join(outsideDir, "background-leak.txt"),
+		[]byte("escaped-in-background\n"), 0o600)
+}
+`
+
+	// The helper binary is built to a path this outer test owns and cleans
+	// up itself (outsideRoot, removed via t.TempDir() much later), never to
+	// a t.TempDir() registered inside the fixture: that cleanup runs
+	// synchronously the instant the fixture's own test function returns --
+	// exactly the moment the helper has just been started and is
+	// guaranteed to still be running -- and RemoveAll on a directory
+	// holding an in-use exe fails with the same "Access is denied" this
+	// comment already ruled out above, this time from testing.T's own
+	// cleanup rather than go test's.
+	fixtureSource := func(outsidePath, binaryPath, address string) string {
+		return fmt.Sprintf(`package abuse
+
+import (
+	"os/exec"
+	"testing"
+)
+
+// TestAttemptsToOutliveMediationWithABackgroundExfiltrator builds the
+// detached helper binary and starts it without waiting for it, the way the
+// synchronous PIPE-133 abuse case deliberately does not: this attempt is
+// asynchronous on purpose, betting that mediation is done deciding the
+// command has finished before the helper gets around to acting.
+func TestAttemptsToOutliveMediationWithABackgroundExfiltrator(t *testing.T) {
+	build := exec.Command("go", "build", "-o", %q, "./cmd/helper")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("could not build the background helper: %%v\n%%s", err, output)
+	}
+	child := exec.Command(%q, %q, %q)
+	if err := child.Start(); err != nil {
+		t.Fatalf("could not start the background helper: %%v", err)
+	}
+	// Deliberately not waiting: this test, and the mediated go test process
+	// running it, exit here while the helper is still starting.
+}
+`, binaryPath, binaryPath, address, outsidePath)
+	}
+
+	mediatedBinary := filepath.Join(outsideRoot, "mediated-helper.exe")
+	rawBinary := filepath.Join(outsideRoot, "raw-helper.exe")
+
+	// --- The mediated run. ---
+	mediatedWorktree := testedNamesFixture(t, map[string]string{
+		"go.mod":             "module codeflux.test/pipe133a/background\n\ngo 1.26.0\n",
+		"main.go":            "package abuse\n",
+		"abuse_test.go":      fixtureSource(mediatedOutside, mediatedBinary, mediatedAddress),
+		"cmd/helper/main.go": helperSource,
+	})
+	mediatedPayload := acceptMediatedPayload()
+	execution := &AgentExecution{}
+	// Package is scoped to "." rather than "./...": the module also
+	// contains cmd/helper, a plain package main with no test file of its
+	// own, and go test prints "no test files" for it when the pattern
+	// covers the whole module -- text runNamedTestExamples treats as
+	// evidence nothing ran (PIPE-118's guard against a misspelled name
+	// matching nothing), which would misreport this fixture as broken
+	// rather than proving anything about confinement.
+	passed, failures := execution.runNamedTestExamples(t.Context(), mediatedWorktree,
+		[]namedTestExample{
+			{Package: ".", Name: "TestAttemptsToOutliveMediationWithABackgroundExfiltrator"},
+		})
+	if len(failures) != 0 || len(passed) != 1 {
+		t.Fatalf("the background-exfiltrator fixture itself did not run cleanly: "+
+			"passed=%v failures=%v", passed, failures)
+	}
+
+	// Give the backgrounded helper (2s sleep before it acts) comfortably
+	// longer than it would need to complete both escape attempts if nothing
+	// stopped it.
+	time.Sleep(6 * time.Second)
+
+	select {
+	case payload := <-mediatedPayload:
+		t.Fatalf("REFUSAL FAILED: the backgrounded helper reached the network "+
+			"under mediation after the mediated command had already finished: %q",
+			payload)
+	default:
+		// Refused: no connection ever arrived, because the helper was
+		// terminated before it dialed.
+	}
+
+	mediatedLeak := filepath.Join(mediatedOutside, "background-leak.txt")
+	if _, statErr := os.Stat(mediatedLeak); !os.IsNotExist(statErr) {
+		t.Fatalf("REFUSAL FAILED: the backgrounded helper's write outside the "+
+			"worktree survived under mediation (stat err = %v)", statErr)
+	}
+
+	// --- Discrimination: the identical fixture, run the way this stage ran
+	// it before PIPE-131 -- exec.Command inheriting this test process's own
+	// environment, with no confinement in front of it at all.
+	rawWorktree := testedNamesFixture(t, map[string]string{
+		"go.mod":             "module codeflux.test/pipe133a/background-raw\n\ngo 1.26.0\n",
+		"main.go":            "package abuse\n",
+		"abuse_test.go":      fixtureSource(rawOutside, rawBinary, rawAddress),
+		"cmd/helper/main.go": helperSource,
+	})
+	rawPayload := acceptRawPayload()
+	raw := exec.CommandContext(t.Context(), "go", "test", "-count=1",
+		"-run", "^TestAttemptsToOutliveMediationWithABackgroundExfiltrator$", "./...")
+	raw.Dir = rawWorktree
+	if output, err := raw.CombinedOutput(); err != nil {
+		t.Fatalf("the unmediated fixture did not run cleanly: %v\n%s", err, output)
+	}
+
+	var rawNetworkPayload string
+	select {
+	case rawNetworkPayload = <-rawPayload:
+	case <-time.After(20 * time.Second):
+		t.Fatal("fixture assumption broken: the unmediated backgrounded helper " +
+			"never reached the loopback listener either, so this proves nothing " +
+			"about confinement")
+	}
+	if rawNetworkPayload != "backgrounded-exfiltration" {
+		t.Fatalf("fixture assumption broken: the unmediated backgrounded helper "+
+			"did not send its expected payload either (%q)", rawNetworkPayload)
+	}
+
+	rawLeak := filepath.Join(rawOutside, "background-leak.txt")
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(rawLeak); err == nil {
+			break
+		} else if time.Now().After(deadline) {
+			t.Fatalf("fixture assumption broken: the unmediated backgrounded "+
+				"helper's write outside the worktree did not even survive, so "+
+				"the mediated refusal above proves nothing about confinement: %v",
+				err)
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }

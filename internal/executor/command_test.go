@@ -46,6 +46,28 @@ func TestCommandProcessTreeHelper(t *testing.T) {
 		if err := os.WriteFile(os.Getenv("CODEFLUX_TREE_MARKER"), []byte("survived"), 0o600); err != nil {
 			os.Exit(3)
 		}
+	case "orphan-parent":
+		// PIPE-132a: reproduces a mediated command that finishes
+		// successfully -- the ordinary case -- while a background helper it
+		// started with Start() rather than Wait() is still running. This
+		// deliberately does NOT wait for the child and does NOT sleep
+		// itself, so the parent's own process exits almost immediately,
+		// long before the orphaned child's sleep below completes.
+		child := exec.Command(os.Args[0], "-test.run=^TestCommandProcessTreeHelper$")
+		for _, entry := range os.Environ() {
+			if !strings.HasPrefix(entry, commandHelperMode+"=") {
+				child.Env = append(child.Env, entry)
+			}
+		}
+		child.Env = append(child.Env, commandHelperMode+"=orphan-child")
+		if err := child.Start(); err != nil {
+			os.Exit(2)
+		}
+	case "orphan-child":
+		time.Sleep(2 * time.Second)
+		if err := os.WriteFile(os.Getenv("CODEFLUX_TREE_MARKER"), []byte("survived"), 0o600); err != nil {
+			os.Exit(3)
+		}
 	default:
 		return
 	}

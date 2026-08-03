@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-102
+Date: 2026-08-02
+Status: One closed; the other left open because the mechanism cannot reach it
+Change-ID: CL-20260802-092
+Commit: pending
+Request-or-TODO: PIPE-132a, PIPE-133a
+Goal: Bound what a launched verification process may reach
+Assumptions: That a job object would close PIPE-133's two gaps -- wrong, and
+  establishing that is most of this entry's value
+Decisions: Refused to flip the two recorded observations into assertions. They
+  are unreachable by this mechanism for a structural reason -- a job object
+  governs lifetime, not syscalls -- and an assertion that passed here would have
+  passed for the wrong reason and read as containment nobody has.
+  Added a third abuse vector to the same family instead, which is what "extend,
+  do not rewrite" asks for and what proves the mechanism's real scope end to end
+  through the coordinator rather than the raw executor.
+  Verified both new tests by disabling confinement and reproducing the failure
+  before restoring it. A confinement test that has never been seen to fail is
+  indistinguishable from one asserting something already true.
+  Measured the cost by the same toggle rather than estimating it, following what
+  PIPE-131 did for mediation
+Files-or-schemas: new internal/executor/process_windows.go and its Unix no-op,
+  command.go, command_test.go, a new Windows-only confinement test, and one
+  added test in the coordinator's mediation file
+Validation: Confinement test PASS at 8.09s confirmed independently; executor
+  suite ok; canary 4.06-4.74s
+Failures-or-discarded-approaches: Two fixture-design bugs, both Windows
+  file-locking artifacts rather than confinement effects: re-executing the test
+  binary as the helper collided with go test's own cleanup, and building the
+  helper under t.TempDir() collided with testing.T's synchronous cleanup
+Known-limitations: The start-to-assignment window; syscalls of a running process
+Next-safe-step: Nothing here. Real network and filesystem confinement is a
+  different mechanism and should be filed as its own ticket if it is wanted
+
 Dev-Log: DL-20260802-101
 Date: 2026-08-02
 Status: Seven closed or capability-complete; the rest blocked on one file

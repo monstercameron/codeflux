@@ -199,6 +199,19 @@ func ExecuteAuthorizedTool(
 	if err := command.Start(); err != nil {
 		return ToolResult{}, fmt.Errorf("start command: %w", err)
 	}
+	// PIPE-132a: bound what the started process -- and anything it goes on
+	// to spawn -- may still be doing once this call is finished with it, not
+	// merely where it was allowed to launch from. See processConfinement's
+	// doc comment in process_windows.go for exactly what this does and does
+	// not contain; on non-Windows platforms this is a no-op and behavior is
+	// unchanged from before this ticket.
+	confinement, confineErr := beginProcessConfinement(command)
+	if confineErr != nil {
+		_ = terminateProcessTree(command)
+		_ = command.Wait()
+		return ToolResult{}, fmt.Errorf("confine command process: %w", confineErr)
+	}
+	defer func() { _ = confinement.release() }()
 	publishProgress(ctx, authorized.Progress, ToolProgress{
 		RequestID: request.ID, State: "running",
 	})
@@ -208,6 +221,7 @@ func ExecuteAuthorizedTool(
 	// worker dying mid-command rather than leaking one into the test host.
 	if err := checkFault(authorized.Faults, FaultPointAfterCommandStart); err != nil {
 		_ = terminateProcessTree(command)
+		_ = confinement.release()
 		_ = command.Wait()
 		return ToolResult{}, err
 	}
@@ -228,12 +242,20 @@ func ExecuteAuthorizedTool(
 	case <-ctx.Done():
 		cancelled = true
 		_ = terminateProcessTree(command)
+		_ = confinement.release()
 		waitErr = <-waited
 	case <-timer.C:
 		timedOut = true
 		_ = terminateProcessTree(command)
+		_ = confinement.release()
 		waitErr = <-waited
 	}
+	// The success path (waitErr from the first case above) reaches here with
+	// the confinement job still open on purpose: closing it is what proves
+	// PIPE-132a's actual claim -- that a descendant the command spawned and
+	// left running keeps running only until this function is done with the
+	// command, not indefinitely. The deferred release above closes it after
+	// the result is assembled below.
 	stdoutLive.flush()
 	stderrLive.flush()
 	stdoutResult, stdoutErr := stdout.Finalize()
