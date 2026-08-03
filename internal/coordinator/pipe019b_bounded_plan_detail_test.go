@@ -34,7 +34,7 @@ const multiLineAcceptanceRequirement = "Create cmd/answer/main.go so the " +
 // reproduces the original failure exactly — "agent plan step 1 is invalid" —
 // confirming this test would have caught it.
 func TestPIPE019b_AgentPlanStepsBoundsTheDetailNotTheRequirement(t *testing.T) {
-	steps := agentPlanSteps(multiLineAcceptanceRequirement)
+	steps := agentPlanSteps("", multiLineAcceptanceRequirement)
 	if len(steps) < 2 {
 		t.Fatalf("expected at least an edit step and a verify step, got %d",
 			len(steps))

@@ -20,7 +20,17 @@ var ErrActionBlocked = errors.New("durable control blocks new actions")
 type StepKind string
 
 const (
-	StepKindEdit           StepKind = "edit"
+	// StepKindEdit writes a file whole. It is how a file comes into existence.
+	StepKindEdit StepKind = "edit"
+	// StepKindPatch changes part of a file that already exists.
+	//
+	// A separate kind rather than a second tool on the edit kind. Every step
+	// kind names exactly one completion tool, and that is what makes the
+	// mapping usable in four places at once — plan validation, the round's tool
+	// allowlist, completion, and scope enforcement. Broadening one kind to two
+	// tools broke the first of those and silently disabled the second: the
+	// validator refused every plan, and no attempt ever reached a prompt.
+	StepKindPatch          StepKind = "patch"
 	StepKindReadFile       StepKind = "read-file"
 	StepKindListDirectory  StepKind = "list-directory"
 	StepKindSearchText     StepKind = "search-text"

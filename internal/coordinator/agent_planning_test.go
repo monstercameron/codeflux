@@ -92,14 +92,14 @@ func TestAnEmptyAnswerLeavesThePlanAlone(t *testing.T) {
 // What changes is that a run writing one file now knows what the others owe,
 // which is the thing a per-file summary could never say.
 func TestEveryStepCarriesTheWholeDecomposition(t *testing.T) {
-	parsed := agentPlanSteps(
+	parsed := agentPlanSteps("",
 		"Create cmd/bank/main.go and cmd/bank/account.go for a ledger.")
 	behaviours := []string{
 		"Deposit adds to the balance",
 		"Withdraw refuses to overdraw",
 		"Balance prints the current total",
 	}
-	steps := stepsForBehaviours(behaviours, parsed)
+	steps := stepsForBehaviours("", behaviours, parsed)
 
 	edits := 0
 	for _, step := range steps {
@@ -139,8 +139,8 @@ func TestEveryStepCarriesTheWholeDecomposition(t *testing.T) {
 // Which files exist is a fact about the request and the repository. A model
 // asked to invent paths produces a plan whose steps bind to nothing on disk.
 func TestAPlanWithNoFilesFallsBackRatherThanInventingPaths(t *testing.T) {
-	parsed := agentPlanSteps("Make it faster.")
-	steps := stepsForBehaviours([]string{"Be quicker"}, parsed)
+	parsed := agentPlanSteps("", "Make it faster.")
+	steps := stepsForBehaviours("", []string{"Be quicker"}, parsed)
 	for _, step := range steps {
 		for _, file := range step.ExpectedFiles {
 			if !strings.Contains(

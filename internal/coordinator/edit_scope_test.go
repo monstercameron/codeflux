@@ -5,9 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	agentloop "codeflux.dev/codeflux/internal/agent"
-	"codeflux.dev/codeflux/internal/executor"
 )
 
 const evaluatorBefore = `package main
@@ -116,35 +113,6 @@ func TestTheScopeComesFromTheGate(t *testing.T) {
 		); got != expected.scope {
 			t.Errorf("gate %q (blind spots only: %t) permits %s, wanted %s",
 				expected.gate, expected.blindSpotsOnly, got, expected.scope)
-		}
-	}
-}
-
-// TestAPatchToolNobodyIsOfferedIsNoPatchTool covers the defect that made every
-// other patch change pointless.
-//
-// The loop offers a model only the tools an open step declares. Listing the
-// whole-file tool alone made apply-patch unreachable: registered, described,
-// tested, and never once in tools_you_may_call. Rung 6 wrote whole files eleven
-// and thirteen times in single attempts with the patch tool sitting unoffered.
-func TestAPatchToolNobodyIsOfferedIsNoPatchTool(t *testing.T) {
-	for _, step := range agentPlanSteps(
-		"Write cmd/generated/main.go that prints a line.",
-	) {
-		if step.Kind != agentloop.StepKindEdit {
-			continue
-		}
-		offered := map[executor.ToolName]bool{}
-		for _, tool := range step.CompletionTools {
-			offered[tool] = true
-		}
-		if !offered[executor.ToolApplyPatch] {
-			t.Errorf("step %q cannot be completed by a patch, so the patch "+
-				"tool will never be offered for it", step.ID)
-		}
-		if !offered[executor.ToolApplyEdit] {
-			t.Errorf("step %q cannot be completed by a whole-file write, so a "+
-				"file cannot be created for it", step.ID)
 		}
 	}
 }

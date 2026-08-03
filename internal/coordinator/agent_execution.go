@@ -246,7 +246,7 @@ func (execution *AgentExecution) Run(
 	// rung the settings name for it and no other. It does not climb: there is
 	// nothing to climb from, and a decomposition that misses a behaviour is
 	// paid for on every rung, on every attempt, by work that cannot recover it.
-	steps, planningNote := execution.planFromRequirement(ctx, scope.requirement)
+	steps, planningNote := execution.planFromRequirement(ctx, scope.worktree, scope.requirement)
 	ledger.satisfied(ctx, pipeline.StageAtomicInstructions, planningNote,
 		map[string]any{
 			"planning_rung": execution.settings.PlanningRung,
@@ -699,7 +699,7 @@ func (execution *AgentExecution) Run(
 			// when only the attempt was, and would move the revision every
 			// other record attributes itself to.
 			steps = adoptDurablePlanSteps(
-				agentPlanSteps(scope.requirement), plan)
+				agentPlanSteps(scope.worktree, scope.requirement), plan)
 			execution.publishPlan(ctx, scope, steps)
 		}
 		approvalID, approvalErr := domain.NewApprovalID()
@@ -782,6 +782,22 @@ func (execution *AgentExecution) Run(
 			execution.say(ctx, scope, events.KindMessageFinal,
 				providerCircuit.narrate(attempt))
 			continue
+		}
+		// A plan this loop will never accept is not a model failure.
+		//
+		// A step whose completion tool does not match its kind fails
+		// identically however good the model is, so retrying it spends
+		// attempts and an escalation on coordinator metadata. A run did
+		// exactly that: three attempts, an escalation to the most expensive
+		// rung, zero files written, zero tests run, and a full pipeline dump
+		// describing stages nothing had reached.
+		if errors.Is(runErr, agentloop.ErrPlanContract) {
+			execution.say(ctx, scope, events.KindMessageFinal,
+				"This run cannot proceed: its plan does not satisfy the "+
+					"agent loop's own contract ("+runErr.Error()+"). That is "+
+					"a defect in this build rather than in the work or the "+
+					"model, and no number of attempts will change it.")
+			return runErr
 		}
 		if runErr != nil {
 			// A loop error this does not recognise costs an attempt, not the

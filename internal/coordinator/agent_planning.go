@@ -33,9 +33,10 @@ import (
 // hiccup during planning should cost a worse decomposition, not the run.
 func (execution *AgentExecution) planFromRequirement(
 	ctx context.Context,
+	worktree string,
 	requirement string,
 ) ([]agentloop.PlanStep, string) {
-	parsed := agentPlanSteps(requirement)
+	parsed := agentPlanSteps(worktree, requirement)
 	if execution.escalate == nil || execution.settings.PlanningRung == "" {
 		return parsed, "parsed from the request, because no planning model is " +
 			"configured"
@@ -65,7 +66,7 @@ func (execution *AgentExecution) planFromRequirement(
 		return parsed, "parsed from the request, because the planning model " +
 			"named no distinct behaviours"
 	}
-	return stepsForBehaviours(behaviours, parsed),
+	return stepsForBehaviours(worktree, behaviours, parsed),
 		"planned on " + execution.settings.PlanningRung + ": " +
 			counted(len(behaviours), "behaviour") + " named"
 }
@@ -153,6 +154,7 @@ func trimLeadingNumber(line string) string {
 // contributes is what each step is *for*, which is the part the parser could
 // never know.
 func stepsForBehaviours(
+	worktree string,
 	behaviours []string,
 	parsed []agentloop.PlanStep,
 ) []agentloop.PlanStep {
@@ -176,23 +178,14 @@ func stepsForBehaviours(
 	shared := "The behaviours this program must have, each of which needs its " +
 		"own test:\n" + numbered(behaviours)
 	for index, file := range files {
+		kind := writeStepKindFor(worktree, file)
 		step := agentloop.PlanStep{
-			ID: "edit-" + itoaPlan(index+1), Kind: agentloop.StepKindEdit,
+			ID: "edit-" + itoaPlan(index+1), Kind: kind,
 			State:           agentloop.StepPending,
 			SummaryRedacted: "Write " + file + " — " + shared,
 			MaterialEdit:    true, ValidationRequired: true,
-			ExpectedFiles: []string{file},
-			// Either way of writing the file completes the step.
-			//
-			// The loop offers a model only the tools an open step declares, so
-			// listing the whole-file tool alone made apply-patch unreachable:
-			// it was registered, described, tested, and never once appeared in
-			// tools_you_may_call. Ladder rung 6 wrote whole files eleven and
-			// thirteen times in single attempts with the patch tool sitting
-			// unoffered.
-			CompletionTools: []executor.ToolName{
-				executor.ToolApplyEdit, executor.ToolApplyPatch,
-			},
+			ExpectedFiles:   []string{file},
+			CompletionTools: []executor.ToolName{writeToolFor(kind)},
 		}
 		steps = append(steps, step)
 	}

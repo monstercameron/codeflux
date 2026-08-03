@@ -476,12 +476,17 @@ func (execution *AgentExecution) publish(
 // conventional default when it does not. A step is completed by one tool call,
 // so each file gets its own: a single step covering two files leaves the second
 // write with nowhere to bind.
-func agentPlanSteps(requirement string) []agentloop.PlanStep {
+func agentPlanSteps(worktree, requirement string) []agentloop.PlanStep {
 	files := filesNamedIn(requirement)
 	steps := make([]agentloop.PlanStep, 0, len(files)+1)
 	for index, file := range files {
+		// How the file is going to be written, from whether it is already
+		// there. The plan is rebuilt every attempt precisely so this can change
+		// between them: attempt one creates main.go, attempt three adjusts the
+		// main.go attempt one wrote.
+		kind := writeStepKindFor(worktree, file)
 		steps = append(steps, agentloop.PlanStep{
-			ID: fmt.Sprintf("edit-%d", index+1), Kind: agentloop.StepKindEdit,
+			ID: fmt.Sprintf("edit-%d", index+1), Kind: kind,
 			State: agentloop.StepPending,
 			// A bounded summary of the requirement travels with every step, not
 			// the requirement itself (PIPE-019b). "Write cmd/greet/main.go" alone
@@ -496,18 +501,8 @@ func agentPlanSteps(requirement string) []agentloop.PlanStep {
 			// reliably ends in a trailing newline.
 			SummaryRedacted: "Write " + file + " — " + requirementSummary(requirement),
 			MaterialEdit:    true, ValidationRequired: true,
-			ExpectedFiles: []string{file},
-			// Either way of writing the file completes the step.
-			//
-			// The loop offers a model only the tools an open step declares, so
-			// listing the whole-file tool alone made apply-patch unreachable:
-			// it was registered, described, tested, and never once appeared in
-			// tools_you_may_call. Ladder rung 6 wrote whole files eleven and
-			// thirteen times in single attempts with the patch tool sitting
-			// unoffered.
-			CompletionTools: []executor.ToolName{
-				executor.ToolApplyEdit, executor.ToolApplyPatch,
-			},
+			ExpectedFiles:   []string{file},
+			CompletionTools: []executor.ToolName{writeToolFor(kind)},
 		})
 	}
 	return append(steps, agentloop.PlanStep{

@@ -19,8 +19,20 @@ import (
 
 var (
 	ErrMalformedModelTurn = errors.New("agent model turn is malformed")
-	ErrUnknownTool        = errors.New("agent model requested an unknown tool")
-	ErrAccountingUnknown  = errors.New("agent usage or cost accounting is unknown")
+	// ErrPlanContract is a plan this loop will never accept, whoever sends it.
+	//
+	// A step whose completion tool does not match its kind, a kind this build
+	// does not know, a step with no expected files where its kind demands them:
+	// none of that is a model producing bad work, and none of it is repaired by
+	// asking a better model. It is the coordinator's own metadata disagreeing
+	// with the loop's, and it fails identically every time.
+	//
+	// It is separated so a caller can tell the two apart. Retrying this cost a
+	// run three attempts and an escalation to the most expensive rung before it
+	// gave up, and every one of those attempts failed on the same sentence.
+	ErrPlanContract      = errors.New("agent plan does not satisfy the loop's contract")
+	ErrUnknownTool       = errors.New("agent model requested an unknown tool")
+	ErrAccountingUnknown = errors.New("agent usage or cost accounting is unknown")
 )
 
 const (
@@ -1154,17 +1166,19 @@ type planStepKindContract struct {
 func validatePlanStepContract(step PlanStep) error {
 	contract, ok := planStepContract(step.Kind)
 	if !ok {
-		return errors.New("agent plan step kind is invalid")
+		return fmt.Errorf("%w: step kind is invalid", ErrPlanContract)
 	}
 	if len(step.CompletionTools) != 1 ||
 		step.CompletionTools[0] != contract.completionTool {
-		return errors.New(
-			"agent plan step completion tools differ from its kind",
-		)
+		return fmt.Errorf(
+			"%w: a %s step is completed by %s and this one declares %v",
+			ErrPlanContract, step.Kind, contract.completionTool,
+			step.CompletionTools)
 	}
 	if step.MaterialEdit != contract.materialEdit ||
 		step.ValidationRequired != contract.validationRequired {
-		return errors.New("agent plan step semantics differ from its kind")
+		return fmt.Errorf("%w: step semantics differ from its kind",
+			ErrPlanContract)
 	}
 	if !validExpectedFiles(step.ExpectedFiles) {
 		return errors.New("agent plan step expected-file scope is invalid")
@@ -1178,7 +1192,7 @@ func validatePlanStepContract(step PlanStep) error {
 
 func stepKindRequiresExpectedFiles(kind StepKind) bool {
 	switch kind {
-	case StepKindEdit, StepKindReadFile, StepKindListDirectory,
+	case StepKindEdit, StepKindPatch, StepKindReadFile, StepKindListDirectory,
 		StepKindSearchText, StepKindSearchSymbol:
 		return true
 	default:
@@ -1233,6 +1247,11 @@ func planStepContract(kind StepKind) (planStepKindContract, bool) {
 	case StepKindEdit:
 		return planStepKindContract{
 			completionTool: executor.ToolApplyEdit,
+			materialEdit:   true, validationRequired: true,
+		}, true
+	case StepKindPatch:
+		return planStepKindContract{
+			completionTool: executor.ToolApplyPatch,
 			materialEdit:   true, validationRequired: true,
 		}, true
 	case StepKindReadFile:
@@ -1597,4 +1616,20 @@ func stepOwningPathInState(
 		return 0, false
 	}
 	return matched, true
+}
+
+// ValidatePlanStep is the loop's own judgement about one plan step, exported so
+// whatever builds a plan can check its work before a run pays for it.
+//
+// The plan builder and this validator hold the same fact — which tool completes
+// which kind of step — and they drifted: the builder listed two tools for the
+// edit kind while this requires exactly the one the kind names. Every plan was
+// refused before the first prompt, three attempts produced nothing, and the
+// failure surfaced as a model-quality problem it was not.
+//
+// Nothing here is new logic. It is the same check the loop applies, reachable
+// from the side that produces the thing being checked, so the two can be
+// asserted to agree instead of assumed to.
+func ValidatePlanStep(step PlanStep) error {
+	return validatePlanStepContract(step)
 }

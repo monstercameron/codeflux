@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-146
+Date: 2026-08-03
+Status: The step contract is single-sourced and asserted
+Change-ID: CL-20260803-136
+Commit: pending
+Request-or-TODO: Pipeline analysis items 1 and 2
+Goal: Stop the planner and the validator disagreeing, and stop retrying
+  disagreements
+Decisions: Added a step kind rather than teaching the validator to accept two
+  tools. One kind naming one tool is what makes the mapping usable in four
+  places at once, and loosening it would have moved the ambiguity rather than
+  removed it.
+  Resolved the kind from the filesystem. The same plan step means different
+  things on different attempts, and the plan is already rebuilt each attempt
+  precisely so that can be noticed.
+  Exported the loop's validator rather than duplicating its rules. A second
+  copy of a rule is a second thing to drift
+Files-or-schemas: new internal/coordinator/write_step_kind.go and
+  plan_step_invariants_test.go, internal/agent/loop.go, loop_types.go,
+  agent_narration.go, agent_planning.go, agent_execution.go
+Validation: Build, vet, gofmt, the agent and executor suites and the new
+  invariant tests
+Failures-or-discarded-approaches: The two-tools-on-one-kind shape, shipped and
+  reverted within the hour. It read correctly in the plan builder and was
+  refused by a validator in another package, which is the defect the invariant
+  test now exists to catch
+Known-limitations: Items 3 onward of the analysis are not done: the model is
+  still given seven lines of a file and asked to change it, refinement is not
+  yet bounded to two findings per round, and finding identity is not tracked
+  across attempts
+Next-safe-step: Patch context -- the target file's relevant function in full,
+  its tests, and the base digest
+
 Dev-Log: DL-20260803-145
 Date: 2026-08-03
 Status: The patch path is reachable for the first time

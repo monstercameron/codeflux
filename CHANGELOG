@@ -50,6 +50,38 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-136
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- one mapping from step kind to write tool, and a plan the loop
+  refuses stops the run at once
+Request-or-TODO: Pipeline analysis, 2026-08-03, items 1 and 2
+Outcome: CL-20260803-135 listed two completion tools on the edit step so the
+  patch tool would be offered. The loop's validator requires exactly the one
+  tool a step's kind names, and it had not been told. Every plan was refused
+  before the first prompt: three attempts, an escalation to the most expensive
+  rung, zero files written, zero patches attempted, zero tests run, and a full
+  pipeline dump describing thirty-six stages nothing had reached. Thirteen
+  seconds of planning and reporting with no coding loop at all.
+  The remedy is a separate kind rather than a broadened one. A create step is
+  completed by the whole-file tool and a modify step by the patch tool, one
+  each, and which one a file gets is resolved from whether it is already on
+  disk. The plan is rebuilt every attempt, so the same file is a create on
+  attempt one and a modify on attempt three — which is the transition the patch
+  tool existed for and never had.
+  The mapping now lives in one place and the loop's own validator is exported,
+  so a test asserts the two agree rather than assuming it. Each file had been
+  individually defensible; only the relationship between them was wrong.
+  A plan the loop will never accept is no longer retried. It fails identically
+  however good the model is, and treating it as a model-quality problem spent
+  three attempts and an escalation on coordinator metadata the model never
+  sees. It now ends the run at once and says it is a defect in this build
+  rather than in the work.
+Verification: Build, vet, gofmt, three new invariant tests covering plan
+  acceptance before and after the files exist, the kind-to-tool mapping, and
+  the create-to-modify transition
+Dev-Log: DL-20260803-146
+
 Change-ID: CL-20260803-135
 Commit: pending
 Date: 2026-08-03
