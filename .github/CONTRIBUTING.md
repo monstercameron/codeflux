@@ -111,20 +111,25 @@ git config core.hooksPath .githooks
 
 That installs two hooks, which are the fast and slow rungs of one ladder.
 
-**pre-commit** formats staged Go files, runs `lint`, then runs unit tests **for
-the packages you changed** — not the whole repository, which is not a unit run:
+**pre-commit** formats staged Go files, runs `lint`, and runs `artifact-check`.
+A commit with no staged Go file skips all of it.
+
+Its unit-test step is **disabled by default** as of 2026-08-02: the commit-time
+test gate cost more than it caught. Opt back in per command with
+`CODEFLUX_PRECOMMIT_TESTS=1 git commit ...`, which runs the tests **for the
+packages you changed** — not the whole repository, which is not a unit run:
 `internal/coordinator`'s engine test builds and executes generated programs and
 takes over nine minutes by itself. It runs untagged, so nothing behind the
-`integration` build tag is built. A commit with no staged Go file skips all of
-it.
+`integration` build tag is built.
 
 **pre-push** runs the full suite with a coverage profile and refuses a push
 carrying Go changes when statement coverage is below **80%**. A push with no Go
 change skips it, and a failing suite is refused rather than measured, because a
 percentage from a partial run describes only the packages that passed.
 
-The narrow hook cannot see a change that breaks a *dependent* package. That is
-what the full run at push time, and CI after it, are for.
+With the commit-time tests off, nothing runs a test until push. Even with them
+on, the narrow hook could not see a change that breaks a *dependent* package.
+Either way, the full run at push time and CI after it are what catch that.
 
 The browser suite additionally needs Playwright browsers; the harness reports
 what is missing rather than failing obscurely.

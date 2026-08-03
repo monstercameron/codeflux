@@ -25,6 +25,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-096
+Date: 2026-08-02
+Status: Done
+Change-ID: CL-20260802-086
+Commit: pending
+Request-or-TODO: Direct instruction, "bypass the hooks"
+Goal: Stop paying for a check the lanes had already run
+Assumptions: That "bypass the hooks" meant the expensive gate rather than all of
+  them -- an interpretation, stated as one
+Decisions: Made the step opt-in rather than deleting it, so the decision is
+  visible in the file and reversible without archaeology.
+  Corrected the doc comment. It originally read "at Cam's explicit request",
+  which overstated what was said: the instruction was to bypass the hooks, and
+  turning this one layer off is this file's reading of that instruction, not a
+  request for this specific change. The distinction matters because the comment
+  is what a future reader will treat as the authority for the loosening
+Files-or-schemas: .githooks/pre-commit, .github/CONTRIBUTING.md
+Validation: Manual; the disabled path announces itself
+Failures-or-discarded-approaches: None
+Known-limitations: Nothing runs a test until push
+Next-safe-step: Turn it back on once the tree is down to one lane
+
 Dev-Log: DL-20260802-095
 Date: 2026-08-02
 Status: Logic complete and tested; deliberately not marked closed

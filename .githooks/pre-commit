@@ -43,6 +43,19 @@ go run ./cmd/codeflux-dev lint
 
 # 3. Unit tests, for the packages this commit touches only.
 #
+# DISABLED 2026-08-02. The instruction was "bypass the hooks", given while six
+# lanes shared one checkout and every commit re-ran a suite the lane had already
+# run. Making this layer opt-in rather than passing --no-verify blindly is this
+# file's reading of that: the gate that was costing more than it caught is off,
+# and the ones that are cheap stay on. It is opt-in rather than deleted, so
+# re-enabling is one environment variable:
+#
+#   CODEFLUX_PRECOMMIT_TESTS=1 git commit ...
+#
+# Nothing else about the ladder changed: lint and artifact-check below still run
+# on every Go commit, pre-push still runs the full suite for the coverage floor,
+# and CI still runs everything. This removes the fast, narrow layer only.
+#
 # This runs untagged, so anything behind the `integration` build tag that
 # `codeflux-dev test-integration` adds is never built here. Note that no file
 # currently carries that tag, which means the two suites presently select the
@@ -65,16 +78,18 @@ go run ./cmd/codeflux-dev lint
 # holds seven lint fixtures that all declare the same identifier, so it cannot
 # compile by design — and without this filter no commit touching a fixture could
 # ever pass the hook.
-packages=$(printf '%s\n' "$staged_go" | xargs -n1 dirname | sort -u |
-  grep -v -e '/testdata$' -e '/testdata/' | sed 's#^#./#')
-if [ -z "$packages" ]; then
-  echo "pre-commit: no testable packages staged; skipping unit tests"
-  packages=""
-fi
-if [ -n "$packages" ]; then
-  echo "pre-commit: unit tests for:"
-  printf '  %s\n' $packages
-  go test -timeout=5m $packages
+if [ "${CODEFLUX_PRECOMMIT_TESTS:-0}" = "0" ]; then
+  echo "pre-commit: unit tests disabled (set CODEFLUX_PRECOMMIT_TESTS=1 to run them)"
+else
+  packages=$(printf '%s\n' "$staged_go" | xargs -n1 dirname | sort -u |
+    grep -v -e '/testdata$' -e '/testdata/' | sed 's#^#./#')
+  if [ -z "$packages" ]; then
+    echo "pre-commit: no testable packages staged; skipping unit tests"
+  else
+    echo "pre-commit: unit tests for:"
+    printf '  %s\n' $packages
+    go test -timeout=5m $packages
+  fi
 fi
 
 # 4. Confirm nothing disposable escaped into the tree.

@@ -50,6 +50,32 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-086
+Commit: pending
+Date: 2026-08-02
+Type: Chore -- the commit-time test gate becomes opt-in
+Request-or-TODO: Direct instruction, 2026-08-02: "bypass the hooks"
+Outcome: Six lanes shared one checkout and each had already run the tests for
+  the package it changed before handing work over, so the pre-commit unit run
+  re-ran work that had just been done and cost minutes per commit.
+  Making the layer opt-in is this change's reading of "bypass the hooks", rather
+  than passing --no-verify blindly and losing the cheap checks with the
+  expensive one. Formatting, lint and the artifact check still run on every Go
+  commit; pre-push still runs the full suite for the coverage floor; CI still
+  runs everything
+Affected-behavior: A commit no longer runs tests unless
+  CODEFLUX_PRECOMMIT_TESTS=1 is set. Nothing now runs a test until push
+Compatibility-or-migration: Opt-in rather than deleted, so re-enabling is one
+  environment variable and the removal is reversible by reading the file
+Verification: Manual. The hook is exercised by every commit in this session; the
+  disabled path prints its own notice rather than silently skipping
+Known-limitations: The stated consequence is the real one and is written into
+  CONTRIBUTING rather than left implicit: with this off, the first test anything
+  runs is at push time. That is a genuine loosening, accepted deliberately for
+  the duration of a six-lane session and worth revisiting when the tree is
+  quiet again
+Dev-Log: DL-20260802-096
+
 Change-ID: CL-20260802-085
 Commit: pending
 Date: 2026-08-02
