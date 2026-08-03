@@ -50,6 +50,46 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-081
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- a contract can now disagree with its implementation
+Request-or-TODO: PIPE-137, PIPE-138, PIPE-139, PIPE-140, PIPE-141
+Outcome: describeContracts derived a contract's effects and purity by walking
+  the same function body the atoms stage later walks, so the two were
+  definitionally equal and no fixture could make them disagree. A contract that
+  cannot be contradicted is not a check. The declared half now comes from the
+  //codeflux:atom doc comment through internal/atomdoc, an independent source,
+  while signature, parameter types and error cases stay derived from the type
+  signature -- those were never the vacuous part.
+  Declared purity is compared against observed effects and the gate fails on a
+  disagreement, naming each one. checkAtoms fails on a declared-pure atom that
+  reaches outside its arguments. Effect resolution goes through the file's own
+  import declarations rather than a bare identifier list, so time.Duration(n) is
+  no longer an effect and a renamed import is still followed. testsNaming
+  resolves call sites instead of sweeping identifiers, which is the second site
+  of the defect PIPE-008 repaired at testedNames
+Affected-behavior: A run whose produced code carries no atom declaration -- the
+  shape of every existing scripted-model fixture here -- records the contracts
+  stage as skipped rather than satisfied. That is a visible change and it is the
+  correct one: it never claimed a held row it could back
+Compatibility-or-migration: StageContracts' PIPE-137 and StageAtomVerification's
+  PIPE-141 unestablished markers are cleared. StageAtoms keeps PIPE-138's,
+  because only the purity half of contract satisfaction is checked
+Verification: The discrimination proof is a function declaring "None: pure atom"
+  whose body calls fmt.Println; the stage reports broke and names it. Under the
+  old code that fixture could not have disagreed with itself. A control fixture
+  where declaration and body agree holds. A vacuity guard confirms the
+  no-declaration case is skipped, not held
+Known-limitations: A call through a value that cannot be resolved to an import
+  -- a method on a local variable, a struct field, an injected interface -- is
+  invisible to the effect resolver. The wider rule was tried and rejected: it
+  flags var b strings.Builder; b.WriteString(x) as impure, trading a stated
+  false negative for a much larger false positive across ordinary code. That is
+  a judgment call rather than a proof. Preconditions and postconditions actually
+  holding are still unchecked
+Dev-Log: DL-20260802-091
+
 Change-ID: CL-20260802-080
 Commit: pending
 Date: 2026-08-02

@@ -34,6 +34,27 @@ func testsNaming(worktree string) (map[string][]string, error) {
 }
 
 // testsNamingInFiles is testsNaming restricted to exactly the given files.
+//
+// It used to collect every identifier appearing anywhere in a test
+// function's body — a plain *ast.Ident sweep — so a produced function
+// counted as named by a test the moment any identifier of that name turned
+// up: a local variable, a struct-literal field key, a type used only in a
+// declaration. checkAtomVerification (StageAtomVerification) reads this map
+// to decide which tests to run for a unit, so a unit whose name coincided
+// with a local variable was reported verified by a test that never called
+// it at all.
+//
+// This is the second site of the defect PIPE-008 repairs at testedNames
+// (agent_stage_structure.go) and is not reached by that fix, because the two
+// functions are separate parses feeding separate stages. The repair is the
+// same one, applied here: only call sites count now — a plain call by its
+// identifier, and a method or package-qualified call by its selector.
+//
+// Deliberate strictness, matching PIPE-008's own: a function invoked
+// indirectly — passed as a value to something that calls it later — is not
+// counted. That makes the check stricter than the truth rather than looser,
+// which is the safe direction for a stage whose whole claim is that a unit's
+// own tests were run and passed.
 func testsNamingInFiles(
 	worktree string, files []string,
 ) (map[string][]string, error) {
@@ -57,12 +78,26 @@ func testsNamingInFiles(
 			testName := function.Name.Name
 			seen := map[string]bool{}
 			ast.Inspect(function, func(node ast.Node) bool {
-				identifier, isIdentifier := node.(*ast.Ident)
-				if !isIdentifier || seen[identifier.Name] {
+				call, isCall := node.(*ast.CallExpr)
+				if !isCall {
 					return true
 				}
-				seen[identifier.Name] = true
-				naming[identifier.Name] = append(naming[identifier.Name], testName)
+				var callee string
+				switch target := call.Fun.(type) {
+				case *ast.Ident:
+					// A plain call: helper(...)
+					callee = target.Name
+				case *ast.SelectorExpr:
+					// A method or package-qualified call: value.Method(...)
+					// or package.Function(...). The selector is the name
+					// that matches a produced function.
+					callee = target.Sel.Name
+				}
+				if callee == "" || seen[callee] {
+					return true
+				}
+				seen[callee] = true
+				naming[callee] = append(naming[callee], testName)
 				return true
 			})
 		}

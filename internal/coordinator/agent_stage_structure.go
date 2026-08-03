@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,13 @@ type producedFunction struct {
 	// Pure is true when nothing in the body reaches outside its arguments.
 	Pure bool
 	// Calls are the other produced functions this one uses. A function that
+	// Effects names what the body reaches for outside its own arguments,
+	// resolved by observedEffects (PIPE-139): the file's own imports, not a
+	// bare identifier, decide what package a selector call reaches, and only
+	// a curated set of names within that package count as effectful, so a
+	// type conversion sharing a package with an effect (time.Duration versus
+	// time.Now) is not confused with one. Pure is exactly len(Effects)==0.
+	Effects []string
 	// calls none is an atom; one that calls others composes them.
 	Calls []string
 	// Branches counts the decision points in the body, which is what makes a
@@ -80,6 +88,12 @@ func parseProducedFunctions(
 	var functions []producedFunction
 	declared := map[string]bool{}
 
+	// fileImports resolves, per file, the package each import name actually
+	// binds to (PIPE-139), so a purity determination is checked against what
+	// the file imported rather than trusted from a bare identifier that a
+	// renamed import or a shadowing local name would make wrong in either
+	// direction.
+	fileImports := map[string]map[string]string{}
 	type pending struct {
 		function producedFunction
 		body     *ast.FuncDecl
@@ -99,6 +113,7 @@ func parseProducedFunctions(
 			return nil, fmt.Errorf("%s: %w", file, parseErr)
 		}
 		// Purity is decided per function, from what its own body calls. It
+		fileImports[file] = importMap(tree)
 		// used to be decided per file, from what the file imported: in a
 		// single-file program that marked every function impure because one of
 		// them printed, and reported "0 pure atoms" for code that was almost
@@ -143,7 +158,18 @@ func parseProducedFunctions(
 		// A function is impure when its own body reaches outside itself. That
 		// is a question about the body, not about what its neighbours in the
 		// same file happen to need.
-		function.Pure = !callsAnythingImpure(item.body)
+		//
+		// observedEffects (PIPE-139) is used here rather than the older,
+		// coarser callsAnythingImpure: it resolves a call's package from the
+		// file's own imports instead of a bare identifier, and matches a
+		// curated set of effectful names within a package instead of treating
+		// every call into it as one, so it does not confuse a type
+		// conversion (time.Duration(n)) with an effect (time.Now()).
+		// callsAnythingImpure itself is left as it was for its other, unowned
+		// callers (agent_stage_recall.go, code_collection_application.go);
+		// this is a new, additional function, not a signature change to it.
+		function.Effects = observedEffects(item.body, fileImports[item.function.File])
+		function.Pure = len(function.Effects) == 0
 		declarationStart := item.body.Pos()
 		if item.body.Doc != nil {
 			declarationStart = item.body.Doc.Pos()
@@ -191,6 +217,122 @@ func callsAnythingImpure(function *ast.FuncDecl) bool {
 }
 
 // describeBody reports what one function calls, how much it branches, and how
+// importMap resolves each name a file's own import declarations bind to the
+// import path it names (PIPE-139).
+//
+// A purity check that trusts a call's bare identifier text is wrong in two
+// directions at once: a renamed import ("import ios \"os\"") reaches the
+// operating system under a name no fixed list of package identifiers
+// contains, and a local variable or parameter that happens to share a
+// package's conventional name is not that package at all. Resolving through
+// the file's own imports fixes both, because only a name this file actually
+// imported appears in the returned map.
+func importMap(file *ast.File) map[string]string {
+	imports := map[string]string{}
+	for _, spec := range file.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			continue
+		}
+		name := path
+		if slash := strings.LastIndex(path, "/"); slash >= 0 {
+			name = path[slash+1:]
+		}
+		if spec.Name != nil {
+			name = spec.Name.Name
+		}
+		if name == "_" || name == "." {
+			// A blank import is never called by name, and a dot import puts
+			// its names directly in scope with no selector at all — neither
+			// shape is a `pkg.Name` call this resolves.
+			continue
+		}
+		imports[name] = path
+	}
+	return imports
+}
+
+// effectPackages are the import paths this check knows reach outside the
+// program: a file, the clock, randomness, another process, the network, or a
+// log. Membership is keyed by import path, resolved through importMap
+// (PIPE-139), not by the identifier a call happens to be written with.
+var effectPackages = map[string]bool{
+	"fmt": true, "os": true, "log": true, "time": true,
+	"math/rand": true, "net/http": true, "os/exec": true, "bufio": true,
+}
+
+// pureConversionTypes names, per import path, the identifiers that package
+// exports as types rather than functions, so a call-shaped type conversion
+// into that package — time.Duration(n) is the case this ticket names
+// (PIPE-139) — is not read as a call to the package's clock, its file, or
+// whatever else shares its import path. This is a curated list rather than a
+// type-checker's answer: distinguishing a conversion from a call in general
+// needs full type information this check does not load, and a short,
+// reviewable list of known type names is the bounded alternative that fixes
+// the named case without pretending to a precision this check does not have.
+var pureConversionTypes = map[string]map[string]bool{
+	"time": {"Duration": true, "Month": true, "Weekday": true},
+}
+
+// observedEffects names what a function's body actually reaches for outside
+// its own arguments (PIPE-139), replacing a blanket "this package is an
+// effect" reading with two narrower ones: which package a selector call
+// really names, resolved through the file's own imports rather than trusted
+// from a bare identifier (importMap); and which names within that package are
+// effectful, resolved through a curated list rather than treated as every
+// exported name in it (effectPackages, pureConversionTypes).
+//
+// Stated limit: a call through a value this cannot resolve to an import —
+// a method on a local variable, a struct field, or an injected interface —
+// is not examined here at all, so an effect reached only that way is
+// invisible to this check. Widening the rule to flag every such call was
+// tried and rejected: an ordinary local value most produced code holds
+// (a strings.Builder, a sync.WaitGroup, an error) is called through exactly
+// the same shape, and flagging all of them as impure would have traded this
+// false negative for a much larger false positive across ordinary code. That
+// gap is real and is left for a caller with actual type information to close.
+func observedEffects(function *ast.FuncDecl, imports map[string]string) []string {
+	var effects []string
+	seen := map[string]bool{}
+	ast.Inspect(function, func(node ast.Node) bool {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			return true
+		}
+		selector, isSelector := call.Fun.(*ast.SelectorExpr)
+		if !isSelector {
+			return true
+		}
+		base, isIdentifier := selector.X.(*ast.Ident)
+		if !isIdentifier {
+			return true
+		}
+		path, isImported := imports[base.Name]
+		if !isImported || !effectPackages[path] {
+			return true
+		}
+		if pureConversionTypes[path][selector.Sel.Name] {
+			// A type conversion, not a call: time.Duration(n) shares an
+			// import path with time.Now() and nothing else.
+			return true
+		}
+		if path == "fmt" && strings.HasPrefix(selector.Sel.Name, "Sprint") {
+			// Formatting a string is not an effect; writing one out is. The
+			// distinction is which fmt function, because Sprintf builds a
+			// value and Println changes the world.
+			return true
+		}
+		name := path + "." + selector.Sel.Name
+		if !seen[name] {
+			seen[name] = true
+			effects = append(effects, name)
+		}
+		return true
+	})
+	sort.Strings(effects)
+	return effects
+}
+
 // deeply it loops.
 func describeBody(
 	function *ast.FuncDecl,
@@ -475,7 +617,20 @@ func producedFunctionCacheKey(files []string) string {
 	return strings.Join(sorted, "\x1f")
 }
 
-// checkAtoms reports whether the run produced anything atomic at all.
+// checkAtoms reports whether the run produced anything atomic at all, and —
+// PIPE-138 — enforces purity where a contract declares it.
+//
+// The flow's own gate for this stage says an atom "reads nothing outside its
+// arguments", and until this ticket nothing checked that: the stage counted
+// how many atoms happened to be pure and never failed on one that was not.
+// This compares each atom's declared contract — the //codeflux:atom doc
+// comment PIPE-137's contracts stage now reads from, the same source, not
+// re-derived here — against what it was actually observed to do
+// (producedFunction.Effects, PIPE-139). An atom that declares "Effects: -
+// None: pure atom" and reaches outside itself anyway is a gate failure, named
+// with what it reaches for; an atom with no declaration, or one that declares
+// an effect, is not judged here — there is nothing declared for it to
+// contradict.
 func checkAtoms(worktree string, cache *producedFunctionCache) stageOutcome {
 	functions, err := cache.readProducedFunctions()
 	if err != nil {
@@ -492,8 +647,9 @@ func checkAtoms(worktree string, cache *producedFunctionCache) stageOutcome {
 			evidence)
 	}
 	return held(fmt.Sprintf(
-		"%d atomic function(s), %d of them pure, and %d composing function(s)",
-		len(atoms), countPure(atoms), len(molecules)), evidence)
+		"%d atomic function(s), %d of them pure, and %d composing function(s); "+
+			"%d atom(s) declare purity and none of them contradicts it",
+		len(atoms), countPure(atoms), len(molecules), declaredPureCount), evidence)
 }
 
 // checkAtomTests requires each atom to be reachable from a test.
@@ -549,6 +705,38 @@ func checkMolecules(worktree string, cache *producedFunctionCache) stageOutcome 
 	_, molecules := atomsAndMolecules(functions)
 	if len(molecules) == 0 {
 		return skipped("the run composed nothing, so there is no composition to check")
+
+	files, err := cache.producedFilesList()
+	if err != nil {
+		return broke("the produced source could not be read: "+err.Error(), nil)
+	}
+	declared, err := declaredContracts(worktree, files)
+	if err != nil {
+		return broke("the declared atom documentation could not be read: "+
+			err.Error(), nil)
+	}
+	var violations []string
+	declaredPureCount := 0
+	for _, atom := range atoms {
+		document, hasDeclaration := declared[atom.Name]
+		if !hasDeclaration || !declaredPurity(document) {
+			continue
+		}
+		declaredPureCount++
+		if !atom.Pure {
+			violations = append(violations, fmt.Sprintf(
+				"%s declares \"Effects: None: pure atom\" but reaches outside "+
+					"its arguments: %s", atom.Name, strings.Join(atom.Effects, ", ")))
+		}
+	}
+	sort.Strings(violations)
+	evidence["declared_pure_atoms"] = declaredPureCount
+	if len(violations) > 0 {
+		evidence["purity_violations"] = violations
+		return broke(fmt.Sprintf(
+			"%d atom(s) declare purity their own body contradicts: %s",
+			len(violations), strings.Join(violations, "; ")), evidence)
+	}
 	}
 	var undischarged []string
 	for _, molecule := range molecules {

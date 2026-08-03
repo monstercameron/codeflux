@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-091
+Date: 2026-08-02
+Status: Five closed; one marker deliberately left standing
+Change-ID: CL-20260802-081
+Commit: pending
+Request-or-TODO: PIPE-137 through PIPE-141
+Goal: Make the contracts stage capable of failing
+Assumptions: A contract derived from the finished code is satisfied by that code
+  by construction, so the defect is the source of the declaration, not the
+  strictness of the comparison
+Decisions: Took the declared half from the atom doc comment rather than
+  inventing a second declaration format, because internal/atomdoc already parses
+  and validates that schema and a second source would drift from the first.
+  Recorded skipped rather than held when nothing carries a declaration.
+  Fabricating a contract from the code for that case would have reintroduced the
+  exact defect the ticket names, and every fixture in this repository is
+  currently in that shape, so the tempting shortcut was also the wrong one.
+  Rejected the wider effect rule and said why in the ticket rather than shipping
+  it quietly: any-unresolved-selector-is-impure is stricter but wrong more often.
+  Left StageAtoms' marker up. Purity is one half of contract satisfaction and
+  claiming the whole gate on half the work would be the same overclaim this
+  change exists to remove
+Files-or-schemas: agent_stage_delivery.go, agent_stage_structure.go,
+  agent_stage_unit_verification.go, a new atom_declared_contract.go, four new
+  test files, two rows in internal/pipeline/checks.go
+Validation: The disagreement fixture, its agreeing control, the undeclared
+  vacuity guard, a renamed-import case and a coincidental-identifier case, run
+  alongside PIPE-008's own tests; the engine canary at 4.48s against a 3.8s
+  baseline under concurrent lane load
+Failures-or-discarded-approaches: The wider effect rule, discarded for
+  false positives on ordinary Builder-style code
+Known-limitations: Unresolvable receiver calls; preconditions and postconditions
+Next-safe-step: PIPE-138's remaining half, once contract evaluation exists
+
 Dev-Log: DL-20260802-090
 Date: 2026-08-02
 Status: Three closed, one diagnosed and blocked

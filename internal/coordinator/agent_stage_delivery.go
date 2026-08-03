@@ -3,54 +3,137 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/pipeline"
 	"codeflux.dev/codeflux/internal/storage"
 )
 
-// describeContracts states what each produced function promises.
+// describeContracts states what each produced function promises, and —
+// PIPE-137/PIPE-140 — checks that promise against what the function actually
+// does.
 //
-// A contract here is derived from the code rather than agreed before it, which
-// is the weaker of the two possible orders and is said plainly rather than
-// dressed up: a contract read off an implementation cannot disagree with it,
-// so it cannot catch the implementation being wrong. What it can do is make
-// the promise explicit, comparable between runs, and available to a later run
-// deciding whether an atom it needs already exists.
+// A contract used to be read off the finished implementation: "effects" and
+// "pure" were computed by re-walking the same function body checkAtoms would
+// later re-walk to decide the very thing the contract claimed. Two facts
+// computed from one source by the same method cannot disagree, so the
+// contract could not fail to describe its own implementation — it was
+// unfalsifiable by construction, whatever the code actually was.
+//
+// The declared half of a contract now comes from somewhere else entirely:
+// declaredContracts reads the //codeflux:atom doc comment AGENTS.md's "Atom
+// Documentation Style" already requires, which is text the atom's author
+// wrote, independent of the AST walk that decides what the body observably
+// does. Preconditions, postconditions, and declared effects come from there.
+// Signature, parameter/result types, and whether a function returns an error
+// are left as objective facts read from the type signature — those were
+// never the vacuous half; a function's own declared parameter types cannot
+// disagree with its parameter types.
+//
+// A function with no admitted directive, or an unparsable one, has no
+// declared contract and is recorded as such rather than having one invented
+// for it from its body — inventing one is exactly the defect being removed.
+// When nothing produced carries a declared contract, this stage cannot yet
+// establish the gate and records skipped, not satisfied, matching the
+// vacuity guard PIPE-010 and PIPE-011 established. When a declared contract
+// disagrees with what was observed — a function that declares no effects but
+// reaches outside its own arguments — that is a real, checkable
+// contradiction and the stage fails, naming it (PIPE-140): this is what
+// makes the declared-effects half of an atom's contract worth anything,
+// where before nothing ever compared it against reality.
 func describeContracts(worktree string) stageOutcome {
 	functions, err := readProducedFunctions(worktree)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
+	files, err := producedGoFiles(worktree)
+	if err != nil {
+		return broke("the produced source could not be read: "+err.Error(), nil)
+	}
+	declared, err := declaredContracts(worktree, files)
+	if err != nil {
+		return broke("the declared atom documentation could not be read: "+
+			err.Error(), nil)
+	}
+
 	contracts := map[string]any{}
+	var undeclared []string
+	var disagreements []string
+	declaredCount := 0
 	for _, function := range functions {
 		if isTestScaffolding(function) {
 			continue
 		}
-		contracts[function.Name] = map[string]any{
+		entry := map[string]any{
 			"file":       function.File,
 			"signature":  function.Signature,
 			"inputs":     function.Parameters,
 			"outputs":    function.Results,
 			"errors":     function.ReturnsError,
-			"effects":    effectsOf(function),
-			"pure":       function.Pure,
 			"exported":   function.Exported,
 			"calls":      function.Calls,
 			"branches":   function.Branches,
 			"complexity": complexityLabel(function.LoopDepth),
+			// The observed half: what the body was actually seen to do,
+			// independent of anything declared about it.
+			"observed_effects": function.Effects,
+			"observed_pure":    function.Pure,
 		}
+		document, hasDeclaration := declared[function.Name]
+		if !hasDeclaration {
+			entry["declared"] = false
+			contracts[function.Name] = entry
+			undeclared = append(undeclared, function.Name)
+			continue
+		}
+		declaredCount++
+		declaredPure := declaredPurity(document)
+		entry["declared"] = true
+		entry["declared_effects"] = declaredEffectNames(document)
+		entry["declared_pure"] = declaredPure
+		entry["preconditions"] = document.Preconditions.Items
+		entry["postconditions"] = document.Postconditions.Items
+		contracts[function.Name] = entry
+		if declaredPure && !function.Pure {
+			disagreements = append(disagreements, fmt.Sprintf(
+				"%s declares \"Effects: None: pure atom\" but its body reaches "+
+					"outside its arguments: %s",
+				function.Name, strings.Join(function.Effects, ", ")))
+		}
+	}
+	sort.Strings(undeclared)
+	sort.Strings(disagreements)
+	evidence := map[string]any{
+		"contracts": contracts,
+		// false now for the entries this can vouch for: a declared entry's
+		// effects field is text the author wrote before this check ever ran,
+		// not a re-derivation of what the check itself just observed.
+		"derived_after":    false,
+		"declared_count":   declaredCount,
+		"undeclared_count": len(undeclared),
+		"undeclared":       undeclared,
 	}
 	if len(contracts) == 0 {
 		return skipped("the run produced no function to describe")
 	}
+	if len(disagreements) > 0 {
+		evidence["disagreements"] = disagreements
+		return broke(fmt.Sprintf(
+			"%d unit(s) declare effects their implementation contradicts: %s",
+			len(disagreements), strings.Join(disagreements, "; ")), evidence)
+	}
+	if declaredCount == 0 {
+		return skippedWith(fmt.Sprintf(
+			"%d function(s) produced, none carries a //codeflux:atom declared "+
+				"contract to check agreement against yet", len(contracts)),
+			evidence)
+	}
 	return held(fmt.Sprintf(
-		"%d function contract(s) recorded, derived from the code rather than "+
-			"agreed before it", len(contracts)),
-		map[string]any{
-			"contracts":     contracts,
-			"derived_after": true,
-		})
+		"%d of %d function contract(s) are declared in the source rather than "+
+			"read off it, and every declared one agrees with what its body does",
+		declaredCount, len(contracts)), evidence)
 }
 
 // recallKnownAtoms moved to agent_stage_recall.go (PIPE-050/PIPE-051): the
@@ -127,12 +210,12 @@ func countArtifacts(
 
 // effectsOf names what a function does beyond returning a value.
 //
-// The contract's gate asks for declared effects, and "pure" alone does not say
-// what an impure function actually touches. This is coarse — it distinguishes
-// reaching outside from not — and coarse and true beats precise and invented.
+// It returns producedFunction.Effects directly: the named, per-call list
+// observedEffects resolves (PIPE-139), rather than the single placeholder
+// string "reaches outside its arguments" this used to substitute for any
+// impurity at all. Callers outside this ticket's scope
+// (agent_stage_recall.go) keep the same []string shape and now see which
+// specific import and name a function reached for.
 func effectsOf(function producedFunction) []string {
-	if function.Pure {
-		return []string{}
-	}
-	return []string{"reaches outside its arguments"}
+	return function.Effects
 }

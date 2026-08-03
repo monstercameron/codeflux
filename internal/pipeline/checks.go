@@ -37,7 +37,14 @@ var Checks = []StageCheck{
 	{StageClarification, "resolveAmbiguity", true, ""},
 	{StageAtomicInstructions, "AgentExecution.planFromRequirement", true, ""},
 	{StageDecompositionCover, "AgentExecution.Run", true, ""},
-	{StageContracts, "describeContracts", true, "PIPE-137"},
+	// PIPE-137/PIPE-140: describeContracts now reads the declared half of a
+	// contract (preconditions, postconditions, effects, purity) from the
+	// //codeflux:atom doc comment rather than re-deriving it from the same
+	// AST walk that later checks the implementation, and fails when a
+	// declared-pure function is observed to reach outside its arguments.
+	// When nothing produced carries a declared contract it records skipped,
+	// not satisfied — it never claims a held row it cannot back.
+	{StageContracts, "describeContracts", true, ""},
 	{StageRecall, "AgentExecution.recallKnownAtoms", true, "PIPE-050"},
 	{StageAtoms, "checkAtoms", true, "PIPE-138"},
 	{StageAtomDocumentation, "checkAtomDocumentation", true, ""},
@@ -45,7 +52,13 @@ var Checks = []StageCheck{
 	{StageAtomExampleTests, "checkAtomTests", true, ""},
 	{StageAtomPropertyTests, "checkPropertyTests", true, ""},
 	{StageAtomFuzz, "checkFuzzing", true, ""},
-	{StageAtomVerification, "checkAtomVerification", true, "PIPE-141"},
+	// PIPE-141: testsNaming now resolves call sites (a plain call or a
+	// method/package-qualified selector) rather than sweeping every
+	// identifier in a test file, so a unit whose name coincides with a local
+	// variable or field is no longer reported verified by a test that never
+	// calls it — the same repair PIPE-008 made at testedNames, applied at
+	// this second, separate site.
+	{StageAtomVerification, "checkAtomVerification", true, ""},
 	{StageAtomMutation, "checkMutations", true, ""},
 	{StageAtomOptimization, "checkSimplification", false, ""},
 	{StageAtomComplexity, "checkComplexity", false, ""},
