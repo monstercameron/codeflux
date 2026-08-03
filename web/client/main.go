@@ -260,6 +260,16 @@ func productApplication() ui.Node {
 	store = store.ReduceRemote(frontendstate.SettingsChanged{
 		Settings: settingsViewForMountedSettings(settingsProps),
 	})
+	// First-run's five setup cards are static local copy — the step number,
+	// title, status word, body, and call to action are all literal strings in
+	// firstRunLayout, not projections of a coordinator answer. Nothing there
+	// is fetched, so nothing ever moves the loading state coordinatorStore
+	// seeds it with; DataLoading was left permanent rather than placed ahead
+	// of a fetch that was never written. The surface has real content on
+	// every visit, so DataReady is the correct answer, not DataReadyEmpty.
+	store = store.ReduceRemote(frontendstate.FirstRunChanged{
+		FirstRun: frontendstate.FirstRunView{State: frontendstate.DataReady},
+	})
 	if location.Path == "/" &&
 		strings.TrimSpace(location.Query) == "" &&
 		resource.Ready &&

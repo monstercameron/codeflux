@@ -25,6 +25,38 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-086
+Date: 2026-08-02
+Status: Three fixed; suite down to twelve failures
+Change-ID: CL-20260802-076
+Commit: pending
+Request-or-TODO: REPO-048, REPO-046, REPO-047
+Goal: Fix the three browser failures that were not thread-and-graph data
+Assumptions: Checked rather than carried -- see the correction below
+Decisions: Established that first-run needs no remote data before choosing a
+  state, rather than assuming the loading state was waiting on an unwritten
+  fetch. firstRunLayout renders static copy and FirstRunView's step fields are
+  read by nothing, so DataReady is the honest answer and DataReadyEmpty would
+  have been the wrong word for a surface with real content.
+  Fixed the legend at the entry spans rather than the ancestor chain, which is
+  where this ticket's own text said the defect was. The ticket was wrong: the
+  container was already correctly bound. The distinction is worth keeping,
+  because it explains why a bounds check caught what looking at the screen could
+  not -- overflow:hidden clips paint, not layout geometry.
+  Fixed focus contamination at loadInteractionThread, the single shared entry
+  point, rather than in the contaminated check. Repairing the victim would have
+  left the next one to be found the same way
+Files-or-schemas: web/client/main.go, web/frontend/shell/reference_chrome.go,
+  internal/frontendtest/interaction_checks.go
+Validation: A real test-browser run, 15 failures down to 12, with the three
+  named checks gone from the failure list; a live click through to /tasks; a DOM
+  scan of all 380 descendants
+Failures-or-discarded-approaches: The ancestor-chain diagnosis, disproved by
+  reading the container's existing constraints before changing anything
+Known-limitations: The remaining twelve failures need a populated thread and
+  graph, which no supported path creates -- REPO-041 and REPO-044
+Next-safe-step: REPO-041
+
 Dev-Log: DL-20260802-085
 Date: 2026-08-02
 Status: Rule unified; drift removed the day it appeared

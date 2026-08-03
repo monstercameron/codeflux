@@ -500,6 +500,23 @@ func loadInteractionThread(
 	if err := browserAssertions().Locator(root).ToHaveAttribute("data-responsive-mode", mode); err != nil {
 		return route, root, err
 	}
+	// Every check in this file shares one Playwright page across the whole
+	// suite, and the navigation above does not by itself guarantee
+	// document.activeElement starts empty: a check earlier in the run can
+	// fail mid keyboard-traversal and leave a real control focused, and that
+	// survives into the next check's reloaded document. A focus-restoration
+	// check asserts a *specific* control ends up focused, so inheriting an
+	// unrelated one it never expected corrupts an otherwise-correct result --
+	// this is how shortcut-dialog-restores-invoker-focus failed only inside
+	// the suite, immediately after the independently broken
+	// runKeyboardTraversalCheck left focus wherever its own failed Tab press
+	// landed. Blur whatever is focused so every check starts from the same
+	// neutral state instead of depending on what the previous one left.
+	if _, err := page.Evaluate(
+		`() => { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } }`,
+	); err != nil {
+		return route, root, err
+	}
 	return route, root, nil
 }
 

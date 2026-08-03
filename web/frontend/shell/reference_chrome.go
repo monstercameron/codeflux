@@ -2132,6 +2132,17 @@ func GraphPane(props GraphPaneProps) ui.Node {
 		html.Div(html.Props{
 			Class: css.New(
 				u.Flex, u.ItemsCenter, u.JustifyBetween,
+				// The row is a flex item stretched across a flex-column
+				// ancestor (the Aside), and stretch alone does not stop it
+				// growing past that width: without an explicit MinWidth(Zero)
+				// here, the row's own auto minimum width is its content's
+				// min-content size — title plus the legend's five entries at
+				// full width — which pushed the row, and the panel around it,
+				// past the viewport regardless of the legend's own
+				// Overflow.Hidden and ellipsis. Those only clip once
+				// something in the ancestor chain lets the row itself shrink
+				// below that content width.
+				css.MinWidth(css.Zero),
 				css.MinHeight(css.Px(50)),
 				css.PaddingX(css.Px(tokens.Spacing.MD)),
 				css.BorderBottom(css.Px(1), css.Hex(string(tokens.Colors.BorderSubtle))),
@@ -2187,16 +2198,30 @@ func graphLegend(tokens design.Tokens) ui.Node {
 	}
 	nodes := make([]ui.Node, 0, len(entries))
 	for _, entry := range entries {
+		// Overflow.Hidden on the row above clips paint, not layout: a flex
+		// item with no MinWidth(Zero) of its own keeps its full content-based
+		// box even when the row has no room for it, and that box's real
+		// position and width are what a viewport-bounds check measures. Every
+		// entry, and the label inside it, needs its own MinWidth(Zero) so the
+		// shrink each entry actually gets is real — this is what let the
+		// "Memory" entry's own span report a right edge past the row's
+		// clipped boundary and past the viewport, even though a person never
+		// saw it painted there.
 		nodes = append(nodes, html.Span(html.Props{
 			Class: css.New(
 				u.InlineFlex, u.ItemsCenter, css.Gap(css.Px(4)),
+				css.MinWidth(css.Zero), css.Overflow.Hidden,
 				css.TextColor(css.Hex(string(entry.tone))),
 			).String(),
 		},
 			primitives.Icon(primitives.IconProps{Name: entry.icon, Size: primitives.IconSizeSmall}),
 			html.Span(html.Props{
-				Class: css.New(css.TextColor(css.Hex(string(tokens.Colors.TextMuted)))).String(),
-				Text:  entry.label,
+				Class: css.New(
+					css.MinWidth(css.Zero), css.Overflow.Hidden,
+					css.WhiteSpace.NoWrap, css.TextOverflowEllipsis(),
+					css.TextColor(css.Hex(string(tokens.Colors.TextMuted))),
+				).String(),
+				Text: entry.label,
 			}),
 		))
 	}

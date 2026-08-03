@@ -50,6 +50,40 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-076
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- three browser defects, one of them user-facing
+Request-or-TODO: REPO-048, REPO-046, REPO-047
+Outcome: The first-run page no longer sits on loading skeletons for ever.
+  coordinatorStore dispatched FirstRunChanged once at boot with DataLoading and
+  nothing ever moved it, so /first-run rendered placeholder bars for all five
+  setup cards permanently and the "Open tasks" call to action never mounted --
+  the plan's first prototype journey, and a new user could not complete it. It
+  now dispatches DataReady alongside the other panes' answers.
+  The graph legend no longer overflows the viewport. The container was already
+  width-bound; the per-entry spans were not, so their content-based automatic
+  minimum size stopped them shrinking. overflow:hidden clips paint, not layout
+  geometry, so the last entry still measured past the viewport even though
+  nobody would have seen it painted there.
+  One interaction check no longer contaminates the next. The suite reuses one
+  page, so a check that failed could leave an element focused going into the
+  following one; loadInteractionThread now blurs before handing the page on
+Affected-behavior: A new user can complete the first-run journey. Nothing else
+  changes for an existing one
+Compatibility-or-migration: None
+Verification: test-browser improved from 15 failures to 12 -- 248 of 260 checks
+  pass -- and all twelve remaining are REPO-041 and REPO-044's thread and graph
+  data gap. The first-run fix was driven live: five region states reported
+  ready, the cards rendered, and "Open tasks" was clicked through to /tasks. The
+  legend fix was verified by DOM scan: 0 of 380 descendants exceed 1280px, down
+  from 2
+Known-limitations: first-run genuinely needs no remote data -- FirstRunView's
+  CurrentStep and Completed exist and are read by nothing, and the cards are
+  static copy. So DataReady is honest today and would need revisiting if the
+  surface ever gains real state
+Dev-Log: DL-20260802-086
+
 Change-ID: CL-20260802-075
 Commit: pending
 Date: 2026-08-02
