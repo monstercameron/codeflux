@@ -26,6 +26,10 @@ type outstanding struct {
 	// askedForCases records whether this instruction included synthesised
 	// cases, so the caller can count the round it has spent.
 	askedForCases bool
+	// owedCases is how many synthesised cases were still untried when this was
+	// computed, so the next round can tell whether the run is closing the gap
+	// or standing still. See the case ladder in outstandingWork.
+	owedCases int
 }
 
 // any reports whether the run owes anything.
@@ -74,13 +78,34 @@ func (execution *AgentExecution) outstandingWork(
 			len(gaps.TangledFunctions)))
 	}
 
-	// The case ladder is bounded because it is derived rather than demanded:
-	// every input comes from a signature, so a run can always be asked for one
-	// more and the ask would never end. Two rounds is enough to close most of
-	// it and few enough that it cannot become a standard nothing meets.
-	const caseRoundLimit = 2
-	if caseRounds < caseRoundLimit {
-		if owed, err := untriedCases(scope.worktree); err == nil && len(owed) > 0 {
+	// The case ladder is bounded by the run's own attempt budget, not by a
+	// round count of its own.
+	//
+	// It used to stop after two rounds, on the reasoning that every input is
+	// derived from a signature so the ask could never end. That was right
+	// about the risk and wrong about the remedy: the run then declared itself
+	// complete with the case stage still failing, which is the ledger and the
+	// run disagreeing about the same fact. Observed on ladder rung 2, where
+	// three cases stayed untried and the run finished anyway.
+	//
+	// Bounding it by whether the debt is still falling was the next wrong
+	// answer, and it was wrong in an instructive way: a run that plateaus is
+	// exactly the run the model ladder exists for, and refusing to ask again
+	// meant the escalation that would have brought a stronger model was never
+	// reached. The ask now continues while the run has attempts left, and the
+	// convergence tracker decides whether to escalate, decompose, or stop —
+	// one mechanism for "this is not getting anywhere" instead of two that
+	// disagree.
+	//
+	// The backstop is a cap on rounds rather than on progress, so a run that
+	// oscillates cannot spend its whole ceiling here alone.
+	const caseRoundBackstop = 8
+	if owed, err := untriedCases(scope.worktree); err == nil && len(owed) > 0 {
+		owedNow := 0
+		for _, cases := range owed {
+			owedNow += len(cases)
+		}
+		if caseRounds < caseRoundBackstop {
 			if work.gate == "" {
 				work.gate = "atom-case-synthesis"
 				work.because = "inputs it was meant to try were never tried"
@@ -90,6 +115,7 @@ func (execution *AgentExecution) outstandingWork(
 				"%d function(s) have inputs nothing tries", len(owed)))
 			work.askedForCases = true
 		}
+		work.owedCases = owedNow
 	}
 
 	if len(parts) == 0 {

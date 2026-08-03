@@ -409,6 +409,8 @@ func (execution *AgentExecution) Run(
 	// machine will not take on its own.
 	awaitingApproval := ""
 	sendBack := func(gate string, instruction string, because string) {
+		tracef("sendback", "gate=%s because=%s", gate, because)
+		traceBlock("instruct", "what the next attempt is told:", instruction)
 		failure = instruction
 		sentBackBecause = because
 		// The rung THIS attempt actually ran on, captured before anything
@@ -485,6 +487,7 @@ func (execution *AgentExecution) Run(
 	ledger.sealPreAttemptStages()
 	for attempt := 1; progress.moreAttempts() && awaitingApproval == ""; attempt++ {
 		progress.beginAttempt()
+		tracef("attempt", "%d begins on rung %s", attempt, progress.currentRung())
 		if attempt > 1 {
 			// The flow ledger follows the attempt loop rather than the run, so
 			// each attempt's stages are recorded under their own number. See
@@ -565,6 +568,30 @@ func (execution *AgentExecution) Run(
 				attempt, runErr.Error()))
 			continue
 		}
+		// A provider that would not answer is the machinery failing, not the
+		// work, and it is recoverable in a way "the database will not open"
+		// is not: the next attempt may run on a different rung, and the
+		// transport may simply be having a moment. Ending the run here threw
+		// away everything the earlier attempts had already got past their
+		// gates — observed on ladder rung 2, where six attempts of accepted
+		// work were discarded because the seventh could not reach the
+		// provider immediately after escalating.
+		//
+		// The retry executor has already exhausted its own budget by this
+		// point, so this is not a second retry layer: it is the attempt loop
+		// absorbing a failed attempt, which is what it is for. If the
+		// provider stays unreachable the attempt budget ends the run anyway,
+		// and it ends with the record of what did succeed intact.
+		if errors.Is(runErr, providers.ErrRetryBudgetExhausted) ||
+			errors.Is(runErr, providers.ErrTransport) ||
+			errors.Is(runErr, providers.ErrRateLimited) {
+			sendBack("assembly", providerFailureInstruction(runErr),
+				"the provider did not answer")
+			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+				"Attempt %d could not reach the model: %s. Trying again.",
+				attempt, runErr.Error()))
+			continue
+		}
 		if runErr != nil {
 			execution.say(ctx, scope, events.KindMessageFinal,
 				"The run stopped: "+runErr.Error())
@@ -623,10 +650,15 @@ func (execution *AgentExecution) Run(
 		// in a named line. Rung 5 had one found at attempt three, sent back
 		// once, not fixed, and never raised again — and the run then reported
 		// implementation-complete with a suite that caught nothing.
-		if !progress.lastAttempt() &&
-			execution.settings.AdversarialReview && !reviewed {
-			if findings, reviewErr := execution.reviewAdversarially(
-				ctx, scope.worktree,
+		//
+		// PIPE-102: no longer gated behind execution.settings.AdversarialReview.
+		// Plan.md §22 forbids trading away a required reviewer for a lower
+		// cost, so a setting may scale what the critic checks -- PIPE-095's
+		// risk-selected checks already do exactly that -- but it may not
+		// delete the critic outright the way this flag used to.
+		if !progress.lastAttempt() && !reviewed {
+			if findings, reviewErr := execution.reviewAdversariallyForRisk(
+				ctx, scope.worktree, scope.riskLevel,
 			); reviewErr == nil && len(findings) > 0 {
 				defects := 0
 				for _, finding := range findings {
@@ -637,13 +669,30 @@ func (execution *AgentExecution) Run(
 				// Only a review that found nothing objective closes the door.
 				// Blind spots alone are the bounded ask the round limit was
 				// written for.
+				//
+				// PIPE-100: reviewed is set on this path only, which is
+				// reached only when the review actually produced findings
+				// that are about to be sent back below. A review that errored
+				// or found nothing never reaches this assignment, so it does
+				// not spend the run's one review round -- a later attempt is
+				// still reviewed for real rather than the round being consumed
+				// by a pass that never actually saw the code that ships.
 				reviewed = defects == 0
-				failure = adversarialInstruction(findings)
 				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 					"Attempt %d passes every gate. A review found %d defect(s) and "+
 						"%d blind spot(s) in it anyway; going back for them.",
 					attempt, defects, len(findings)-defects))
-				sentBackBecause = "a review found it weaker than it looks"
+				// PIPE-099: routed through sendBack exactly like every other
+				// gate, so the convergence tracker sees a run repeating the
+				// same review finding and can escalate or decompose on it.
+				// Before this, a review finding set failure and continued
+				// directly, and progress.record was never called for it, so a
+				// run stuck on the same finding attempt after attempt neither
+				// escalated up the model ladder nor decomposed -- the one
+				// stall the rest of the loop is built to catch was invisible
+				// to it from exactly this gate.
+				sendBack("adversarial-review", adversarialInstruction(findings),
+					"a review found it weaker than it looks")
 				continue
 			}
 		}
@@ -695,9 +744,22 @@ func (execution *AgentExecution) Run(
 	// checked, and it may not claim to have finished work whose checks failed.
 	// Both used to end the same way — "implementation-complete" — which is how
 	// a program that printed the wrong answer came to be reported as done.
+	//
+	// When files were written after the last test run, the suite is run here
+	// rather than trusting a verdict about older code. Asking the model to run
+	// its tests again instead was tried and was worse: the model's last act in
+	// almost every attempt is a write, so the ask fired every time and the run
+	// never reached the stages past this one — twelve attempts, five stages
+	// recorded, no progress. The coordinator already runs this exact command
+	// in three other stages; running it once more is cheaper than a round trip
+	// and cannot be forgotten.
+	validationHeld := narrator.ranValidation && !narrator.validationFailed
+	validationReason := validationDetail(narrator)
+	if narrator.filesChangedSinceValidation {
+		validationHeld, validationReason = revalidateAfterWrite(ctx, scope.worktree)
+	}
 	verified := compiles && ledger.require(ctx, pipeline.StageIntegrationTests,
-		narrator.ranValidation && !narrator.validationFailed,
-		validationDetail(narrator),
+		validationHeld, validationReason,
 		map[string]any{"command": "go test ./...", "attempts": attempts})
 	if !verified {
 		// Only the two stages that genuinely cannot proceed are blocked here
@@ -746,6 +808,9 @@ func (execution *AgentExecution) Run(
 		ctx, scope.worktree, scope.requirement, examples)
 	ledger.decide(ctx, pipeline.StageEndToEndTests, acceptance)
 
+	tracef("flow", "compiles=%t verified=%t — structure stages %s",
+		compiles, verified,
+		map[bool]string{true: "run their checks", false: "record blocked"}[compiles])
 	execution.examineStructure(ctx, ledger, scope, compiles, verified)
 	if compiles {
 		ledger.decide(ctx, pipeline.StageRecall,
@@ -1290,6 +1355,9 @@ func validationDetail(narrator *narratingExecutor) string {
 			"produced has been checked"
 	case narrator.validationFailed:
 		return "the project's own test command ran and did not pass"
+	case narrator.filesChangedSinceValidation:
+		return "files were written after the last test run, so what the run " +
+			"leaves behind has not been checked as it stands"
 	default:
 		return "the project's own test command ran and passed in the worktree"
 	}
@@ -1456,4 +1524,45 @@ func acceptanceDetail(count int) string {
 	return fmt.Sprintf("the request was recorded as a message and carries %d "+
 		"executable acceptance example(s) the finished work must satisfy",
 		count)
+}
+
+// revalidateAfterWrite runs the project's suite because the worktree moved
+// since the last time the run ran it.
+//
+// The verdict this replaces was about code that no longer exists: a run that
+// tested, then edited, then stopped reported "the project's own test command
+// ran and passed" for a worktree that did not build. Rather than refuse such a
+// run outright — which fails it for something a single command would settle —
+// the command is run here and the real answer recorded.
+func revalidateAfterWrite(ctx context.Context, worktree string) (bool, string) {
+	command := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
+	command.Dir = worktree
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return true, "files were written after the run's own last test, so " +
+			"the suite was run again here and passed"
+	}
+	return false, "files were written after the run's own last test, so the " +
+		"suite was run again here and did not pass: " +
+		firstMeaningfulLine(string(output))
+}
+
+// firstMeaningfulLine is the first line of command output worth quoting.
+//
+// Go prints package status lines before it prints what broke, so the first
+// line of a failing run is routinely "? pkg [no test files]" — which reads as
+// success and is why a failure once went unnoticed in a stage's own detail.
+func firstMeaningfulLine(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "?") ||
+			strings.HasPrefix(trimmed, "ok ") {
+			continue
+		}
+		if len(trimmed) > 200 {
+			return trimmed[:200]
+		}
+		return trimmed
+	}
+	return "the suite reported no readable failure"
 }

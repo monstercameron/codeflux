@@ -300,3 +300,11 @@ func counted(count int, noun string) string {
 	}
 	return strconv.Itoa(count) + " " + noun + "s"
 }
+
+// currentRung is the model this run is on now, for the live trace.
+func (tracker *convergence) currentRung() string {
+	if tracker == nil {
+		return "unknown"
+	}
+	return tracker.rung
+}

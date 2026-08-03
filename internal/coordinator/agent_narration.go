@@ -41,6 +41,17 @@ type narratingExecutor struct {
 	// validationFailed is the verdict of the most recent validation run, not a
 	// memory of every failure before it.
 	validationFailed bool
+	// filesChangedSinceValidation records whether anything was written after
+	// the last test run, which makes that run's verdict stale.
+	//
+	// Without this the verification gate read the most recent validation
+	// regardless of what happened next, so a run that tested, then edited, and
+	// then stopped reported "the project's own test command ran and passed" —
+	// about code that no longer existed. Observed on ladder rung 2: the gate
+	// said the tests passed while the worktree failed to build with "undefined:
+	// run", and two later stages that re-ran the suite themselves contradicted
+	// it in the same ledger.
+	filesChangedSinceValidation bool
 	// lastFailure is the output of the most recent tool that did not succeed.
 	// It is what the next attempt is shown: an agent told only that its tests
 	// failed will guess at why, and the guess is usually a second failure.
@@ -117,6 +128,13 @@ func (narrator *narratingExecutor) ExecuteTool(
 		narrator.ranValidation = true
 		narrator.validationFailed =
 			completed != domain.CommandExecutionStateSucceeded
+		narrator.filesChangedSinceValidation = false
+	}
+	if executor.ToolName(name) == executor.ToolApplyEdit &&
+		completed == domain.CommandExecutionStateSucceeded {
+		// A successful write supersedes whatever the last test run judged.
+		// A failed one changed nothing, so it leaves the verdict standing.
+		narrator.filesChangedSinceValidation = true
 	}
 	operationNode := narrator.recordInGraph(request, name, detail,
 		completed == domain.CommandExecutionStateSucceeded)
@@ -125,6 +143,11 @@ func (narrator *narratingExecutor) ExecuteTool(
 	// Each finished tool is also said out loud in the conversation. The tool
 	// events carry the same facts, but nothing renders them yet, and a person
 	// watching a run needs to see it move rather than infer that it did.
+	tracef("tool", "%-12s %-10s %s", name, completed, traceOneLine(summary, 110))
+	if completed != domain.CommandExecutionStateSucceeded &&
+		narrator.lastFailure != "" {
+		traceBlock("output", "what it reported:", traceOneLine(narrator.lastFailure, 600))
+	}
 	narrator.execution.say(narrator.ctx, narrator.scope,
 		events.KindMessageFinal, toolNarration(name, string(completed), summary))
 	return result, nil

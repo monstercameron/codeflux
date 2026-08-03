@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-108
+Date: 2026-08-03
+Status: Rung one green; rung two down to gates it can now be told about
+Change-ID: CL-20260803-098
+Commit: pending
+Request-or-TODO: The ladder-ascent instruction
+Goal: Climb, and fix what the climb exposes
+Decisions: Ran the suite in the coordinator rather than asking the model to.
+  The coordinator already runs that exact command in three other stages, and a
+  command it runs cannot be forgotten by a model that has just written a file
+  and thinks it is done.
+  Absorbed provider failures at the attempt loop rather than adding another
+  retry layer. The retry executor has already spent its budget by then; what
+  was missing was the attempt loop treating an unreachable provider the way it
+  already treats a malformed turn.
+  Bounded the case ask by the run's own attempt budget rather than by a rule
+  of its own. One mechanism for "this is not getting anywhere" instead of two
+  that disagree.
+  Added the trace to stderr and gated it on an environment variable. Every
+  defect this session was found by reading a database after the fact or by
+  taking a goroutine dump, which is a slow way to learn that a run is stuck on
+  stage seven
+Files-or-schemas: agent_narration.go, agent_execution.go, agent_outstanding.go,
+  agent_malformed_turn.go, agent_convergence.go, a new trace.go, and three new
+  test files
+Validation: The engine canary at 3.55s; the trace exercised end to end on it
+Failures-or-discarded-approaches: Two of mine, both corrected in this change.
+  Asking the model to re-test looped the run. Reading "five rows per attempt"
+  as a regression was wrong -- the structure stages run after the attempt loop,
+  so only the last attempt records the full flow
+Known-limitations: Rung two is not green yet
+Next-safe-step: Rung two's case gate, then rungs three and four
+
 Dev-Log: DL-20260803-107
 Date: 2026-08-03
 Status: Rung two reaches the same gates rung one passes

@@ -292,6 +292,7 @@ func (ledger *pipelineLedger) recordMeasured(
 		// readable as "this run's record is incomplete".
 		return
 	}
+	traceStage(stage, state, detail)
 	ledger.mutex.Lock()
 	ledger.recorded[stage] = true
 	ledger.history[stage] = decidedStage{

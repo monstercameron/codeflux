@@ -40,3 +40,21 @@ func malformedTurnInstruction(refusal error) string {
 			"say what is missing rather than reaching outside it.")
 	return instruction.String()
 }
+
+// providerFailureInstruction is what the next attempt is told when the model
+// could not be reached at all.
+//
+// It says the work is intact, because that is the fact most likely to be
+// misread: nothing the previous attempts wrote was rolled back, and an
+// instruction that read like a refusal would invite a rewrite of work that was
+// already accepted. It names the failure so a person reading the timeline can
+// tell a provider outage from a mistake the run made.
+func providerFailureInstruction(failure error) string {
+	return "The previous attempt could not reach the model, so it did no " +
+		"work. What the provider boundary reported:\n\n" +
+		failure.Error() +
+		"\n\nNothing was rolled back: every file the earlier attempts wrote " +
+		"is still in the worktree exactly as they left it. Continue from " +
+		"there rather than starting again, and address whatever was " +
+		"outstanding before this interruption."
+}

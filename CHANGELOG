@@ -50,6 +50,52 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-098
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a false green, a run killed by its provider, and a live trace
+Request-or-TODO: The ladder-ascent instruction, 2026-08-03
+Outcome: Four more defects found by climbing, and the observability that would
+  have found them sooner.
+  The verification gate reported the most recent test run and nothing else, so
+  a run that tested, then edited, then stopped recorded "the project's own test
+  command ran and passed" about code that no longer existed. Three stages
+  disagreed in one ledger: integration-tests said passed while repetition and
+  platform-matrix, which re-run the suite themselves, both failed. Running the
+  suite by hand settled it -- the worktree did not build. A write now
+  supersedes the verdict, and rather than refuse such a run outright the
+  coordinator re-runs the suite itself and records the real answer.
+  Asking the model to re-run its own tests was tried first and was worse: the
+  model's last act in almost every attempt is a write, so the ask fired every
+  time and the run never reached the stages past it -- twelve attempts, five
+  stages recorded, no progress. That is written down rather than quietly
+  replaced.
+  A provider that would not answer ended the whole run. Rung two escalated,
+  the next model call failed transport, and six attempts of work that had
+  already passed their gates were discarded. The code had already decided this
+  shape for a malformed turn -- cost an attempt, not the run -- and a provider
+  outage belongs in the same category.
+  The case ladder stopped asking after two rounds and the run then declared
+  itself complete with the case stage still failing. Bounding the ask by
+  whether the debt was falling was the next wrong answer: a run that plateaus
+  is exactly the run the model ladder exists for, and refusing to ask again
+  meant the escalation that would have brought a stronger model was never
+  reached
+Affected-behavior: A run that finishes on an unchecked write has its suite run
+  for it. A provider outage costs an attempt. The case ask continues while the
+  run has attempts left
+Compatibility-or-migration: CODEFLUX_TRACE is off by default and a run without
+  it is byte-identical to before
+Verification: Each fix has its own test, including the control that keeps the
+  gate honest -- a failed write leaves the verdict standing, authentication
+  failure is not absorbed, and a suite that only passes three distinct values
+  has still not tried the empty input
+Known-limitations: The trace writes to stderr rather than the test log because
+  Go buffers a subtest's log until it ends, which is when a person watching a
+  slow run stops needing it. That means it interleaves with other output on a
+  loaded machine
+Dev-Log: DL-20260803-108
+
 Change-ID: CL-20260803-097
 Commit: pending
 Date: 2026-08-03
