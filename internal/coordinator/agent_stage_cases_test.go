@@ -340,3 +340,40 @@ func TestAnAdderKeepsItsOverflowCase(t *testing.T) {
 		t.Error("a function with no loop lost its overflow case")
 	}
 }
+
+// TestAReaderCaseIsTriedByAReaderOverTheSameKindOfInput covers the fourth place
+// the invented-literal defect appeared.
+//
+// strings.NewReader("!!! not the expected shape") asks a run to guess three
+// exclamation marks and a particular sentence. Ladder rung 5 was refused eight
+// cases on readEntries for this, which failed stage 7 and blocked thirteen hard
+// stages behind it.
+func TestAReaderCaseIsTriedByAReaderOverTheSameKindOfInput(t *testing.T) {
+	source := `func TestReadEntries(t *testing.T) {
+		for _, input := range []string{"", "{\"a\":1}", "not json at all", "  padded  ",
+			"one\ttwo\nthree", "caf\u00e9", strings.Repeat("q", 50000), "x"} {
+			_, _ = readEntries(strings.NewReader(input))
+		}
+	}`
+	for _, candidate := range casesForType("io.Reader") {
+		if !caseIsTried(source, []string{"TestReadEntries"}, candidate) {
+			t.Errorf("a suite reading every kind of input left %q untried",
+				candidate.Shape)
+		}
+	}
+}
+
+// TestAReaderCaseNeedsASuiteThatActuallyReads keeps the leniency bounded: the
+// property match runs over every literal in the file, so requiring that a
+// reader is built somewhere stops it satisfying a reader case in a suite that
+// never reads anything.
+func TestAReaderCaseNeedsASuiteThatActuallyReads(t *testing.T) {
+	source := `func TestSomethingElse(t *testing.T) {
+		got := describe("")
+		if got != "" { t.Fail() }
+	}`
+	empty := atomCase{Shape: `strings.NewReader("")`, Class: caseDegenerate}
+	if caseIsTried(source, []string{"TestSomethingElse"}, empty) {
+		t.Error("a suite that never builds a reader satisfied a reader case")
+	}
+}

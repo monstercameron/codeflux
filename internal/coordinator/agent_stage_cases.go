@@ -401,6 +401,23 @@ func caseIsTried(testSource string, tests []string, candidate atomCase) bool {
 	if wanted, isInteger := integerShapeSignature(candidate.Shape); isInteger {
 		return testSourceHasIntegerShape(testSource, wanted)
 	}
+	// A reader built from a string is a string case wearing a constructor.
+	//
+	// The fourth place this same defect appeared. strings.NewReader("!!! not
+	// the expected shape") asks a run to guess three exclamation marks and a
+	// particular sentence; what the case is actually about is a reader over
+	// input that cannot be parsed. Ladder rung 5 was refused eight cases on
+	// readEntries for this, which failed stage 7 and blocked thirteen hard
+	// stages behind it.
+	//
+	// Unwrapped to the string inside and matched on its property, which is
+	// where the machinery for strings already lives.
+	if inner, isReader := readerShapeContents(candidate.Shape); isReader {
+		if !testSourceBuildsAReader(testSource) {
+			return false
+		}
+		return testSourceHasStringShape(testSource, classifyStringShape(inner))
+	}
 	// A quoted string shape has the same invented part a composite literal has.
 	// Nothing about `"héllo wörld"` says those words; it says "text with
 	// characters outside ASCII". Matching the text asked a run to guess the
@@ -1085,6 +1102,47 @@ func workGrowsWithItsArgument(function producedFunction) bool {
 	for _, parameter := range function.Parameters {
 		switch parameter {
 		case "int", "int64", "int32", "uint", "uint64", "uint32":
+			return true
+		}
+	}
+	return false
+}
+
+// readerShapeContents unwraps a shape written as a reader over a literal.
+//
+// Reports the string the reader is built from, so the case can be matched on
+// what that string is rather than on which characters this file happened to
+// choose. Anything that is not a reader over a literal is left alone.
+func readerShapeContents(shape string) (string, bool) {
+	trimmed := strings.TrimSpace(shape)
+	for _, constructor := range []string{
+		"strings.NewReader(", "bytes.NewBufferString(", "bytes.NewReader(",
+	} {
+		if !strings.HasPrefix(trimmed, constructor) ||
+			!strings.HasSuffix(trimmed, ")") {
+			continue
+		}
+		argument := strings.TrimSpace(
+			trimmed[len(constructor) : len(trimmed)-1])
+		if kind, quoted := stringShapeSignature(argument); quoted {
+			_ = kind
+			return strings.Trim(argument, `"`), true
+		}
+	}
+	return "", false
+}
+
+// testSourceBuildsAReader reports whether the tests construct a reader at all.
+//
+// The property match below is over every string literal in the suite, which is
+// lenient by design; requiring that a reader is built somewhere keeps that
+// leniency from satisfying a reader case in a suite that never reads anything.
+func testSourceBuildsAReader(testSource string) bool {
+	for _, constructor := range []string{
+		"strings.NewReader(", "bytes.NewBufferString(", "bytes.NewReader(",
+		"bufio.NewReader(", "os.Open(", "io.NopCloser(",
+	} {
+		if strings.Contains(testSource, constructor) {
 			return true
 		}
 	}

@@ -25,6 +25,37 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-136
+Date: 2026-08-03
+Status: Post-loop enrichment is transactional and its output is durable
+Change-ID: CL-20260803-126
+Commit: pending
+Request-or-TODO: The rung 5 enrichment analysis
+Goal: Stop the worktree, the artifact record and the checkpoint disagreeing
+Decisions: Re-captured the checkpoint after enrichment rather than exempting
+  the enriched tree from the comparison. The enriched revision is verified --
+  it was built, tested and accepted two lines earlier -- so reporting the
+  pre-enrichment digest would describe a tree that no longer exists.
+  Recorded the enriched files under their own artifact type, so a reader can
+  tell a file the coordinator documented from one the model wrote.
+  Restored on a failure to record, not only on a failure to build. An artifact
+  record that lags the worktree is worse than none: it answers, and answers
+  with a program nobody is running
+Files-or-schemas: new internal/coordinator/enrich_verified_work.go,
+  agent_execution.go, agent_stage_recall.go
+Validation: Build, vet, gofmt, recall/registration/derive suites
+Failures-or-discarded-approaches: Requiring verification to have held rather
+  than not to have failed, which stopped registration in every fixture and
+  would have stopped it in any flow that does not run the whole ladder
+Known-limitations: Items 5 to 9 and 11 to 12 remain: the derived documentation
+  still states complexity and determinism claims it cannot support for an
+  io.Reader, stale advisories are not recomputed against the final digest,
+  case synthesis emits two identical literals under different labels, the
+  evidence bundle still misses advisory failures recorded after it, the
+  terminal messages are not yet reconciled to one authority, and neither path
+  coverage in-loop nor the performance noise floor has a focused test
+Next-safe-step: Rung 5 once more, then rung 6
+
 Dev-Log: DL-20260803-135
 Date: 2026-08-03
 Status: Every item of the rung 5 regression analysis is implemented

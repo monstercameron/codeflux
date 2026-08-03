@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-126
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- enrichment commits or does not happen, and unverified atoms are
+  not admitted
+Request-or-TODO: Rung 5 enrichment analysis, 2026-08-03, items 1 to 4 and 10
+Outcome: Deriving the registry documentation was right; doing it in place was
+  not. Enrichment edited the verified worktree, revalidated, and stopped --
+  leaving the tree different from every recorded artifact and from the
+  checkpoint digest the run then reported as its verified revision. Rung 5
+  ended with a correct 7,593-byte program on disk, an artifact record holding
+  the version before enrichment, and a terminal record saying "the worktree is
+  NOT verified revision 8bef148ac7cd". All three were accurate, and the run
+  failed anyway, because the only thing anyone could read back was the stale
+  copy.
+  The sequence now commits or does not happen: enrich, build, test, check the
+  acceptance examples, re-record every produced file, capture a new verified
+  digest. Any step failing puts the previous revision back and records nothing.
+  Registration is withheld when this run's atom verification was performed and
+  did not hold. Rung 5 registered three atoms while case synthesis had failed,
+  example tests and verification were blocked behind it, and the task ended
+  failed. A registry row asserts that a later task may reuse this instead of
+  building it, and saying that about code whose own verification never ran
+  poisons every project that reads it.
+  Withheld on a checked failure rather than on the absence of a check. A flow
+  that never reached the stage has established nothing either way, and refusing
+  on that would stop registration everywhere except a full run.
+Verification: Build, vet, gofmt, the recall, registration and derived-schema
+  suites
+Dev-Log: DL-20260803-136
+
 Change-ID: CL-20260803-125
 Commit: pending
 Date: 2026-08-03

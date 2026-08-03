@@ -1070,33 +1070,26 @@ func (execution *AgentExecution) Run(
 	tracef("checkpoint", "restored=%t verified_revision=%s",
 		restoredFromCheckpoint, checkpoint.digest)
 
-	// Enrichment, after the work is verified and never before it.
+	// Enrichment, after the work is verified and never before it, as a
+	// transaction.
 	//
 	// The atom schema used to be asked of the model, which cost attempts,
 	// competed with the delivery gates, and produced a worse answer than the
-	// analysis already had. Every one of the nineteen fields is a fact this run
-	// measured: the signature gives inputs and outputs, the effect analysis
-	// gives effects and determinism, ReturnsError gives failure semantics,
-	// LoopDepth gives the complexity bound.
+	// analysis already had. Deriving it is right; doing it in place was not.
+	// Enrichment edited the verified worktree, revalidated, and stopped —
+	// leaving the tree different from every recorded artifact and from the
+	// checkpoint digest the run then reported as its verified revision. The
+	// ladder read the stored bytes, found the version before enrichment, and
+	// failed a run whose program was correct on disk.
 	//
-	// Reverted whole if it breaks anything. A registry row is worth having and
-	// is not worth a working program.
+	// So the whole sequence commits or it does not happen: enrich, build, test,
+	// re-record the artifacts, re-capture the checkpoint. Any step failing puts
+	// the previous revision back.
 	if checkpoint.taken && !restoredFromCheckpoint {
-		if produced, readErr := readProducedFunctions(scope.worktree); readErr == nil {
-			if documented, deriveErr := deriveAtomDocumentation(
-				scope.worktree, produced,
-			); documented > 0 {
-				held, _ := revalidateAfterWrite(ctx, scope.worktree)
-				if deriveErr != nil || !held {
-					checkpoint.restore(scope.worktree)
-					tracef("enrich", "documenting %d atom(s) broke the work; "+
-						"reverted to %s", documented, checkpoint.digest)
-				} else {
-					assembled = execution.assemble(ctx, scope.worktree)
-					tracef("enrich", "documented %d atom(s) from measured "+
-						"facts; tests still pass", documented)
-				}
-			}
+		if enriched := execution.enrichVerifiedWork(
+			ctx, scope, checkpoint,
+		); enriched > 0 {
+			assembled = execution.assemble(ctx, scope.worktree)
 		}
 	}
 

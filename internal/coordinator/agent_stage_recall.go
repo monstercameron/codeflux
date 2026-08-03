@@ -159,17 +159,49 @@ func (execution *AgentExecution) recallKnownAtoms(
 	// has a populated registry — not merely stored source text — to search.
 	// This never blocks: a registration failure is recorded in its own
 	// stage's evidence and does not change recall's own outcome below.
-	atomRecords, moleculeRecords := execution.registerAndRecordProducedDeclarations(
-		ctx, scope, worktree, wanted, registry)
+	// Registration requires that the atom pipeline actually verified these
+	// atoms, not merely that a run happened.
+	//
+	// Ladder rung 5 registered three atoms while atom-case synthesis had
+	// failed, atom-example-tests and atom-verification were blocked behind it,
+	// and the task itself ended failed. A registry row says "a later task may
+	// reuse this instead of building it", and saying that about code whose own
+	// verification never ran poisons every project that reads it — the whole
+	// value of the registry is that its contents were checked.
+	//
+	// The rows are not lost. They are simply not written yet: a later run over
+	// the same project, whose atom phase does hold, will register the same
+	// declarations from the same contracts.
+	// Withheld when verification was performed and did not hold, rather than
+	// whenever it is not known to have held. The distinction matters: a flow
+	// that never reached the stage has established nothing either way, and
+	// refusing on that would stop registration in every context except a full
+	// run — including the fixtures that prove registration works at all.
+	var atomRecords, moleculeRecords []registrationRecord
+	if verificationChecked && !verificationHeld {
+		registration = registrationOutcomes{
+			atom: skipped("this run's atom verification did not hold, so its " +
+				"atoms are not admitted: a registry row asserts that a later " +
+				"task may reuse this instead of building it"),
+			molecule: skipped("this run's atom verification did not hold, so " +
+				"its molecules are not admitted"),
+		}
+		tracef("memory", "registration withheld — atom verification did not hold")
+	} else {
+		atomRecords, moleculeRecords = execution.registerAndRecordProducedDeclarations(
+			ctx, scope, worktree, wanted, registry)
+	}
 	// Handed back so the run's own ledger records these stages, rather than
 	// leaving the ledger to declare them not-implemented while registration
 	// writes a second row saying it ran. Rung 3 showed exactly that
 	// disagreement: atom-registration and molecule-registration both read
 	// "no part of this build performs this stage" in the same run in which
 	// registerAndRecordProducedDeclarations had just been called.
-	registration = registrationOutcomes{
-		atom:     registrationStageOutcome("atom", atomRecords),
-		molecule: registrationStageOutcome("molecule", moleculeRecords),
+	if !verificationChecked || verificationHeld {
+		registration = registrationOutcomes{
+			atom:     registrationStageOutcome("atom", atomRecords),
+			molecule: registrationStageOutcome("molecule", moleculeRecords),
+		}
 	}
 
 	reused := reusedFunctionNames(decisions)
