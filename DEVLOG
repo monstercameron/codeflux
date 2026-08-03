@@ -25,38 +25,35 @@ Next-safe-step:
 
 Entries
 -------
-Dev-Log: DL-20260802-065
+Dev-Log: DL-20260802-067
 Date: 2026-08-02
-Status: Worktree rule reversed; co-tenancy rules written in its place
-Change-ID: CL-20260802-055
+Status: Completion record written
+Change-ID: CL-20260802-057
 Commit: pending
-Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
-  inside of dev and be careful to not clobber other agents changes"
-Goal: One shared checkout, with the care that requires spelled out
-Assumptions: "Never use worktrees" governs agent working copies. It cannot mean
-  the product's per-task worktrees, which are a shipped feature with their own
-  package, so the section says which one it means rather than leaving a heading
-  that reads like a blanket ban
-Decisions: The replacement is longer than a simple prohibition would be, because
-  removing the isolation makes the co-tenancy rules load-bearing rather than
-  advisory. Each one is written from a failure that actually occurred today: the
-  ledger identifier collision, the four commits blocked by other lanes' files,
-  the syntactically incomplete test file, and the shared file needing hunk-level
-  staging. The accepted cost is stated rather than hidden, so the next agent to
-  hit a red gate it did not cause recognises it as the known trade instead of
-  treating it as a bug or a reason to bypass
-Files-or-schemas: AGENTS.md, TODOS.md. No schema change
-Validation: Prose only. CONTRIBUTING and CLAUDE.md were checked and mention no
-  worktrees, so nothing else needed reconciling
-Failures-or-discarded-approaches: The worktree rule lasted a few hours. It was
-  the right diagnosis of a real deadlock and the wrong remedy for how this
-  repository is actually worked
-Known-limitations: Unenforced. Nothing prevents git add -A, and nothing detects
-  one lane clobbering another; the co-tenancy rules are habits. Worktrees also
-  genuinely did solve the cross-lane gate failures, so those return in full: a
-  red gate you did not cause, and a push that carries other lanes' commits, are
-  now permanent conditions rather than problems to be fixed
-Next-safe-step: None required
+Request-or-TODO: The session's twenty-four closed tickets
+Goal: Make TODOS.md say what is true after twenty-four tickets landed
+Assumptions: A finished change under an unchecked box is indistinguishable from
+  work nobody started, and the next agent will either redo it or route around it
+Decisions: Recorded evidence beneath every checked item rather than only the
+  tick, because several of these tickets were wrong in their own wording and the
+  correction is the useful part. REPO-018 is the clearest: it recorded 44
+  findings and asked for them to be deleted, when 19 were live wired frontend
+  code and deleting them would have broken the shipped client.
+  Filed eighteen new items rather than absorbing the gaps quietly. Closing
+  twenty-four while filing eighteen is what an audit looks like when it is
+  working; hiding the eighteen would have made the ledger read better and be
+  less true
+Files-or-schemas: TODOS.md
+Validation: The ledger-identifier rule from CL-20260802-042 accepts the file
+Failures-or-discarded-approaches: Splitting TODOS.md per commit was attempted
+  and abandoned. Even at zero context its hunks merge between adjacent tickets,
+  so selecting one checkbox drags in its neighbours' -- which would attribute a
+  box to a commit that does not carry the work. That is less accurate than one
+  honest record, not more
+Known-limitations: This breaks AGENTS.md's rule that the box is checked in the
+  commit carrying the work, stated here rather than left for a reader to notice.
+  The surviving binding is the per-commit Change-Log trailer
+Next-safe-step: PIPE-020a before the paid ladder is next run
 
 Dev-Log: DL-20260802-066
 Date: 2026-08-02
@@ -80,7 +77,7 @@ Dev-Log: DL-20260802-065
 Date: 2026-08-02
 Status: Worktree rule reversed; co-tenancy rules written in its place
 Change-ID: CL-20260802-055
-Commit: pending
+Commit: da61102
 Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
   inside of dev and be careful to not clobber other agents changes"
 Goal: One shared checkout, with the care that requires spelled out

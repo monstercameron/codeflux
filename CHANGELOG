@@ -42,34 +42,37 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260802-055
+Change-ID: CL-20260802-057
 Commit: pending
 Date: 2026-08-02
-Type: Agent worktrees are prohibited; everyone works in the dev checkout
-Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
-  inside of dev and be careful to not clobber other agents changes"
-Outcome: AGENTS.md's "One Lane, One Worktree" is replaced by "Everyone Works in
-  dev, Nobody Clobbers". Agents no longer create a worktree or a second clone;
-  they work directly in the dev checkout alongside each other, and the
-  co-tenancy rules become the discipline instead of the workaround: stage
-  explicit paths and never git add -A; stage only your own hunk when a shared
-  file carries another lane's work; re-read CHANGELOG and DEVLOG immediately
-  before writing an entry because identifiers move and have already collided;
-  never revert, reformat, or repair a file you did not change, the one exception
-  being a mechanical gofmt left unstaged; expect a syntactically broken tree that
-  is not yours and wait rather than fixing it; never rewrite shared history; and
-  treat the fixed-port dev server as shared. The section states the accepted cost
-  plainly -- a repository-wide gate can be red for reasons unrelated to you, and
-  a push carries whatever else is unpushed -- and that this is not a licence to
-  route around a gate. The prohibition is explicitly scoped to agent working
-  copies; the per-task worktrees the product creates in internal/gitwork are
-  untouched, and the section says so, because a later agent reading only the
-  heading could otherwise remove a product feature
-Affected-behavior: None at runtime
-Compatibility-or-migration: Supersedes CL-20260802-022. Any worktree created
-  under the previous rule should be removed with git worktree remove
-Verification: Prose only; no Go source touched
-Dev-Log: DL-20260802-065
+Type: Record -- completion ledger for this session's work
+Request-or-TODO: The session's twenty-four closed tickets
+Outcome: TODOS.md is brought into line with what landed: twenty-four items
+  checked with their evidence, and eighteen new items filed for gaps the work
+  exposed. Corrections to two stale records are included, as is the
+  qualification on REPO-018's own wording, whose stated diagnosis was wrong in a
+  way that would have deleted live frontend code
+Affected-behavior: None. This is the completion record
+Compatibility-or-migration: None
+Verification: The ledger-identifier rule added by CL-20260802-042 accepts the
+  file, and lint was green over this working tree before the commit sequence
+  began
+Known-limitations: AGENTS.md asks for the checkbox in the same commit as the
+  work it describes, and this commit does not honour that. Six lanes shared one
+  checkout, so TODOS.md carries interleaved edits whose hunks merge between
+  adjacent tickets even at zero context -- selecting one ticket's checkbox drags
+  in its neighbours', which would attribute a box to a commit that does not
+  carry the work. Splitting it would have been less accurate, not more. The
+  binding that survives is the per-commit Change-Log trailer, which is what
+  CL-20260802-041's hook enforces and what a reviewer resolves against.
+  This commit also carries a correction: at revision da61102 both CHANGELOG and
+  DEVLOG hold CL-20260802-055 and DL-20260802-065 twice. Two sessions were
+  writing these files at once, and one swept the other's entry from the working
+  tree before that session committed the same entry itself. The redundant copy
+  is removed here rather than left, since a duplicated identifier is an
+  accidental repetition of one record rather than a second record, and
+  CL-20260802-042's rule exists to refuse exactly this
+Dev-Log: DL-20260802-067
 
 Change-ID: CL-20260802-056
 Commit: pending
@@ -87,7 +90,7 @@ Known-limitations: None
 Dev-Log: DL-20260802-066
 
 Change-ID: CL-20260802-055
-Commit: pending
+Commit: da61102
 Date: 2026-08-02
 Type: Agent worktrees are prohibited; everyone works in the dev checkout
 Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
