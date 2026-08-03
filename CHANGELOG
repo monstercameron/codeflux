@@ -42,6 +42,50 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-056
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- regenerated constant
+Request-or-TODO: MEM-001 through MEM-005
+Outcome: The generated schema-version constant follows migration 000035 from 34
+  to 35. It belongs with the migration commit and was missed there
+Affected-behavior: buildinfo reports the schema version the migrations actually
+  reach. Left stale it would have understated the schema by one
+Compatibility-or-migration: Generated source, regenerated
+Verification: codeflux-dev migration-check accepts the catalog, and the
+  constant now matches migrations.LatestVersion
+Known-limitations: None
+Dev-Log: DL-20260802-066
+
+Change-ID: CL-20260802-055
+Commit: pending
+Date: 2026-08-02
+Type: Agent worktrees are prohibited; everyone works in the dev checkout
+Request-or-TODO: User: "lets never use worktrees, just tell the agents to build
+  inside of dev and be careful to not clobber other agents changes"
+Outcome: AGENTS.md's "One Lane, One Worktree" is replaced by "Everyone Works in
+  dev, Nobody Clobbers". Agents no longer create a worktree or a second clone;
+  they work directly in the dev checkout alongside each other, and the
+  co-tenancy rules become the discipline instead of the workaround: stage
+  explicit paths and never git add -A; stage only your own hunk when a shared
+  file carries another lane's work; re-read CHANGELOG and DEVLOG immediately
+  before writing an entry because identifiers move and have already collided;
+  never revert, reformat, or repair a file you did not change, the one exception
+  being a mechanical gofmt left unstaged; expect a syntactically broken tree that
+  is not yours and wait rather than fixing it; never rewrite shared history; and
+  treat the fixed-port dev server as shared. The section states the accepted cost
+  plainly -- a repository-wide gate can be red for reasons unrelated to you, and
+  a push carries whatever else is unpushed -- and that this is not a licence to
+  route around a gate. The prohibition is explicitly scoped to agent working
+  copies; the per-task worktrees the product creates in internal/gitwork are
+  untouched, and the section says so, because a later agent reading only the
+  heading could otherwise remove a product feature
+Affected-behavior: None at runtime
+Compatibility-or-migration: Supersedes CL-20260802-022. Any worktree created
+  under the previous rule should be removed with git worktree remove
+Verification: Prose only; no Go source touched
+Dev-Log: DL-20260802-065
+
 Change-ID: CL-20260802-054
 Commit: b9e286d
 Date: 2026-08-02
