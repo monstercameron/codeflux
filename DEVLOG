@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-131
+Date: 2026-08-03
+Status: A produced atom reaches atom_documentation_revisions end to end
+Change-ID: CL-20260803-121
+Commit: pending
+Request-or-TODO: Analysis item 5
+Goal: Make the compounding-effort thesis testable rather than asserted
+Decisions: Fixed the insertion point rather than loosening the parser. The
+  parser was right: prose after the last field is not part of the schema.
+  Emitted "None:" with a reason for the empty cases rather than an empty list.
+  The schema accepts an explained absence for either kind, and a later run
+  reading "None: it reaches nothing outside its arguments" knows something a
+  blank line does not tell it.
+  Carried the refusal reasons in evidence and in the trace. Two defects were
+  found in one run because the record finally said why; without that each would
+  have cost a guess and a re-run
+Files-or-schemas: atom_documentation_derive.go and a new test,
+  agent_stage_recall.go
+Validation: Build, vet, gofmt, the derive/registration/refinement suites
+Failures-or-discarded-approaches: Inserting at StartLine, which is correct for
+  change attribution and wrong for this
+Known-limitations: Proven at the unit level. No full ladder run has yet been
+  observed writing a registry row, and no second task has yet retrieved one --
+  which is analysis item 6, the code-reuse canary, and is the thing that would
+  actually prove reuse rather than accumulation
+Next-safe-step: Watch rung 5, then build the two-task reuse canary
+
 Dev-Log: DL-20260803-130
 Date: 2026-08-03
 Status: Blockers 1, 2 and 4 closed; 5 (registration) is next

@@ -62,7 +62,7 @@ func deriveAtomDocumentation(
 		})
 		lines := strings.Split(string(original), "\n")
 		for _, function := range inFile {
-			at := function.StartLine - 1
+			at := declarationLine(lines, function)
 			if at < 0 || at > len(lines) {
 				continue
 			}
@@ -98,28 +98,47 @@ func atomSchemaComment(function producedFunction) string {
 	var comment strings.Builder
 	comment.WriteString("//codeflux:atom\n")
 	comment.WriteString("// Codeflux atom documentation (schema v1):\n")
-	for _, field := range [][2]string{
-		{"Purpose", derivedPurpose(function)},
-		{"Use when", derivedUseWhen(function)},
-		{"Do not use when", derivedDoNotUseWhen(function)},
-		{"Semantics", derivedSemantics(function)},
-		{"Inputs", derivedInputs(function)},
-		{"Outputs", derivedOutputs(function)},
-		{"Preconditions", derivedPreconditions(function)},
-		{"Postconditions", derivedPostconditions(function)},
-		{"Effects", derivedEffects(function)},
-		{"Failure semantics", derivedFailure(function)},
-		{"Determinism", derivedDeterminism(function)},
-		{"Idempotency and retry", derivedIdempotency(function)},
-		{"Reconciliation and compensation", derivedCompensation(function)},
-		{"Security and privacy", derivedSecurity(function)},
-		{"Dependencies and bindings", derivedDependencies(function)},
-		{"Complexity and limits", derivedComplexity(function)},
-		{"Examples", derivedExamples(function)},
-		{"Verification", derivedVerification(function)},
-		{"Retrieval concepts", derivedRetrievalConcepts(function)},
+	// Seven of the nineteen fields are lists, and a list is read from lines
+	// beginning with a dash. Written as prose they parse as empty, and the
+	// document is refused for a field that visibly has words in it: "field
+	// \"Inputs\" is empty" against a line reading "int, []int". Every derived
+	// comment was written correctly and none of them registered.
+	//
+	// An explained "None:" is accepted for either kind, which is why the
+	// no-input and no-effect cases below do not need bullets.
+	for _, field := range []struct {
+		label string
+		prose string
+		items []string
+	}{
+		{label: "Purpose", prose: derivedPurpose(function)},
+		{label: "Use when", prose: derivedUseWhen(function)},
+		{label: "Do not use when", prose: derivedDoNotUseWhen(function)},
+		{label: "Semantics", prose: derivedSemantics(function)},
+		{label: "Inputs", items: derivedInputItems(function)},
+		{label: "Outputs", items: derivedOutputItems(function)},
+		{label: "Preconditions", items: derivedPreconditionItems(function)},
+		{label: "Postconditions", items: derivedPostconditionItems(function)},
+		{label: "Effects", items: derivedEffectItems(function)},
+		{label: "Failure semantics", items: derivedFailureItems(function)},
+		{label: "Determinism", prose: derivedDeterminism(function)},
+		{label: "Idempotency and retry", prose: derivedIdempotency(function)},
+		{label: "Reconciliation and compensation", prose: derivedCompensation(function)},
+		{label: "Security and privacy", prose: derivedSecurity(function)},
+		{label: "Dependencies and bindings", prose: derivedDependencies(function)},
+		{label: "Complexity and limits", prose: derivedComplexity(function)},
+		{label: "Examples", items: derivedExampleItems(function)},
+		{label: "Verification", prose: derivedVerification(function)},
+		{label: "Retrieval concepts", prose: derivedRetrievalConcepts(function)},
 	} {
-		fmt.Fprintf(&comment, "//   %s:\n//     %s\n", field[0], field[1])
+		fmt.Fprintf(&comment, "//   %s:\n", field.label)
+		if field.prose != "" {
+			fmt.Fprintf(&comment, "//     %s\n", field.prose)
+			continue
+		}
+		for _, item := range field.items {
+			fmt.Fprintf(&comment, "//     - %s\n", item)
+		}
 	}
 	return strings.TrimRight(comment.String(), "\n")
 }
@@ -153,50 +172,6 @@ func derivedSemantics(function producedFunction) string {
 	return fmt.Sprintf(
 		"%d decision point(s), so the answer depends on which case the input "+
 			"falls into.", function.Branches)
-}
-
-func derivedInputs(function producedFunction) string {
-	return phraseList(function.Parameters, "None: it takes no arguments.")
-}
-
-func derivedOutputs(function producedFunction) string {
-	return phraseList(function.Results, "None: it returns nothing, so its "+
-		"whole contribution is its effects.")
-}
-
-func derivedPreconditions(function producedFunction) string {
-	if len(function.Parameters) == 0 {
-		return "None: there is nothing to constrain."
-	}
-	return "the arguments are of the declared types; nothing further is " +
-		"enforced by the signature, and what the body requires beyond that is " +
-		"recorded in failure semantics."
-}
-
-func derivedPostconditions(function producedFunction) string {
-	if function.ReturnsError {
-		return "on success the results are meaningful; on failure the error " +
-			"is non-nil and the other results must not be relied on."
-	}
-	if len(function.Results) == 0 {
-		return "the effects below have happened."
-	}
-	return "the results are meaningful for every input the preconditions admit."
-}
-
-func derivedEffects(function producedFunction) string {
-	if len(function.Effects) == 0 {
-		return "None: it reaches nothing outside its arguments."
-	}
-	return strings.Join(function.Effects, ", ") + "."
-}
-
-func derivedFailure(function producedFunction) string {
-	if function.ReturnsError {
-		return "failure is returned as an error the caller must handle."
-	}
-	return "None: it returns no error, so it cannot report a failure to its " +
-		"caller and must not be given input it cannot handle."
 }
 
 func derivedDeterminism(function producedFunction) string {
@@ -255,11 +230,6 @@ func derivedComplexity(function producedFunction) string {
 	}
 }
 
-func derivedExamples(function producedFunction) string {
-	return "see the tests that name " + function.Name + "; they are the " +
-		"worked examples, and they are executed rather than described."
-}
-
 func derivedVerification(function producedFunction) string {
 	return "verified by this project's own suite: it compiles, its tests pass, " +
 		"and the acceptance examples for the task that produced it match."
@@ -301,4 +271,113 @@ func phraseList(items []string, empty string) string {
 		return empty
 	}
 	return strings.Join(items, ", ")
+}
+
+// declarationLine finds the line the func keyword is on.
+//
+// StartLine points at the doc comment when a declaration has one, which is
+// right for attributing a change and wrong for inserting a schema block: put
+// the block there and it lands above the ordinary comment, so the prose that
+// follows it reads as a continuation of the last field and the whole schema is
+// refused. Every derived comment was written and none of them registered.
+//
+// The block goes directly above the declaration, after the ordinary doc
+// comment, which is where the schema's own instruction has always said to put
+// it.
+func declarationLine(lines []string, function producedFunction) int {
+	at := function.StartLine - 1
+	if at < 0 {
+		return -1
+	}
+	for scan := at; scan < len(lines) && scan < function.EndLine; scan++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[scan]), "func ") {
+			return scan
+		}
+	}
+	return at
+}
+
+// The seven list fields. Each returns items, and an explained "None:" as the
+// single item where the answer is that there are none -- which the schema
+// accepts for a list exactly as it does for prose.
+
+func derivedInputItems(function producedFunction) []string {
+	if len(function.Parameters) == 0 {
+		return []string{"None: it takes no arguments."}
+	}
+	items := make([]string, 0, len(function.Parameters))
+	for index, parameter := range function.Parameters {
+		items = append(items, fmt.Sprintf(
+			"argument %d, of type %s", index+1, parameter))
+	}
+	return items
+}
+
+func derivedOutputItems(function producedFunction) []string {
+	if len(function.Results) == 0 {
+		return []string{
+			"None: it returns nothing, so its whole contribution is its effects."}
+	}
+	items := make([]string, 0, len(function.Results))
+	for index, result := range function.Results {
+		items = append(items, fmt.Sprintf(
+			"result %d, of type %s", index+1, result))
+	}
+	return items
+}
+
+func derivedPreconditionItems(function producedFunction) []string {
+	if len(function.Parameters) == 0 {
+		return []string{"None: there is nothing to constrain."}
+	}
+	return []string{
+		"the arguments are of the declared types",
+		"nothing further is enforced by the signature; what the body requires " +
+			"beyond that is recorded under failure semantics",
+	}
+}
+
+func derivedPostconditionItems(function producedFunction) []string {
+	if function.ReturnsError {
+		return []string{
+			"on success the results are meaningful",
+			"on failure the error is non-nil and the other results must not be " +
+				"relied on",
+		}
+	}
+	if len(function.Results) == 0 {
+		return []string{"the effects listed above have happened"}
+	}
+	return []string{
+		"the results are meaningful for every input the preconditions admit"}
+}
+
+func derivedEffectItems(function producedFunction) []string {
+	if len(function.Effects) == 0 {
+		return []string{"None: it reaches nothing outside its arguments."}
+	}
+	items := make([]string, 0, len(function.Effects))
+	for _, effect := range function.Effects {
+		items = append(items, "reaches "+effect)
+	}
+	return items
+}
+
+func derivedFailureItems(function producedFunction) []string {
+	if function.ReturnsError {
+		return []string{
+			"failure is returned as an error the caller must handle",
+			"the other results must not be read when the error is non-nil",
+		}
+	}
+	return []string{
+		"None: it returns no error, so it cannot report a failure to its " +
+			"caller and must not be given input it cannot handle."}
+}
+
+func derivedExampleItems(function producedFunction) []string {
+	return []string{
+		"the tests that name " + function.Name + " are the worked examples, " +
+			"and they are executed rather than described",
+	}
 }

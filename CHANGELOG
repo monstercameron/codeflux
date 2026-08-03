@@ -50,6 +50,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-121
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the atom registry fills for the first time
+Request-or-TODO: Process-refinement analysis item 5
+Outcome: Every run of this session recorded "0 of N produced atom(s) carried
+  schema-v1 //codeflux:atom documentation". Deriving the documentation from
+  measured facts was the right half of the answer and it still registered
+  nothing, for two reasons neither of which was visible.
+  The schema block was inserted above StartLine, which points at the doc
+  comment rather than at the declaration, so it landed before the ordinary
+  comment and the prose that followed read as a continuation of the last field.
+  It now goes directly above the func keyword, which is where the schema's own
+  instruction has always said to put it.
+  Seven of the nineteen fields are lists, read from lines beginning with a
+  dash, and they were written as prose. The document was refused with 'field
+  "Inputs" is empty' against a line reading "int, []int" -- a field that
+  visibly has words in it. Those seven now emit items.
+  Neither reason was reachable from any record. Registration counted refusals
+  and discarded why, so "0 of 2 produced atoms" was the whole account. The
+  reasons are now carried in the stage's evidence, traced per atom, and named
+  in the stage detail, which is what made both defects findable in one run
+  instead of one per guess.
+Verification: Build, vet, gofmt, and a new test that drives an undocumented
+  atom through derivation into the registry and reads the revision back out of
+  storage
+Dev-Log: DL-20260803-131
+
 Change-ID: CL-20260803-120
 Commit: pending
 Date: 2026-08-03

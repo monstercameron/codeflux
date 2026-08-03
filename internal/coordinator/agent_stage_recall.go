@@ -220,8 +220,22 @@ func registrationStageOutcome(kind string, records []registrationRecord) stageOu
 			registered++
 		}
 	}
+	// The reasons are carried, not just the count. A registry that never fills
+	// is the defect this whole path exists to prevent, and "0 of 2" says it
+	// happened without saying why -- which is how it went unnoticed for a
+	// session.
+	reasons := map[string]string{}
+	for _, record := range records {
+		if !record.Registered && record.SkipReason != "" {
+			reasons[record.Name] = record.SkipReason
+		}
+	}
 	evidence := map[string]any{
 		"produced": len(records), "registered": registered,
+		"refused": reasons,
+	}
+	for name, why := range reasons {
+		tracef("memory", "  %s not registered — %s", name, traceOneLine(why, 110))
 	}
 	switch {
 	case len(records) == 0:
@@ -233,9 +247,9 @@ func registrationStageOutcome(kind string, records []registrationRecord) stageOu
 			registered, len(records), kind), evidence)
 	default:
 		return broke(fmt.Sprintf(
-			"0 of %d produced %s(s) carried schema-v1 //codeflux:atom "+
-				"documentation, so nothing was registered and no later task "+
-				"can find this work", len(records), kind), evidence)
+			"0 of %d produced %s(s) reached the registry, so no later task can "+
+				"find this work: %s", len(records), kind,
+			refusalSummary(reasons)), evidence)
 	}
 }
 
@@ -575,4 +589,21 @@ func countRegistered(records []registrationRecord) int {
 		}
 	}
 	return count
+}
+
+// refusalSummary renders why nothing was registered, shortest first.
+func refusalSummary(reasons map[string]string) string {
+	if len(reasons) == 0 {
+		return "no reason was recorded, which is itself a defect"
+	}
+	names := make([]string, 0, len(reasons))
+	for name := range reasons {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		parts = append(parts, name+": "+reasons[name])
+	}
+	return strings.Join(parts, "; ")
 }
