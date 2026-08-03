@@ -66,6 +66,31 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-041
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- commit-msg hook
+Request-or-TODO: REPO-020
+Outcome: .githooks/commit-msg requires both ledger trailers and resolves each
+  identifier against the staged CHANGELOG and DEVLOG, so an entry added in the
+  same commit counts and a dangling reference does not. It is a hook rather than
+  a lint check because lint runs from pre-commit, before a commit message
+  exists; reading .git/COMMIT_EDITMSG was rejected because it persists after
+  every commit, so a standalone or CI lint would validate a stale message or
+  none at all
+Affected-behavior: A commit missing either trailer, carrying a malformed one, or
+  naming an identifier with no ledger entry is now refused. codeflux-dev lint is
+  unaffected and structurally cannot fail on this rule
+Compatibility-or-migration: Requires core.hooksPath set to .githooks, as the
+  existing hooks already do
+Verification: Five tests drive the real hook through actual git commit calls in
+  a temporary repository. One reproduces CL-20260802-018 -- swept into checkpoint
+  92f1eed with no trailer, git log --grep returning nothing -- proving the hook
+  would have refused the one commit whose ledger binding this repository lost
+Known-limitations: It cannot repair CL-20260802-018; adding a trailer means
+  rewriting a released commit. Recorded as REPO-020a
+Dev-Log: DL-20260802-051
+
 Change-ID: CL-20260802-040
 Commit: pending
 Date: 2026-08-02

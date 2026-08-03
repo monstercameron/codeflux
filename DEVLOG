@@ -51,6 +51,39 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-051
+Date: 2026-08-02
+Status: Hook in place and exercised through real commits
+Change-ID: CL-20260802-041
+Commit: pending
+Request-or-TODO: REPO-020
+Goal: Enforce that a commit carries both ledger trailers and that the entries
+  they name exist, since the most-violated rules here are the unenforced ones
+Assumptions: A trailer that resolves to nothing is as bad as an absent one,
+  because the CHANGELOG's stated recovery path is git log --grep
+Decisions: Put the check in .githooks/commit-msg rather than in lint, against
+  the ticket's own wording. lint runs from pre-commit, which fires before a
+  commit message exists. Reading .git/COMMIT_EDITMSG was considered and
+  rejected: it persists after every commit ever made, so a standalone or CI lint
+  would validate a stale message, or on a fresh clone find none -- and CI is the
+  case the ticket names. commit-msg fires once per attempt and is handed the
+  proposed message.
+  The hook resolves identifiers against the staged ledgers via git show
+  :CHANGELOG, so an entry added in the same commit counts. It does not re-invoke
+  lint, which would double the cost of every commit including two Staticcheck
+  passes
+Files-or-schemas: .githooks/commit-msg, cmd/codeflux-dev/commit_msg_hook_test.go
+Validation: Five tests drive the real hook file through actual git commit calls
+  in a temporary repository: missing trailers, malformed trailer, well-formed
+  trailer with no ledger entry, and the valid case. The fifth reproduces
+  CL-20260802-018, whose commit carries no trailer because it was swept into
+  checkpoint 92f1eed, and shows the hook would have refused it
+Failures-or-discarded-approaches: The .git/COMMIT_EDITMSG route, above
+Known-limitations: It prevents recurrence and cannot repair CL-20260802-018;
+  adding a trailer there means rewriting a released commit. Filed as REPO-020a.
+  The hook only runs where core.hooksPath is set
+Next-safe-step: Decide REPO-020a
+
 Dev-Log: DL-20260802-050
 Date: 2026-08-02
 Status: Six bindings corrected; resolution now tested

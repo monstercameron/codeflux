@@ -1,0 +1,84 @@
+#!/bin/sh
+# REPO-020: refuse a commit whose message does not carry both ledger
+# trailers, or that names an identifier no CHANGELOG/DEVLOG entry declares.
+#
+# This lives here rather than as a `codeflux-dev lint` sub-check because of
+# where it sits in git's own hook lifecycle. `lint` runs from pre-commit,
+# which fires BEFORE a commit message exists to inspect -- `git commit -m`
+# has not been given one yet, and an interactive `git commit` has not opened
+# the editor yet either. commit-msg is the hook git designed for exactly
+# this: it fires once per commit attempt, after the message is written, and
+# receives the proposed message's file as its one argument. There is no
+# reliable way to recover that signal from a generic `lint` run instead.
+# Reading .git/COMMIT_EDITMSG from lint was considered and rejected: the
+# file persists after every commit ever made, so a plain `codeflux-dev lint`
+# run standalone or in CI would either read a stale message left over from
+# the last commit (a false failure or a false pass unrelated to anything in
+# flight) or find nothing on a fresh clone (silently never enforcing the
+# rule where it matters most). Neither gives a trustworthy answer to "is a
+# commit being made right now"; commit-msg's argument always does. Because
+# the check lives here and not in `lint`, a plain `codeflux-dev lint` --
+# standalone, in CI, or from the pre-commit hook -- never touches it and
+# therefore cannot fail on it.
+#
+# This intentionally does not re-run `codeflux-dev lint`: pre-commit already
+# ran the full lint pass (protobuf lint and breaking checks, go vet, and
+# staticcheck across two build targets) moments before commit-msg fires for
+# the same staged tree, and running all of that again here would roughly
+# double the cost of every commit for no new information -- exactly the kind
+# of hook slowness AGENTS.md already names as what teaches people to reach
+# for --no-verify. The trailer and ledger-existence check below is a handful
+# of greps against the message and the two ledger files, so it stays fast.
+#
+# Bypass with --no-verify only when the user has explicitly asked for it.
+
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+
+msgfile="$1"
+
+# Strip comment lines the way git itself does before interpreting a message;
+# `git commit -m` never adds them, but an editor-composed message can.
+body=$(grep -v '^#' "$msgfile" || true)
+
+change_log_value=$(printf '%s\n' "$body" | grep -E '^Change-Log:[ 	]*' | sed -E 's/^Change-Log:[ 	]*//' | tail -n1)
+dev_log_value=$(printf '%s\n' "$body" | grep -E '^Dev-Log:[ 	]*' | sed -E 's/^Dev-Log:[ 	]*//' | tail -n1)
+
+if [ -z "$change_log_value" ]; then
+  echo "commit-msg: commit message is missing a 'Change-Log: CL-YYYYMMDD-NNN' trailer" >&2
+  echo "commit-msg: see AGENTS.md, 'Change Ledger, Development Ledger, and Commit Discipline'" >&2
+  exit 1
+fi
+if [ -z "$dev_log_value" ]; then
+  echo "commit-msg: commit message is missing a 'Dev-Log: DL-YYYYMMDD-NNN' trailer" >&2
+  echo "commit-msg: see AGENTS.md, 'Change Ledger, Development Ledger, and Commit Discipline'" >&2
+  exit 1
+fi
+
+if ! printf '%s' "$change_log_value" | grep -Eq '^CL-[0-9]{8}-[0-9]{3}$'; then
+  echo "commit-msg: Change-Log trailer '$change_log_value' does not match CL-YYYYMMDD-NNN" >&2
+  exit 1
+fi
+if ! printf '%s' "$dev_log_value" | grep -Eq '^DL-[0-9]{8}-[0-9]{3}$'; then
+  echo "commit-msg: Dev-Log trailer '$dev_log_value' does not match DL-YYYYMMDD-NNN" >&2
+  exit 1
+fi
+
+# The entry must exist in the STAGED ledger content, because AGENTS.md
+# requires the entry to be added in the same commit as the change it
+# describes -- checking the working tree would pass a commit whose ledger
+# edit was never staged, and checking HEAD would refuse the very commit that
+# introduces the entry.
+if ! git show :CHANGELOG 2>/dev/null | grep -Eq "^Change-ID: ${change_log_value}\$"; then
+  echo "commit-msg: no CHANGELOG entry declares Change-ID: $change_log_value" >&2
+  echo "commit-msg: add the entry and stage CHANGELOG in this commit" >&2
+  exit 1
+fi
+if ! git show :DEVLOG 2>/dev/null | grep -Eq "^Dev-Log: ${dev_log_value}\$"; then
+  echo "commit-msg: no DEVLOG entry declares Dev-Log: $dev_log_value" >&2
+  echo "commit-msg: add the entry and stage DEVLOG in this commit" >&2
+  exit 1
+fi
+
+echo "commit-msg: ok ($change_log_value / $dev_log_value)"
