@@ -51,6 +51,41 @@ Known-limitations: The comment in this hook about the integration build tag is
   rather than here, since that is the change that made it false
 Next-safe-step: Continue the commit sequence
 
+Dev-Log: DL-20260802-052
+Date: 2026-08-02
+Status: Rule registered; lint green
+Change-ID: CL-20260802-042
+Commit: pending
+Request-or-TODO: REPO-021
+Goal: Make a ledger identifier collision a caught error rather than something a
+  reader discovers later
+Assumptions: Sequential numbering across concurrent lanes will keep colliding,
+  so the rule matters more than the numbering scheme
+Decisions: The ticket said the identifiers collided once. Measuring found six --
+  CL-20260802-028, and DL-20260802-004, -012, -014, -015, -038. All are released,
+  and AGENTS.md forbids rewriting or renumbering a released entry, so a rule
+  that simply refuses duplicates would have turned lint red on the repository's
+  own history and re-blocked every commit.
+  Made it a ratchet with a content-addressed allowlist: the SHA-256 of each
+  duplicate entry's full text, not the identifier alone. A bare identifier list
+  would let a lane delete one of the six and reuse its number for unrelated
+  content; a count-based tolerance would let a new collision hide behind a
+  removed one
+Files-or-schemas: cmd/codeflux-dev/ledger_identifiers.go and its test,
+  cmd/codeflux-dev/checks.go registration
+Validation: Clean fixture, preamble-template regression, duplicate Change-ID,
+  duplicate Dev-Log, malformed identifiers, a substitute duplicate reusing a
+  legacy identifier with different content, and the real ledgers
+Failures-or-discarded-approaches: The first version scanned the whole file and
+  read the field-name template in each ledger's preamble -- bare Change-ID: and
+  Dev-Log: labels with no values -- as malformed entries, turning lint red.
+  Anchored parsing to the Entries marker. A line-number skip was rejected: the
+  preamble's length is not stable, and it would start passing over a real defect
+  the day the preamble grows
+Known-limitations: The six exemptions are permanent by design. A seventh
+  collision is a failure, not an entry
+Next-safe-step: None; the ticket is closed
+
 Dev-Log: DL-20260802-051
 Date: 2026-08-02
 Status: Hook in place and exercised through real commits

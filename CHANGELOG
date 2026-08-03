@@ -66,6 +66,29 @@ Known-limitations: The hook still tests only the changed packages, so a change
   breaking a dependent package is caught later, at push and in CI
 Dev-Log: DL-20260802-064
 
+Change-ID: CL-20260802-042
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- repository lint rule
+Request-or-TODO: REPO-021
+Outcome: lint refuses a duplicate or malformed CHANGELOG/DEVLOG identifier. Six
+  collisions already exist and are released, so they are exempted by a
+  content-addressed allowlist -- SHA-256 of each duplicate entry's full text --
+  which a later lane cannot exploit by deleting one and reusing its identifier
+  for different content. Parsing is anchored to the Entries marker, because both
+  ledgers open with a field-name template whose bare labels an unanchored scan
+  reads as malformed entries
+Affected-behavior: codeflux-dev lint gains a check. No product behavior changed
+Compatibility-or-migration: None. The six historical collisions are recorded,
+  not corrected; AGENTS.md forbids rewriting a released entry
+Verification: Clean fixture passes, preamble-template regression passes,
+  duplicate Change-ID and Dev-Log both fire, malformed identifiers fire, a
+  substitute duplicate reusing a legacy identifier with different content still
+  fires, and the real ledgers pass
+Known-limitations: The allowlist grows only by deliberate edit, which is the
+  intent; a seventh collision is a failure, not an entry
+Dev-Log: DL-20260802-052
+
 Change-ID: CL-20260802-041
 Commit: pending
 Date: 2026-08-02
