@@ -6153,6 +6153,32 @@ func (engine engineFixture) carryOut(
 	// being worth anything the moment somebody doubts it.
 	t.Logf("the run reported:\n%s", engine.narration())
 	engine.reportFlow(t, created.TaskID)
+	// Two results, reported separately, because they are two questions.
+	//
+	// The checks after this ask whether the produced program builds, runs and
+	// prints what was asked. The task state asks whether the pipeline
+	// converged. Rung 6 answered yes to the first and no to the second and the
+	// suite reported PASS, which reads as "the platform worked" when what was
+	// established is "the program was correct despite the platform not
+	// finishing". A ladder that hides the second question cannot measure
+	// progress on the thing it exists to measure.
+	if task, taskErr := engine.repositories.GetTask(
+		ctx, created.TaskID,
+	); taskErr == nil {
+		t.Logf("task state: %s", task.State)
+		switch task.State {
+		case domain.TaskStateAwaitingReview, domain.TaskStateCompleted:
+			// Converged.
+		case domain.TaskStatePaused:
+			t.Errorf("the program is correct and the pipeline did not "+
+				"converge: the task ended %s, meaning the completion floor "+
+				"held and a required gate did not. This rung is not passed "+
+				"until both do.", task.State)
+		default:
+			t.Errorf("the task ended %s: the pipeline did not converge",
+				task.State)
+		}
+	}
 	return binding.WorktreePath, created.TaskID
 }
 

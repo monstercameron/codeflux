@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-141
+Date: 2026-08-03
+Status: Rung 6 passes its behaviour check and does not converge; the trace now
+  says why
+Change-ID: CL-20260803-131
+Commit: pending
+Request-or-TODO: The rung 6 trace
+Goal: Make the trace answer the question a watcher has
+Decisions: Reported totals rather than boundaries. Phases are not contiguous
+  here and no amount of boundary-drawing makes them so; what is real is how
+  much each accounted for.
+  Printed the unaccounted remainder explicitly. It is the largest number on a
+  run like this one and the only one that points at the actual cost
+Files-or-schemas: trace.go, agent_execution.go,
+  engine_produces_program_test.go
+Validation: Build, vet, gofmt, coordinator suites
+Failures-or-discarded-approaches: The contiguous-phase model, committed and
+  wrong. It looked right in the code and produced twenty-three phases on the
+  first run that exercised it
+Known-limitations: Rung 6 ends paused — the completion floor holds and a
+  required gate does not — so under the stricter metric it is not a passed
+  rung. Which gate is now visible in the trace and is the next thing to fix
+Next-safe-step: Rung 6 again, read the phase totals and the failing gate
+
 Dev-Log: DL-20260803-140
 Date: 2026-08-03
 Status: The terminal-state invariant is enforced from three directions

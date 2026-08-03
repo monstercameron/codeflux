@@ -1367,6 +1367,7 @@ func (execution *AgentExecution) Run(
 		infrastructureRetries: infrastructure.Consecutive,
 		unresolved:            unfinished,
 	})
+	tracePhaseTotals()
 	traceBlock("final", "how this run ended:", report)
 	execution.say(ctx, scope, events.KindMessageFinal, report)
 	return nil

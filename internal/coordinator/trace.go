@@ -38,6 +38,12 @@ func traceOneLine(text string, limit int) string {
 // The stage's own gate is printed beside its verdict, because "atom-fuzz
 // skipped" says nothing on its own and "atom-fuzz skipped — the gate wanted a
 // decoding boundary and the source has none" is the whole answer.
+//
+// The severity is printed beside every decision, because a reader watching a
+// run go past cannot otherwise tell a failure that will stop the work from one
+// that will be carried as a note, and the two look identical in a log. So is
+// the elapsed time, because "which stage is slow" should not require
+// subtracting timestamps by eye.
 func traceStage(
 	stage pipeline.Number, state pipeline.State, detail string,
 	started time.Time,
@@ -49,15 +55,14 @@ func traceStage(
 	if declared, found := pipeline.StageByNumber(stage); found {
 		name, gate = declared.Name, declared.Gate
 	}
-	tracePhaseBoundary(stage)
-	// The severity is printed beside every decision. A reader watching a run go
-	// past cannot otherwise tell a failure that will stop the work from one
-	// that will be carried as a note, and the two look identical in a log.
-	// Each stage carries how long it took, so a reader can see which one is
-	// slow without subtracting timestamps by eye.
-	elapsed := ""
+	took := time.Duration(0)
 	if !started.IsZero() {
-		elapsed = fmt.Sprintf("%6.2fs", time.Since(started).Seconds())
+		took = time.Since(started)
+	}
+	recordPhaseTime(stage, took)
+	elapsed := ""
+	if took > 0 {
+		elapsed = fmt.Sprintf("%6.2fs", took.Seconds())
 	}
 	tracef("stage", "%2d %-26s %-16s %-8s %8s  %s",
 		int(stage), name, state, severityOf(stage), elapsed,
@@ -67,42 +72,79 @@ func traceStage(
 	}
 }
 
-// Phase and stage timing, so a reader can see where a run spends itself.
+// Phase accounting, so a reader can see where a run spends itself.
 //
-// The stage lines alone say what happened and in what order. What they do not
-// say is how long any of it took, and "which part of this is slow" is the
-// question somebody watching a three-hundred-second run is actually asking.
+// Phases are not contiguous in this flow, and pretending they are produced
+// nonsense: stages are decided in dependency order rather than in numeric
+// order, so a run bounced between "specification" and "delivery" twenty-three
+// times in four minutes and the boundaries said nothing.
+//
+// What a reader wants is not a line every time the label changes. It is how
+// much of the run each phase accounted for, which is a total rather than a
+// sequence. So a phase is announced once, the first time one of its stages is
+// decided, and its total is reported at the end.
 var (
-	timingMutex   sync.Mutex
-	currentPhase  pipeline.Phase
-	phaseStarted  time.Time
-	phaseOrdinals int
+	phaseMutex  sync.Mutex
+	phaseTotals = map[pipeline.Phase]time.Duration{}
+	phaseSeen   = map[pipeline.Phase]bool{}
+	phaseOrder  []pipeline.Phase
 )
 
-// tracePhaseBoundary announces a phase when the first of its stages is decided,
-// and closes the previous one with what it cost.
-//
-// Phases are what the flow is organised around — contracts, atoms, molecules,
-// the program, delivery — and a run that spends four minutes in one of them has
-// said something a stage-by-stage reading makes you assemble for yourself.
-func tracePhaseBoundary(stage pipeline.Number) {
+// recordPhaseTime announces a phase the first time it is entered and adds this
+// stage's cost to its total.
+func recordPhaseTime(stage pipeline.Number, elapsed time.Duration) {
 	phase, known := pipeline.PhaseOf(stage)
 	if !known {
 		return
 	}
-	timingMutex.Lock()
-	defer timingMutex.Unlock()
-	if phase == currentPhase {
+	phaseMutex.Lock()
+	defer phaseMutex.Unlock()
+	if !phaseSeen[phase] {
+		phaseSeen[phase] = true
+		phaseOrder = append(phaseOrder, phase)
+		fmt.Fprintf(os.Stderr, "[%7.1fs] %-9s ── %s begins ──\n",
+			tracing.Since().Seconds(), "phase", phase)
+	}
+	phaseTotals[phase] += elapsed
+}
+
+// tracePhaseTotals reports what each phase accounted for, once, at the end.
+//
+// The per-stage lines answer "what happened". This answers "where did the time
+// go", which is the question somebody watching a four-minute run actually has
+// and which reading individual lines answers slowly if at all.
+//
+// The unaccounted remainder is the most useful number in it. On a run whose
+// stages measured nine seconds out of four minutes, the answer to "why is this
+// slow" is not in any stage — it is the model calls and the tool runs between
+// them, and saying so plainly is better than leaving a reader to subtract.
+func tracePhaseTotals() {
+	if !traceEnabled() {
 		return
 	}
-	if currentPhase != "" {
-		fmt.Fprintf(os.Stderr,
-			"[%7.1fs] %-9s ── %s ended after %.1fs ──\n",
-			tracing.Since().Seconds(), "phase", currentPhase,
-			time.Since(phaseStarted).Seconds())
+	phaseMutex.Lock()
+	defer phaseMutex.Unlock()
+	if len(phaseOrder) == 0 {
+		return
 	}
-	phaseOrdinals++
-	currentPhase, phaseStarted = phase, time.Now()
-	fmt.Fprintf(os.Stderr, "[%7.1fs] %-9s ── phase %d: %s began ──\n",
-		tracing.Since().Seconds(), "phase", phaseOrdinals, phase)
+	var measured time.Duration
+	for _, phase := range phaseOrder {
+		measured += phaseTotals[phase]
+	}
+	fmt.Fprintf(os.Stderr, "[%7.1fs] %-9s ── where the time went ──\n",
+		tracing.Since().Seconds(), "phase")
+	for _, phase := range phaseOrder {
+		total := phaseTotals[phase]
+		share := 0.0
+		if measured > 0 {
+			share = float64(total) / float64(measured) * 100
+		}
+		fmt.Fprintf(os.Stderr, "%22s| %-16s %7.2fs  %5.1f%% of measured\n",
+			"", phase, total.Seconds(), share)
+	}
+	if gap := tracing.Since() - measured; gap > 0 {
+		fmt.Fprintf(os.Stderr,
+			"%22s| %-16s %7.2fs  model calls, tool runs, and waiting\n",
+			"", "unaccounted", gap.Seconds())
+	}
 }

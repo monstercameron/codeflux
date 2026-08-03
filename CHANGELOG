@@ -50,6 +50,30 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-131
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the phase trace said nothing, and the ladder's second question was
+  never asked
+Request-or-TODO: Observed in the rung 6 trace, 2026-08-03
+Outcome: The phase boundaries added an hour earlier were nonsense on their
+  first real run. Stages are decided in dependency order rather than in numeric
+  order, so the label changed constantly and the run reported twenty-three
+  phases in four minutes, bouncing between specification and delivery. A
+  boundary every time a label changes is not a phase; it is a label changing.
+  A phase is now announced once, the first time one of its stages is decided,
+  and the totals are reported at the end with each phase's share. The most
+  useful line is the remainder: rung 6 measured nine seconds of stages across
+  four minutes, and the answer to "why is this slow" was never going to be in
+  any stage — it is the model calls and tool runs between them, which the trace
+  now says outright rather than leaving a reader to subtract.
+  The ladder's second question was also missing: an edit adding it had silently
+  failed to apply, so the suite still reported only whether the program worked.
+  It now logs the task state and fails when the program is correct and the
+  pipeline did not converge.
+Verification: Build, vet, gofmt, the coordinator suites
+Dev-Log: DL-20260803-141
+
 Change-ID: CL-20260803-130
 Commit: pending
 Date: 2026-08-03
