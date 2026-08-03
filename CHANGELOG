@@ -50,6 +50,36 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-074
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- the pipeline ledger gets a reader
+Request-or-TODO: PIPE-006a
+Outcome: web/frontend/pipelineledger renders the stage table with per-stage
+  duration and the skip-audit headline with its three-way breakdown, mounted
+  into the already-live review panel. Until PIPE-006b landed the wire and this
+  landed the surface, the 39-stage ledger -- the central evidence artifact of
+  the whole milestone -- could not be seen by anybody.
+  Unmeasured is distinguished from instant on three non-colour channels:
+  different accessible text, a different status glyph, and a different DOM
+  shape. The decoder discards a wire elapsed value when the measured flag is
+  false, so a malformed upstream response cannot leak a false duration
+Affected-behavior: A new read-only section in the review panel
+Compatibility-or-migration: The classification is not on the wire, so the client
+  recomputes it from internal/pipeline's static tables, precedented by
+  evidencereport importing internal/evidence. The run's own free-text reason
+  stays server-side and is not shown
+Verification: Native projection tests cover the populated, empty and failed
+  states and the measured-zero case. The shell was driven in a real browser and
+  the screenshots opened -- it boots and renders correctly with this compiled in
+Known-limitations: **The populated ledger was never seen in a browser.** The
+  review panel's button is disabled with "There is no work to review yet"
+  because a fresh database has no completed task, so the headline and breakdown
+  are covered only by projection tests, which is weaker than a viewed
+  screenshot. That is REPO-041 and REPO-044 again: no supported path produces a
+  run to look at. test-browser did not complete and no result is claimed from it
+Dev-Log: DL-20260802-084
+
 Change-ID: CL-20260802-073
 Commit: pending
 Date: 2026-08-02

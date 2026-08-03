@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-084
+Date: 2026-08-02
+Status: Surface built; populated state unverified in a browser
+Change-ID: CL-20260802-074
+Commit: pending
+Request-or-TODO: PIPE-006a
+Goal: Let somebody see the ledger the whole milestone produces
+Assumptions: Evidence nobody can read is not evidence
+Decisions: Mounted into the already-live review panel rather than main.go or
+  shell, both of which another lane held. Finding a reachable surface beat
+  taking a contended file.
+  Distinguished unmeasured from instant on text, glyph and DOM shape rather than
+  colour, and made the decoder distrust a wire elapsed value when the measured
+  flag is false -- the flag is the authority, and a client that trusts the
+  number over the flag reintroduces exactly the ambiguity PIPE-006b's schema
+  change removed.
+  Recomputed the classification client-side rather than showing a bare ratio.
+  Collapsing the three classes would have undone the distinction PIPE-042 exists
+  to preserve, which is worse than depending on a shared table
+Files-or-schemas: web/frontend/pipelineledger, web/client pipeline stage
+  resource and mounted hook, web/frontend/timelineview caveat rendering
+Validation: Native projection tests for populated, empty, failed and
+  measured-zero; a live browser run of the shell with screenshots opened
+Failures-or-discarded-approaches: None
+Known-limitations: The populated ledger was never rendered in a browser, because
+  no completed task exists to review. Stated rather than glossed. The timeline
+  caveat is built and nothing populates its field -- PIPE-044a
+Next-safe-step: PIPE-044a, and REPO-041 so the surface can be seen with data
+
 Dev-Log: DL-20260802-083
 Date: 2026-08-02
 Status: Corrected

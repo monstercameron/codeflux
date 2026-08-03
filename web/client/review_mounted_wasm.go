@@ -52,77 +52,103 @@ func useMountedReview(
 		return loadReviewResource(ctx, openBrowserReviewResourceClient, thread.TaskID())
 	}, dependency)
 	state := resource.Get()
-	if thread.TaskID().IsZero() {
-		return primitives.InlineAlert(primitives.InlineAlertProps{Title: "Review unavailable", Message: "Select an authoritative task to load its review.", Tone: design.StatusNeutral, Mode: mode})
-	}
-	if state.Loading {
-		return primitives.InlineAlert(primitives.InlineAlertProps{Title: "Loading task review", Message: "Loading sealed evidence and the bounded diff.", Tone: design.StatusNeutral, Mode: mode})
-	}
-	if state.Error != nil || !state.Ready {
+	// The pipeline ledger is fetched unconditionally, alongside the review
+	// resource above, so this hook's call order never depends on the review
+	// resource's own state -- GoWebComponents hooks are positional, and an
+	// early return before this line on some renders and after it on others
+	// would desync them. Its own LedgerCard already carries loading, empty,
+	// and error presentation, so it is safe to show beside review content in
+	// every state review itself can be in (PIPE-006a).
+	ledgerNode, _ := useMountedPipelineLedger(thread, mode, 0)
+
+	var body ui.Node
+	switch {
+	case thread.TaskID().IsZero():
+		body = primitives.InlineAlert(primitives.InlineAlertProps{Title: "Review unavailable", Message: "Select an authoritative task to load its review.", Tone: design.StatusNeutral, Mode: mode})
+	case state.Loading:
+		body = primitives.InlineAlert(primitives.InlineAlertProps{Title: "Loading task review", Message: "Loading sealed evidence and the bounded diff.", Tone: design.StatusNeutral, Mode: mode})
+	case state.Error != nil || !state.Ready:
 		message := "The sealed evidence report could not be loaded."
 		if state.Error != nil {
 			message = state.Error.Error()
 		}
-		return primitives.InlineAlert(primitives.InlineAlertProps{Title: "Review unavailable", Message: message, Tone: design.StatusFailure, Mode: mode})
-	}
-	value := state.Value
-	children := []ui.Node{evidencereport.ReportCard(evidencereport.Props{Report: value.Report, Mode: mode})}
-	if value.Diff == nil {
-		message := "The live diff no longer matches this immutable evidence report. Refresh task evidence before making a decision."
-		if value.DiffMatchesReport {
-			message = "No bounded textual diff is available for this report."
-		}
-		children = append(children, primitives.InlineAlert(primitives.InlineAlertProps{Title: "Diff unavailable", Message: message, Tone: design.StatusWarning, Mode: mode}))
-	} else {
-		selection := selectedPath.Get()
-		if _, ok := diffreview.FindChangedFile(value.Diff.Files, selection); !ok && len(value.Diff.Files) > 0 {
-			selection = value.Diff.Files[0].Path.String()
-		}
-		props := diffreview.Props{
-			Mode: mode, DiffIdentity: value.Diff.Identity, BaseRevision: value.Diff.BaseRevision,
-			HeadRevision: value.Diff.HeadRevision, Files: value.Diff.Files,
-			CategoryFilters: filters.Get(), SelectedPath: selection,
-			WhitespaceVisible: whitespace.Get(), ActiveHunkRowKey: activeRow.Get(),
-			OnSelectFile: selectedPath.Set,
-			OnToggleCategory: func(category diffreview.FileCategory, active bool) {
-				next := append([]diffreview.CategoryFilter(nil), filters.Get()...)
-				for index := range next {
-					if next[index].Category == category {
-						next[index].Active = active
-					}
-				}
-				filters.Set(next)
-			},
-			OnToggleWhitespace: whitespace.Set, OnActiveHunkRowChange: activeRow.Set,
-		}
-		props.OnOpenPlanStep = func(link taskgraph.PlanStepLink) {
-			if navigation.OpenPlan != nil {
-				navigation.OpenPlan(link.PlanRevision, link.StepID)
+		body = primitives.InlineAlert(primitives.InlineAlertProps{Title: "Review unavailable", Message: message, Tone: design.StatusFailure, Mode: mode})
+	default:
+		value := state.Value
+		children := []ui.Node{evidencereport.ReportCard(evidencereport.Props{Report: value.Report, Mode: mode})}
+		if value.Diff == nil {
+			message := "The live diff no longer matches this immutable evidence report. Refresh task evidence before making a decision."
+			if value.DiffMatchesReport {
+				message = "No bounded textual diff is available for this report."
 			}
-		}
-		props.OnOpenToolEvent = navigation.OpenEvent
-		props.OnOpenValidation = navigation.OpenValidation
-		props.OnOpenInEditor = func(path string, line uint32) {
-			status.Set("Opening " + path + " in the configured editor…")
-			ui.SafeGo("open reviewed file in editor", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), mountedReviewTimeout)
-				defer cancel()
-				err := openReviewedFile(ctx, thread.WorkspaceID(), path, line)
-				ui.PostAsync(func() {
-					if err != nil {
-						status.Set("Editor open failed: " + err.Error())
-						return
+			children = append(children, primitives.InlineAlert(primitives.InlineAlertProps{Title: "Diff unavailable", Message: message, Tone: design.StatusWarning, Mode: mode}))
+		} else {
+			selection := selectedPath.Get()
+			if _, ok := diffreview.FindChangedFile(value.Diff.Files, selection); !ok && len(value.Diff.Files) > 0 {
+				selection = value.Diff.Files[0].Path.String()
+			}
+			props := diffreview.Props{
+				Mode: mode, DiffIdentity: value.Diff.Identity, BaseRevision: value.Diff.BaseRevision,
+				HeadRevision: value.Diff.HeadRevision, Files: value.Diff.Files,
+				CategoryFilters: filters.Get(), SelectedPath: selection,
+				WhitespaceVisible: whitespace.Get(), ActiveHunkRowKey: activeRow.Get(),
+				OnSelectFile: selectedPath.Set,
+				OnToggleCategory: func(category diffreview.FileCategory, active bool) {
+					next := append([]diffreview.CategoryFilter(nil), filters.Get()...)
+					for index := range next {
+						if next[index].Category == category {
+							next[index].Active = active
+						}
 					}
-					status.Set("Opened " + path + " in the configured editor.")
+					filters.Set(next)
+				},
+				OnToggleWhitespace: whitespace.Set, OnActiveHunkRowChange: activeRow.Set,
+			}
+			props.OnOpenPlanStep = func(link taskgraph.PlanStepLink) {
+				if navigation.OpenPlan != nil {
+					navigation.OpenPlan(link.PlanRevision, link.StepID)
+				}
+			}
+			props.OnOpenToolEvent = navigation.OpenEvent
+			props.OnOpenValidation = navigation.OpenValidation
+			props.OnOpenInEditor = func(path string, line uint32) {
+				status.Set("Opening " + path + " in the configured editor…")
+				ui.SafeGo("open reviewed file in editor", func() {
+					ctx, cancel := context.WithTimeout(context.Background(), mountedReviewTimeout)
+					defer cancel()
+					err := openReviewedFile(ctx, thread.WorkspaceID(), path, line)
+					ui.PostAsync(func() {
+						if err != nil {
+							status.Set("Editor open failed: " + err.Error())
+							return
+						}
+						status.Set("Opened " + path + " in the configured editor.")
+					})
 				})
-			})
+			}
+			children = append(children, diffreview.DiffReview(props))
 		}
-		children = append(children, diffreview.DiffReview(props))
+		if status.Get() != "" {
+			children = append(children, html.P(html.Props{Role: "status", Aria: map[string]string{"live": "polite"}, Text: status.Get()}))
+		}
+		body = html.Div(html.Props{Data: map[string]string{"component": "mounted-task-review"}, Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(mode.Tokens().Spacing.LG))).String()}, children...)
 	}
-	if status.Get() != "" {
-		children = append(children, html.P(html.Props{Role: "status", Aria: map[string]string{"live": "polite"}, Text: status.Get()}))
-	}
-	return html.Div(html.Props{Data: map[string]string{"component": "mounted-task-review"}, Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(mode.Tokens().Spacing.LG))).String()}, children...)
+	return html.Div(html.Props{
+		Data:  map[string]string{"component": "mounted-task-review-and-ledger"},
+		Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(mode.Tokens().Spacing.LG))).String(),
+	}, body, pipelineLedgerSection(mode, ledgerNode))
+}
+
+// pipelineLedgerSection wraps the mounted pipeline ledger card with its own
+// labelled heading so it reads as a distinct section of the task review
+// rather than an unexplained extra block (PIPE-006a).
+func pipelineLedgerSection(mode primitives.Mode, ledger ui.Node) ui.Node {
+	tokens := mode.Tokens()
+	return html.Section(html.Props{
+		Aria:  map[string]string{"label": "Pipeline stage ledger"},
+		Data:  map[string]string{"component": "review-pipeline-ledger-section"},
+		Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(tokens.Spacing.SM))).String(),
+	}, ledger)
 }
 
 func openBrowserReviewResourceClient(ctx context.Context) (reviewResourceLease, error) {

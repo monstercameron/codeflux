@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/readout"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
@@ -131,6 +132,18 @@ func renderMessage(message timelinecard.Message, props Props) ui.Node {
 		_ = message.Body
 	}
 	role := messagePresentationRole(message.Role)
+	// A durable, agent-authored message is the run's own final word. If the
+	// caller has this attempt's skip-audit summary in hand, show it here too
+	// -- so a person reading the timeline sees what the run did not do
+	// without opening the pipeline ledger separately (PIPE-044). Nothing
+	// renders when the caller has not supplied one or the audit could not be
+	// computed: this is additive, never a claim manufactured for a message
+	// that never carried one.
+	if role == "agent" && message.Status == timelinecard.MessageComplete && props.PipelineSkipSummary != nil {
+		if caveat := pipelineledger.RunCompletionCaveat(*props.PipelineSkipSummary, props.Mode); caveat != nil {
+			children = append(children, caveat)
+		}
+	}
 	return html.Div(html.Props{
 		Aria: map[string]string{"label": humanize(role) + " message content"},
 		Data: map[string]string{

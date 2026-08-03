@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
 	"github.com/monstercameron/GoWebComponents/v5/css"
@@ -70,6 +71,15 @@ type Props struct {
 	Mode     primitives.Mode
 	Actions  Actions
 	Selected bool
+	// PipelineSkipSummary carries the most recently computed skip audit for
+	// the active task attempt, when the caller has one to give (PIPE-044). It
+	// is nil-safe and optional: a caller that does not populate it renders
+	// exactly as before, so wiring the pipeline ledger's data into a
+	// particular card is additive and does not require every construction
+	// site of Props to change. Where it is set, a durable, agent-authored
+	// final message shows it beside the message body, so a reader of the
+	// timeline learns what the run did not do without opening the ledger.
+	PipelineSkipSummary *pipelineledger.SkipSummary
 }
 
 // Renderer is the exhaustive GWC card renderer. Unsupported or malformed

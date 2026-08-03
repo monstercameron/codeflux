@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
+	"codeflux.dev/codeflux/internal/pipeline"
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
 	"github.com/monstercameron/GoWebComponents/v5/ui"
@@ -587,4 +589,86 @@ func findButtonHandler(node ui.Node, accessibleLabel string) (func(), bool) {
 		}
 	}
 	return nil, false
+}
+
+func pipelineSkipSummaryFixture() pipelineledger.SkipSummary {
+	rows := make([]pipelineledger.StageRow, 0, len(pipeline.Flow))
+	for _, stage := range pipeline.Flow {
+		state := pipeline.StateSatisfied
+		if stage.Number == pipeline.StageAtomOptimization {
+			state = pipeline.StateSkipped
+		}
+		rows = append(rows, pipelineledger.StageRow{Number: stage.Number, Name: stage.Name, State: state})
+	}
+	return pipelineledger.ComputeSkipSummary(rows)
+}
+
+// TestFinalMessageShowsTheSkipAuditCaveatWhenSupplied is PIPE-044's
+// final-message requirement observed from the renderer's own boundary: a
+// durable, agent-authored message must show the skip-audit caveat when the
+// caller supplies one, so a reader of the timeline learns what the run did
+// not do without opening the pipeline ledger separately.
+func TestFinalMessageShowsTheSkipAuditCaveatWhenSupplied(t *testing.T) {
+	summary := pipelineSkipSummaryFixture()
+	card := timelinecard.Card{
+		Kind: timelinecard.KindMessage, StableKey: "message:final", Sequence: 60,
+		Message: &timelinecard.Message{
+			ID: "message-final", Role: "assistant", Body: "Finished: implemented after 3 round(s) and 5 tool call(s).",
+			Status: timelinecard.MessageComplete,
+		},
+	}
+	markup := renderNode(t, ui.CreateElement(Renderer, Props{
+		Card: card, Mode: testMode(), PipelineSkipSummary: &summary,
+	}))
+	if !strings.Contains(markup, `data-component="run-completion-caveat"`) {
+		t.Errorf("final message missing the skip-audit caveat: %s", markup)
+	}
+	if !strings.Contains(markup, "established, 1 declined, 0 not implemented") {
+		t.Errorf("caveat did not name the established/declined/not-implemented split: %s", markup)
+	}
+}
+
+// TestFinalMessageOmitsTheCaveatWhenNoSummaryIsSupplied keeps the addition
+// backward compatible: every existing construction site of Props that does
+// not know about the pipeline ledger must render exactly as it did before.
+func TestFinalMessageOmitsTheCaveatWhenNoSummaryIsSupplied(t *testing.T) {
+	card := timelinecard.Card{
+		Kind: timelinecard.KindMessage, StableKey: "message:final-no-summary", Sequence: 61,
+		Message: &timelinecard.Message{
+			ID: "message-final-no-summary", Role: "assistant", Body: "Finished: implemented.",
+			Status: timelinecard.MessageComplete,
+		},
+	}
+	markup := renderCard(t, card)
+	if strings.Contains(markup, `data-component="run-completion-caveat"`) {
+		t.Errorf("caveat must not render when no summary was supplied: %s", markup)
+	}
+}
+
+// TestFinalMessageOmitsTheCaveatOnUserAndProvisionalMessages keeps the
+// caveat scoped to a run's own durable final word: it must not appear on a
+// user's own message or on a still-streaming assistant message.
+func TestFinalMessageOmitsTheCaveatOnUserAndProvisionalMessages(t *testing.T) {
+	summary := pipelineSkipSummaryFixture()
+	userCard := timelinecard.Card{
+		Kind: timelinecard.KindMessage, StableKey: "message:user", Sequence: 62,
+		Message: &timelinecard.Message{
+			ID: "message-user", Role: "user", Body: "Please fix the bug.", Status: timelinecard.MessageComplete,
+		},
+	}
+	provisionalCard := timelinecard.Card{
+		Kind: timelinecard.KindMessage, StableKey: "message:provisional", Sequence: 63,
+		Message: &timelinecard.Message{
+			ID: "message-provisional", Role: "assistant", Body: "Working on it",
+			Status: timelinecard.MessageProvisional,
+		},
+	}
+	for _, card := range []timelinecard.Card{userCard, provisionalCard} {
+		markup := renderNode(t, ui.CreateElement(Renderer, Props{
+			Card: card, Mode: testMode(), PipelineSkipSummary: &summary,
+		}))
+		if strings.Contains(markup, `data-component="run-completion-caveat"`) {
+			t.Errorf("caveat must only appear on a durable agent message, card %q: %s", card.StableKey, markup)
+		}
+	}
 }
