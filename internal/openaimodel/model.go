@@ -24,6 +24,7 @@ import (
 	"codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/providers"
+	"codeflux.dev/codeflux/internal/tracing"
 )
 
 // DefaultEndpoint is the Responses API.
@@ -188,10 +189,19 @@ func (model *Model) ObserveThink(
 	ctx context.Context,
 	input agent.ModelInput,
 ) (agent.ModelTurn, error) {
-	body, err := json.Marshal(model.buildRequest(input))
+	wire := model.buildRequest(input)
+	body, err := json.Marshal(wire)
 	if err != nil {
 		return agent.ModelTurn{}, fmt.Errorf("encode the model request: %w", err)
 	}
+	// What was actually sent, for somebody watching the run.
+	//
+	// The instruction the coordinator composed is visible in its own trace, and
+	// this is the thing that reached the provider: the same text plus the
+	// repository context, the plan, the tools, and whatever the previous round
+	// left behind. When a run does something inexplicable, the explanation is
+	// almost always in the difference between those two.
+	traceRequest(model.identity.Model, wire)
 	requestID, err := domain.NewModelRequestID()
 	if err != nil {
 		return agent.ModelTurn{}, err
@@ -241,7 +251,67 @@ func (model *Model) ObserveThink(
 	if executeErr != nil {
 		return agent.ModelTurn{}, executeErr
 	}
-	return model.decodeTurn(input, requestID, reply)
+	turn, err := model.decodeTurn(input, requestID, reply)
+	traceReply(model.identity.Model, turn, err)
+	return turn, err
+}
+
+// traceRequest writes the outgoing prompt to the live trace.
+//
+// Excerpted rather than printed whole: a request carries the whole repository
+// context and the plan, which is thousands of lines the reader already knows,
+// and burying the instruction in them is the same as not printing it. The head
+// and the tail are where the instruction and the specific ask live, and the
+// omitted count keeps the excerpt honest about the size of what was sent.
+func traceRequest(model string, request responsesRequest) {
+	if !tracing.Enabled() {
+		return
+	}
+	tools := make([]string, 0, len(request.Tools))
+	for _, declared := range request.Tools {
+		tools = append(tools, declared.Name)
+	}
+	effort := ""
+	if request.Reasoning != nil {
+		effort = " effort=" + request.Reasoning.Effort
+	}
+	schema := ""
+	if request.Text != nil {
+		schema = " schema=" + request.Text.Format.Name
+	}
+	tracing.Printf("prompt", "→ %s%s%s tools=[%s]",
+		model, effort, schema, strings.Join(tools, " "))
+	for _, turn := range request.Input {
+		if turn.Role == "system" {
+			continue
+		}
+		tracing.Block("prompt", "  "+turn.Role+":",
+			tracing.Excerpt(turn.Content, 24, 12))
+	}
+}
+
+// traceReply writes what came back.
+//
+// Tool calls are named with their arguments excerpted, because a file write's
+// argument is the whole file and the question a watcher has is which file, not
+// what is in it — the file is on disk a moment later either way.
+func traceReply(model string, turn agent.ModelTurn, err error) {
+	if !tracing.Enabled() {
+		return
+	}
+	if err != nil {
+		tracing.Printf("reply", "← %s failed: %s", model, err.Error())
+		return
+	}
+	tracing.Printf("reply", "← %s %d tool call(s), %d token(s) out",
+		model, len(turn.ToolCalls), turn.Usage.OutputTokens)
+	for _, call := range turn.ToolCalls {
+		tracing.Printf("reply", "  calls %s(%s)", call.Call.Name,
+			tracing.OneLine(string(call.Call.Arguments), 160))
+	}
+	if message := strings.TrimSpace(turn.MessageRedacted); message != "" {
+		tracing.Block("reply", "  said:", tracing.Excerpt(message, 20, 8))
+	}
 }
 
 // classifyModelAttemptError turns one physical attempt's transport failure

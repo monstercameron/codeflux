@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-139
+Date: 2026-08-03
+Status: Provider handling is a bounded state machine; the trace shows prompts
+Change-ID: CL-20260803-129
+Commit: pending
+Request-or-TODO: The provider-failure analysis; the stdout tracing request
+Goal: Make termination guaranteed rather than emergent, and make a run
+  watchable
+Decisions: Separated the two budgets. The work's is refunded because the run
+  learned nothing; the machinery's decreases and is never refunded, and it is
+  the thing that terminates.
+  Made recovery-required a real ending rather than a nicer word for failed. It
+  is the only state that says the worktree is worth keeping, which is exactly
+  true of a draft nobody could check.
+  Derived the finalisation context with WithoutCancel and a fresh timeout.
+  Cancellation still decides what the ending is; it must not prevent the ending
+  being written down.
+  Moved the trace primitives into their own package rather than duplicating
+  them. The coordinator knows which stage is running and the model client knows
+  what was sent, and only one of those two is worth watching without the other
+Files-or-schemas: new internal/tracing, new
+  internal/coordinator/provider_circuit.go and its test, agent_execution.go,
+  finalization.go, trace.go, agent_pipeline_ledger.go,
+  internal/openaimodel/model.go
+Validation: Build, vet, gofmt, seven circuit tests and the coordinator suites
+Failures-or-discarded-approaches: Keeping the counter-and-checkpoint shape and
+  lowering its threshold, which would have left the no-checkpoint case looping
+Known-limitations: No stale-run reconciler yet, so a crashed process still
+  leaves a run marked running. Finalisation is not yet idempotent behind a
+  single keyed function. The provider-level health state across runs is not
+  implemented; the circuit is per-run only
+Next-safe-step: Rung 6 again, watching the phase timings and the prompts
+
 Dev-Log: DL-20260803-138
 Date: 2026-08-03
 Status: Ten of the fourteen rung-6 items are in

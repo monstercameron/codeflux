@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
@@ -49,11 +50,24 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 	// floorHeld is whether the tree that exists builds, passes its tests and
 	// reproduces the acceptance examples.
 	floorHeld bool,
+	// recoverable is whether the run stopped for a reason outside the work —
+	// a provider that went away, a deadline — leaving a draft worth resuming.
+	recoverable bool,
 	reason string,
 ) finalization {
 	if execution == nil || execution.repositories == nil {
 		return finalization{Reason: reason}
 	}
+	// Finalisation runs on its own time, not on the provider's.
+	//
+	// The context that timed out waiting for a model is the same context this
+	// would use to write the ending, so a run that died of a provider timeout
+	// could not record that it had. The cancellation still decides what the
+	// ending is; it must not prevent the ending being written down.
+	ctx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+
 	task, err := execution.repositories.GetTask(ctx, taskID)
 	if err != nil {
 		return finalization{Reason: reason}
@@ -82,9 +96,18 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 	// nothing is wrong with what it produced, and a person decides what happens
 	// next. It is reached from running, which failed also is, so this is a
 	// choice between two legal endings rather than a new one.
+	//
+	// recovery-required is the third: a draft nobody could check because the
+	// machinery went away. That is not bad work, it is unfinished work, and
+	// calling it failed loses the distinction that decides whether anybody
+	// looks at it again. It is also the only ending that says "the worktree is
+	// worth keeping", which is exactly true here and false of a real failure.
 	ending := domain.TaskStateFailed
-	if floorHeld {
+	switch {
+	case floorHeld:
 		ending = domain.TaskStatePaused
+	case recoverable:
+		ending = domain.TaskStateRecoveryRequired
 	}
 	moved, err := execution.repositories.TransitionTask(ctx, storage.TransitionTask{
 		EventID:          eventID,

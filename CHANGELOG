@@ -50,6 +50,46 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-129
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- provider failure becomes a bounded state machine, and the trace
+  shows phases, timings, prompts and replies
+Request-or-TODO: Provider-failure analysis and the tracing request, 2026-08-03
+Outcome: Opening the circuit was tied to holding a checkpoint, so the case with
+  no verified work -- the one where stopping matters most, because there is
+  nothing to fall back on -- was the case that kept asking an unavailable
+  provider. The checkpoint now decides what recovery means, not whether the
+  breaker opens.
+  Four dispositions replace one boolean, because the three ways of stopping are
+  genuinely different: a run holding verified work finishes on it, a run
+  holding an unverified draft is left recovery-required for somebody to resume,
+  and a run whose credentials are wrong is not waiting for anything.
+  recovery-required is not "failed": a draft nobody could check because the
+  machinery went away is unfinished work, not bad work, and it is the only
+  ending that says the worktree is worth keeping.
+  The machinery got its own allowance, separate from the work's and never
+  refunded. Refunding the work's budget is right -- a run learned nothing from
+  an outage -- but a refund with no separate ceiling is an unbounded licence to
+  keep asking. One outer retry and twenty-five seconds; the provider adapter
+  already owns network retries with its own backoff, and this layer's only job
+  is to notice that the layer below has given up.
+  Cancellation outranks everything, and an authentication or safety refusal is
+  not retried at all. The message is composed from the ruling, so a run can no
+  longer say "Trying again" and finalise on the next line.
+  Finalisation runs on its own context, derived with WithoutCancel: the context
+  that timed out waiting for a model was the same one used to write the ending,
+  so a run that died of a provider timeout could not record that it had.
+  The trace now shows what a watcher asked for: phase boundaries with elapsed
+  time, per-stage duration, and the prompts and replies themselves. The trace
+  primitives moved to internal/tracing so the model client can write to the
+  same stream -- a trace showing which stage is running and not what was sent
+  answers "where is it" and not "why".
+Verification: Build, vet, gofmt, seven circuit tests covering exhaustion with
+  and without a checkpoint, the bounded transport retry, the unrefundable
+  allowance, unretryable failures, cancellation precedence and the narration
+Dev-Log: DL-20260803-139
+
 Change-ID: CL-20260803-128
 Commit: pending
 Date: 2026-08-03

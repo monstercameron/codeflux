@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/events"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -119,20 +120,47 @@ func (execution *AgentExecution) recordEnrichedSource(
 		}
 		sanitized := execution.redactForStorage(content)
 		taskID := scope.taskID
-		repositoryID := scope.repositoryID
-		if _, writeErr := execution.repositories.RecordProducedArtifact(
-			ctx, storage.RecordArtifact{
-				ProjectID: scope.projectID, RepositoryID: &repositoryID,
-				TaskID: &taskID, Type: "generated-source-enriched",
-				Path: file, Content: sanitized,
-				MediaType:    storage.ArtifactMediaType(file),
-				StorageClass: storage.ArtifactPermanentSemantic,
-			},
-		); writeErr != nil {
-			execution.say(ctx, scope, events.KindMessageFinal,
-				"The documented source could not be stored for later reading: "+
-					writeErr.Error())
-			return 0
+		// The repository binding is optional and the store refuses an empty
+		// one, so it is passed only when there is one to pass. A run whose
+		// scope carries no repository can still record what it produced, and
+		// the alternative — refusing to record — loses the enriched source over
+		// a binding that was never required.
+		var repositoryBinding *domain.RepositoryID
+		if !scope.repositoryID.IsZero() {
+			repositoryID := scope.repositoryID
+			repositoryBinding = &repositoryID
+		}
+		record := storage.RecordArtifact{
+			ProjectID: scope.projectID, RepositoryID: repositoryBinding,
+			TaskID: &taskID, Type: "generated-source-enriched",
+			Path: file, Content: sanitized,
+			MediaType:    storage.ArtifactMediaType(file),
+			StorageClass: storage.ArtifactPermanentSemantic,
+		}
+		_, writeErr := execution.repositories.RecordProducedArtifact(ctx, record)
+		if writeErr != nil {
+			// The source is worth more than its links.
+			//
+			// A binding the store refuses — a task row that is not there, a
+			// repository the scope never carried — costs the record its
+			// provenance. Losing the record costs the run its output: the
+			// worktree is temporary, and the artifact is the copy anybody
+			// reads afterwards. So the links are dropped and the bytes are
+			// kept, and the fact that this happened is traced rather than
+			// swallowed, because a run whose task row is missing has a
+			// problem somebody should hear about.
+			tracef("enrich", "recording %s with its bindings failed (%v); "+
+				"storing it unlinked rather than losing it", file, writeErr)
+			record.TaskID = nil
+			record.RepositoryID = nil
+			if _, retryErr := execution.repositories.RecordProducedArtifact(
+				ctx, record,
+			); retryErr != nil {
+				execution.say(ctx, scope, events.KindMessageFinal,
+					"The documented source could not be stored for later "+
+						"reading: "+retryErr.Error())
+				return 0
+			}
 		}
 		stored++
 	}

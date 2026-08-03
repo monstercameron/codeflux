@@ -71,6 +71,18 @@ type convergence struct {
 // The research gates are deliberately absent. A run can legitimately need
 // several rounds to cover its cases, and escalating on the second would spend a
 // stronger model on ordinary progress.
+// escalationWouldNotHelp names the gates a dearer model cannot satisfy any
+// better than a cheap one.
+//
+// Both ask for text the run has already been given in full: which declarations
+// lack a comment, and which fields the schema wants in which order. Nothing
+// about that is a reasoning problem, and escalating on it spends the ladder's
+// most expensive rung on typing.
+var escalationWouldNotHelp = map[string]bool{
+	"atom-documentation": true,
+	"completeness":       true,
+}
+
 var regressionProneGates = map[string]bool{
 	"assembly":          true,
 	"integration-tests": true,
@@ -266,6 +278,23 @@ func (tracker *convergence) record(gate string, failure string) verdict {
 	}
 	if tracker.repeats < threshold {
 		return verdict{}
+	}
+	// A stronger model is not the remedy for a missing comment.
+	//
+	// Escalation buys reasoning, and the gates below do not need any: the run
+	// was told which declarations lack a doc comment and which nineteen fields
+	// the schema wants, and a model that did not do it was not held back by
+	// its capacity. Ladder rung 6 escalated to the most expensive rung over
+	// work of exactly this kind and then spent 165 seconds there before the
+	// provider gave out.
+	//
+	// The run keeps its attempts and stays where it is. If it cannot do the
+	// work at this rung it will not do it at a dearer one, and the gate is
+	// advisory anyway.
+	if escalationWouldNotHelp[gate] {
+		return verdict{Why: "the " + gate + " gate is asking for text rather " +
+			"than for judgement, so a stronger model would not help; the run " +
+			"stays where it is"}
 	}
 	if next, more := tracker.settings.NextRung(tracker.rung); more {
 		from := tracker.rung

@@ -413,10 +413,10 @@ func (execution *AgentExecution) Run(
 	var carriedAdvisories []adversarialFinding
 	reviewRounds := 0
 	unrecognisedLoopErrors := 0
-	repeatedInfrastructureFailures := 0
-	lastInfrastructureOutcome := ""
-	lastInfrastructureTree := ""
-	providerCircuitOpen := ""
+	// The machinery's own allowance, separate from the work's and never
+	// refunded, and the ruling that ends the run when it is spent.
+	infrastructure := newInfrastructureBudget(time.Now())
+	var providerCircuit circuitDecision
 	// unfinished is what the run still owed when it ran out of attempts, so
 	// the completion message can say so instead of claiming to be done.
 	unfinished := ""
@@ -446,57 +446,6 @@ func (execution *AgentExecution) Run(
 	//
 	// None of those follow here. The worktree did not change, the model formed
 	// no judgement, and there is nothing to learn.
-	sendBackInfrastructure := func(instruction string, outcome string) {
-		tracef("infra", "gate=provider-availability outcome=%s "+
-			"worktree_changed=false", outcome)
-		failure = instruction
-		sentBackBecause = "the provider did not answer"
-		progress.refund()
-		// The circuit breaker.
-		//
-		// Waiting out a third ninety-second provider timeout learns nothing the
-		// first two did not already establish, and a run that has a verified
-		// checkpoint is spending that time refusing to finish work it has
-		// already done. Rung 3 reached its third checkpoint at 135 seconds and
-		// then spent 272 more seconds on identical provider failures without
-		// touching the worktree.
-		//
-		// Identical means the same failure category against the same tree. A
-		// different category is a different fact, and a changed tree means the
-		// run got somewhere between the failures, so both reset the count.
-		here := producedTreeDigest(scope.worktree)
-		if outcome == lastInfrastructureOutcome && here == lastInfrastructureTree {
-			repeatedInfrastructureFailures++
-		} else {
-			repeatedInfrastructureFailures = 1
-		}
-		lastInfrastructureOutcome, lastInfrastructureTree = outcome, here
-		// An exhausted retry budget is already the second strike.
-		//
-		// The two-failure rule is right for a raw transport error, which may be
-		// one closed socket. It is wrong for "retry budget exhausted", which is
-		// the provider's own retry policy reporting that it has already tried
-		// and given up: repeating the whole attempt asks the same question of
-		// the same unavailable provider and pays another full timeout to hear
-		// the same answer.
-		//
-		// Ladder rung 5 waited 90.8 seconds for the first, then began a second
-		// attempt that would have cost another ninety before the circuit could
-		// open — with a verified checkpoint sitting on disk the whole time.
-		if outcome == "retry-budget-exhausted" && checkpoint.taken {
-			providerCircuitOpen = outcome
-			tracef("infra", "circuit open on the first exhausted retry budget; "+
-				"finalising from verified revision %s", checkpoint.digest)
-			return
-		}
-		if repeatedInfrastructureFailures >= 2 && checkpoint.taken {
-			providerCircuitOpen = outcome
-			tracef("infra", "circuit open after %d identical failure(s); "+
-				"finalising from verified revision %s",
-				repeatedInfrastructureFailures, checkpoint.digest)
-		}
-	}
-
 	// Whether the review that is sending work back found only blind spots,
 	// which decides whether the next attempt is a tests-only round.
 	blindSpotsOnlyThisRound := false
@@ -505,6 +454,37 @@ func (execution *AgentExecution) Run(
 	// one thing cannot quietly break the one thing that defines done.
 	acceptanceGuard := acceptanceInvariant(
 		parseAcceptanceExamples(scope.requirement))
+
+	// One ruling per provider failure, taken before anything is said or done.
+	//
+	// The old shape scattered the decision: a counter here, a checkpoint test
+	// there, a message printed before either had been consulted. It could say
+	// "Trying again" and finalise on the next line, and it tied opening the
+	// breaker to holding a checkpoint — so the case with no verified work, the
+	// one where stopping matters most because there is nothing to fall back
+	// on, was the case that kept going.
+	sendBackInfrastructure := func(refusal error, instruction string) {
+		decision := decideCircuit(
+			refusal, infrastructure, checkpoint.taken, time.Now())
+		tracef("infra", "gate=provider-availability outcome=%s "+
+			"disposition=%s worktree_changed=false budget=%d",
+			providerOutcomeOf(refusal), decision.Disposition,
+			infrastructure.AttemptsRemaining)
+		failure = instruction
+		sentBackBecause = "the provider did not answer"
+		// The work's budget is refunded because the run learned nothing. The
+		// infrastructure allowance is not, and it is the one that terminates.
+		progress.refund()
+		if decision.Open {
+			providerCircuit = decision
+		}
+		if decision.RetryAfter > 0 {
+			select {
+			case <-ctx.Done():
+			case <-time.After(decision.RetryAfter):
+			}
+		}
+	}
 
 	sendBack := func(gate string, instruction string, because string) {
 		tracef("sendback", "gate=%s because=%s", gate, because)
@@ -635,7 +615,7 @@ func (execution *AgentExecution) Run(
 
 	ledger.sealPreAttemptStages()
 	for attempt := 1; progress.moreAttempts() && awaitingApproval == "" &&
-		providerCircuitOpen == ""; attempt++ {
+		!providerCircuit.Open; attempt++ {
 		// Time enough to finish, or do not start.
 		//
 		// A model call takes as long as it takes, and finishing takes a known
@@ -649,7 +629,9 @@ func (execution *AgentExecution) Run(
 		// nothing to reserve against, and inventing one would end runs that
 		// were entitled to continue.
 		if short, remaining := tooLateToStartAnAttempt(ctx); short {
-			providerCircuitOpen = "deadline-reserved-for-finalisation"
+			providerCircuit = circuitDecision{Open: true,
+				Disposition: circuitRestoreAndFinish,
+				Reason:      "the time left is reserved for finishing properly"}
 			tracef("deadline", "%s left, less than the %s reserved to finish; "+
 				"not starting attempt %d",
 				remaining.Round(time.Second), finalisationReserve, attempt)
@@ -759,23 +741,10 @@ func (execution *AgentExecution) Run(
 		if errors.Is(runErr, providers.ErrRetryBudgetExhausted) ||
 			errors.Is(runErr, providers.ErrTransport) ||
 			errors.Is(runErr, providers.ErrRateLimited) {
-			sendBackInfrastructure(providerFailureInstruction(runErr),
-				providerOutcomeOf(runErr))
-			// Said after the breaker has decided, not before. The message used
-			// to promise another attempt and the circuit then finalised the run
-			// on the next line, so the last thing a reader saw was "Trying
-			// again" from a run that never tried again.
-			if providerCircuitOpen != "" {
-				execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
-					"Attempt %d could not reach the model: %s. The provider "+
-						"has exhausted its own retries, so refinement stops "+
-						"here and the run finishes from its verified revision.",
-					attempt, runErr.Error()))
-				continue
-			}
-			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
-				"Attempt %d could not reach the model: %s. Trying again.",
-				attempt, runErr.Error()))
+			sendBackInfrastructure(runErr, providerFailureInstruction(runErr))
+			// Said after the ruling, never before it.
+			execution.say(ctx, scope, events.KindMessageFinal,
+				providerCircuit.narrate(attempt))
 			continue
 		}
 		if runErr != nil {
@@ -1068,12 +1037,9 @@ func (execution *AgentExecution) Run(
 	// checkpoint keeps what it ended with, and one that never reached a
 	// checkpoint has nothing to go back to.
 	restoredFromCheckpoint := false
-	if providerCircuitOpen != "" {
-		execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
-			"The provider stopped answering (%s) and the worktree had not "+
-				"changed between attempts, so refinement stopped rather than "+
-				"waiting it out. Finishing from revision %s, which %s.",
-			providerCircuitOpen, checkpoint.digest, checkpoint.reason))
+	if providerCircuit.Open {
+		execution.say(ctx, scope, events.KindMessageFinal,
+			"Refinement stopped: "+providerCircuit.Reason+".")
 	}
 	if checkpoint.taken {
 		if held, _ := revalidateAfterWrite(ctx, scope.worktree); !held {
@@ -1341,8 +1307,13 @@ func (execution *AgentExecution) Run(
 	//
 	// A message saying a run has ended is not an ending. The durable state is.
 	if !finished.Terminal {
+		// A run stopped by the machinery leaves a draft worth resuming, which
+		// is a different ending from work that was checked and found wanting.
+		recoverable := providerCircuit.Open &&
+			providerCircuit.Disposition == circuitRecoveryRequired
 		finished = execution.finaliseNonTerminalRun(
-			ctx, scope, taskID, compiles && verified, finished.Reason)
+			ctx, scope, taskID, compiles && verified, recoverable,
+			finished.Reason)
 	}
 
 	// The terminal record, last, once the state it describes is durable.
@@ -1362,7 +1333,7 @@ func (execution *AgentExecution) Run(
 			producedTreeDigest(scope.worktree) == checkpoint.digest),
 		advisories:            carriedAdvisories,
 		attempts:              attempts,
-		infrastructureRetries: repeatedInfrastructureFailures,
+		infrastructureRetries: infrastructure.Consecutive,
 		unresolved:            unfinished,
 	})
 	traceBlock("final", "how this run ended:", report)
