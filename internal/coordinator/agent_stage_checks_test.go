@@ -164,7 +164,7 @@ func TestAnUntestedAtomIsReported(t *testing.T) {
 		"cmd/thing/main_test.go": "package main\n\nimport \"testing\"\n\n" +
 			"func TestUsed(t *testing.T) {\n\tif used(1) != 1 {\n\t\tt.Fatal(\"no\")\n\t}\n}\n",
 	})
-	outcome := checkAtomTests(worktree)
+	outcome := checkAtomTests(worktree, newProducedFunctionCache(worktree))
 	if outcome.Held {
 		t.Error("an atom no test mentions was reported as covered")
 	}

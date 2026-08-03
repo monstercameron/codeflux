@@ -50,6 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-072
+Commit: pending
+Date: 2026-08-02
+Type: Change -- share the shell-out, not the tree
+Request-or-TODO: PIPE-057
+Outcome: The ticket asked to stop re-parsing produced source about twenty times
+  a run. Measurement says the parse is not the cost: parseProducedFunctions runs
+  in 0-506 microseconds, while producedGoFiles is a git status process spawn at
+  18-22ms. Six of each is roughly 120ms of a 3.8s run.
+  So the cache memoizes the file list, the parsed tree, tested names and
+  documented names for the four checks examineStructure runs consecutively, and
+  the four shell-outs collapse to one. It also removes a fully wasted parse:
+  resolveAttribution built an attributedScope that both of its callers discarded
+Affected-behavior: None. No check's verdict changes
+Compatibility-or-migration: None
+Verification: The cache is keyed on the exact sorted file list, never on the
+  worktree, so an attribution-derived list and a git-status-derived list cannot
+  share an entry -- a conflation that would be a correctness bug, and there is a
+  test for it. Each test proven to discriminate by injecting the exact defect
+Known-limitations: Wall clock is noise-dominated and is reported as such rather
+  than dressed up: five lanes were editing this checkout, a controlled A/B
+  drifted together as load rose, and the provable saving is below the noise
+  floor. The structural claim is guaranteed by the code, not sampled.
+  checkSimplification is deliberately uncached because it runs after mutation
+  testing writes and restores files in place
+Dev-Log: DL-20260802-082
+
 Change-ID: CL-20260802-071
 Commit: pending
 Date: 2026-08-02

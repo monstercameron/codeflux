@@ -58,7 +58,7 @@ func (execution *AgentExecution) outstandingWork(
 			"it does not do what was asked ("+failures[0]+")")
 	}
 
-	attribution, _ := execution.resolveAttribution(ctx, scope)
+	attribution := execution.resolveAttribution(ctx, scope)
 	if gaps, err := findCompletenessGaps(
 		scope.worktree, execution.settings, attribution,
 	); err == nil && !gaps.Empty() {

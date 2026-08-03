@@ -157,20 +157,28 @@ func (execution *AgentExecution) resolveBaseRevision(
 	return strings.TrimSpace(binding.BaseRevision)
 }
 
-// resolveAttribution derives the full change attribution and, from it, the
-// declaration-level attributed scope for one run. It is the one place every
-// stage that needs either should call from, so the base revision is read and
-// the diff is taken the same way everywhere rather than once per stage.
+// resolveAttribution derives the full change attribution for one run. It is
+// the one place every stage that needs it should call from, so the base
+// revision is read and the diff is taken the same way everywhere rather than
+// once per stage.
+//
+// It used to also parse the produced source and return the declaration-level
+// attributedScope alongside it, but neither of its two callers has ever used
+// that second value — each discards it with `_` — so every call paid for a
+// parse whose result was thrown away before this run ever looked at it
+// (PIPE-057). Every real consumer of an attributed scope (checkComplexity,
+// checkSimplification, findCompletenessGaps) already parses its own file list
+// and calls attributeDeclarations itself, because each needs the parse
+// anyway to do its own job; resolving a scope here bought nothing they were
+// not already doing. If a future caller needs the scope without needing the
+// parse for anything else, compute it the same way those do:
+// attributeDeclarations(functions, attribution) over whatever it already
+// parsed.
 func (execution *AgentExecution) resolveAttribution(
 	ctx context.Context, scope agentScope,
-) (changeAttribution, attributedScope) {
+) changeAttribution {
 	baseRevision := execution.resolveBaseRevision(ctx, scope.taskID)
-	attribution := deriveChangeAttribution(ctx, scope.worktree, baseRevision)
-	functions, err := attributedFunctions(scope.worktree, attribution)
-	if err != nil {
-		return attribution, attributedScope{}
-	}
-	return attribution, attributeDeclarations(functions, attribution)
+	return deriveChangeAttribution(ctx, scope.worktree, baseRevision)
 }
 
 // attributionFiles returns every file this run's attribution says changed,

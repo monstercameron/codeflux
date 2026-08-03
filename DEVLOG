@@ -25,6 +25,39 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-082
+Date: 2026-08-02
+Status: Cached, and the premise corrected
+Change-ID: CL-20260802-072
+Commit: pending
+Request-or-TODO: PIPE-057
+Goal: Stop repeating per-run work, and find out which work actually repeats
+Assumptions: The ticket's assumption -- that AST parsing is the cost -- was
+  tested rather than adopted, and it did not hold
+Decisions: Measured before designing. The parse is essentially free and the git
+  status spawn is not, so the cache shares the shell-out first. A refactor built
+  on the ticket's framing would have optimised the cheap half.
+  Keyed the cache on the exact sorted file list rather than the worktree.
+  PIPE-111 introduced two distinct file sets -- attribution-derived and
+  whole-worktree -- and a worktree-keyed cache would silently serve one for the
+  other, which is a wrong answer rather than a slow one.
+  Scoped the cache to a single examineStructure call and no further. Produced
+  source changes during a run, so a cache that outlives the window between two
+  worktree writes answers questions about a tree that no longer exists.
+  Left checkSimplification uncached deliberately: it runs after mutation testing
+  writes and restores files in place, and spanning that boundary would be unsafe
+  if a restore ever failed part-way
+Files-or-schemas: agent_stage_attribution.go, agent_stage_structure.go,
+  agent_stage_completeness.go, agent_stage_runner.go, agent_outstanding.go, and
+  a new cache test
+Validation: Three tests, each proven to discriminate by injecting the exact
+  defect -- including one that fails if the cache key collapses to the worktree
+Failures-or-discarded-approaches: None discarded; the wasted attributedScope
+  parse was found while reading rather than by measurement
+Known-limitations: Wall clock could not be measured cleanly under five
+  concurrent lanes and is reported as noise-dominated rather than invented
+Next-safe-step: The remaining uncached checks, once their files are free
+
 Dev-Log: DL-20260802-081
 Date: 2026-08-02
 Status: Eleven files tagged; fixtures extracted

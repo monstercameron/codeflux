@@ -181,7 +181,7 @@ func TestTheGateAndTheLedgerAgreeOnWhatIsTested(t *testing.T) {
 	if !outcome.Held {
 		t.Errorf("the gate is satisfied and the ledger is not: %s", outcome.Detail)
 	}
-	documentation := checkAtomDocumentation(worktree)
+	documentation := checkAtomDocumentation(worktree, newProducedFunctionCache(worktree))
 	if !documentation.Held {
 		t.Errorf("the gate is satisfied and documentation is not: %s",
 			documentation.Detail)
@@ -213,7 +213,7 @@ func TestAnUndocumentedMainIsAskedForRatherThanOnlyReported(t *testing.T) {
 		t.Error("the ledger reports an undocumented main and the gate never " +
 			"asks for one, so no attempt can close it")
 	}
-	if checkAtomDocumentation(worktree).Held {
+	if checkAtomDocumentation(worktree, newProducedFunctionCache(worktree)).Held {
 		t.Error("the ledger accepts an undocumented main the gate asks for, " +
 			"so the two disagree in the other direction")
 	}

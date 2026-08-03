@@ -163,25 +163,19 @@ func findCompletenessGaps(
 	return gaps, nil
 }
 
-// documentedNames reports which produced functions carry a doc comment.
+// documentedNamesInFiles reports which of the given files' produced
+// functions carry a doc comment.
 //
 // A doc comment is one attached to the declaration, which is where Go tooling
 // looks and where a reader finds it. A comment floating elsewhere in the file
 // documents nothing in particular.
 //
-// It enumerates files through producedGoFiles' git-status view. An
-// attribution-aware caller that already has the correct, base-revision file
-// list should call documentedNamesInFiles directly instead (PIPE-112).
-func documentedNames(worktree string) (map[string]bool, error) {
-	files, err := producedGoFiles(worktree)
-	if err != nil {
-		return nil, err
-	}
-	return documentedNamesInFiles(worktree, files)
-}
-
-// documentedNamesInFiles is documentedNames restricted to exactly the given
-// files.
+// It takes an explicit file list rather than discovering one from
+// producedGoFiles' git-status view itself (PIPE-112), so an
+// attribution-aware caller and a cache sharing one already-resolved list
+// (PIPE-057) both get the same behaviour a bare producedGoFiles-backed
+// wrapper would have given, without shelling out to `git status` again to
+// rediscover a list the caller already has.
 func documentedNamesInFiles(
 	worktree string, files []string,
 ) (map[string]bool, error) {
@@ -223,12 +217,12 @@ func documentedNamesInFiles(
 // structure, into the run's evidence. That is a true description in a place
 // nobody reading the code will ever look. This checks the comment is on the
 // declaration, where the next person to open the file will find it.
-func checkAtomDocumentation(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+func checkAtomDocumentation(worktree string, cache *producedFunctionCache) stageOutcome {
+	functions, err := cache.readProducedFunctions()
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	documented, err := documentedNames(worktree)
+	documented, err := cache.documentedNamesCached()
 	if err != nil {
 		return broke("the produced source could not be read: "+err.Error(), nil)
 	}

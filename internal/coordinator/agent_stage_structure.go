@@ -298,6 +298,15 @@ func testedNames(worktree string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
+	return testedNamesInFiles(worktree, files)
+}
+
+// testedNamesInFiles is testedNames restricted to exactly the given files,
+// factored out the same way parseProducedFunctions is (PIPE-111/PIPE-057) so
+// a caller that already holds the produced-file list from elsewhere in the
+// same pass does not have to pay for producedGoFiles' `git status` a second
+// time to get it again.
+func testedNamesInFiles(worktree string, files []string) (map[string]bool, error) {
 	referenced := map[string]bool{}
 	fileSet := token.NewFileSet()
 	for _, file := range files {
@@ -330,9 +339,145 @@ func testedNames(worktree string) (map[string]bool, error) {
 	return referenced, nil
 }
 
+// producedFunctionCache memoizes the produced-file list and the parsed
+// function tree for the span of one stage-examination pass over one fixed
+// worktree state (PIPE-057).
+//
+// A single instance is created at the top of examineStructure and used only
+// by the checks that pass — checkAtoms, checkAtomTests, checkMolecules, and
+// checkAtomDocumentation — which run consecutively, before any stage that
+// executes repository code or otherwise writes to the worktree, and which
+// therefore all see the same produced-file list and the same parsed tree.
+// Ledger recording between them (ledger.decide) commits verdicts to the
+// run's own storage, not to the worktree, so it cannot invalidate anything
+// held here.
+//
+// It must never be created once and held across an attempt boundary, or
+// across the boundary between outstandingWork's own call and this run's
+// later call to examineStructure: the agent writes files to its worktree
+// between attempts, so a cache instance surviving either boundary would
+// answer questions about a worktree that no longer exists. A fresh instance
+// belongs at the top of each call that needs one, and nowhere else.
+//
+// It caches the parsed tree by the exact file list requested, not by the
+// worktree alone, which is what keeps a producedGoFiles-derived list and an
+// attribution-derived list from silently sharing one entry: the two can
+// legitimately disagree once a run has committed to its own worktree
+// (PIPE-111's design caution), and a cache keyed only on the worktree would
+// answer one question with the other's cached result.
+type producedFunctionCache struct {
+	worktree string
+
+	haveProducedFiles bool
+	producedFiles     []string
+	producedFilesErr  error
+
+	parsed   map[string][]producedFunction
+	parseErr map[string]error
+
+	haveTestedNames bool
+	testedNames     map[string]bool
+	testedNamesErr  error
+
+	haveDocumentedNames bool
+	documentedNames     map[string]bool
+	documentedNamesErr  error
+}
+
+// newProducedFunctionCache creates an empty cache bound to one worktree. See
+// producedFunctionCache's own doc for the lifetime rule that makes this safe.
+func newProducedFunctionCache(worktree string) *producedFunctionCache {
+	return &producedFunctionCache{worktree: worktree}
+}
+
+// producedFilesList is producedGoFiles' `git status` view, shelled out at
+// most once for this cache's lifetime.
+func (cache *producedFunctionCache) producedFilesList() ([]string, error) {
+	if !cache.haveProducedFiles {
+		cache.producedFiles, cache.producedFilesErr = producedGoFiles(cache.worktree)
+		cache.haveProducedFiles = true
+	}
+	return cache.producedFiles, cache.producedFilesErr
+}
+
+// functionsFor parses exactly the given files, once, and returns the same
+// result to every later caller in this cache's lifetime that asks for the
+// identical file set — which every check sharing one cache does, because
+// they all resolve their file list the same way within one static pass.
+func (cache *producedFunctionCache) functionsFor(
+	files []string,
+) ([]producedFunction, error) {
+	key := producedFunctionCacheKey(files)
+	if cache.parsed == nil {
+		cache.parsed = map[string][]producedFunction{}
+		cache.parseErr = map[string]error{}
+	}
+	if functions, cached := cache.parsed[key]; cached {
+		return functions, cache.parseErr[key]
+	}
+	functions, err := parseProducedFunctions(cache.worktree, files)
+	cache.parsed[key] = functions
+	cache.parseErr[key] = err
+	return functions, err
+}
+
+// readProducedFunctions is readProducedFunctions, memoized for this cache's
+// lifetime: the same producedGoFiles file list and the same parse are
+// reused by every caller that asks through this cache instead of through
+// the bare package function.
+func (cache *producedFunctionCache) readProducedFunctions() ([]producedFunction, error) {
+	files, err := cache.producedFilesList()
+	if err != nil {
+		return nil, err
+	}
+	return cache.functionsFor(files)
+}
+
+// testedNamesCached is testedNames, memoized for this cache's lifetime.
+func (cache *producedFunctionCache) testedNamesCached() (map[string]bool, error) {
+	if !cache.haveTestedNames {
+		files, err := cache.producedFilesList()
+		if err != nil {
+			return nil, err
+		}
+		cache.testedNames, cache.testedNamesErr = testedNamesInFiles(cache.worktree, files)
+		cache.haveTestedNames = true
+	}
+	return cache.testedNames, cache.testedNamesErr
+}
+
+// documentedNamesCached is documentedNames, memoized for this cache's
+// lifetime and sharing its producedFilesList rather than shelling out to
+// `git status` again to get the same list documentedNames would have asked
+// for itself.
+func (cache *producedFunctionCache) documentedNamesCached() (map[string]bool, error) {
+	if !cache.haveDocumentedNames {
+		files, err := cache.producedFilesList()
+		if err != nil {
+			return nil, err
+		}
+		cache.documentedNames, cache.documentedNamesErr =
+			documentedNamesInFiles(cache.worktree, files)
+		cache.haveDocumentedNames = true
+	}
+	return cache.documentedNames, cache.documentedNamesErr
+}
+
+// producedFunctionCacheKey canonicalizes a file list into a cache key. The
+// list is sorted before joining because the same set of files requested in
+// a different order is still the same parse, and every producer of a file
+// list here (producedGoFiles, attributionFiles) is already sorted in
+// practice — the sort is a correctness guarantee against that changing
+// silently, not a workaround for a known case that needs it today.
+func producedFunctionCacheKey(files []string) string {
+	sorted := append([]string(nil), files...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, "\x1f")
+}
+
 // checkAtoms reports whether the run produced anything atomic at all.
-func checkAtoms(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+func checkAtoms(worktree string, cache *producedFunctionCache) stageOutcome {
+	functions, err := cache.readProducedFunctions()
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
@@ -356,12 +501,12 @@ func checkAtoms(worktree string) stageOutcome {
 // An atom nothing tests is an atom nothing has checked, whatever the suite
 // says overall: coverage can be carried entirely by its callers while the atom
 // itself is never examined on its own terms.
-func checkAtomTests(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+func checkAtomTests(worktree string, cache *producedFunctionCache) stageOutcome {
+	functions, err := cache.readProducedFunctions()
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	referenced, err := testedNames(worktree)
+	referenced, err := cache.testedNamesCached()
 	if err != nil {
 		return broke("the produced tests could not be read: "+err.Error(), nil)
 	}
@@ -392,12 +537,12 @@ func checkAtomTests(worktree string) stageOutcome {
 // Testing the parts is not testing the composition. The obligation a molecule
 // carries is that its atoms add up, and only a test of the molecule itself can
 // discharge it.
-func checkMolecules(worktree string) stageOutcome {
-	functions, err := readProducedFunctions(worktree)
+func checkMolecules(worktree string, cache *producedFunctionCache) stageOutcome {
+	functions, err := cache.readProducedFunctions()
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	referenced, err := testedNames(worktree)
+	referenced, err := cache.testedNamesCached()
 	if err != nil {
 		return broke("the produced tests could not be read: "+err.Error(), nil)
 	}

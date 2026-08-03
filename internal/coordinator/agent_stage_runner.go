@@ -56,22 +56,32 @@ func (execution *AgentExecution) examineStructure(
 	// everything when it could not be established, so a run whose base
 	// revision is unknown is held to the old, whole-worktree standard rather
 	// than a silently narrowed one.
-	attribution, _ := execution.resolveAttribution(ctx, scope)
+	attribution := execution.resolveAttribution(ctx, scope)
+
+	// Shared across every check below that parses what producedGoFiles' own
+	// git-status view names, so checkAtoms, checkAtomTests, checkMolecules,
+	// and checkAtomDocumentation shell out to `git status` and parse the
+	// produced source once between them rather than once each (PIPE-057).
+	// Safe because nothing in this run of consecutive checks writes to the
+	// worktree — see producedFunctionCache's own doc for the lifetime rule
+	// that makes it unsafe anywhere else.
+	cache := newProducedFunctionCache(worktree)
 
 	// Structure, from the source itself. These hold whether or not the tests
 	// pass, because they are statements about what was written rather than
 	// about what it does.
-	ledger.decide(ctx, pipeline.StageAtoms, checkAtoms(worktree))
+	ledger.decide(ctx, pipeline.StageAtoms, checkAtoms(worktree, cache))
 	ledger.decide(ctx, pipeline.StageAtomCaseSynthesis, checkCaseCoverage(worktree))
-	ledger.decide(ctx, pipeline.StageAtomExampleTests, checkAtomTests(worktree))
-	ledger.decide(ctx, pipeline.StageMolecules, checkMolecules(worktree))
+	ledger.decide(ctx, pipeline.StageAtomExampleTests, checkAtomTests(worktree, cache))
+	ledger.decide(ctx, pipeline.StageMolecules, checkMolecules(worktree, cache))
 	// control-flow is decided after the obligations exist, so it discharges
 	// them rather than answering before they were raised.
 	ledger.decide(ctx, pipeline.StageAntiPatterns, checkAntiPatterns(worktree, attribution))
 	ledger.decide(ctx, pipeline.StageAtomComplexity,
 		checkComplexity(worktree, attribution))
 	ledger.decide(ctx, pipeline.StageContracts, describeContracts(worktree))
-	ledger.decide(ctx, pipeline.StageAtomDocumentation, checkAtomDocumentation(worktree))
+	ledger.decide(ctx, pipeline.StageAtomDocumentation,
+		checkAtomDocumentation(worktree, cache))
 	ledger.decide(ctx, pipeline.StageAtomPropertyTests, checkPropertyTests(worktree))
 	// Obligations are raised durably so a later stage can discharge them by
 	// name, rather than being stated in prose and reported satisfied for
