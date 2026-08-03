@@ -50,6 +50,34 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-137
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- a run can see the file it is about to patch
+Request-or-TODO: Pipeline analysis item 3; direct instruction to document how
+  the tests are run
+Outcome: Context selection reads the repository at its base revision, and on a
+  generated project that is empty: the files a refinement changes are ones the
+  run wrote itself, and they were in no revision when the selection ran. So a
+  refinement round asked a model to change a file it had last seen several
+  attempts earlier, and the model did the only thing available — rewrote the
+  whole file from memory, which is how a working program loses a function
+  nobody meant to touch.
+  A patch cannot be written from memory at all. Its hunks are matched against
+  the file's exact text, indentation included, so offering the patch tool
+  without the file was offering a tool that could not be used. Every file a
+  step is about to modify is now in the round's context in full, with the
+  revision a patch is written against, and the tests beside it, which are what
+  must still pass afterwards.
+  Only those files. Everything else is context selection's business, and files
+  nobody asked about spend the context the instruction needs.
+  docs/testing.md is added, at request: the four test surfaces and which one
+  spends money, how to run one ladder rung, how to read the trace, what a
+  healthy rung looks like, how to read a run afterwards without paying for
+  another, and the three different things a rung failure can mean.
+Verification: Build, vet, gofmt, three new context tests
+Dev-Log: DL-20260803-147
+
 Change-ID: CL-20260803-136
 Commit: pending
 Date: 2026-08-03

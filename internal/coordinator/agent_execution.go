@@ -727,6 +727,17 @@ func (execution *AgentExecution) Run(
 		// has finished. Gathered once above; shaped here into the decision the
 		// run has to make about each item.
 		context = append(context, preflight.contextItems()...)
+		// The files this attempt is going to change, in full, with the revision
+		// a patch is written against — and the tests beside them, which are
+		// what must still pass afterwards.
+		//
+		// Context selection reads the repository at its base revision, and on a
+		// generated project that is empty: the files being refined are ones
+		// this run wrote, and they were in no revision when the selection ran.
+		// A patch cannot be written from memory, so offering the patch tool
+		// without the file was offering a tool that could not be used.
+		context = append(context, patchContextItems(scope.worktree, steps)...)
+		context = append(context, producedTestFilesFor(scope.worktree, steps)...)
 		if failure != "" {
 			context = append(context, agentContextItem(
 				"last-test-run-output", failure))

@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-147
+Date: 2026-08-03
+Status: The patch tool has what it needs to be usable
+Change-ID: CL-20260803-137
+Commit: pending
+Request-or-TODO: Pipeline analysis item 3; the testing-doc request
+Goal: Stop asking for a patch against a file the run cannot see
+Decisions: Included the whole file rather than a hunk around the change. Which
+  hunk matters is not knowable before the model decides what to change, and a
+  generated file is a few thousand bytes — cheaper to send once than to send
+  the wrong window and pay for the rewrite that follows.
+  Named the revision beside it, so a hunk that fails because the file moved is
+  distinguishable from one that never matched. Those need different answers.
+  Included tests only from the directory being changed. A test elsewhere is
+  testing something else
+Files-or-schemas: new internal/coordinator/patch_context.go and its test,
+  agent_execution.go, internal/executor/patch_tool.go, new docs/testing.md
+Validation: Build, vet, gofmt, the new context tests
+Failures-or-discarded-approaches: None
+Known-limitations: Items 4 onward remain: refinement is not yet bounded to two
+  findings per round, findings have no stable identity across attempts, and
+  edit scope is still derived from the gate rather than from the findings
+  selected
+Next-safe-step: The refinement transaction -- at most two findings, one patch
+  per file, verify, commit or restore
+
 Dev-Log: DL-20260803-146
 Date: 2026-08-03
 Status: The step contract is single-sourced and asserted

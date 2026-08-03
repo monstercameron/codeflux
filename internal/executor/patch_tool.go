@@ -238,6 +238,12 @@ func indentForMessage(text string) string {
 // Short because it travels in prompts and is read by a model as often as by
 // this code. Twelve hex characters distinguish anything a run will encounter
 // and stay readable in a sentence.
+// HashOfContent is exported so a prompt can name the revision a patch will be
+// written against. A hunk that fails because the file moved is a different
+// problem from one that never matched, and only a named revision tells them
+// apart.
+func HashOfContent(content string) string { return hashOfContent(content) }
+
 func hashOfContent(content string) string {
 	digest := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(digest[:])[:12]
