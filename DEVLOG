@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-087
+Date: 2026-08-02
+Status: Four landed; rate measurement deferred and filed
+Change-ID: CL-20260802-077
+Commit: pending
+Request-or-TODO: PIPE-127 through PIPE-130
+Goal: Make the mutation score mean what the gate says it means
+Assumptions: A score that can be raised without improving the tests is not a
+  measurement
+Decisions: Built each mutant before running it rather than inferring
+  compilability from the suite's result. A failing suite and a failing build are
+  different facts and the old code conflated them in the direction that flatters.
+  Moved to the syntax tree rather than adding guards to the byte scanner. A
+  guard list is a rule somebody has to maintain; a BinaryExpr node cannot be
+  inside a string literal, so the property holds by construction.
+  Kept firstAttributedLine byte-for-byte even though checkMutations no longer
+  calls it, because a test outside this lane's ownership exercises it directly
+  and because it is the contrast that makes PIPE-128's proof legible. Its doc
+  comment now says why it is kept and points at the test that shows why it was
+  replaced.
+  Cleared the unestablished marker only after PIPE-130 showed the score
+  discriminating, rather than on the strength of the three repairs alone
+Files-or-schemas: internal/coordinator/agent_stage_mutation.go and a new test,
+  one line in internal/pipeline/checks.go
+Validation: The blind fixture scores 0% and the thorough one 100% on identical
+  source; the comment-and-literal contrast; the engine canary at 4.85s, well
+  under the 480s that got another lane's work backed out
+Failures-or-discarded-approaches: The end-to-end fixture's total wall clock did
+  not drop, because AST discovery finds candidates the first-occurrence scan
+  missed -- ten against five. That is more work and a better score, and it is
+  reported as such rather than framed as a speed win
+Known-limitations: No false-positive or false-negative rate exists. PIPE-130a
+Next-safe-step: PIPE-130a, or PIPE-061's parallel mutation runs
+
 Dev-Log: DL-20260802-086
 Date: 2026-08-02
 Status: Three fixed; suite down to twelve failures

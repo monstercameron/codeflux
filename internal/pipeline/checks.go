@@ -46,7 +46,7 @@ var Checks = []StageCheck{
 	{StageAtomPropertyTests, "checkPropertyTests", true, ""},
 	{StageAtomFuzz, "checkFuzzing", true, ""},
 	{StageAtomVerification, "checkAtomVerification", true, "PIPE-141"},
-	{StageAtomMutation, "checkMutations", true, "PIPE-127"},
+	{StageAtomMutation, "checkMutations", true, ""},
 	{StageAtomOptimization, "checkSimplification", false, ""},
 	{StageAtomComplexity, "checkComplexity", false, ""},
 	{StageMolecules, "checkMolecules", true, ""},

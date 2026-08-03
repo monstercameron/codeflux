@@ -50,6 +50,48 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-077
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- the mutation score now measures what it claims
+Request-or-TODO: PIPE-127, PIPE-128, PIPE-129, PIPE-130
+Outcome: The score was inflatable three ways and unverified in a fourth.
+  An uncompilable mutant counted as caught, so the cheapest way to raise the
+  score was to generate mutants that could not build. Each candidate is now
+  built before the suite ever runs and discarded if it fails, with its own
+  counter. On a real fixture, one of the old implementation's five "caught"
+  mutations was a build failure it credited as caught -- the free score
+  observed rather than theorised. Discarding is also about six times cheaper
+  than scoring: 0.11s against 0.73s, and the ratio widens on a slower suite.
+  Mutation now walks the syntax tree. Only *ast.BinaryExpr nodes with a mutable
+  operator are candidates, spliced at the operator's own position, so landing
+  inside a string literal or a comment is structurally impossible rather than
+  avoided by a rule -- a literal is one opaque node and a comment is wired into
+  no expression.
+  Sampling takes an evenly spaced stride across the attributed candidates rather
+  than the first twelve, so the score describes the change instead of whichever
+  lines come first
+Affected-behavior: The reported score changes, and should be read as more
+  honest rather than as a regression where it drops
+Compatibility-or-migration: StageAtomMutation's PIPE-127 unestablished marker is
+  cleared, on the basis that the gate claims the tests are known to detect
+  defects and the score is now shown to discriminate
+Verification: PIPE-130 is the proof and is the reason the rest is believable. A
+  fixture whose only test discards its result -- genuinely blind to the
+  boundary -- scores 0% and records broke, so a high score is unachievable there
+  by construction. The contrast is identical source with a test that checks both
+  edges, scoring 100%. Without that pairing a low score would be
+  indistinguishable from a broken check.
+  PIPE-128's proof is a contrast in one test: the same " == " byte pattern is
+  placed in a comment, a string literal and real code, and the retained byte
+  scanner is run beside the AST discovery. The AST finds only the real code; the
+  scanner lands on the comment
+Known-limitations: PIPE-130's full text also asks for false-positive and
+  false-negative rates, which need repeated trials across a fixture population.
+  Only the discrimination proof was delivered; the rates are filed as PIPE-130a,
+  and until they exist the threshold is a number nobody has calibrated
+Dev-Log: DL-20260802-087
+
 Change-ID: CL-20260802-076
 Commit: pending
 Date: 2026-08-02
