@@ -1350,3 +1350,76 @@ func mustControlJSON(value any) string {
 }
 
 var _ TaskControlOperations = (*Repositories)(nil)
+
+// StaleRunningTask is a task left active by a process that is no longer there.
+type StaleRunningTask struct {
+	TaskID   domain.TaskID
+	State    domain.TaskState
+	Revision uint64
+	// UpdatedAt is when anything last happened to it, which is how staleness is
+	// judged.
+	UpdatedAt time.Time
+}
+
+// ListStaleRunningTasks finds tasks that have been active with nothing
+// happening to them for longer than a run plausibly takes.
+//
+// A crash, a kill, or a database failure mid-transition leaves a task marked
+// running with no process behind it. Nothing retries it, nothing reports it,
+// and whatever is waiting on it waits forever — the same invisibility a run
+// that returns without an ending produces, arrived at from the outside.
+//
+// Judged on time since the last change rather than on a heartbeat, because that
+// is the signal this schema already carries and a heartbeat nobody writes is
+// worse than a timestamp everybody does.
+func (repositories *Repositories) ListStaleRunningTasks(
+	ctx context.Context,
+	olderThan time.Duration,
+	limit int,
+) ([]StaleRunningTask, error) {
+	if olderThan <= 0 {
+		olderThan = time.Hour
+	}
+	if limit < 1 || limit > 1000 {
+		limit = 100
+	}
+	cutoff := time.Now().Add(-olderThan).UnixMicro()
+	rows, err := repositories.database.sql.QueryContext(ctx,
+		`SELECT id, state, revision, updated_at_unix_micros
+		   FROM tasks
+		  WHERE state IN ('running', 'validating')
+		    AND updated_at_unix_micros < ?
+		  ORDER BY updated_at_unix_micros
+		  LIMIT ?`, cutoff, limit)
+	if err != nil {
+		return nil, classify("find stale running tasks", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var stale []StaleRunningTask
+	for rows.Next() {
+		var (
+			identifier string
+			state      string
+			revision   uint64
+			updated    int64
+		)
+		if err := rows.Scan(&identifier, &state, &revision, &updated); err != nil {
+			return nil, classify("scan stale running task", err)
+		}
+		taskID, parseErr := domain.ParseTaskID(identifier)
+		if parseErr != nil {
+			continue
+		}
+		stale = append(stale, StaleRunningTask{
+			TaskID:    taskID,
+			State:     domain.TaskState(state),
+			Revision:  revision,
+			UpdatedAt: time.UnixMicro(updated),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("read stale running tasks", err)
+	}
+	return stale, nil
+}

@@ -129,3 +129,58 @@ func (execution *AgentExecution) finaliseNonTerminalRun(
 		"floor: %t)", ending, reason, floorHeld)
 	return finalization{Terminal: true, Reason: reason, TaskState: ending}
 }
+
+// ensureTerminal is the last word: a run may not leave its task active.
+//
+// Deferred from Run, so it holds for every path out — the ones that return an
+// error, the ones that panic past a recover, and the ones somebody adds later
+// without reading this file. It does nothing when an ending was already
+// recorded, which is the ordinary case; what it catches is the path that
+// forgot.
+//
+// recovery-required rather than failed, deliberately. A run that reached the
+// end without recording an outcome has produced work nobody has judged, and the
+// two endings say different things about whether the worktree is worth keeping.
+func (execution *AgentExecution) ensureTerminal(
+	ctx context.Context,
+	scope agentScope,
+	taskID domain.TaskID,
+) {
+	if execution == nil || execution.repositories == nil {
+		return
+	}
+	// Its own context, for the same reason finaliseNonTerminalRun has one: the
+	// path most likely to reach here without an ending is the one whose context
+	// expired, and that context cannot be used to write the ending down.
+	ctx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+
+	task, err := execution.repositories.GetTask(ctx, taskID)
+	if err != nil {
+		return
+	}
+	if task.State != domain.TaskStateRunning &&
+		task.State != domain.TaskStateValidating {
+		return
+	}
+	tracef("final", "the run returned with its task still %s; forcing %s",
+		task.State, domain.TaskStateRecoveryRequired)
+	eventID, err := domain.NewEventID()
+	if err != nil {
+		return
+	}
+	_, _ = execution.repositories.TransitionTask(ctx, storage.TransitionTask{
+		EventID:          eventID,
+		TaskID:           taskID,
+		ExpectedRevision: task.Revision,
+		From:             task.State,
+		To:               domain.TaskStateRecoveryRequired,
+		IdempotencyKey: agentExecutionKey(
+			"agent-run-left-active-", taskID.String()),
+	})
+	execution.say(ctx, scope, events.KindMessageFinal,
+		"This run returned without recording an ending, which is a defect in "+
+			"the run rather than in the work. The task is marked as needing "+
+			"recovery so the worktree is kept and somebody can pick it up.")
+}

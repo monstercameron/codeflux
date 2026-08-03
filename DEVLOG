@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-140
+Date: 2026-08-03
+Status: The terminal-state invariant is enforced from three directions
+Change-ID: CL-20260803-130
+Commit: pending
+Request-or-TODO: The provider-failure analysis, items 7, 9 and 10
+Goal: Make a run impossible to lose
+Decisions: Deferred the guarantee from Run rather than adding it to each exit.
+  The paths that need it most are the ones nobody remembered.
+  Made the reconciler read time-since-change rather than a heartbeat. A
+  heartbeat nobody writes is worse than a timestamp everybody does, and this
+  schema already carries the timestamp.
+  Kept the shared provider health advisory. A run refusing to start on another
+  run's evidence has been denied its attempt, and the first attempt of a run is
+  exactly where that is least acceptable
+Files-or-schemas: new internal/coordinator/provider_health.go,
+  stale_run_reconciler.go and their tests, finalization.go,
+  agent_execution.go, internal/storage/task_control_repository.go
+Validation: Build, vet, gofmt, six new tests
+Failures-or-discarded-approaches: A reconciler test asserting the task's state
+  after a pass. The shared fixture creates no task row, so the assertion tested
+  the fixture rather than the reconciler; what is covered instead is that a
+  live run is never touched and that a second pass moves nothing
+Known-limitations: The reconciler is not wired into a scheduler yet — it exists
+  and is tested and nothing calls it periodically. Finalisation is still not a
+  single keyed function; the guarantee is enforced by the defer instead
+Next-safe-step: Read rung 6 with the new trace, then rung 7
+
 Dev-Log: DL-20260803-139
 Date: 2026-08-03
 Status: Provider handling is a bounded state machine; the trace shows prompts

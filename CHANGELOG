@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-130
+Commit: pending
+Date: 2026-08-03
+Type: Feature -- three ways a run can go missing, closed
+Request-or-TODO: Provider-failure analysis, items 7, 9 and 10
+Outcome: A run may not return with its task active, and that is now enforced by
+  a defer rather than intended by every path. "Every path arranges it" is the
+  kind of claim that stays true until somebody adds a path, and a task left
+  running is invisible: nothing retries it, nothing reports it, and whatever is
+  waiting on it waits forever. The forced ending is recovery-required rather
+  than failed, because a run that reached the end without recording an outcome
+  produced work nobody has judged.
+  The case a defer cannot catch — the process died, so there was no return to
+  defer from — is covered by a reconciler that finds tasks sitting active with
+  nothing happening to them and marks them for recovery. It never resumes
+  anything: restarting work that may have been half done, on a provider that
+  may have been why it died, is a decision with a bill attached and belongs to
+  a person. Its staleness window is deliberately generous, because reconciling
+  a live run out from under itself is a far worse defect than leaving a dead
+  one for another cycle.
+  Provider health is now shared across runs. The per-run circuit is right and
+  insufficient: twenty tasks discovering the same dead provider one full
+  timeout at a time is twenty times the wait and twenty times the spend for one
+  fact. A run that exhausts a provider records it for thirty seconds; a run
+  starting inside that window is told before it waits rather than after. It is
+  advisory — the run still tries, because a task that never starts because an
+  unrelated one failed is the worse mistake — and a success clears it at once.
+Verification: Build, vet, gofmt, six new tests covering the shared health
+  window and the reconciler's refusal to touch a live run
+Dev-Log: DL-20260803-140
+
 Change-ID: CL-20260803-129
 Commit: pending
 Date: 2026-08-03

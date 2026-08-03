@@ -142,6 +142,20 @@ func (execution *AgentExecution) Run(
 	if err != nil {
 		return err
 	}
+	// The invariant, enforced rather than intended.
+	//
+	// When this returns, the task is terminal or explicitly recoverable — never
+	// running, never validating. Every path below tries to arrange that, and
+	// "every path below" is exactly the kind of claim that is true until
+	// somebody adds a path. A run left running is invisible: nothing retries
+	// it, nothing reports it, and whatever is waiting on it waits forever.
+	//
+	// So the guarantee is made where it cannot be forgotten, and it is the
+	// generous ending rather than the harsh one: a run that reached here
+	// without recording an outcome has produced work nobody has judged, and
+	// recovery-required says that while failed does not.
+	defer execution.ensureTerminal(ctx, scope, taskID)
+
 	execution.say(ctx, scope, events.KindMessageFinal,
 		"Starting work in an isolated worktree.")
 
@@ -477,6 +491,13 @@ func (execution *AgentExecution) Run(
 		progress.refund()
 		if decision.Open {
 			providerCircuit = decision
+			// What this run learned about the provider is worth more than one
+			// run. Twenty tasks discovering the same dead provider one full
+			// timeout at a time is twenty times the wait for one fact.
+			if decision.Disposition != circuitFailConfiguration {
+				sharedProviderHealth.recordExhausted(
+					progress.currentModel(), decision.Reason, time.Now())
+			}
 		}
 		if decision.RetryAfter > 0 {
 			select {
@@ -639,6 +660,16 @@ func (execution *AgentExecution) Run(
 		}
 		progress.beginAttempt()
 		tracef("attempt", "%d begins on rung %s", attempt, progress.currentRung())
+		// What another run has already found out about this provider, said
+		// before the wait rather than after it. Advisory: this run still tries,
+		// because a task that never starts because an unrelated one failed is
+		// the worse mistake.
+		if why, recent := sharedProviderHealth.recentlyExhausted(
+			progress.currentModel(), time.Now(),
+		); recent {
+			tracef("infra", "another run found %s unavailable moments ago (%s); "+
+				"trying anyway", progress.currentModel(), why)
+		}
 		if attempt > 1 {
 			// The flow ledger follows the attempt loop rather than the run, so
 			// each attempt's stages are recorded under their own number. See
