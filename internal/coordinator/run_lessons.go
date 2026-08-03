@@ -2,11 +2,9 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
-	agentloop "codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/domain"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -206,42 +204,6 @@ var sharpLessons = map[string]string{
 		"and the repeated-element input, not only the ordinary one.",
 	"adversarial-review": "Never discard an error. A function that ignores " +
 		"what a call returns hides the failure it was meant to report.",
-}
-
-// lessonContextItems are the project's past lessons, ready to put in front of
-// a run before it starts.
-//
-// Returned as ordinary context items rather than appended to the instruction,
-// so a lesson is visibly a thing the project learned rather than part of what
-// this request is asking for. A run that cannot tell those apart will treat an
-// old lesson as a new requirement.
-func (execution *AgentExecution) lessonContextItems(
-	ctx context.Context,
-	scope agentScope,
-) []agentloop.RepositoryContextItem {
-	if execution == nil || execution.repositories == nil {
-		return nil
-	}
-	// Read wider than will be shown, then rank. Taking the newest eight puts
-	// whatever failed most recently in front of a run it may have nothing to
-	// do with, which is how a lessons list becomes noise a run learns to skip.
-	lessons, err := execution.repositories.ListProjectLessons(
-		ctx, scope.projectID, maximumLessonsInContext*5)
-	if err != nil || len(lessons) == 0 {
-		return nil
-	}
-	lessons = rankLessonsForRequirement(lessons, scope.requirement)
-	var body strings.Builder
-	body.WriteString(
-		"Earlier runs in this project were sent back for these reasons. They " +
-			"are not part of this request; they are mistakes already made " +
-			"here, and repeating one costs an attempt.\n\n")
-	for index, lesson := range lessons {
-		fmt.Fprintf(&body, "%d. %s\n", index+1, lesson.Statement)
-	}
-	return []agentloop.RepositoryContextItem{
-		agentContextItem("lessons-from-earlier-runs", body.String()),
-	}
 }
 
 // rankLessonsForRequirement puts the lessons most likely to matter to this

@@ -50,6 +50,42 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-111
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- gate priority, a provider gate of its own, and memory before
+  planning rather than after
+Request-or-TODO: Two refinement analyses, 2026-08-03
+Outcome: Four changes, all of them orderings rather than new machinery.
+  A concrete test failure now preempts every research gate. go build does not
+  compile test files, so a test calling a function with the wrong number of
+  arguments passed the assembly gate and arrived at the refinement loop listed
+  underneath a block asking for three synthesised integer cases. Rung 3 spent
+  the attempt on the cases. The compiler had named the file, the line and the
+  mistake; nothing else the run could have been told was worth as much.
+  Provider failures leave the assembly gate. Arriving there -- the gate that
+  means "the code does not compile" -- counted toward the stall that drives
+  escalation, so a closed socket bought a more expensive model; was written
+  down as a lesson, so the project learned about its own code from an outage;
+  and charged an attempt, so a run two gates from finished could die of a
+  transport blip. None of those follow now, and the attempt is refunded under a
+  bound.
+  Memory moved in front of planning. Retrieval and registration both lived in
+  recallKnownAtoms, which runs after the attempt loop, so a run was told what
+  it could have reused at the moment it could no longer use it. Registration
+  was implemented and worked; nothing read it in time to matter. Retrieved
+  items are now presented as a decision -- use unchanged, adapt, or reject with
+  a reason -- and every refused candidate carries the exact reason it was
+  refused, so "memory found nothing" and "memory correctly refused unsafe
+  reuse" can be told apart.
+  Atom enrichment moved behind delivery readiness and gained an admission
+  gate. Rung 2 alternated atom-documentation, completeness, completeness,
+  atom-documentation on the lowest rung, fixing each in turn and regressing the
+  other; neither is a reason a program cannot be reviewed.
+Verification: Build, vet, gofmt, the case and lesson suites, one new admission
+  test
+Dev-Log: DL-20260803-121
+
 Change-ID: CL-20260803-110
 Commit: pending
 Date: 2026-08-03

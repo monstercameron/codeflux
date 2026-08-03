@@ -47,7 +47,35 @@ var examineStructureVerifiedGatedStages = []pipeline.Number{
 }
 
 // examineStructure performs every stage that can be decided from what the run
-// actually produced.
+// actually produced, under the flow's own default profile.
+//
+// No production caller declares anything but pipeline.ProfileDefault today:
+// task intake carries no field a profile could be read from, and adding one
+// is a separate concern from consulting the profile the flow already
+// declares (PIPE-046a; see docs/plan.md's "Integration status" note under
+// "Declared Run Profiles"). This wrapper is what keeps that gap named rather
+// than silently closed by a caller-supplied default: examineStructureWithProfile
+// is the one real implementation, and this calls it with ProfileDefault, which
+// ValidateProfiles requires to decline nothing — so this method's behavior is
+// unchanged from before PIPE-046a landed.
+func (execution *AgentExecution) examineStructure(
+	ctx context.Context,
+	ledger *pipelineLedger,
+	scope agentScope,
+	compiles bool,
+	verified bool,
+) {
+	execution.examineStructureWithProfile(ctx, ledger, scope, compiles, verified, pipeline.ProfileDefault)
+}
+
+// examineStructureWithProfile is examineStructure, extended with the run's
+// declared profile (PIPE-046a): a stage the profile declines is recorded
+// skipped, with the profile's own reason, before the wave that would
+// otherwise have scheduled it, and is never handed to
+// pipeline.RestrictToStages/RunConcurrently at all -- the same "never
+// invoked" guarantee PIPE-046's TestPIPE046_AProfileSelectsADifferentStageSetFromTheSchedulerItself
+// proved against the scheduler directly, now proved through this production
+// call site.
 //
 // They are grouped here rather than scattered through the run because they
 // share one precondition — there is something that builds — and because the
@@ -58,12 +86,13 @@ var examineStructureVerifiedGatedStages = []pipeline.Number{
 // over. Every one of these used to be absent, which made a run that examined
 // nothing indistinguishable from a run that examined everything and found it
 // good.
-func (execution *AgentExecution) examineStructure(
+func (execution *AgentExecution) examineStructureWithProfile(
 	ctx context.Context,
 	ledger *pipelineLedger,
 	scope agentScope,
 	compiles bool,
 	verified bool,
+	profile pipeline.RunProfile,
 ) {
 	worktree := scope.worktree
 	if !compiles {
@@ -186,12 +215,23 @@ func (execution *AgentExecution) examineStructure(
 					"unconditional wave", stage), nil
 		}
 	}
+	unconditionalApplicable, unconditionalDeclines :=
+		declineProfiledStages(examineStructureUnconditionalStages, profile)
+	recordProfileDeclines(ctx, ledger, profile, unconditionalDeclines)
 	for _, decision := range pipeline.RunConcurrently(
-		ctx, pipeline.RestrictToStages(pipeline.Requirements, examineStructureUnconditionalStages),
+		ctx, pipeline.RestrictToStages(pipeline.Requirements, unconditionalApplicable),
 		pipeline.ResourceClassMap(), unconditionalRun, pipeline.ScheduleOptions{},
 	) {
 		ledger.recordDecision(ctx, decision)
 	}
+
+	// The profile's decision is made before the run starts, so it takes
+	// priority over "blocked because the suite failed": a stage the profile
+	// already declined was never going to run regardless of what the suite
+	// did, and recording it blocked would misattribute the reason.
+	verifiedApplicable, verifiedDeclines :=
+		declineProfiledStages(examineStructureVerifiedGatedStages, profile)
+	recordProfileDeclines(ctx, ledger, profile, verifiedDeclines)
 
 	if !verified {
 		// What is left genuinely does need a passing suite: a mutation score
@@ -202,7 +242,7 @@ func (execution *AgentExecution) examineStructure(
 		// (PIPE-017): deciding what is worth rewriting without a mutation
 		// score is deciding it under tests nobody has shown can detect a
 		// fault, which is the thing the ordering exists to prevent.
-		for _, stage := range examineStructureVerifiedGatedStages {
+		for _, stage := range verifiedApplicable {
 			ledger.blocked(ctx, stage,
 				"the suite does not pass, so nothing measured from running it "+
 					"would mean anything")
@@ -251,10 +291,50 @@ func (execution *AgentExecution) examineStructure(
 		}
 	}
 	for _, decision := range pipeline.RunConcurrently(
-		ctx, pipeline.RestrictToStages(pipeline.Requirements, examineStructureVerifiedGatedStages),
+		ctx, pipeline.RestrictToStages(pipeline.Requirements, verifiedApplicable),
 		pipeline.ResourceClassMap(), verifiedGatedRun, pipeline.ScheduleOptions{},
 	) {
 		ledger.recordDecision(ctx, decision)
+	}
+}
+
+// declineProfiledStages splits a candidate stage list into what the profile
+// still asks examineStructureWithProfile to decide and what it has already
+// decided, preserving the caller's order in both (PIPE-046a).
+//
+// This is deliberately checked before pipeline.RestrictToStages ever sees the
+// list: a declined stage must never reach the scheduler at all, matching the
+// guarantee TestPIPE046_AProfileSelectsADifferentStageSetFromTheSchedulerItself
+// proved for RunConcurrently directly -- a stage the profile declines gets no
+// Runner call, not a Runner call that happens to return skipped.
+func declineProfiledStages(
+	stages []pipeline.Number, profile pipeline.RunProfile,
+) (applicable []pipeline.Number, declined []pipeline.ProfileDecline) {
+	for _, stage := range stages {
+		if reason, ok := profile.DeclinedReason(stage); ok {
+			declined = append(declined, pipeline.ProfileDecline{Stage: stage, Reason: reason})
+			continue
+		}
+		applicable = append(applicable, stage)
+	}
+	return applicable, declined
+}
+
+// recordProfileDeclines writes one skipped ledger row per stage the profile
+// declined, before the wave that would otherwise have scheduled it
+// (docs/plan.md's own integration note for PIPE-046a). The detail names both
+// the profile and its stated reason, so a reader of the ledger sees a
+// decision made before the run started rather than an unexplained skip.
+func recordProfileDeclines(
+	ctx context.Context,
+	ledger *pipelineLedger,
+	profile pipeline.RunProfile,
+	declines []pipeline.ProfileDecline,
+) {
+	for _, decline := range declines {
+		ledger.record(ctx, decline.Stage, pipeline.StateSkipped,
+			fmt.Sprintf("declined in advance by run profile %q: %s", profile.Name, decline.Reason),
+			nil)
 	}
 }
 

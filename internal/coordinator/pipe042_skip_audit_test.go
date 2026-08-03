@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -77,7 +78,7 @@ func TestPIPE042_ComputeSkipAuditClassifiesEveryNonEstablishingStage(t *testing.
 			State: pipeline.StateSatisfied, DetailRedacted: "a stale prior read"},
 	}
 
-	result, err := ComputeSkipAudit(records, pipeline.StageSkipAudit)
+	result, err := ComputeSkipAudit(records, pipeline.StageSkipAudit, pipeline.ProfileDefault)
 	if err != nil {
 		t.Fatalf("ComputeSkipAudit refused a real ledger: %v", err)
 	}
@@ -170,7 +171,7 @@ func TestPIPE042_ComputeSkipAuditRefusesToClaimARatioFromNothing(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			result, err := ComputeSkipAudit(records, pipeline.StageSkipAudit)
+			result, err := ComputeSkipAudit(records, pipeline.StageSkipAudit, pipeline.ProfileDefault)
 			if err == nil {
 				t.Fatalf("ComputeSkipAudit computed a ratio from nothing: %+v", result)
 			}
@@ -286,4 +287,83 @@ func TestPIPE042_CheckSkipAuditRecordsHeldWithTheFullBreakdownWhenItCan(t *testi
 	if total, ok := outcome.Evidence["total_stages"].(int); !ok || total != 3 {
 		t.Errorf("total_stages = %v, want 3", outcome.Evidence["total_stages"])
 	}
+}
+
+// TestPIPE046a_SkipAuditClassifiesAProfileDeclineDifferentlyFromTheDefault
+// proves classifySkipAuditEntry consults the run's declared profile
+// (PIPE-046a) rather than only pipeline.Checks/pipeline.Section33Resolved.
+//
+// The same skipped row -- platform-matrix, which pipeline.Checks marks
+// MaySatisfy true with no Section33Resolved entry -- classifies as
+// SkipPrincipledDecline under checkSkipAudit's default profile (the same
+// answer ClassifyDecline alone would give: a check that may satisfy,
+// recorded skipped, is a principled decline) and as SkipDeclinedByProfile
+// under checkSkipAuditWithProfile(..., pipeline.ProfileLibrary), which is
+// the one profiles.go actually declines it under.
+//
+// Discrimination: replacing classifySkipAuditEntry's
+// pipeline.ClassifyDeclineForProfile call with the unprofiled
+// pipeline.ClassifyDecline (dropping the profile argument entirely) makes
+// the library subtest below fail, because the row would then classify
+// SkipPrincipledDecline the same as the default run -- the two subtests
+// would stop disagreeing.
+func TestPIPE046a_SkipAuditClassifiesAProfileDeclineDifferentlyFromTheDefault(t *testing.T) {
+	taskID, err := domain.NewTaskID()
+	if err != nil {
+		t.Fatalf("mint a task id: %v", err)
+	}
+	store := fakeSkipAuditStore{records: []storage.PipelineStageRecord{
+		{Stage: pipeline.StageInstructions, Name: "instructions",
+			State: pipeline.StateSatisfied, DetailRedacted: "held"},
+		{Stage: pipeline.StagePlatformMatrix, Name: "platform-matrix",
+			State: pipeline.StateSkipped, DetailRedacted: "no cross-compilation target declared"},
+	}}
+
+	findEntry := func(entries []map[string]any, stage pipeline.Number) (map[string]any, bool) {
+		for _, entry := range entries {
+			if stageValue, ok := entry["stage"].(int); ok && pipeline.Number(stageValue) == stage {
+				return entry, true
+			}
+		}
+		return nil, false
+	}
+
+	t.Run("default profile classifies it a principled decline", func(t *testing.T) {
+		outcome := checkSkipAudit(context.Background(), store, taskID, 1)
+		entries, ok := outcome.Evidence["entries"].([]map[string]any)
+		if !ok {
+			t.Fatalf("entries evidence is %T", outcome.Evidence["entries"])
+		}
+		entry, found := findEntry(entries, pipeline.StagePlatformMatrix)
+		if !found {
+			t.Fatalf("platform-matrix is not in the entries: %+v", entries)
+		}
+		if entry["classification"] != string(SkipPrincipledDecline) {
+			t.Errorf("default classification = %v, want %q",
+				entry["classification"], SkipPrincipledDecline)
+		}
+	})
+
+	t.Run("library profile classifies the same row declined by profile", func(t *testing.T) {
+		outcome := checkSkipAuditWithProfile(context.Background(), store, taskID, 1, pipeline.ProfileLibrary)
+		entries, ok := outcome.Evidence["entries"].([]map[string]any)
+		if !ok {
+			t.Fatalf("entries evidence is %T", outcome.Evidence["entries"])
+		}
+		entry, found := findEntry(entries, pipeline.StagePlatformMatrix)
+		if !found {
+			t.Fatalf("platform-matrix is not in the entries: %+v", entries)
+		}
+		if entry["classification"] != string(SkipDeclinedByProfile) {
+			t.Errorf("library classification = %v, want %q",
+				entry["classification"], SkipDeclinedByProfile)
+		}
+		reason, _ := entry["reason"].(string)
+		if !strings.Contains(reason, `run profile "library"`) {
+			t.Errorf("library reason does not name the declaring profile: %q", reason)
+		}
+		if declined, ok := outcome.Evidence["declined_by_profile"].(int); !ok || declined != 1 {
+			t.Errorf("declined_by_profile evidence = %v, want 1", outcome.Evidence["declined_by_profile"])
+		}
+	})
 }

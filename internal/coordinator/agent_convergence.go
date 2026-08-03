@@ -55,6 +55,9 @@ type convergence struct {
 	// when its budget runs out with gates left. Once per run: a second would
 	// make the ceiling advisory.
 	extended bool
+	// refunded counts attempts given back because the machinery failed rather
+	// than the work. Bounded so a provider that stays down cannot loop.
+	refunded int
 }
 
 // newConvergence starts a run at the bottom of its ladder.
@@ -98,6 +101,29 @@ func (tracker *convergence) moreAttempts() bool {
 		return true
 	}
 	return false
+}
+
+// refund gives back an attempt that was never spent on the work.
+//
+// A provider that would not answer, a transport that closed mid-turn: the run
+// learned nothing, produced nothing, and left the worktree exactly as it found
+// it. Charging it an attempt spends the run's budget on the machinery's behalf,
+// and a run that was two gates from finished can die of a socket.
+//
+// Bounded, because a provider that is down tends to stay down. Past the bound
+// the run pays for the attempt like any other and the budget ends it, which is
+// the correct outcome for a provider that is not coming back.
+func (tracker *convergence) refund() {
+	if tracker.refunded >= tracker.settings.MaximumAttempts {
+		return
+	}
+	tracker.refunded++
+	if tracker.spent > 0 {
+		tracker.spent--
+	}
+	if tracker.total > 0 {
+		tracker.total--
+	}
 }
 
 // topUp is how many extra attempts a still-converging run is given.

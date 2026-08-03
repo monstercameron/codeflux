@@ -26,6 +26,9 @@ type outstanding struct {
 	// askedForCases records whether this instruction included synthesised
 	// cases, so the caller can count the round it has spent.
 	askedForCases bool
+	// askedForDocumentation records whether this instruction asked for the
+	// atom schema, which is asked at most once per run.
+	askedForDocumentation bool
 	// owedCases is how many synthesised cases were still untried when this was
 	// computed, so the next round can tell whether the run is closing the gap
 	// or standing still. See the case ladder in outstandingWork.
@@ -46,6 +49,9 @@ func (execution *AgentExecution) outstandingWork(
 	ctx context.Context,
 	scope agentScope,
 	caseRounds int,
+	// documentationRounds is how many times this run has already been asked
+	// for the atom schema. It is asked once; see the block that uses it.
+	documentationRounds int,
 	// testsPassed is whether the run's own suite is actually known to have
 	// passed. Three instruction builders used to assert that it had, whether or
 	// not anything established it — see validationPreamble.
@@ -54,6 +60,14 @@ func (execution *AgentExecution) outstandingWork(
 	var work outstanding
 	var parts []string
 	var summaries []string
+	// satisfied is what this attempt has already established, carried into the
+	// instruction so the next one is told what its edit must not cost. Reaching
+	// here at all means the package built: outstandingWork is only asked after
+	// the assembly gate held.
+	satisfied := []string{"The package compiles."}
+	if testsPassed {
+		satisfied = append(satisfied, "The project's own test suite passes.")
+	}
 
 	examples := parseAcceptanceExamples(scope.requirement)
 	if _, failures := execution.checkAcceptance(
@@ -64,6 +78,9 @@ func (execution *AgentExecution) outstandingWork(
 		parts = append(parts, acceptanceInstruction(examples, failures))
 		summaries = append(summaries,
 			"it does not do what was asked ("+failures[0]+")")
+	} else if len(examples) > 0 {
+		satisfied = append(satisfied,
+			"The acceptance examples match exactly, byte for byte.")
 	}
 
 	attribution := execution.resolveAttribution(ctx, scope)
@@ -80,6 +97,9 @@ func (execution *AgentExecution) outstandingWork(
 				"too much",
 			len(gaps.UntestedAtoms), len(gaps.UndocumentedAtoms),
 			len(gaps.TangledFunctions)))
+	} else if err == nil {
+		satisfied = append(satisfied,
+			"Every function has a test that names it and a doc comment.")
 	}
 
 	// The case ladder is bounded by the run's own attempt budget, not by a
@@ -104,7 +124,10 @@ func (execution *AgentExecution) outstandingWork(
 	// The backstop is a cap on rounds rather than on progress, so a run that
 	// oscillates cannot spend its whole ceiling here alone.
 	const caseRoundBackstop = 8
-	if owed, err := untriedCases(scope.worktree); err == nil && len(owed) > 0 {
+	if owed, err := untriedCases(scope.worktree); err == nil && len(owed) == 0 {
+		satisfied = append(satisfied,
+			"Every input case derived from a signature is tried by a test.")
+	} else if err == nil && len(owed) > 0 {
 		owedNow := 0
 		for _, cases := range owed {
 			owedNow += len(cases)
@@ -133,18 +156,33 @@ func (execution *AgentExecution) outstandingWork(
 	// Asked last, and only for leaf functions, because it is the most
 	// expensive instruction in the set — nineteen fields per atom — and a run
 	// still failing to compile has more urgent problems than being findable.
-	if produced, err := readProducedFunctions(scope.worktree); err == nil {
-		if undocumented := atomsWithoutRegistrableDocumentation(
-			scope.worktree, produced,
-		); len(undocumented) > 0 {
-			if work.gate == "" {
+	// Only once everything else holds, and only once.
+	//
+	// This used to be asked alongside the delivery gates, and the two fought:
+	// ladder rung 2 alternated atom-documentation, completeness, completeness,
+	// atom-documentation on the lowest rung, fixing each in turn and regressing
+	// the other. Neither is a reason a program cannot be reviewed — a correct,
+	// tested, accepted program with no registry row is deliverable; an
+	// unreviewable one with a perfect registry row is not — so enrichment
+	// belongs after readiness rather than in competition with it.
+	//
+	// Asked once because it is a write of a comment, not a repair of a defect.
+	// A run that was told exactly which atoms and exactly which nineteen fields
+	// and did not do it will not do it on the fourth telling either, and the
+	// run has somewhere better to spend the attempt.
+	if len(parts) == 0 && documentationRounds == 0 {
+		if produced, err := readProducedFunctions(scope.worktree); err == nil {
+			if undocumented := atomsWithoutRegistrableDocumentation(
+				scope.worktree, produced,
+			); len(undocumented) > 0 {
 				work.gate = "atom-documentation"
 				work.because = "its atoms cannot be found by a later task"
+				work.askedForDocumentation = true
+				parts = append(parts, atomDocumentationInstruction(undocumented))
+				summaries = append(summaries, fmt.Sprintf(
+					"%d atom(s) carry no registrable documentation",
+					len(undocumented)))
 			}
-			parts = append(parts, atomDocumentationInstruction(undocumented))
-			summaries = append(summaries, fmt.Sprintf(
-				"%d atom(s) carry no registrable documentation",
-				len(undocumented)))
 		}
 	}
 
@@ -163,9 +201,35 @@ func (execution *AgentExecution) outstandingWork(
 	for index, part := range parts {
 		fmt.Fprintf(&instruction, "%d. %s\n\n", index+1, part)
 	}
+	instruction.WriteString(invariantBlock(satisfied))
 	work.instruction = strings.TrimRight(instruction.String(), "\n")
 	work.summary = strings.Join(summaries, "; ") + "."
 	return work
+}
+
+// invariantBlock names what the next attempt must not break.
+//
+// A run told to add three test cases rewrites the test file, and nothing in
+// what it was told says the acceptance output still has to match afterwards.
+// The gates all run again, so the regression is caught -- and caught costs an
+// attempt, which a sentence would have saved. Rung 5 spent six attempts fixing
+// two things in turn and regressing the other each time.
+//
+// Only obligations already established are listed. Naming one the run has not
+// met yet would read as a fourth thing to do, hidden in the section that says
+// it is not asking for anything.
+func invariantBlock(satisfied []string) string {
+	if len(satisfied) == 0 {
+		return ""
+	}
+	var block strings.Builder
+	block.WriteString(
+		"These are already true and must stay true. They are not work; they " +
+			"are what the work above must not cost:\n")
+	for _, held := range satisfied {
+		fmt.Fprintf(&block, "  - %s\n", held)
+	}
+	return block.String()
 }
 
 // wasOrWere keeps the sentence grammatical, because a message that reads as

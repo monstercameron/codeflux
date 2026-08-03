@@ -397,6 +397,7 @@ func (execution *AgentExecution) Run(
 	// never once asked about. A stage that can only accuse is worse than no
 	// stage: a reader cannot tell an unfixed defect from an unaskable one.
 	caseRounds := 0
+	documentationRounds := 0
 	// unfinished is what the run still owed when it ran out of attempts, so
 	// the completion message can say so instead of claiming to be done.
 	unfinished := ""
@@ -411,6 +412,29 @@ func (execution *AgentExecution) Run(
 	// awaitingApproval stops the loop when the ladder's next step is one this
 	// machine will not take on its own.
 	awaitingApproval := ""
+	// sendBackInfrastructure records an attempt lost to the machinery rather
+	// than to the work.
+	//
+	// Kept apart from sendBack on purpose, and not merely renamed. A provider
+	// that would not answer used to arrive at the assembly gate — the gate that
+	// means "the code does not compile" — because that was the closest name to
+	// hand, and three consequences followed from the mislabelling. It counted
+	// toward the stall that drives escalation, so a closed socket bought a more
+	// expensive model, which is money spent on the wrong remedy. It was written
+	// down as a lesson, so the project learned something about its own code
+	// from an outage. And it charged an attempt, so a run two gates from
+	// finished could die of a transport blip.
+	//
+	// None of those follow here. The worktree did not change, the model formed
+	// no judgement, and there is nothing to learn.
+	sendBackInfrastructure := func(instruction string, outcome string) {
+		tracef("infra", "gate=provider-availability outcome=%s "+
+			"worktree_changed=false", outcome)
+		failure = instruction
+		sentBackBecause = "the provider did not answer"
+		progress.refund()
+	}
+
 	sendBack := func(gate string, instruction string, because string) {
 		tracef("sendback", "gate=%s because=%s", gate, because)
 		// Every refusal is something this project has now learned. Written
@@ -509,6 +533,22 @@ func (execution *AgentExecution) Run(
 	// Intake, clarification and planning are decided once, above this loop.
 	// Sealing them here lets each later attempt carry them forward instead of
 	// recording them as never performed.
+	// What this project already knows, gathered before the run plans anything.
+	//
+	// Retrieval and registration both lived in recallKnownAtoms, which runs
+	// after the attempt loop has finished. A run was therefore told what it
+	// could have reused at the moment it could no longer use it, and the
+	// stage's report that the project held no earlier work was filed after the
+	// work had been rebuilt. Registration was implemented and worked; nothing
+	// read it in time for it to matter.
+	//
+	// Computed once rather than per attempt. What the project knows does not
+	// change while this run is working, and re-reading it every attempt would
+	// spend a query to be told the same thing.
+	preflight := execution.runMemoryPreflight(ctx, scope)
+	execution.say(ctx, scope, events.KindMessageFinal,
+		"Memory preflight: "+preflight.summary()+".")
+
 	ledger.sealPreAttemptStages()
 	for attempt := 1; progress.moreAttempts() && awaitingApproval == ""; attempt++ {
 		progress.beginAttempt()
@@ -560,12 +600,11 @@ func (execution *AgentExecution) Run(
 					"context: "+selection.Reason)
 		}
 		context := selection.Items
-		// What earlier runs in this project got wrong, before this one starts.
-		// This is the half of the memory loop that was missing: the write path
-		// existed since M21 and its only caller extracted build commands from
-		// an accepted review, which no run reaches, so every memory table was
-		// empty and two ladder rungs independently invented the same deadlock.
-		context = append(context, execution.lessonContextItems(ctx, scope)...)
+		// What this project has already built and already got wrong, put in
+		// front of the run before it plans rather than reported to it after it
+		// has finished. Gathered once above; shaped here into the decision the
+		// run has to make about each item.
+		context = append(context, preflight.contextItems()...)
 		if failure != "" {
 			context = append(context, agentContextItem(
 				"last-test-run-output", failure))
@@ -616,8 +655,8 @@ func (execution *AgentExecution) Run(
 		if errors.Is(runErr, providers.ErrRetryBudgetExhausted) ||
 			errors.Is(runErr, providers.ErrTransport) ||
 			errors.Is(runErr, providers.ErrRateLimited) {
-			sendBack("assembly", providerFailureInstruction(runErr),
-				"the provider did not answer")
+			sendBackInfrastructure(providerFailureInstruction(runErr),
+				providerOutcomeOf(runErr))
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d could not reach the model: %s. Trying again.",
 				attempt, runErr.Error()))
@@ -661,9 +700,41 @@ func (execution *AgentExecution) Run(
 		// adversarial review already learned: a run shown a third of the
 		// picture fixes a third of it, and the part it is not shown is the part
 		// it is free to break.
-		outstanding := execution.outstandingWork(ctx, scope, caseRounds,
-			narrator.ranValidation && !narrator.validationFailed &&
-				!narrator.filesChangedSinceValidation)
+		// A concrete test failure outranks every research gate.
+		//
+		// go build does not compile test files, so a test calling a function
+		// with the wrong number of arguments passes the assembly gate and
+		// arrives here. Ladder rung 3 got exactly that — "too many arguments in
+		// call to run" — listed underneath a block asking for three synthesised
+		// integer cases, and spent the attempt on the cases. The compiler had
+		// named the file, the line and the mistake; nothing else the run could
+		// have been told was worth as much.
+		//
+		// Sent alone, deliberately. The argument for naming everything at once
+		// holds between gaps of comparable weight, where a run fixing one is
+		// free to break another. It does not hold between a broken build and a
+		// missing doc comment: there is nothing to trade off, because until
+		// this passes none of the other checks are measuring the program that
+		// will exist.
+		testsHeld, testFailure := revalidateAfterWrite(ctx, scope.worktree)
+		if !testsHeld {
+			sendBack("integration-tests",
+				"the tests do not pass. Fix this before anything else; it is "+
+					"the only thing being asked for in this attempt:\n\n"+
+					testFailure,
+				"its tests do not pass")
+			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
+				"Attempt %d: the tests do not pass (%s). Fixing that first.",
+				attempt, firstMeaningfulLine(testFailure)))
+			continue
+		}
+
+		// Reaching here means the suite ran and passed on the worktree as it
+		// stands now, which is a stronger fact than the narrator's flags: those
+		// record what the agent's own tool calls did, and the agent's last act
+		// is almost always a write.
+		outstanding := execution.outstandingWork(
+			ctx, scope, caseRounds, documentationRounds, true)
 		if outstanding.any() && progress.lastAttempt() {
 			// Out of attempts with work still owed. Saying so is the whole
 			// point: the run used to fall through here and report
@@ -675,6 +746,9 @@ func (execution *AgentExecution) Run(
 		if outstanding.any() && !progress.lastAttempt() {
 			if outstanding.askedForCases {
 				caseRounds++
+			}
+			if outstanding.askedForDocumentation {
+				documentationRounds++
 			}
 			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
@@ -1614,4 +1688,24 @@ func firstMeaningfulLine(output string) string {
 		return trimmed
 	}
 	return "the suite reported no readable failure"
+}
+
+// providerOutcomeOf names what the transport did, as a typed outcome rather
+// than a sentence about it.
+//
+// The distinction is recorded because the three are not the same problem: a
+// rate limit clears on its own, an exhausted retry budget means the provider
+// answered and kept failing, and a transport error may be this machine's
+// network. Reading any of them off console text would collapse them into one.
+func providerOutcomeOf(err error) string {
+	switch {
+	case errors.Is(err, providers.ErrRateLimited):
+		return "rate-limited"
+	case errors.Is(err, providers.ErrRetryBudgetExhausted):
+		return "retry-budget-exhausted"
+	case errors.Is(err, providers.ErrTransport):
+		return "transport-failed"
+	default:
+		return "unavailable"
+	}
 }

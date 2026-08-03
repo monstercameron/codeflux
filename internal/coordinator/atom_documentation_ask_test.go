@@ -85,3 +85,31 @@ func TestNothingIsAskedWhenTheSchemaIsAlreadyThere(t *testing.T) {
 		t.Errorf("with nothing missing there is nothing to ask, got %q", got)
 	}
 }
+
+// TestATaskLocalProcedureIsNotWorthRegistering covers the admission gate.
+//
+// printFizzBuzz was queued for nineteen fields of documentation alongside a CLI
+// argument parser, and ladder rung 2 spent its attempts alternating between
+// that ask and the completeness gate on the lowest rung of the model ladder.
+func TestATaskLocalProcedureIsNotWorthRegistering(t *testing.T) {
+	for _, refused := range []producedFunction{
+		{Name: "printFizzBuzz", Parameters: []string{"int"}, Pure: false},
+		{Name: "run", Parameters: []string{"io.Reader", "io.Writer"},
+			Results: []string{"error"}, ReturnsError: true, Pure: false},
+		{Name: "banner", Results: []string{"string"}, Pure: true},
+	} {
+		if worthAdmitting(refused) {
+			t.Errorf("%s was queued for the full atom schema", refused.Name)
+		}
+	}
+	parser := producedFunction{
+		Name:       "parseArguments",
+		Parameters: []string{"[]string"},
+		Results:    []string{"[]int", "error"},
+		ReturnsError: true,
+		Pure:       true,
+	}
+	if !worthAdmitting(parser) {
+		t.Error("a pure parser returning a value was refused registration")
+	}
+}

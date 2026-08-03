@@ -49,6 +49,12 @@ type taskRunLauncherStore interface {
 	GetTask(context.Context, domain.TaskID) (storage.Task, error)
 	GetRepository(context.Context, domain.RepositoryID) (storage.Repository, error)
 	GetWorktreeBinding(context.Context, domain.TaskID) (storage.WorktreeBinding, error)
+	// UpdateRepositoryGitIdentity resynchronises the repository's stored
+	// revision to the one a task's worktree was actually created from
+	// (AUDIT-011b). Without this, git_identity stays pinned to whatever it
+	// was bound to at EnsureLocalBootstrap forever, and any later context
+	// selection comparing it against the worktree's real HEAD mismatches.
+	UpdateRepositoryGitIdentity(context.Context, domain.RepositoryID, string) error
 }
 
 // NewTaskRunLauncher builds the launcher.
@@ -216,6 +222,13 @@ func (launcher *TaskRunLauncher) resolveWorktree(
 ) (string, error) {
 	binding, err := launcher.store.GetWorktreeBinding(ctx, taskID)
 	if err == nil && strings.TrimSpace(binding.WorktreePath) != "" {
+		// The worktree already exists, from an earlier launch of this same
+		// task. Its binding names the exact revision it was created from
+		// (AUDIT-011b): resynchronise the repository's stored identity to
+		// that value here too, since a restart, retry, or crash recovery
+		// reaching this branch would otherwise leave git_identity however a
+		// previous, unrelated launch last left it.
+		launcher.resyncRepositoryGitIdentity(ctx, binding.RepositoryID, binding.BaseRevision)
 		return binding.WorktreePath, nil
 	}
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
@@ -243,7 +256,33 @@ func (launcher *TaskRunLauncher) resolveWorktree(
 	if err != nil {
 		return "", fmt.Errorf("create the task worktree: %w", err)
 	}
+	// AUDIT-011b: EnsureLocalBootstrap bound git_identity once, at first
+	// open, and nothing ever updated it after that. Context selection later
+	// insists it match the worktree's real HEAD exactly, so a repository
+	// that had gained even one commit since it was opened degraded to the
+	// worktree-listing fallback on every subsequent launch. Resolving `base`
+	// above and not recording it was exactly that gap; this closes it.
+	launcher.resyncRepositoryGitIdentity(ctx, repository.ID, base)
 	return created.Binding.WorktreePath, nil
+}
+
+// resyncRepositoryGitIdentity best-effort synchronises the repository's
+// stored revision to the one just resolved for a task's worktree.
+//
+// It does not fail the launch on a write error. The worktree itself is
+// already created and correct; a failure here only means context selection
+// may degrade to its fallback for this run, which is the existing, safe
+// behavior this ticket is closing off — not a reason to refuse a launch that
+// otherwise fully succeeded.
+func (launcher *TaskRunLauncher) resyncRepositoryGitIdentity(
+	ctx context.Context,
+	repositoryID domain.RepositoryID,
+	revision string,
+) {
+	if strings.TrimSpace(revision) == "" {
+		return
+	}
+	_ = launcher.store.UpdateRepositoryGitIdentity(ctx, repositoryID, revision)
 }
 
 // newLeaseID mints the lease that binds this worker to this run.

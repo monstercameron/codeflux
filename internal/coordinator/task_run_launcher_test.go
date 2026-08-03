@@ -258,6 +258,12 @@ func (stubLauncherStore) GetWorktreeBinding(
 	return storage.WorktreeBinding{}, errors.New("the launcher tests do not read bindings")
 }
 
+func (stubLauncherStore) UpdateRepositoryGitIdentity(
+	context.Context, domain.RepositoryID, string,
+) error {
+	return errors.New("the launcher tests do not resynchronise git identity")
+}
+
 // fixedSequences is a predictable enqueue ordering source.
 type fixedSequences struct{}
 

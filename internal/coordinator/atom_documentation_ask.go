@@ -65,10 +65,52 @@ func atomsWithoutRegistrableDocumentation(
 		if len(function.Calls) > 0 || documented[function.Name] {
 			continue
 		}
+		if !worthAdmitting(function) {
+			continue
+		}
 		missing = append(missing, function.Name)
 	}
 	sort.Strings(missing)
 	return missing
+}
+
+// worthAdmitting decides whether a function is worth nineteen fields of
+// documentation and a permanent row in the project's registry.
+//
+// Being an atom is not the same as being worth remembering. Every leaf function
+// was asked for the full schema, which put printFizzBuzz — a task-local
+// procedure that prints and returns nothing — in the same queue as a CLI
+// argument parser, and ladder rung 2 spent its attempts oscillating between
+// that ask and the completeness gate on the lowest rung of the model ladder.
+//
+// The questions worth asking are whether the behaviour can recur, whether it
+// can be stated precisely enough for a later run to match against, and whether
+// reusing it would save anything:
+//
+//   - A function that returns nothing produces no value a caller could want.
+//     Its whole contribution is its effect, and an effect is reproduced by
+//     doing it, not by calling this.
+//   - A function that takes nothing has no applicability to state. There is no
+//     input shape a later task could match against.
+//   - A function that reaches outside its arguments carries the environment it
+//     reached into, and that environment is not part of what gets reused.
+//
+// Deliberately conservative in one direction: refusing to register something
+// reusable costs a later run the work of rebuilding it, and registering
+// something task-local costs every later run the context of reading past it,
+// plus the attempts spent writing it. The second is charged repeatedly.
+func worthAdmitting(function producedFunction) bool {
+	if len(function.Results) == 0 {
+		return false
+	}
+	if len(function.Parameters) == 0 {
+		return false
+	}
+	// Returning only an error is an effect with a receipt, not a value.
+	if len(function.Results) == 1 && function.ReturnsError {
+		return false
+	}
+	return function.Pure
 }
 
 // atomDocumentationInstruction asks for the documentation registration needs.

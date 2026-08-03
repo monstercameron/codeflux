@@ -180,6 +180,83 @@ func (application *codeCollectionApplication) ListCodeSymbols(
 	return page, nil
 }
 
+// ListRegisteredAtoms returns the atoms the repository's project registered.
+//
+// This reads the database and never the working tree, which is the whole point
+// of it being a separate listing. ListCodeSymbols answers "what does this
+// checkout declare right now"; this answers "what has this project admitted
+// and kept". The two disagree routinely and both answers are correct: a
+// catalog entry has no Go declaration anywhere, and a declaration deleted
+// yesterday is still a registered atom.
+func (application *codeCollectionApplication) ListRegisteredAtoms(
+	ctx context.Context,
+	query transport.CodeCollectionQuery,
+) (transport.RegisteredAtomPage, error) {
+	if query.RepositoryID.IsZero() {
+		return transport.RegisteredAtomPage{}, transport.ErrWorkspaceTargetNotFound
+	}
+	repository, err := application.repositories.GetRepository(ctx, query.RepositoryID)
+	if err != nil {
+		return transport.RegisteredAtomPage{}, translateWorkspaceError(err)
+	}
+	limit := boundedCodeLimit(query.Limit)
+	revisions, err := application.repositories.ListAtomDocumentationRevisionsByProject(
+		ctx, repository.ProjectID, 0,
+	)
+	if err != nil {
+		return transport.RegisteredAtomPage{}, err
+	}
+	// Names live in their own lane and an atom may have documentation without
+	// ever having been named, so the names are read once and joined here
+	// rather than queried per row.
+	names := map[domain.AtomID]string{}
+	named, err := application.repositories.ListAtomNamesByProject(ctx, repository.ProjectID)
+	if err != nil {
+		return transport.RegisteredAtomPage{}, err
+	}
+	for _, name := range named {
+		if name.Valid {
+			names[name.AtomID] = name.CanonicalName.String()
+		}
+	}
+	// Listing revisions does not hydrate their documents, so the one field
+	// this surface draws is read in its own statement rather than left empty.
+	purposes, err := application.repositories.ListAtomDocumentationPurposesByProject(
+		ctx, repository.ProjectID,
+	)
+	if err != nil {
+		return transport.RegisteredAtomPage{}, err
+	}
+
+	search := strings.ToLower(strings.TrimSpace(query.Search))
+	page := transport.RegisteredAtomPage{TotalRegistered: uint32(len(revisions))}
+	for _, revision := range revisions {
+		record := transport.RegisteredAtomRecord{
+			AtomID:                   revision.AtomID.String(),
+			Name:                     names[revision.AtomID],
+			Purpose:                  purposes[revision.RevisionID.String()],
+			Authoring:                string(revision.Authoring),
+			SchemaVersion:            revision.SchemaVersion,
+			SourceRepositoryRevision: revision.SourceRepositoryRevision,
+			RevisionID:               revision.RevisionID.String(),
+		}
+		// A registered atom is searched by name and by promise for the same
+		// reason a declared one is: the question people arrive with is what an
+		// atom does, and no identity answers it.
+		if search != "" &&
+			!strings.Contains(strings.ToLower(record.Name), search) &&
+			!strings.Contains(strings.ToLower(record.Purpose), search) {
+			continue
+		}
+		if len(page.Atoms) == limit {
+			page.Truncated = true
+			break
+		}
+		page.Atoms = append(page.Atoms, record)
+	}
+	return page, nil
+}
+
 // InspectCodeSymbol reads one declaration closely.
 func (application *codeCollectionApplication) InspectCodeSymbol(
 	ctx context.Context,

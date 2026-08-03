@@ -25,6 +25,47 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-121
+Date: 2026-08-03
+Status: P0 orderings landed; influence recording and the terminal record are not
+Change-ID: CL-20260803-111
+Commit: pending
+Request-or-TODO: The gate-priority analysis and the memory-layer analysis
+Goal: Put concrete failures ahead of research gates, and memory ahead of
+  planning
+Decisions: Sent the test failure alone rather than in the combined list. The
+  argument for naming everything at once holds between gaps of comparable
+  weight, where fixing one is free to break another. It does not hold between a
+  broken build and a missing doc comment: until the first passes, none of the
+  other checks are measuring the program that will exist.
+  Kept the combined list for everything else, and added an invariant block
+  naming what is already true. The anti-oscillation reason for batching is
+  still right; what was wrong was batching a blocker with an enhancement.
+  Gave provider failure its own path rather than renaming its gate. Renaming
+  would have left it counting toward escalation and being written down as a
+  lesson, which are the two consequences that actually cost something.
+  Bounded the attempt refund by MaximumAttempts. A provider that is down stays
+  down, and past the bound the budget should end the run.
+  Made admission worthiness a property of the signature: returns a value, takes
+  an argument, reaches outside nothing. printFizzBuzz fails all three
+  interpretations of reusable; a pure parser passes.
+  Asked for the atom schema once. It is a write of a comment, not a repair of a
+  defect, and a run told exactly which atoms and which nineteen fields that did
+  not do it will not do it on the fourth telling
+Files-or-schemas: new internal/coordinator/memory_preflight.go,
+  agent_execution.go, agent_outstanding.go, agent_convergence.go,
+  atom_documentation_ask.go, run_lessons.go, agent_narration.go
+Validation: Build, vet, gofmt, coordinator case/lesson/admission tests
+Failures-or-discarded-approaches: Leaving lessonContextItems beside the new
+  preflight. Two paths that assemble the same context can disagree, and the one
+  nobody reads is the one that goes wrong
+Known-limitations: Influence is not recorded -- retrieval is not reuse, and
+  nothing yet persists whether the model used, adapted, rejected, or ignored a
+  presented item. No durable terminal record on every exit path. No protected
+  best-verified checkpoint. Registration still runs at the end of the run
+  rather than after acceptance
+Next-safe-step: Run rungs 1 and 2 shared and read the memory-preflight counts
+
 Dev-Log: DL-20260803-120
 Date: 2026-08-03
 Status: The lesson loop covers tool refusals as well as gate refusals

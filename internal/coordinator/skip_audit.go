@@ -15,12 +15,15 @@ import (
 // establish anything, distinguishing a decision this run made on purpose
 // from a gap nobody has closed yet (PIPE-042).
 //
-// The three values are the vocabulary internal/pipeline already carries
-// through pipeline.StageCheck and pipeline.Section33Resolved rather than a
+// The four values are the vocabulary internal/pipeline already carries
+// through pipeline.StageCheck, pipeline.Section33Resolved, and — since
+// PIPE-046a — the run's own declared pipeline.RunProfile, rather than a
 // second one invented here: MaySatisfy and Section33Resolved together say,
 // for every stage, whether it can ever be satisfied and, when it cannot,
 // whether that is because a real check declined it or because nothing was
-// ever meant to check it at all.
+// ever meant to check it at all; the profile says, independently of either,
+// whether the run decided in advance the stage did not apply to this task at
+// all.
 type SkipAuditClassification string
 
 const (
@@ -45,6 +48,14 @@ const (
 	// it. It is the default: a stage falls here unless the static vocabulary
 	// in pipeline.Checks names a reason it could not have done otherwise.
 	SkipUnimplemented SkipAuditClassification = "unimplemented"
+	// SkipDeclinedByProfile means the run's declared pipeline.RunProfile
+	// marked this stage inapplicable before the run started (PIPE-046a). This
+	// takes priority over the other three: the profile's decision predates
+	// whatever this run's own ledger happened to record for the stage, so a
+	// stage the profile declines is never folded into unimplemented or
+	// principled-decline, even though — before PIPE-046a wired the profile in
+	// here — it always was.
+	SkipDeclinedByProfile SkipAuditClassification = "declined-by-profile"
 )
 
 // SkipAuditEntry is one stage this run did not establish anything for.
@@ -114,9 +125,16 @@ var errSkipAuditNothingRecorded = errors.New(
 // perfect run, when records carries nothing else to audit — the vacuity
 // guard requirement 4 asks for. checkSkipAudit turns that error into a
 // skipped stage outcome rather than a satisfied one.
+//
+// profile is the run's own declared pipeline.RunProfile (PIPE-046a):
+// classification is computed against it rather than against
+// pipeline.ProfileDefault implicitly, so a profile-declined stage audits as
+// SkipDeclinedByProfile even though the ledger row it reads back only ever
+// carried a bare Stage and State.
 func ComputeSkipAudit(
 	records []storage.PipelineStageRecord,
 	self pipeline.Number,
+	profile pipeline.RunProfile,
 ) (SkipAuditResult, error) {
 	var result SkipAuditResult
 	for _, record := range records {
@@ -133,10 +151,10 @@ func ComputeSkipAudit(
 			result.Blocked++
 		case pipeline.StateSkipped:
 			result.Skipped++
-			result.Entries = append(result.Entries, classifySkipAuditEntry(record))
+			result.Entries = append(result.Entries, classifySkipAuditEntry(record, profile))
 		case pipeline.StateNotImplemented:
 			result.NotImplemented++
-			result.Entries = append(result.Entries, classifySkipAuditEntry(record))
+			result.Entries = append(result.Entries, classifySkipAuditEntry(record, profile))
 		}
 	}
 	if result.TotalStages == 0 {
@@ -151,14 +169,19 @@ func ComputeSkipAudit(
 }
 
 // classifySkipAuditEntry decides why one skipped or not-implemented stage
-// established nothing, using only pipeline.Checks and
-// pipeline.Section33Resolved — the same static vocabulary PIPE-004,
-// PIPE-010, and PIPE-011 already carry — rather than inventing a second
-// classification or guessing at this run's intent from prose (PIPE-042).
+// established nothing, using pipeline.Checks, pipeline.Section33Resolved, and
+// the run's own declared profile — the same static vocabulary PIPE-004,
+// PIPE-010, and PIPE-011 already carry, extended by PIPE-046a — rather than
+// inventing a second classification or guessing at this run's intent from
+// prose (PIPE-042).
 //
 // The rule is about what CAN ever be true of the stage, combined with what
-// this run's own ledger says happened to it:
+// this run's own ledger says happened to it and what its declared profile
+// decided before the run started:
 //
+//   - a stage the run's profile declines is SkipDeclinedByProfile regardless
+//     of anything below — the profile's decision predates the ledger row
+//     (PIPE-046a);
 //   - a stage nothing may ever satisfy (MaySatisfy false) either has a real
 //     check that legitimately cannot claim — named in Section33Resolved,
 //     which makes it a principled decline — or has no check at all, which is
@@ -171,7 +194,10 @@ func ComputeSkipAudit(
 //   - the same stage recorded not-implemented is unimplemented: for this
 //     run, nothing established anything for it, whether because the build
 //     genuinely has no code for it or because this attempt never reached it.
-func classifySkipAuditEntry(record storage.PipelineStageRecord) SkipAuditEntry {
+func classifySkipAuditEntry(
+	record storage.PipelineStageRecord,
+	profile pipeline.RunProfile,
+) SkipAuditEntry {
 	entry := SkipAuditEntry{
 		Stage: record.Stage, Name: record.Name, State: record.State,
 		Classification: SkipUnimplemented,
@@ -179,10 +205,13 @@ func classifySkipAuditEntry(record storage.PipelineStageRecord) SkipAuditEntry {
 	}
 	// One implementation, shared with the browser, which recomputes this from
 	// the wire because the classification is not carried on it. Two copies
-	// drifted apart the day the second was written; see pipeline.ClassifyDecline.
-	class, ticket := pipeline.ClassifyDecline(record.Stage, record.State)
+	// drifted apart the day the second was written; see
+	// pipeline.ClassifyDeclineForProfile.
+	class, ticket := pipeline.ClassifyDeclineForProfile(record.Stage, record.State, profile)
 	entry.Classification = SkipAuditClassification(class)
 	switch {
+	case class == pipeline.DeclineByProfile:
+		entry.Reason = fmt.Sprintf("declined in advance by run profile %q: %s", profile.Name, ticket)
 	case ticket != "":
 		entry.Reason = ticket + ": " + record.DetailRedacted
 	case class == pipeline.DeclineNoCheckByDesign:
@@ -191,7 +220,26 @@ func classifySkipAuditEntry(record storage.PipelineStageRecord) SkipAuditEntry {
 	return entry
 }
 
-// checkSkipAudit is StageSkipAudit's performer (PIPE-042).
+// checkSkipAudit is StageSkipAudit's performer (PIPE-042), auditing under the
+// flow's own default profile.
+//
+// No production caller declares anything but pipeline.ProfileDefault today —
+// see examineStructure's own doc comment in agent_stage_runner.go for why —
+// so this stays the thin default-profile wrapper and checkSkipAuditWithProfile
+// is the one real implementation (PIPE-046a).
+func checkSkipAudit(
+	ctx context.Context,
+	store PipelineStageLedgerStore,
+	taskID domain.TaskID,
+	attempt uint64,
+) stageOutcome {
+	return checkSkipAuditWithProfile(ctx, store, taskID, attempt, pipeline.ProfileDefault)
+}
+
+// checkSkipAuditWithProfile is checkSkipAudit, extended with the run's
+// declared profile (PIPE-046a): a stage the profile declined in advance
+// audits as SkipDeclinedByProfile rather than being folded into
+// unimplemented or principled-decline.
 //
 // It reads this run's own ledger, through the same PipelineStageLedgerStore
 // seam PIPE-006b opened for the wire, rather than reasoning from the flow
@@ -203,11 +251,12 @@ func classifySkipAuditEntry(record storage.PipelineStageRecord) SkipAuditEntry {
 // record skipped rather than a ratio computed from nothing, the same
 // fallback checkSimplification (PIPE-010) and checkComplexity (PIPE-011) use
 // when their own gate cannot be established.
-func checkSkipAudit(
+func checkSkipAuditWithProfile(
 	ctx context.Context,
 	store PipelineStageLedgerStore,
 	taskID domain.TaskID,
 	attempt uint64,
+	profile pipeline.RunProfile,
 ) stageOutcome {
 	if store == nil {
 		return skipped("no pipeline stage ledger is attached, so no skip " +
@@ -219,7 +268,7 @@ func checkSkipAudit(
 			"this run's ledger could not be read, so no skip ratio can be "+
 				"computed: %s", err.Error()))
 	}
-	result, computeErr := ComputeSkipAudit(records, pipeline.StageSkipAudit)
+	result, computeErr := ComputeSkipAudit(records, pipeline.StageSkipAudit, profile)
 	if computeErr != nil {
 		return skipped(computeErr.Error())
 	}
@@ -231,10 +280,11 @@ func checkSkipAudit(
 func skipAuditDetail(result SkipAuditResult) string {
 	return fmt.Sprintf(
 		"%d of %d stage(s) established nothing (%.0f%% skip ratio): "+
-			"%d principled decline(s), %d stage(s) with no check by design, "+
-			"%d unimplemented",
+			"%d declined by profile, %d principled decline(s), "+
+			"%d stage(s) with no check by design, %d unimplemented",
 		result.Skipped+result.NotImplemented, result.TotalStages,
 		result.SkipRatio*100,
+		countSkipAuditClassification(result.Entries, SkipDeclinedByProfile),
 		countSkipAuditClassification(result.Entries, SkipPrincipledDecline),
 		countSkipAuditClassification(result.Entries, SkipNoCheckByDesign),
 		countSkipAuditClassification(result.Entries, SkipUnimplemented))
@@ -276,16 +326,17 @@ func skipAuditEvidence(result SkipAuditResult) map[string]any {
 		})
 	}
 	return map[string]any{
-		"total_stages":       result.TotalStages,
-		"satisfied":          result.Satisfied,
-		"failed":             result.Failed,
-		"blocked":            result.Blocked,
-		"skipped":            result.Skipped,
-		"not_implemented":    result.NotImplemented,
-		"skip_ratio":         result.SkipRatio,
-		"principled_decline": countSkipAuditClassification(result.Entries, SkipPrincipledDecline),
-		"no_check_by_design": countSkipAuditClassification(result.Entries, SkipNoCheckByDesign),
-		"unimplemented":      countSkipAuditClassification(result.Entries, SkipUnimplemented),
-		"entries":            entries,
+		"total_stages":        result.TotalStages,
+		"satisfied":           result.Satisfied,
+		"failed":              result.Failed,
+		"blocked":             result.Blocked,
+		"skipped":             result.Skipped,
+		"not_implemented":     result.NotImplemented,
+		"skip_ratio":          result.SkipRatio,
+		"declined_by_profile": countSkipAuditClassification(result.Entries, SkipDeclinedByProfile),
+		"principled_decline":  countSkipAuditClassification(result.Entries, SkipPrincipledDecline),
+		"no_check_by_design":  countSkipAuditClassification(result.Entries, SkipNoCheckByDesign),
+		"unimplemented":       countSkipAuditClassification(result.Entries, SkipUnimplemented),
+		"entries":             entries,
 	}
 }
