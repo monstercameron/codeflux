@@ -151,6 +151,34 @@ const (
 	// Read this stage by name, not by its place in the printed order, until
 	// that renumbering lands.
 	StageSkipAudit Number = 39
+
+	// StageAtomRegistration writes the registry row a later run's recall
+	// (stage six) depends on: documentation, contract hash, and the exact
+	// revision the atom was verified at (PIPE-048). Without this stage
+	// nothing ever wrote that row, so every run's recall search over the
+	// project's earlier stored source text was the only registry that could
+	// ever exist -- accurate about what compiled, silent about what was
+	// actually verified and documented.
+	//
+	// It belongs, conceptually, immediately after atom-documentation: an
+	// atom is only worth registering once it carries the documentation
+	// recall reads. It is numbered and positioned last instead, additively
+	// after StageSkipAudit, for the same reason PIPE-020 and PIPE-042 give
+	// for their own appended stages — renumbering the flow is PIPE-045's,
+	// not this ticket's, to do. Read this stage by name, not by its place in
+	// the printed order, until that renumbering lands.
+	StageAtomRegistration Number = 40
+
+	// StageMoleculeRegistration is StageAtomRegistration's molecule-level
+	// counterpart (PIPE-049): a composed function is registered on the same
+	// terms, additionally recording the atoms it composes as its parts, so a
+	// later run can reuse a join and not only a leaf.
+	//
+	// It belongs, conceptually, immediately after molecule-verification. It
+	// is numbered and positioned last instead, additively after
+	// StageAtomRegistration, for the reason every other appended stage in
+	// this flow gives.
+	StageMoleculeRegistration Number = 41
 )
 
 // State is what became of one stage in one attempt.
@@ -282,6 +310,18 @@ var Flow = []Stage{
 	// beside delivery where it conceptually belongs; see StageSkipAudit.
 	{StageSkipAudit, "skip-audit",
 		"every stage this run recorded skipped or not-implemented is classified as a principled decline, a decision with no check by design, or an unimplemented gap, and the resulting ratio is reported as this run's headline figure"},
+
+	// PIPE-048, appended additively at the numeric end of the flow rather
+	// than beside atom-documentation where it conceptually belongs; see
+	// StageAtomRegistration.
+	{StageAtomRegistration, "atom-registration",
+		"each verified atom that carries schema-v1 documentation is written to the durable atom registry with its documentation, contract hash, and the exact repository revision it was verified at"},
+
+	// PIPE-049, appended additively at the numeric end of the flow rather
+	// than beside molecule-verification where it conceptually belongs; see
+	// StageMoleculeRegistration.
+	{StageMoleculeRegistration, "molecule-registration",
+		"each verified molecule that carries schema-v1 documentation is written to the durable atom registry on the same terms as an atom, additionally naming the atoms it composes as its parts"},
 }
 
 // StageByNumber returns one stage of the flow.

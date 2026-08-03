@@ -380,6 +380,52 @@ func (repositories *Repositories) ListAtomDocumentationRevisionsPendingReembeddi
 	return pending, nil
 }
 
+// ListAtomDocumentationRevisionsByProject returns every currently admitted
+// atom-documentation revision in one project, newest first, bounded by limit
+// (PIPE-048/PIPE-054: "the registry as it now stands"). Invalidated revisions
+// are excluded -- an invalidated revision is not something a later run
+// should recall as a live match.
+//
+// It does not load each revision's full field set (documentFromFields): a
+// caller indexing the registry by ContractHash to look for a match, or to
+// classify a reuse-regret finding, has no use for the nineteen-field prose
+// until it has already decided a particular revision matters, and loading it
+// for every row up front would turn a bounded index scan into N+1 queries
+// for the common case where most rows are never inspected further.
+func (repositories *Repositories) ListAtomDocumentationRevisionsByProject(
+	ctx context.Context,
+	projectID domain.ProjectID,
+	limit int,
+) ([]AtomDocumentationRevision, error) {
+	if projectID.IsZero() {
+		return nil, errors.New("atom documentation project ID must not be empty")
+	}
+	if limit < 1 || limit > 1000 {
+		limit = 200
+	}
+	rows, err := repositories.database.sql.QueryContext(
+		ctx,
+		atomDocumentationRevisionSelect+`
+		 WHERE project_id = ? AND validation_status = 'admitted'
+		 ORDER BY created_at_unix_micros DESC, id
+		 LIMIT ?`,
+		projectID, limit,
+	)
+	if err != nil {
+		return nil, classify("list atom documentation revisions by project", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var revisions []AtomDocumentationRevision
+	for rows.Next() {
+		record, err := scanAtomDocumentationRevision(rows, "list atom documentation revisions by project")
+		if err != nil {
+			return nil, err
+		}
+		revisions = append(revisions, record)
+	}
+	return revisions, rows.Err()
+}
+
 // atomDocumentationFieldSpec pairs one schema-v1 field label and its
 // structural kind with its value from a parsed atomdoc.Document. This
 // mirrors internal/atomdoc's unexported fieldSpecs table (schema.go): that

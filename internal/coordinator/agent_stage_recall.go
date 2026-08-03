@@ -10,11 +10,26 @@ import (
 	"strings"
 
 	"codeflux.dev/codeflux/internal/atomdoc"
+	"codeflux.dev/codeflux/internal/pipeline"
 	"codeflux.dev/codeflux/internal/retrieval/recallkey"
 	"codeflux.dev/codeflux/internal/storage"
 )
 
-// recallKnownAtoms is the recall stage (PIPE-050, PIPE-051, PIPE-051a).
+// recallKnownAtoms is the recall stage (PIPE-050, PIPE-051, PIPE-051a), and
+// is also where PIPE-048, PIPE-049, PIPE-052, PIPE-054, and PIPE-055's own
+// work happens, all from this one call site Run() (agent_execution.go, not
+// owned by this change) already gives it:
+//
+//   - PIPE-052 gates a "reuse" decision on this run's own re-verification
+//     (admitReuseDecisions), so a coincidental contract-hash agreement
+//     cannot import an earlier run's blind spots;
+//   - PIPE-048/PIPE-049 register this run's own produced atoms and
+//     molecules once they have been examined
+//     (registerAndRecordProducedDeclarations), so a later run's recall has
+//     a populated registry to search rather than an empty one; and
+//   - PIPE-054/PIPE-055 classify every write decision as a registry gap or
+//     a recall miss against the registry as it stood before this run added
+//     to it (classifyReuseRegret), never blocking recall's own outcome.
 //
 // PIPE-050 requires it to be binding: every contract this run needed leaves
 // with a recorded decision, either `reuse` — naming the project function
@@ -55,14 +70,21 @@ import (
 // without a decision, and no decision is ever admitted by a shape or
 // similarity match alone.
 //
-// It also cannot yet name a registered atom's evidence or verified revision,
-// because PIPE-048 (the atom-registration stage that writes those rows) does
-// not exist — the only registry this stage can search is
-// ListProjectSourceArtifactsExcludingTask, the project's own earlier stored
-// source, which carries no evidence link and no verified revision to report.
-// A `reuse` decision therefore names the matching function, its artifact,
-// and its contract hash, and is explicit that no registered evidence exists
-// to attach, rather than inventing either.
+// A `reuse` decision's own binding still only ever names a matching
+// function, its stored artifact, and its contract hash from
+// ListProjectSourceArtifactsExcludingTask -- the project's own earlier
+// stored source -- because moving the binding search onto the structured
+// atom registry PIPE-048 now populates is a change to bindRecallDecisions'
+// own matching, not merely to what runs beside it, and is left for the
+// ticket that widens recall's own search surface (which classifyReuseRegret
+// below names, per write decision, as exactly the "recall-miss" case: the
+// registry already has what recall's own artifact-based search did not
+// find). What PIPE-048 does give this run, today, is the registry row
+// itself -- documentation, contract hash, and the exact revision the atom
+// was verified at -- written by registerAndRecordProducedDeclarations below,
+// so a *later* run's own artifact-based search at least has real registered
+// source to find, and this run's own regret classification can tell a
+// registry gap from a recall miss rather than only ever reporting the former.
 func (execution *AgentExecution) recallKnownAtoms(
 	ctx context.Context,
 	scope agentScope,
@@ -109,13 +131,47 @@ func (execution *AgentExecution) recallKnownAtoms(
 		})
 	}
 
+	// PIPE-054/PIPE-055: the registry "as it now stands" is read once, before
+	// this run registers anything of its own further down, so a write
+	// decision is classified against prior work rather than against rows
+	// this same call is about to add. classifyReuseRegret turns every write
+	// decision into a registry-gap (nothing usable was ever deposited) or a
+	// recall-miss (the structured registry has an exact match this recall
+	// pass's own artifact-based search did not find) — two different defects
+	// with two different repairs, which is the distinction PIPE-055 asks for.
+	registry := loadRegisteredContractIndex(ctx, execution, scope)
+	regrets := classifyReuseRegret(wanted, decisions, registry)
+
+	// PIPE-052: a reuse decision is admitted only once this run's own
+	// case-synthesis-derived verification (StageAtomVerification) is
+	// confirmed to have held for this attempt — otherwise a contract-hash
+	// match is downgraded to a written justification, so a run whose own
+	// tests did not pass cannot vouch, by a coincidental hash agreement,
+	// that its own atom demonstrated anything.
+	verificationChecked, verificationHeld := reVerificationHeldThisAttempt(ctx, execution, scope)
+	decisions = admitReuseDecisions(decisions, verificationChecked, verificationHeld)
+
+	// PIPE-048/PIPE-049: this run's own produced work is registered now that
+	// it has been examined by every earlier stage, so a later run's recall
+	// has a populated registry — not merely stored source text — to search.
+	// This never blocks: a registration failure is recorded in its own
+	// stage's evidence and does not change recall's own outcome below.
+	atomRecords, moleculeRecords := execution.registerAndRecordProducedDeclarations(
+		ctx, scope, worktree, wanted, registry)
+
 	reused := reusedFunctionNames(decisions)
 	evidence := map[string]any{
-		"functions_needed":      len(wanted),
-		"decisions":             decisions,
-		"already_in_project":    reused,
-		"artifacts_searched":    len(known),
-		"unparseable_artifacts": unparseable,
+		"functions_needed":       len(wanted),
+		"decisions":              decisions,
+		"already_in_project":     reused,
+		"artifacts_searched":     len(known),
+		"unparseable_artifacts":  unparseable,
+		"reuse_regrets":          regrets,
+		"reuse_regret_count":     len(regrets),
+		"reverification_checked": verificationChecked,
+		"reverification_held":    verificationHeld,
+		"atoms_registered":       countRegistered(atomRecords),
+		"molecules_registered":   countRegistered(moleculeRecords),
 	}
 	if len(known) == 0 {
 		return held("the project holds no earlier work, so every contract "+
@@ -329,4 +385,139 @@ func reusedFunctionNames(decisions map[string]recallDecision) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// reVerificationHeldThisAttempt reports whether this run's own
+// StageAtomVerification row is recorded, for the attempt
+// currentAttemptBestEffort resolves, and if so, whether it held (PIPE-052).
+//
+// checked is false whenever nothing could be read at all: no repository, no
+// task identity, a storage error, or simply no row recorded yet for that
+// stage this attempt (a fixture calling recallKnownAtoms directly, never
+// through the full Run flow, most commonly). admitReuseDecisions treats an
+// unchecked result as "not disproven" rather than as a failure, which is
+// what keeps this addition from silently downgrading every reuse decision
+// in a test or a build that never wired StageAtomVerification's own ledger
+// write — the same fail-open posture this file already takes for every
+// other storage read that recall's own binding guarantee does not depend
+// on.
+func reVerificationHeldThisAttempt(
+	ctx context.Context, execution *AgentExecution, scope agentScope,
+) (checked bool, held bool) {
+	if execution == nil || execution.repositories == nil || scope.taskID.IsZero() {
+		return false, false
+	}
+	attempt := currentAttemptBestEffort(ctx, execution.repositories, scope.taskID)
+	records, err := execution.repositories.ListPipelineStages(ctx, scope.taskID, attempt)
+	if err != nil {
+		return false, false
+	}
+	for _, record := range records {
+		if record.Stage == pipeline.StageAtomVerification {
+			return true, record.State == pipeline.StateSatisfied
+		}
+	}
+	return false, false
+}
+
+// admitReuseDecisions applies PIPE-052's re-verification boundary on top of
+// bindRecallDecisions' own contract-hash matching.
+//
+// A reuse decision bindRecallDecisions already reached from an exact
+// contract-hash match is only left standing once this run's own
+// case-synthesis-derived verification (StageAtomVerification) is confirmed
+// to have held for this attempt. When it is confirmed NOT to have held,
+// every reuse decision is downgraded to a written justification: a run
+// whose own tests did not pass cannot vouch, from a coincidental hash
+// agreement alone, that the atom sharing that contract ever demonstrated
+// the behaviour the hash claims — which is exactly the "reuse cannot import
+// the earlier run's blind spots" PIPE-052 asks for. When re-verification
+// could not be checked at all (verificationChecked is false), every
+// decision is returned unchanged: PIPE-050/PIPE-051's existing binding
+// guarantee must not regress because this addition's own read found
+// nothing to say either way.
+func admitReuseDecisions(
+	decisions map[string]recallDecision,
+	verificationChecked bool,
+	verificationHeld bool,
+) map[string]recallDecision {
+	if !verificationChecked || verificationHeld {
+		return decisions
+	}
+	admitted := make(map[string]recallDecision, len(decisions))
+	for name, decision := range decisions {
+		if decision.Decision != "reuse" {
+			admitted[name] = decision
+			continue
+		}
+		admitted[name] = recallDecision{
+			Decision: "write",
+			Justification: fmt.Sprintf(
+				"the contract hash matched %s (artifact %s), but this run's "+
+					"own atom-verification did not hold this attempt, so the "+
+					"match is not admitted (PIPE-052): reuse must not import an "+
+					"earlier run's blind spots through a contract this run has "+
+					"not itself shown passes",
+				decision.MatchedFunction, decision.MatchedArtifact),
+		}
+	}
+	return admitted
+}
+
+// classifyReuseRegret is PIPE-054/PIPE-055's reuse-regret classification.
+//
+// For every contract this recall pass left as a write decision (nothing in
+// the artifact-based search — indexKnownArtifactContracts — matched), it
+// asks one further question against the structured atom registry read by
+// loadRegisteredContractIndex, "as it now stands" before this run's own
+// registration further down adds to it: does the registry already carry a
+// revision with this exact contract hash?
+//
+//   - No: nothing usable for this contract was ever deposited anywhere
+//     recall could have looked. Classified "registry-gap" — the repair is
+//     registering more, or earlier, not widening recall's own search.
+//   - Yes: the registry has an exact match this recall pass's own
+//     artifact-based search did not find, because that search reads stored
+//     source text, not the structured registry. Classified "recall-miss" —
+//     the repair is recall's own search surface, not the registry.
+//
+// A reuse decision is never a regret: recall already found what it needed.
+// Only a write decision — one recall could not admit — is worth asking
+// whether a better answer existed somewhere this pass did not look.
+func classifyReuseRegret(
+	wanted map[string]producedFunction,
+	decisions map[string]recallDecision,
+	registryContractIndex map[atomdoc.ContractHash]storage.AtomDocumentationRevision,
+) map[string]string {
+	regrets := map[string]string{}
+	for name, decision := range decisions {
+		if decision.Decision != "write" {
+			continue
+		}
+		function, ok := wanted[name]
+		if !ok {
+			continue
+		}
+		hash := recallkey.ComputeContractHash(normalizeWantedContract(function))
+		if _, found := registryContractIndex[hash]; found {
+			regrets[name] = "recall-miss"
+			continue
+		}
+		regrets[name] = "registry-gap"
+	}
+	return regrets
+}
+
+// countRegistered counts how many of a registration pass's records actually
+// registered something, for a compact evidence summary alongside the full
+// per-declaration record list a caller can already read from the stage's
+// own ledger row (recordRegistrationStageResult).
+func countRegistered(records []registrationRecord) int {
+	count := 0
+	for _, record := range records {
+		if record.Registered {
+			count++
+		}
+	}
+	return count
 }

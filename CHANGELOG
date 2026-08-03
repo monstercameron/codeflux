@@ -50,6 +50,50 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-084
+Commit: pending
+Date: 2026-08-02
+Type: Feature -- verified atoms and molecules reach the registry
+Request-or-TODO: PIPE-048, PIPE-049, PIPE-052, PIPE-054, PIPE-055
+Outcome: The registry PIPE-050's recall reads from was never written to, so
+  reuse had nothing to find and the section's whole loop was open at one end.
+  Two stages are added to the flow -- atom registration and molecule
+  registration -- and a real run now writes real atom_documentation_revisions
+  rows through them. A molecule registers on the same terms as an atom and
+  names the atoms it composes as dependency bindings.
+  Reuse is refused when this run's own verification failed, which is the
+  direction that matters: an exact contract-hash match downgrades to write
+  rather than reuse, and the justification names the ticket.
+  A recall miss is separated from a registry gap, so "nothing was reused" stops
+  being one undifferentiated outcome
+Affected-behavior: Two new stage numbers, so the flow is longer and
+  phases_test.go's out-of-range probe moves accordingly. Every run writes
+  registry rows it previously did not
+Compatibility-or-migration: ListAtomDocumentationRevisionsByProject is additive
+  with no schema change. The two new stages carry PIPE-048 and PIPE-049
+  unestablished markers and keep them
+Verification: Identity is proven in both directions. The same contract
+  registered twice yields the same atom identity, and a different contract in
+  the same project yields a different one with no cross-contamination -- an
+  implementation that ignored the contract-hash key and returned the most
+  recent atom would pass the first and fail the second. Reuse has an affirmative
+  case as well as a refusal: without the explicitly-held test, a gate that
+  downgraded on any checked evidence rather than only on failure would still
+  pass everything else in the file
+Known-limitations: Run() reaches both performers through recallKnownAtoms, but
+  never records their ledger rows through the pipelineLedger type, because that
+  call site is in a file this change does not own. The stage's own
+  pipeline_stage_records row is written directly and idempotently instead,
+  documented as a narrow exception to this package's ledger-is-the-only-writer
+  shape. That gap is what the two unestablished markers name.
+  PIPE-G08 is NOT demonstrated: stage 6's binding matcher still searches only
+  the raw artifact table and does not consult the new registry, so the registry
+  is populated but not yet read by the reuse decision. Widening that search is
+  the next step and is exactly what the regret classifier's recall-miss output
+  points at. PIPE-053 and PIPE-056 are unstarted; PIPE-056 is blocked because
+  the influence recorder needs a retrieval service AgentExecution does not hold
+Dev-Log: DL-20260802-094
+
 Change-ID: CL-20260802-083
 Commit: pending
 Date: 2026-08-02

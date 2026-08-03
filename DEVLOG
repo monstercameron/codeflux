@@ -25,6 +25,54 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-094
+Date: 2026-08-02
+Status: Five closed, one blocked, two unstarted, one gap named
+Change-ID: CL-20260802-084
+Commit: pending
+Request-or-TODO: PIPE-048, PIPE-049, PIPE-052, PIPE-054, PIPE-055, PIPE-056
+Goal: Put something in the registry recall already knew how to read
+Assumptions: The registry was empty rather than mis-queried -- checked by
+  reading the writer side, which had no caller
+Decisions: Added an affirmative reuse test alongside the refusal. A gate tested
+  only by its refusal is indistinguishable from a gate that refuses everything,
+  and a gate tested only by its permission is indistinguishable from one that
+  permits everything; both directions are needed for either to mean anything.
+  Added a changed-contract identity test after the same-contract one, because
+  the same-contract test alone passes against an implementation that ignores the
+  contract hash entirely and returns the most recent atom.
+  Wrote the stage's own record directly rather than through the ledger type, and
+  said so in the doc comment rather than letting it look like ordinary wiring.
+  Made it idempotent so a future Run()-side write cannot race it.
+  Did not widen stage 6's binding matcher to consult the registry. That path is
+  already tested and the change belongs with the reuse decision rather than with
+  the writer, but it means PIPE-G08 is still unanswered and is stated as such.
+  Left PIPE-056 alone rather than adding uncalled plumbing to internal/retrieval
+  for partial credit
+Files-or-schemas: new agent_stage_registration.go and its test,
+  agent_stage_recall.go, agent_refinable_test.go,
+  internal/storage/atom_documentation_repository.go, and additive rows in
+  internal/pipeline stages, checks, requirements and phases
+Validation: Fifteen registration tests plus PIPE-050 and PIPE-051's existing
+  ones, together, green; migration-check, lint, vet and the engine canary clean
+Failures-or-discarded-approaches: Four first-run failures were self-inflicted
+  fixture bugs -- two doc comments failing the schema's substantive-content word
+  count, two missing a required revision -- diagnosed with throwaway tests and
+  fixed before reporting. An earlier report of mine attributed them to another
+  lane; that was wrong and is corrected here
+Known-limitations: The recorded ledger row does not go through the ledger.
+  PIPE-G08 unanswered. PIPE-053, PIPE-056 and PIPE-048a unstarted
+Next-safe-step: Widen bindRecallDecisions to search the registry, which is what
+  closes PIPE-G08 and what the recall-miss classification is pointing at
+
+Correction to DL-20260802-093: commit a652e01 does not build on its own. It
+carries internal/pipeline/resource_classes.go whole, including two resource
+rows for the registration stages this change introduces, so at that commit the
+file references stage constants that do not yet exist. The hunks should have
+been split the way agent_stage_structure.go's were and were not. HEAD is
+correct once this change lands; the intermediate commit is not, and that is
+recorded rather than quietly rewritten.
+
 Dev-Log: DL-20260802-093
 Date: 2026-08-02
 Status: Three closed; four left for a quieter tree

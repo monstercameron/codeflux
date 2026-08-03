@@ -30,11 +30,15 @@ const (
 	// PhaseVerification is stages 30-34: whether the checking was worth
 	// anything.
 	PhaseVerification Phase = "verification"
-	// PhaseDelivery is stages 35-39: evidence, acceptance, and handover, plus
-	// the acceptance-oracle and skip-audit stages PIPE-020 and PIPE-042 each
-	// appended after StageDeliver rather than reorder the flow to give them
-	// the earlier position they conceptually hold; see StageAcceptanceOracle
-	// and StageSkipAudit.
+	// PhaseDelivery is stages 35-41: evidence, acceptance, and handover, plus
+	// four stages PIPE-020, PIPE-042, PIPE-048, and PIPE-049 each appended
+	// after StageDeliver rather than reorder the flow to give them the
+	// earlier position they conceptually hold; see StageAcceptanceOracle,
+	// StageSkipAudit, StageAtomRegistration, and StageMoleculeRegistration.
+	// The last two conceptually belong beside atom-documentation and
+	// molecule-verification, in PhaseAtoms and PhaseMolecules -- this bucket
+	// is a numeric-position artifact of appending rather than renumbering,
+	// exactly as it already was for the oracle and the skip audit.
 	PhaseDelivery Phase = "delivery"
 )
 
@@ -64,7 +68,7 @@ var phaseBounds = []struct {
 	{StagePathCoverage, PhaseControlFlow},
 	{StageEndToEndTests, PhaseProgram},
 	{StageNonFunctional, PhaseVerification},
-	{StageSkipAudit, PhaseDelivery},
+	{StageMoleculeRegistration, PhaseDelivery},
 }
 
 // PhaseOf reports which phase a stage belongs to.

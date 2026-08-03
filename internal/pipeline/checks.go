@@ -102,6 +102,20 @@ var Checks = []StageCheck{
 	{StageAcceptanceOracle, "AgentExecution.checkAcceptanceOracle", true, ""},
 	// PIPE-042.
 	{StageSkipAudit, "checkSkipAudit", true, ""},
+	// PIPE-048/PIPE-049. Both performers are real and are exercised directly
+	// by internal/coordinator's own registration tests; see
+	// AgentExecution.registerVerifiedAtoms and
+	// AgentExecution.registerVerifiedMolecules for the honestly-stated gap
+	// this Unestablished marker names: Run() (agent_execution.go) is not
+	// owned by this change, so neither performer has a call site there that
+	// records this stage's own ledger row through the pipelineLedger type.
+	// Each is instead invoked from recallKnownAtoms (agent_stage_recall.go,
+	// this change's own file), which does real work — including a direct,
+	// best-effort write of this stage's own pipeline_stage_records row
+	// through storage.RecordPipelineStageResult — but is not the call site
+	// PIPE-050's restructuring will eventually give it.
+	{StageAtomRegistration, "AgentExecution.registerVerifiedAtoms", true, "PIPE-048"},
+	{StageMoleculeRegistration, "AgentExecution.registerVerifiedMolecules", true, "PIPE-049"},
 }
 
 // ValidateChecks reports every disagreement between Flow and Checks.

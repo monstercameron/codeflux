@@ -373,6 +373,24 @@ var Requirements = []Requirement{
 		StageHumanAcceptance,
 		StageDeliver,
 	}},
+
+	{StageAtomRegistration, []Number{
+		// A registered atom's row is only worth writing once the atom
+		// carries the documentation recall depends on -- registering an
+		// undocumented atom would write a row with nothing but a name and a
+		// contract hash, which is not what PIPE-048 asks for.
+		StageAtomDocumentation,
+	}},
+
+	{StageMoleculeRegistration, []Number{
+		// A molecule is only worth registering once composition's own
+		// obligations are verified discharged, and registering it on "the
+		// same terms" as an atom (PIPE-049) means it also needs
+		// atom-registration to have already run, so the atoms it names as
+		// its parts are the ones a reader can actually look up.
+		StageMoleculeVerification,
+		StageAtomRegistration,
+	}},
 }
 
 // RequirementFor returns the declared dependency entry for one stage.

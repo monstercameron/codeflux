@@ -71,7 +71,11 @@ func TestPhasesRunInFlowOrderWithoutInterleaving(t *testing.T) {
 // TestStagesOutsideTheFlowAreUnattributedRatherThanDefaulted proves an
 // out-of-range stage is refused instead of being filed under a phase.
 func TestStagesOutsideTheFlowAreUnattributedRatherThanDefaulted(t *testing.T) {
-	for _, stage := range []Number{-1, 0, StageSkipAudit + 1, 1000} {
+	// StageMoleculeRegistration is, as of PIPE-048/PIPE-049, the flow's
+	// highest-numbered stage; +1 is the first number genuinely outside it.
+	// This probe used to read StageSkipAudit+1 for the same reason, before
+	// those two stages were appended past it.
+	for _, stage := range []Number{-1, 0, StageMoleculeRegistration + 1, 1000} {
 		if phase, found := PhaseOf(stage); found {
 			t.Errorf("stage %d was attributed to phase %q", stage, phase)
 		}

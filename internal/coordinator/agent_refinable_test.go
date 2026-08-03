@@ -69,6 +69,15 @@ var refinementGates = map[string]string{
 	// send-back here would ask the work to fix the flow's own gaps, and a run
 	// could raise its ratio only by declining less honestly.
 	"skip-audit": "",
+	// PIPE-048/PIPE-049: registration writes a durable row about what
+	// verification already established; a run that registered nothing did
+	// so because a produced declaration carried no schema-v1
+	// //codeflux:atom comment, which is atom-documentation's own gate,
+	// already refinable under "completeness" above. Sending work back a
+	// second time here would ask the loop to fix a defect it already has a
+	// gate for, under a different name.
+	"atom-registration":     "",
+	"molecule-registration": "",
 }
 
 // TestEveryStageThatCanFailIsEitherRefinableOrDeclaredReportOnly is the guard
