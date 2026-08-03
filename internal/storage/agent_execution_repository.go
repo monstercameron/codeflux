@@ -1231,6 +1231,82 @@ type TransitionedRunToValidation struct {
 	RunRevision  uint64
 }
 
+// transitionRunStartingToRunning moves a run from "starting" to "running"
+// inside an already-open transaction, when the run is currently "starting".
+// A run in any other state — including "running" already — is left
+// untouched and reported as a no-op rather than an error, so this is safe to
+// call every time a run resumes real work, including a plan re-bind after a
+// pause/resume cycle that put the run row back at "starting"
+// (ResumeControlledTask).
+//
+// This is the primary implementation of the starting -> running step
+// (AUDIT-020a). Before this existed, no production code anywhere performed
+// it: StartPreparedTaskRun (execution_preflight_repository.go) inserts a run
+// at "starting", and confirmed by full symbol search, nothing durable ever
+// moved it further — domain.RunStateRunning was referenced only by the
+// domain package's own declaration and by tests. A run's row sat at
+// "starting" for its entire executing lifetime. BindRunPlan
+// (agent_plan_repository.go) is the call site: it is the first durable,
+// once-per-attempt fact that a run has begun carrying out real work — it
+// binds the run to the plan revision it executes — and the agent execution
+// loop calls it once, early, before any tool call or file change. Calling
+// this helper there means "running" now reflects when work actually begins,
+// not a side effect of the later, unrelated move into validation.
+//
+// TransitionRunToValidation below also calls this, as a narrower defensive
+// fallback for a run that reaches validation without ever having gone
+// through BindRunPlan (for example, a run whose plan failed to record — see
+// the caller in agent_execution.go, which still calls BindRunPlan with a
+// zero plan revision in that case, which BindRunPlan itself refuses before
+// reaching this helper). Without that fallback such a run would still
+// present "starting" through validation, which is the same class of bug this
+// ticket exists to close, just from a different, rarer path.
+func transitionRunStartingToRunning(
+	ctx context.Context,
+	transaction *Transaction,
+	runID domain.RunID,
+	taskID domain.TaskID,
+	micros int64,
+) error {
+	var currentState domain.RunState
+	var currentRevision uint64
+	err := transaction.sql.QueryRowContext(ctx,
+		`SELECT state, revision FROM runs WHERE id = ? AND task_id = ?`,
+		runID, taskID,
+	).Scan(&currentState, &currentRevision)
+	if errors.Is(err, sql.ErrNoRows) {
+		// No such run: leave it for the caller's own subsequent read (plan
+		// binding, validation transition, ...) to report not-found.
+		return nil
+	}
+	if err != nil {
+		return classify("read run before starting-to-running transition", err)
+	}
+	if currentState != domain.RunStateStarting {
+		return nil
+	}
+	if err := domain.ValidateRunTransition(
+		domain.RunStateStarting, domain.RunStateRunning,
+	); err != nil {
+		return err
+	}
+	result, err := transaction.sql.ExecContext(ctx,
+		`UPDATE runs
+		 SET state = ?, revision = revision + 1, updated_at_unix_micros = ?
+		 WHERE id = ? AND task_id = ? AND state = ? AND revision = ?`,
+		domain.RunStateRunning, micros, runID, taskID,
+		domain.RunStateStarting, currentRevision,
+	)
+	if err != nil {
+		return repositoryWriteError("transition run to running", err)
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return typedError(ErrStaleRevision, "transition run to running",
+			errors.New("run state or revision changed"))
+	}
+	return nil
+}
+
 // TransitionRunToValidation atomically moves a running task and its run into
 // validation, the durable precondition RecordCompletionCandidate requires.
 //
@@ -1241,19 +1317,15 @@ type TransitionedRunToValidation struct {
 // ever be recorded as leaving on the completion path, which is the same shape
 // of gap RepairCompletionService.PrepareCompletion's own missing caller was.
 //
-// A second, narrower gap sits directly upstream and this function bridges it
-// rather than assuming it away: StartPreparedTask inserts a run at state
-// "starting" (execution_preflight_repository.go), and confirmed by symbol
-// search, no production code anywhere transitions a run's own durable state
-// to "running" afterward — domain.RunStateRunning is referenced only by the
-// domain package's own declaration and by tests. The *task* reliably reaches
-// "running" (StartPreparedTask sets it directly); the *run* does not. Rather
-// than widen this ticket into fixing the general worker-acknowledgment gap —
-// a separate, larger concern belonging to whatever should mark a run started,
-// not to a completion call site — this function reads the run's actual
-// current state and, if it is still "starting", applies the one further
-// transition domain.RunState already declares valid (starting -> running)
-// before applying running -> validating. Both steps go through
+// A run reaches "running" in the ordinary case well before this function
+// runs: BindRunPlan calls transitionRunStartingToRunning when the agent
+// execution loop binds the run to its plan, at the start of real work
+// (AUDIT-020a). The bridge below is now a narrower defensive fallback for a
+// run that reaches validation without that call having applied — this
+// function reads the run's actual current state and, if it is still
+// "starting", applies the same transition before applying running ->
+// validating, so this call site can never itself be the reason a run's
+// durable state disagrees with the work it did. Both steps go through
 // domain.ValidateRunTransition; neither bypasses the declared state machine,
 // and a run in any other state is refused exactly as before.
 func (repositories *Repositories) TransitionRunToValidation(
@@ -1358,23 +1430,10 @@ func (repositories *Repositories) TransitionRunToValidation(
 			)
 		}
 		if currentRunState == domain.RunStateStarting {
-			bridgeResult, bridgeErr := transaction.sql.ExecContext(ctx,
-				`UPDATE runs
-				 SET state = ?, revision = revision + 1, updated_at_unix_micros = ?
-				 WHERE id = ? AND task_id = ? AND state = ? AND revision = ?`,
-				domain.RunStateRunning, micros, input.RunID, input.TaskID,
-				domain.RunStateStarting, currentRunRevision,
-			)
-			if bridgeErr != nil {
-				return repositoryWriteError(
-					"bridge run to running before validation", bridgeErr,
-				)
-			}
-			if affected, _ := bridgeResult.RowsAffected(); affected != 1 {
-				return typedError(
-					ErrStaleRevision, "bridge run to running before validation",
-					errors.New("run state or revision changed"),
-				)
+			if err := transitionRunStartingToRunning(
+				ctx, transaction, input.RunID, input.TaskID, micros,
+			); err != nil {
+				return err
 			}
 			currentRunState = domain.RunStateRunning
 			currentRunRevision++

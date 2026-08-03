@@ -810,7 +810,14 @@ func (repositories *Repositories) ApprovePlanRevision(
 	return binding, err
 }
 
-// BindRunPlan rejects a superseded, unapproved, or execution-inconsistent plan.
+// BindRunPlan rejects a superseded, unapproved, or execution-inconsistent
+// plan. It is also, since AUDIT-020a, the primary place a run's durable
+// state moves from "starting" to "running": the agent execution loop calls
+// this once, early, before any tool call or file change, so binding the run
+// to the plan it executes is the first durable fact that real work has
+// begun. See transitionRunStartingToRunning for the transition itself and
+// why it runs unconditionally here, ahead of this function's own
+// idempotency check.
 func (repositories *Repositories) BindRunPlan(
 	ctx context.Context,
 	input BindRunPlan,
@@ -829,6 +836,19 @@ func (repositories *Repositories) BindRunPlan(
 	err := repositories.database.RunInTransaction(
 		ctx,
 		func(transaction *Transaction) error {
+			_, micros := repositories.timestamp()
+			// The run reaches "running" here, regardless of whether this bind
+			// is the first for the run or an idempotent/resumed replay
+			// (AUDIT-020a): binding a run to the plan it executes is the
+			// first durable evidence real work is beginning, and it recurs
+			// identically after a pause/resume cycle puts the run row back at
+			// "starting" (ResumeControlledTask). A run already at "running",
+			// or in any other state, is left untouched.
+			if err := transitionRunStartingToRunning(
+				ctx, transaction, input.RunID, input.TaskID, micros,
+			); err != nil {
+				return err
+			}
 			existing, found, err := findRunPlanBinding(
 				ctx,
 				transaction.sql,
@@ -885,7 +905,6 @@ func (repositories *Repositories) BindRunPlan(
 					errors.New("plan approval is required"),
 				)
 			}
-			_, micros := repositories.timestamp()
 			if _, err := transaction.sql.ExecContext(
 				ctx,
 				`INSERT INTO run_plan_bindings (

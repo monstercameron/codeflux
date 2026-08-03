@@ -25,6 +25,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260802-103
+Date: 2026-08-02
+Status: Three closed; one partly-fixed bug reported rather than smoothed over
+Change-ID: CL-20260802-093
+Commit: pending
+Request-or-TODO: AUDIT-020a, PIPE-044a, PIPE-130a
+Goal: Close the three follow-ups this session filed against itself
+Assumptions: That the missing run transition was cosmetic -- wrong, and finding
+  out is the most valuable thing here. Surveying every reader of the column
+  before fixing the writer is what turned a bookkeeping note into a defect
+Decisions: Put the transition at plan binding rather than at some notional
+  start-of-work marker, because it is the earliest fact that is durable, happens
+  once per attempt, and re-fires after resume. Kept the older narrow bridge as a
+  documented fallback rather than deleting it, for a run that reaches validation
+  without ever binding a plan.
+  Reused the review fetch's own summary instead of adding a second fetch for the
+  same data.
+  Made the blind mutation fixtures assert real values that the mutation does not
+  change, rather than discard their results. A fixture that checks nothing
+  proves the score can detect a test that checks nothing, which is a weaker
+  claim than the gate makes.
+  Verified a sample of the calibration's ground truth outside the checker being
+  calibrated, because labels asserted by the thing under measurement are not
+  evidence
+Files-or-schemas: agent_execution_repository.go and its test,
+  agent_plan_repository.go, web/client main, review and pipeline-ledger files,
+  shell.go, timeline_controls.go, and two new test files
+Validation: Full storage package; the end-to-end AUDIT-020 test; a real browser
+  run whose rendered caveat was reconciled against the database
+Failures-or-discarded-approaches: The browser evidence could not use the
+  session's own mounted-thread harness, which never mounts frontend assets, so
+  the test drives its own minimal requirement rather than changing a file it did
+  not own
+Known-limitations: The ledger fetch is not deterministic on a loaded machine
+Next-safe-step: The fetch dependency bug deserves its own ticket if it recurs
+  once the tree is quiet
+
 Dev-Log: DL-20260802-102
 Date: 2026-08-02
 Status: One closed; the other left open because the mechanism cannot reach it

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"codeflux.dev/codeflux/web/frontend/design"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/timeline"
 	"codeflux.dev/codeflux/web/frontend/timelinecard"
@@ -46,6 +47,15 @@ type TimelineControlProps struct {
 	OnCloseReview            func()
 	OnReturnToCurrent        func()
 	OnStop                   func()
+	// PipelineSkipSummary is the active task attempt's most recently computed
+	// skip audit, when the caller has one to give (PIPE-044a). It is threaded
+	// onto every rendered card's timelineview.Props unchanged; timelineview's
+	// own renderer decides, per card, whether it belongs on that message (a
+	// durable, agent-authored final message) and pipelineledger.RunCompletionCaveat
+	// renders nothing when the audit was never computed. Nil here means the
+	// caller had none to give -- loading, unavailable, or no task selected --
+	// and every card renders exactly as it did before this field existed.
+	PipelineSkipSummary *pipelineledger.SkipSummary
 }
 
 // ReviewBindingView identifies the exact authoritative revisions presented in

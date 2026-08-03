@@ -20,6 +20,7 @@ import (
 	"codeflux.dev/codeflux/web/frontend/executionview"
 	"codeflux.dev/codeflux/web/frontend/filetree"
 	frontendi18n "codeflux.dev/codeflux/web/frontend/i18n"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/preferences"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/routes"
@@ -437,7 +438,19 @@ func productApplication() ui.Node {
 			}
 		}
 	}
-	timelineProps.ReviewContent = useMountedReview(
+	// useMountedReview also returns the pipeline ledger's skip-audit summary
+	// it fetches internally (PIPE-044a): the ledger view and the timeline's
+	// own completion caveat beside a run's last word are two presentations
+	// of the same audit, and until now only the ledger view populated it.
+	// This reuses that one fetch rather than calling useMountedPipelineLedger
+	// a second, independent time here -- two competing fetch.UseResource
+	// instances asking the coordinator the same question on every render
+	// raced under load in practice, and because this hook's only dependency
+	// (the task ID) does not change once a task is selected, a fetch that
+	// lost that race stayed stuck, silently, for the rest of the browser
+	// session. One fetch, reused, both places.
+	var pipelineSkipSummary pipelineledger.SkipSummary
+	timelineProps.ReviewContent, pipelineSkipSummary = useMountedReview(
 		selectedThread.Get(),
 		primitives.Mode{
 			Theme: tokens.Theme, Density: tokens.Density,
@@ -463,6 +476,7 @@ func productApplication() ui.Node {
 			},
 		},
 	)
+	timelineProps.PipelineSkipSummary = &pipelineSkipSummary
 	if authoritativeTaskControls != nil && timelineSource.TaskReady {
 		decorateTaskControlsFromProjection(authoritativeTaskControls, timelineSource.Task)
 		if taskControlSource.DecorateRecovery != nil {

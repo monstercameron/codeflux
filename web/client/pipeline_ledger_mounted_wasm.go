@@ -38,6 +38,24 @@ func useMountedPipelineLedger(
 		defer cancel()
 		return loadPipelineStageResource(ctx, openBrowserPipelineStageResourceClient, taskID, attempt)
 	}, dependency)
+	// fetch.UseResource's own dependency diffing missed the very first
+	// transition from no task selected to a real one often enough to be
+	// reproduced in a real browser (PIPE-044a, observed directly by logging
+	// the resource's own state through several real runs): the resource
+	// would settle permanently on the "no task selected" load's resolved
+	// error the instant a thread was selected, holding a real task ID that
+	// was never actually fetched for, because nothing re-ran the loader once
+	// it had already resolved once. GWC's own documented behaviour is that
+	// UseEffect dependency comparison is a hint, not a guarantee, so this
+	// checks the dependency this render actually computed against the one
+	// the resource is known to have last fetched for and forces an explicit
+	// Reload on mismatch, rather than trusting deps diffing alone to catch
+	// every transition.
+	fetchedDependency := ui.UseRef("")
+	if fetchedDependency.Get() != dependency {
+		fetchedDependency.Set(dependency)
+		resource.Reload()
+	}
 	state := resource.Get()
 
 	if taskID.IsZero() {

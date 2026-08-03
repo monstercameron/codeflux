@@ -1601,7 +1601,8 @@ func ConversationPane(props ConversationPaneProps) ui.Node {
 			items = append(items, transcriptSpineRow(
 				ui.CreateElement(timelineview.Renderer, timelineview.Props{
 					Card: card, Mode: props.Mode, Actions: actions,
-					Selected: selectedStableKey != "" && card.StableKey == selectedStableKey,
+					Selected:            selectedStableKey != "" && card.StableKey == selectedStableKey,
+					PipelineSkipSummary: props.Timeline.PipelineSkipSummary,
 				}),
 				card,
 				index == len(cards)-1 && cardStillArriving(card),

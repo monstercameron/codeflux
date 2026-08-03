@@ -50,6 +50,45 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260802-093
+Commit: pending
+Date: 2026-08-02
+Type: Fix -- a run acknowledges that it is running, and pause starts working
+Request-or-TODO: AUDIT-020a, PIPE-044a, PIPE-130a
+Outcome: A run's durable row sat at "starting" for its entire executing life
+  while the task moved through its own states independently. That was recorded
+  as a bookkeeping gap. The survey found it was not one: RequestTaskPause gates
+  on the run being running or validating, so pause was unusable for the whole
+  time a run was actually doing work, and only the brief review window ever
+  admitted it. The transition now happens when the agent binds its plan, which
+  is the earliest durable once-per-attempt fact that work has begun and which
+  re-fires correctly after a pause and resume.
+  The unverified-stages caveat now reaches the run's final timeline message. The
+  summary is threaded from the review fetch that already computed it rather than
+  from a second one.
+  The mutation gate is calibrated: twenty fixtures, one thorough and one
+  deliberately blind for each of the ten operators the mutator declares, with
+  the blind ones asserting real values that the specific mutation happens not to
+  change, which is a harder bar than the earlier fixture that discarded its
+  result entirely
+Affected-behavior: Pause becomes usable during execution. Two tests that forced
+  a state transition through raw SQL needed widening because the row may now
+  legitimately already be running
+Compatibility-or-migration: domain/states.go is untouched; the transition was
+  already declared valid. The browser test is opt-in and skipped by default
+Verification: The caveat's rendered text was cross-checked against a direct
+  database read of the same attempt's stage records, excluding the same stage
+  the summary excludes, and the numbers agree exactly. The mutation calibration
+  verifies a sample of its own ground-truth labels by hand-mutating source and
+  running the suite directly, outside the checker being measured
+Known-limitations: A real fetch bug was found and only partly fixed. A
+  dependency comparison missed the no-task-to-task transition, so the ledger
+  fetch could settle permanently on the earlier load's error; an explicit reload
+  improved the pass rate substantially without making it deterministic, and it
+  is not claimed as reliable. Measured mutation rates are zero false positives
+  and zero false negatives out of ten each, which is a small population
+Dev-Log: DL-20260802-103
+
 Change-ID: CL-20260802-092
 Commit: pending
 Date: 2026-08-02

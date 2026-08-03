@@ -276,10 +276,16 @@ func TestAgentExecutionRepairAndCompletionAttributionLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// AUDIT-020a: BindRunPlan (called by createBoundAgentRunFixture) now
+	// moves the run to "running" itself, so this fixture's run row may
+	// already be "running" rather than "starting" by the time this test
+	// forces it into "validating" for its own setup. Matching either state
+	// keeps this test's intent (force validation for review-decision
+	// coverage) independent of which state the row actually holds.
 	if _, err := fixture.repositories.database.sql.ExecContext(
 		t.Context(),
 		`UPDATE runs SET state = 'validating', revision = revision + 1
-		 WHERE id = ? AND state = 'starting'`,
+		 WHERE id = ? AND state IN ('starting', 'running')`,
 		fixture.runID,
 	); err != nil {
 		t.Fatal(err)
@@ -436,10 +442,12 @@ func TestTaskReviewDecisionsApplyAtomicLifecycle(t *testing.T) {
 	for index, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := createBoundAgentRunFixture(t, 5400+index*100)
+			// AUDIT-020a: see the matching comment above; the bound fixture's
+			// run may already be "running", not "starting".
 			if _, err := fixture.repositories.database.sql.ExecContext(
 				t.Context(),
 				`UPDATE runs SET state = 'validating', revision = revision + 1
-				 WHERE id = ? AND state = 'starting'`,
+				 WHERE id = ? AND state IN ('starting', 'running')`,
 				fixture.runID,
 			); err != nil {
 				t.Fatal(err)

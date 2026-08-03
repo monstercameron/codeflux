@@ -13,6 +13,7 @@ import (
 	"codeflux.dev/codeflux/web/frontend/design"
 	"codeflux.dev/codeflux/web/frontend/diffreview"
 	"codeflux.dev/codeflux/web/frontend/evidencereport"
+	"codeflux.dev/codeflux/web/frontend/pipelineledger"
 	"codeflux.dev/codeflux/web/frontend/primitives"
 	"codeflux.dev/codeflux/web/frontend/sessionclient"
 	"codeflux.dev/codeflux/web/frontend/threadrail"
@@ -39,7 +40,7 @@ func useMountedReview(
 	mode primitives.Mode,
 	requestedPath string,
 	navigation reviewNavigation,
-) ui.Node {
+) (ui.Node, pipelineledger.SkipSummary) {
 	selectedPath := ui.UseState(requestedPath)
 	filters := ui.UseState(activeReviewCategoryFilters())
 	whitespace := ui.UseState(false)
@@ -59,7 +60,17 @@ func useMountedReview(
 	// would desync them. Its own LedgerCard already carries loading, empty,
 	// and error presentation, so it is safe to show beside review content in
 	// every state review itself can be in (PIPE-006a).
-	ledgerNode, _ := useMountedPipelineLedger(thread, mode, 0)
+	//
+	// skipSummary is returned to the caller too (PIPE-044a), rather than
+	// discarded here and fetched a second time from a second call site: two
+	// independent fetch.UseResource instances asking the same coordinator the
+	// same question on every render raced under load in practice -- one
+	// would occasionally never resolve within a generous bound, and because
+	// this hook's only dependency (the task ID) does not change once a task
+	// is selected, a fetch stuck that way stays stuck for the rest of the
+	// browser session with no visible retry. Returning the one instance this
+	// hook already had is the fix, not a longer timeout on a second one.
+	ledgerNode, skipSummary := useMountedPipelineLedger(thread, mode, 0)
 
 	var body ui.Node
 	switch {
@@ -136,7 +147,7 @@ func useMountedReview(
 	return html.Div(html.Props{
 		Data:  map[string]string{"component": "mounted-task-review-and-ledger"},
 		Class: css.New(u.Flex, u.FlexCol, css.Gap(css.Px(mode.Tokens().Spacing.LG))).String(),
-	}, body, pipelineLedgerSection(mode, ledgerNode))
+	}, body, pipelineLedgerSection(mode, ledgerNode)), skipSummary
 }
 
 // pipelineLedgerSection wraps the mounted pipeline ledger card with its own
