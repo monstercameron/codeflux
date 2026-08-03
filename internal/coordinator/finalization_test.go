@@ -85,3 +85,36 @@ func TestTheTerminalRecordNamesTheStateAndTheReason(t *testing.T) {
 		}
 	}
 }
+
+// TestTheTerminalRecordDoesNotContradictItself covers the invariant a restored
+// run broke: the status and the verified revision describe one worktree.
+//
+// Ladder rung 5 ended with "restored=true verified_revision=28c3375abe72" and
+// "Final status: failed — the work was never verified" in the same record.
+func TestTheTerminalRecordDoesNotContradictItself(t *testing.T) {
+	report := terminalReport(terminalFacts{
+		status:            "awaiting-review",
+		reason:            "every required gate held and the work is awaiting review",
+		verifiedRevision:  "28c3375abe72",
+		verifiedBecause:   "compiled, tests passed, acceptance matched",
+		currentIsVerified: true,
+		attempts:          6,
+	})
+	if strings.Contains(report, "never verified") {
+		t.Errorf("a run holding a verified revision reported it as unverified:\n%s",
+			report)
+	}
+	if !strings.Contains(report, "The worktree is that revision") {
+		t.Errorf("the record does not say the worktree is the verified "+
+			"revision:\n%s", report)
+	}
+
+	// And the other direction: a run with nothing verified must not imply it
+	// has something.
+	empty := terminalReport(terminalFacts{
+		status: "failed", reason: "the work was never verified",
+	})
+	if !strings.Contains(empty, "No revision of this work was ever verified") {
+		t.Errorf("a run with nothing verified did not say so:\n%s", empty)
+	}
+}

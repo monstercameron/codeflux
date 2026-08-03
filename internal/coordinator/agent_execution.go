@@ -1082,7 +1082,16 @@ func (execution *AgentExecution) Run(
 	// and cannot be forgotten.
 	validationHeld := narrator.ranValidation && !narrator.validationFailed
 	validationReason := validationDetail(narrator)
-	if narrator.filesChangedSinceValidation {
+	// A restore is a write, and the verdict has to describe the tree that
+	// exists.
+	//
+	// filesChangedSinceValidation tracks what the agent wrote, so a restore was
+	// invisible to it: the run put back a revision it had verified, and then
+	// read the failed verdict of the attempt that had broken it. Ladder rung 5
+	// ended with "restored=true verified_revision=28c3375abe72" and "Final
+	// status: failed — the work was never verified" in the same record, about
+	// the same worktree.
+	if narrator.filesChangedSinceValidation || restoredFromCheckpoint {
 		validationHeld, validationReason = revalidateAfterWrite(ctx, scope.worktree)
 	}
 	verified := compiles && ledger.require(ctx, pipeline.StageIntegrationTests,

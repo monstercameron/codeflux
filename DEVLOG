@@ -25,6 +25,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-132
+Date: 2026-08-03
+Status: Rung 5 passes; its record now agrees with itself
+Change-ID: CL-20260803-122
+Commit: pending
+Request-or-TODO: Rung 5 observed alone
+Goal: Make the terminal record describe the worktree that exists
+Decisions: Forced revalidation on restore rather than trusting the checkpoint's
+  own claim. The checkpoint records that a revision passed when it was taken;
+  whether it still passes on this machine now is a different question, and the
+  cheap answer is to ask
+Files-or-schemas: agent_execution.go, finalization_test.go
+Validation: Build, vet, gofmt, the finalization tests. Rung 5 itself: PASS in
+  220s, six attempts, two checkpoints, one restore, 66 stage records, 5 memory
+  artifacts
+Failures-or-discarded-approaches: None
+Known-limitations: The status vocabulary still comes from completeRunIfPossible
+  rather than from a reconciliation of the checkpoint and the gates, so a
+  restored-and-revalidated run reaching awaiting-review is expected but not yet
+  observed
+Next-safe-step: Rung 5 again to confirm the status, then rung 6
+
 Dev-Log: DL-20260803-131
 Date: 2026-08-03
 Status: A produced atom reaches atom_documentation_revisions end to end

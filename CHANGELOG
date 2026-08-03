@@ -50,6 +50,26 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-122
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a restored run stops calling its own verified work unverified
+Request-or-TODO: Rung 5, run alone, 2026-08-03; analysis item 12
+Outcome: Rung 5 passed, and the checkpoint did exactly what it is for: attempt
+  6 broke the suite, the run put back revision 28c3375abe72, and finished on
+  work that had compiled, passed its tests and matched its acceptance examples.
+  Its record then said "Final status: failed — the work was never verified",
+  in the same paragraph as "restored=true verified_revision=28c3375abe72",
+  about the same worktree.
+  filesChangedSinceValidation tracks what the agent wrote, so a restore was
+  invisible to it: the run replaced the tree and then read the failed verdict
+  of the attempt that had broken it. A restore is a write, and the verdict has
+  to describe the tree that exists, so it now forces a revalidation like any
+  other write.
+Verification: Build, vet, gofmt, and a test that the terminal record cannot say
+  both that a revision was verified and that none ever was
+Dev-Log: DL-20260803-132
+
 Change-ID: CL-20260803-121
 Commit: pending
 Date: 2026-08-03
