@@ -50,8 +50,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-174
+Change-ID: CL-20260803-175
 Commit: pending
+Date: 2026-08-04
+Type: Revert -- a fixture edit of mine caused a hard regression I cannot explain
+Request-or-TODO: Ladder rung 18
+Outcome: CL-20260803-173 added one sentence to rung 18's requirement defining
+  "pure", the same definition rung 17 states, on the reasoning that a bar and
+  its prose must agree. Every pass after that edit died inside two minutes on
+  "load plan step state: database constraint: step does not belong to run plan",
+  having produced nothing; every pass before it reached 31 of 37 stages
+  satisfied with the monad laws asserted. That is strictly worse, and the
+  sentence is reverted. Three explanations were tested and refuted: the sentence
+  is not read as naming files, the plan is recorded successfully in every
+  failing pass, and no step goes unmapped now that adoption traces its drops.
+  Behaviour count does not correlate either -- pass 1 named eighteen and was
+  clean, pass 6 named sixteen and failed. LAD-003 records what was ruled out and
+  the one reading that still fits: currentPlanStepState refuses on count != 1,
+  so two matching rows fail exactly as zero do.
+Affected-behavior: Rung 18's requirement returns to its earlier wording. The
+  purity definition stays unstated, which is the known narrow failure it had
+  before.
+Compatibility-or-migration: None.
+Verification: The reverted fixture compiles and vets. Whether the failure goes
+  with it is what the next pass establishes.
+Dev-Log: DL-20260803-185
+
+Change-ID: CL-20260803-174
+Commit: e133f2d
 Date: 2026-08-04
 Type: Fix -- a step the recorded plan did not know was kept, and every read of
   it was refused

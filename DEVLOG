@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-185
+Date: 2026-08-04
+Status: Committed as CL-20260803-175
+Change-ID: CL-20260803-175
+Request-or-TODO: Ladder rung 18
+Goal: Get back to the better-performing state rather than defend my own change
+Assumptions: None. The correlation is exact: passes 1 through 5 clean, 6 through
+  8 failing, and the only difference at pass 6 was the fixture sentence
+Decisions: Reverted rather than kept while investigating. The edit was a
+  judgement call I made in Cam's absence and flagged as such; it turned a run
+  that reached 31 of 37 stages into one that produces nothing in under two
+  minutes. Keeping a change with that record because I like its reasoning would
+  be the wrong way round
+Files-or-schemas: internal/coordinator/engine_produces_program_test.go, with the
+  comment rewritten to say why the definition is deliberately absent and to
+  point at LAD-003; TODOS.md -- LAD-003
+Validation: Compiles and vets. The next pass is the test
+Failures-or-discarded-approaches: Three refuted hypotheses, all recorded in
+  LAD-003 so the next attempt does not repeat them. I also spent a long stretch
+  reasoning from source about how a requirement string could reach a plan
+  binding and got nowhere; the correlation was in front of me from the first
+  measurement and I should have run the reverting experiment sooner
+Known-limitations: The defect is real and unfound. Something about a
+  requirement's wording can break plan-step binding, and reverting hides it
+  rather than fixing it
+Next-safe-step: Confirm pass 9 is clean, then take LAD-003 as its own piece of
+  work rather than inside a rung climb
+
 Dev-Log: DL-20260803-184
 Date: 2026-08-04
 Status: Committed as CL-20260803-174

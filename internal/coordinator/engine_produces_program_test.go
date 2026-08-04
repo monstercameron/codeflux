@@ -338,28 +338,23 @@ func ladderRungs() []generatedProgram {
 			// against a repository with no tests in it, so its own validation
 			// passes vacuously. This is the first case where the engine's
 			// safety net has something to catch.
-			// "Pure" is spelled out here the way rung 17 spells it out.
+			// "Pure" is deliberately still undefined here — see LAD-003.
 			//
-			// This asked for two pure packages and defined the word nowhere,
-			// while the check is mechanical and strict: an import of fmt makes
-			// a package impure, and fmt.Errorf is the idiomatic way to build
-			// the error a parse failure returns. Rung 18 on 2026-08-04 produced
-			// a correct program — the monad laws asserted, 31 of 37 stages
-			// satisfied, built, run, printing exactly what was asked, surviving
-			// every hostile input — and failed because mean/mean.go imports
-			// fmt. errors.New is not on the list, so there is a clean way to do
-			// it; the run simply had no way to know that was the difference.
-			//
-			// This states the bar rather than lowering it. Nothing about what
-			// is checked changes.
+			// Defining it the way rung 17 does is the obvious improvement and
+			// was tried on 2026-08-04. Every pass after that edit died inside
+			// two minutes on "load plan step state: database constraint: step
+			// does not belong to run plan", having produced nothing; every pass
+			// before it reached 31 of 37 stages satisfied. Three explanations
+			// were tested and refuted — the new sentence is not read as naming
+			// files, the plan is recorded successfully, and no step goes
+			// unmapped — so the mechanism is unknown and the edit is reverted
+			// rather than defended. A requirement's wording must not be able to
+			// break plan binding, and that is the defect to fix.
 			name: "18 composes atomic functions through a Result monad",
 			requirement: "Write a program in the module codeflux.test/workspace. The " +
 				"layout is yours: nothing here names a file, a package or a " +
 				"function, and how the work is grouped is part of what is being " +
-				"asked for. A pure package here may not read input, print, or " +
-				"import fmt, os, bufio, log, net, database/sql, math/rand or " +
-				"time; use errors.New or a sentinel error rather than " +
-				"fmt.Errorf. One package must be pure. It defines a generic type " +
+				"asked for. One package must be pure. It defines a generic type " +
 				"Result[T any] holding either a value or an error, constructors " +
 				"Ok and Err, a method IsOk, a method Unwrap returning the value " +
 				"and the error, and because Go methods cannot take type " +
