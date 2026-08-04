@@ -510,14 +510,39 @@ func (execution *AgentExecution) Run(
 		// infrastructure allowance is not, and it is the one that terminates.
 		progress.refund()
 		if decision.Open {
-			providerCircuit = decision
 			// What this run learned about the provider is worth more than one
 			// run. Twenty tasks discovering the same dead provider one full
 			// timeout at a time is twenty times the wait for one fact.
+			//
+			// Recorded before the step-down below, so the escalation that put
+			// the run here cannot immediately put it back.
 			if decision.Disposition != circuitFailConfiguration {
 				sharedProviderHealth.recordExhausted(
 					progress.currentModel(), decision.Reason, time.Now())
 			}
+			// A rung the run climbed to is one it can climb back down from.
+			//
+			// The rung below was answering minutes ago — it is where every
+			// attempt so far was made — so a provider failure on the rung above
+			// says the escalation is unavailable, not that the run is. Stopping
+			// here throws away a run that was still making progress because a
+			// socket closed on the one request it made at the new rung. Ladder
+			// rung 15 on 2026-08-04 died that way in four of five passes, each
+			// on the first request after moving up.
+			//
+			// Only downward, and only to a rung this run has already used, so
+			// this cannot become a way to spend attempts on a model the run was
+			// never granted. If the run never escalated there is nowhere to go
+			// and the circuit opens exactly as before.
+			if stepped, why := progress.stepDown(); stepped {
+				tracef("infra", "stepping back to %s — %s",
+					progress.currentRung(), why)
+				execution.say(ctx, scope, events.KindMessageFinal,
+					"The stronger model did not answer, so I am continuing on "+
+						progress.currentRung()+".")
+				return
+			}
+			providerCircuit = decision
 		}
 		if decision.RetryAfter > 0 {
 			select {

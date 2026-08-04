@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"codeflux.dev/codeflux/internal/pipeline"
 )
@@ -51,7 +52,11 @@ type convergence struct {
 	// escalations and decomposed record what happened, for the ledger. A run
 	// that quietly cost four times as much is worse than one that says so.
 	escalations []string
-	decomposed  bool
+	// health answers whether a rung is currently down, so escalation does not
+	// move a run onto a provider that just refused another one. Nil means the
+	// process-wide record, which is what production uses.
+	health     func(rung string) (string, bool)
+	decomposed bool
 	// extended records the one extra allowance a still-converging run is given
 	// when its budget runs out with gates left. Once per run: a second would
 	// make the ceiling advisory.
@@ -370,6 +375,23 @@ func (tracker *convergence) record(
 			"stays where it is"}
 	}
 	if next, more := tracker.settings.NextRung(tracker.rung); more {
+		// A rung that is known to be down is not an escalation.
+		//
+		// Escalating onto it spends the run: the request fails at the
+		// transport, the adapter exhausts its own retries, and a run that was
+		// still making progress is abandoned for a reason that has nothing to
+		// do with the work. Ladder rung 15 on 2026-08-04 died that way in four
+		// of five passes, every one on the first request after moving up.
+		// Staying put is worse than moving up and better than stopping, so the
+		// run keeps the fresh allowance and spends it where it can be answered.
+		if why, down := tracker.rungIsDown(next); down {
+			tracker.grant()
+			return verdict{
+				Why: next + " is unavailable (" + why + "), so moving up would " +
+					"end the run rather than strengthen it; staying on " +
+					tracker.rung + " with a fresh allowance",
+			}
+		}
 		from := tracker.rung
 		tracker.rung = next
 		tracker.escalations = append(tracker.escalations, from+" → "+next)
@@ -400,6 +422,49 @@ func (tracker *convergence) record(
 			", which is the top of the ladder, so the request is being split " +
 			"into smaller pieces rather than asked again",
 	}
+}
+
+// stepDown moves the run back to the rung it escalated from, and says whether
+// there was one.
+//
+// Only a rung this run actually climbed from, read off the escalations it
+// recorded rather than off the ladder. Reading the ladder would let a run that
+// started high drop to a model it was never granted, and reading it as "the
+// rung below" would let a run drop repeatedly on one outage. Each step down
+// consumes the escalation that produced it, so a run can only come back down
+// the way it went up.
+//
+// The allowance is refreshed on the way down for the same reason it was on the
+// way up: the attempts that established the cheaper model's ceiling were spent
+// establishing it, and the run is now going to have to work within that ceiling
+// after all.
+func (tracker *convergence) stepDown() (bool, string) {
+	if len(tracker.escalations) == 0 {
+		return false, ""
+	}
+	last := tracker.escalations[len(tracker.escalations)-1]
+	from, _, found := strings.Cut(last, " → ")
+	if !found || from == "" {
+		return false, ""
+	}
+	tracker.escalations = tracker.escalations[:len(tracker.escalations)-1]
+	unreachable := tracker.rung
+	tracker.rung = from
+	tracker.grant()
+	return true, unreachable + " did not answer"
+}
+
+// rungIsDown reports whether a rung gave up on some run inside the health
+// window, and why.
+//
+// Injectable so a test can state the fact rather than arrange an outage. The
+// default reads the process-wide record, which is where a run that exhausted a
+// provider wrote what it found out.
+func (tracker *convergence) rungIsDown(rung string) (string, bool) {
+	if tracker.health != nil {
+		return tracker.health(rung)
+	}
+	return sharedProviderHealth.recentlyExhausted(rung, time.Now())
 }
 
 // currentModel is the rung the run is on now.

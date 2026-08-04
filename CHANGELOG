@@ -50,8 +50,36 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-151
+Change-ID: CL-20260803-152
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- escalating onto a provider that was not answering ended runs that
+  were still making progress
+Request-or-TODO: Ladder rung 15
+Outcome: Escalation exists to give a stuck run a better chance. Escalating onto
+  a rung that is down gives it none: the first request fails at the transport,
+  the adapter exhausts its own retries, the circuit opens and the run stops.
+  Rung 15 died that way in four of five passes on 2026-08-04, every one on the
+  first request after moving up, while the rung below had been answering
+  throughout. Two changes. Escalation no longer moves a run onto a rung another
+  run found unavailable inside the health window -- it stays where it is and
+  keeps the fresh allowance, because staying put is worse than moving up and
+  better than stopping. And when the rung a run climbed to stops answering, the
+  run climbs back down the way it came rather than ending: only to a rung this
+  run actually escalated from, read off its own recorded escalations, and each
+  step consuming the escalation that produced it, so one outage cannot unwind a
+  whole ladder or drop a run below where it started. A run that never escalated
+  has nowhere to go and the circuit opens exactly as before.
+Affected-behavior: A provider failure on an escalated rung costs the escalation
+  rather than the run.
+Compatibility-or-migration: None.
+Verification: Rung 15 passes in 427s over 6 attempts, having failed 5 passes in
+  a row. Five new tests cover the refused escalation, the healthy-ladder
+  control, the step down, the never-escalated control, and the one-step bound.
+Dev-Log: DL-20260803-162
+
+Change-ID: CL-20260803-151
+Commit: 356a4d6
 Date: 2026-08-04
 Type: Fix -- a failing suite was identified by its prose, so a run circling two
   red tests never counted a repeat; and an infrastructure death said nothing

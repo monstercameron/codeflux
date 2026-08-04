@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-162
+Date: 2026-08-04
+Status: Committed as CL-20260803-152
+Change-ID: CL-20260803-152
+Request-or-TODO: Ladder rung 15
+Goal: Stop a provider outage on an escalated rung from ending the run
+Assumptions: That the rung below is still answering. It is the rung every
+  attempt so far was made on, and in all five rung 15 passes it answered until
+  the moment the run left it
+Decisions: Two mechanisms rather than one, because they cover different runs.
+  The health check helps the NEXT run: within one run, the first request at a
+  new rung is what discovers the rung is down, and by then the run has already
+  moved. The step down is what saves the run that discovers it. Stepping down is
+  bounded to escalations this run recorded, so it can never drop a run below the
+  rung it started on or onto a model it was never granted
+Files-or-schemas: internal/coordinator/agent_convergence.go -- stepDown,
+  rungIsDown and an injectable health hook; agent_execution.go --
+  sendBackInfrastructure steps down instead of opening the circuit when it can
+Validation: Rung 15 passes in 427s. Five new tests. The convergence suite passes
+Failures-or-discarded-approaches: The health check alone was written first and
+  did nothing for the run in front of it, for the reason above. Kept anyway --
+  it is what stops the step down being immediately undone by the next
+  escalation
+Known-limitations: A run whose first rung is down still stops, which is correct:
+  there is nowhere to step down to
+Next-safe-step: Rung 16
+
 Dev-Log: DL-20260803-161
 Date: 2026-08-04
 Status: Committed as CL-20260803-151
