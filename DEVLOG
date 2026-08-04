@@ -25,6 +25,26 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-186
+Date: 2026-08-04
+Status: Committed as CL-20260803-176
+Change-ID: CL-20260803-176
+Request-or-TODO: LAD-003
+Goal: Leave the ticket saying where to start rather than what I guessed
+Assumptions: None. The primary key is read from the migration
+Decisions: Recorded the finding without attempting the fix. Rung 18 passes on
+  the reverted fixture and rung 19 is running; changing how plan identities are
+  adopted is a storage-boundary change that deserves its own verification rather
+  than being slipped in mid-climb
+Files-or-schemas: TODOS.md -- LAD-003
+Validation: None needed; no behaviour changed
+Failures-or-discarded-approaches: The double-binding hypothesis, refuted by the
+  primary key. That is now recorded in the ticket so it is not re-tested
+Known-limitations: Still unproven. The new reading explains the symptom and the
+  message, and nothing yet shows RecordPlanRevision returning different
+  identities in this scenario
+Next-safe-step: Rung 19; LAD-003 as its own piece of work afterwards
+
 Dev-Log: DL-20260803-185
 Date: 2026-08-04
 Status: Committed as CL-20260803-175

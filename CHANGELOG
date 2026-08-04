@@ -50,8 +50,33 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-175
+Change-ID: CL-20260803-176
 Commit: pending
+Date: 2026-08-04
+Type: Investigation -- LAD-003 narrowed; one hypothesis refuted and a better one
+  found
+Request-or-TODO: LAD-003
+Outcome: Ruled out the last standing explanation for the plan-binding failure. A
+  run cannot hold two plan bindings: run_plan_bindings.run_id is the table's
+  PRIMARY KEY, so the query's "count(*) != 1" can only ever mean zero, and zero
+  means the step really is not in the revision the run is bound to. Reading the
+  record path for that turned up a better-supported cause:
+  agent_plan_record.go builds its local-to-durable step map from the result of
+  the local BuildAgentPlan call rather than from the value the store returned,
+  so a run adopts step identities it generated itself and assumes the store
+  wrote the same ones. Nothing checks that. If RecordPlanRevision ever returns a
+  revision whose steps carry different identities -- an idempotent hit on an
+  existing revision being the obvious way -- every later step read is refused,
+  with a message saying the step does not belong when the truth is that the run
+  holds identities the store never issued.
+Affected-behavior: None. This edits a ticket.
+Compatibility-or-migration: None.
+Verification: Not applicable; no behaviour changed. The refutation is read
+  directly from migrations/000014_agent_plans.sql.
+Dev-Log: DL-20260803-186
+
+Change-ID: CL-20260803-175
+Commit: 6186d18
 Date: 2026-08-04
 Type: Revert -- a fixture edit of mine caused a hard regression I cannot explain
 Request-or-TODO: Ladder rung 18
