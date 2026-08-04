@@ -50,8 +50,39 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-178
+Change-ID: CL-20260803-179
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a systematic pass over every instruction that asks a run to write
+  code, rather than one more reaction to one more rung
+Request-or-TODO: Standing goal to optimise the prompting
+Outcome: Two instructions were fixed reactively today, each after a rung failed
+  on it. The property gate is the measured one: described in prose it produced
+  nothing -- rung 18 read it twice and wrote twenty-two tests without a loop in
+  any of them -- and with five lines of Go under it the same model on the same
+  rung reached thirteen of thirty-one tests examining a set. This applies that
+  result to the instruction that shares the defect before a rung demands it.
+  fuzzTargetInstruction described a fuzz target in prose, and a Go fuzz target
+  is fiddly in a way prose hides: every parameter of the f.Fuzz closure after
+  *testing.T must match what f.Add supplies, in order and in type, and a
+  mismatch is a compile error rather than a weak test. atom-fuzz was a sendback
+  on rungs 9, 12, 13, 14, 16, 18 and 19. It now shows the target and names both
+  ways it gets written wrong -- the arity mismatch, and treating a decoder's
+  refusal as a finding when it is a pass. The sweep also confirmed two families
+  are closed rather than merely unreported: every instruction that can be raised
+  while the build is broken says so, and the two that cannot assert nothing
+  about the suite rather than guessing.
+Affected-behavior: The atom-fuzz instruction carries a worked example.
+Compatibility-or-migration: None.
+Verification: Three new tests, one of them a sweep asserting that every
+  instruction asking for code shows the code -- property, fuzz, the unreachable
+  marker and the atom schema -- so the next instruction added is held to the
+  same rule. The ladder cannot confirm the effect today: the OpenAI account has
+  no credits remaining and every run 429s at about fifteen seconds.
+Dev-Log: DL-20260803-189
+
+Change-ID: CL-20260803-178
+Commit: 9ad54ea
 Date: 2026-08-04
 Type: Fix -- LAD-003. The run adopted step identities it generated itself and
   assumed the store had written the same ones

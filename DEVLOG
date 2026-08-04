@@ -25,6 +25,34 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-189
+Date: 2026-08-04
+Status: Committed as CL-20260803-179
+Change-ID: CL-20260803-179
+Request-or-TODO: Standing goal to optimise the prompting
+Goal: Review the instructions as a body rather than one per rung failure
+Assumptions: That the property result generalises. It is the strongest evidence
+  available -- same model, same rung, 0 of 22 to 13 of 31 on the strength of an
+  example -- and the fuzz instruction has the same shape, the same symptom, and
+  a trap prose is worse at conveying than the property one had
+Decisions: Enumerated all fourteen instruction builders and checked each against
+  the defect families this session established, rather than waiting for a rung
+  to name one. Two families came back clean, which is a result worth recording:
+  nothing asserts a suite state it was not told, and every ask that shows a
+  marker or a template shows it rather than describing it
+Files-or-schemas: internal/coordinator/agent_outstanding.go --
+  fuzzTargetInstruction; instruction_shapes_test.go
+Validation: Three new tests including a sweep over four instructions, so a new
+  instruction that describes without showing fails a test rather than a rung
+Failures-or-discarded-approaches: Checked whether uncoveredLineInstruction and
+  atomDocumentationInstruction were missing the validation preamble their peers
+  carry. They are, and it is correct: neither asserts anything about the suite,
+  so adding the preamble would make them claim something nothing established.
+  Recorded as a test rather than changed
+Known-limitations: Unmeasured. The property change was measured because a rung
+  ran either side of it; this one cannot be until the account has credits
+Next-safe-step: Rerun rung 19 when credits return and watch atom-fuzz
+
 Dev-Log: DL-20260803-188
 Date: 2026-08-04
 Status: Committed as CL-20260803-178

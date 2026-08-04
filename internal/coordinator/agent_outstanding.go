@@ -647,6 +647,30 @@ func fuzzTargetInstruction(boundaries []string, testsPassed bool) string {
 			"f.Add for a seed or two and f.Fuzz for the body. Assert that it " +
 			"does not panic and that whatever it returns is self-consistent; a " +
 			"decoder is allowed to refuse input, so a returned error is a pass, " +
-			"not a failure. Do not change the decoder to make fuzzing easier.")
+			"not a failure. Do not change the decoder to make fuzzing easier.\n\n" +
+			// The shape, not only the description.
+			//
+			// A fuzz target is fiddly in a way prose hides: the closure's
+			// parameters after *testing.T must match the arity and types of every
+			// f.Add, and getting that wrong is a compile error rather than a weak
+			// test. This is the same remedy that took atom-property-tests from
+			// nothing to satisfied on rung 18 — describing the shape was read and
+			// not acted on, and five lines of it were acted on immediately.
+			"The shape wanted:\n\n" +
+			"\tfunc FuzzParse(f *testing.F) {\n" +
+			"\t\tf.Add(\"1,2\")\n" +
+			"\t\tf.Fuzz(func(t *testing.T, in string) {\n" +
+			"\t\t\tgot, err := Parse(in)\n" +
+			"\t\t\tif err != nil {\n" +
+			"\t\t\t\treturn // refusing bad input is correct, not a finding\n" +
+			"\t\t\t}\n" +
+			"\t\t\tif len(got) == 0 {\n" +
+			"\t\t\t\tt.Errorf(\"parsed %q to nothing without an error\", in)\n" +
+			"\t\t\t}\n" +
+			"\t\t})\n" +
+			"\t}\n\n" +
+			"Every parameter after *testing.T must match what f.Add supplies, " +
+			"in the same order and the same types; a mismatch is a compile " +
+			"error rather than a weak test.")
 	return instruction.String()
 }
