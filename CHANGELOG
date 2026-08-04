@@ -50,8 +50,37 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-164
+Change-ID: CL-20260803-165
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- the fuzz stage named the case it could not handle and then did the
+  one thing guaranteed to fail
+Request-or-TODO: Ladder rung 16
+Outcome: Go refuses -fuzz across more than one package, so the stage names the
+  package holding the targets. packageHoldingFuzzTargets returned nothing when
+  several packages declared one -- "a choice this has no basis to make" -- and
+  the caller then fell back to ./..., which is the single argument certain to be
+  refused. There is no choice to make: each of those packages has a target and
+  each gets fuzzed, one invocation at a time. This only started mattering today,
+  because a run could not produce more than one package until the planner was
+  allowed to choose the layout. Rung 16 on 2026-08-04 was blocked here holding a
+  correct program -- built, ran, printed exactly what was asked, survived every
+  hostile input -- and the only stage that did not hold was this one, refusing
+  to run at all. The twenty-second budget is shared across the packages rather
+  than multiplied by them, floored at five seconds, so the stage's cost does not
+  scale with a layout the run was encouraged to choose and never holds on a
+  fuzzer that looked at nothing.
+Affected-behavior: A multi-package program is fuzzed. A single-package one is
+  fuzzed exactly as before.
+Compatibility-or-migration: None.
+Verification: Four new tests: every package with a target is fuzzed and in a
+  stable order, one package is still named directly, no target is no packages,
+  and the budget is shared rather than multiplied. The two existing tests were
+  updated to the plural helper.
+Dev-Log: DL-20260803-175
+
+Change-ID: CL-20260803-164
+Commit: b876e8d
 Date: 2026-08-04
 Type: Fix -- a protocol slip was recorded as a lost build and bought a dearer
   model

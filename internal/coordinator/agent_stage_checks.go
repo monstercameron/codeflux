@@ -552,39 +552,77 @@ func checkFuzzing(ctx context.Context, worktree string) stageOutcome {
 				"written for any of them: %s",
 			len(boundaries), strings.Join(boundaries, ", ")), boundaryEvidence)
 	}
-	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
-	// One package, because Go refuses to fuzz several at once.
+	// One package per run of the fuzzer, because Go refuses to fuzz several at
+	// once — and every package that has a target, because there is no basis to
+	// pick between them.
 	//
 	// "go test -fuzz=. ./..." fails with "cannot use -fuzz flag with multiple
 	// packages" on any module holding more than one, which every generated
-	// workspace does: a root package beside cmd/generated. So the moment a run
-	// finally wrote a fuzz target, this stage failed — and reported the refusal
-	// as "fuzzing found a failing input", which accuses the program of a defect
-	// the fuzzer never looked for. Ladder rung 9 on 2026-08-03 was asked for a
-	// target three times and failed the gate as soon as it produced one.
-	target := packageHoldingFuzzTargets(worktree, files)
-	if target == "" {
-		target = "./..."
+	// workspace does. That was fixed by naming the single package holding the
+	// targets, and by reporting a refusal as a refusal rather than as
+	// "fuzzing found a failing input", which accuses the program of a defect
+	// the fuzzer never looked for.
+	//
+	// It left the case it had named and not handled: when several packages
+	// declare targets, the helper returned nothing "because that is a choice
+	// this has no basis to make", and the caller then fell back to ./... —
+	// which is the one argument guaranteed to be refused. There is no choice to
+	// make. Every package with a target gets fuzzed. Ladder rung 16 on
+	// 2026-08-04 was blocked here with a correct program: it built, ran,
+	// printed exactly what was asked and survived every hostile input, and the
+	// only stage that did not hold was this one, refusing to run at all.
+	packages := packagesHoldingFuzzTargets(worktree, files)
+	if len(packages) == 0 {
+		packages = []string{"./..."}
 	}
-	command := exec.CommandContext(deadline,
-		"go", "test", "-run=^$", "-fuzz=.", "-fuzztime=20s", target)
-	command.Dir = worktree
-	output, err := command.CombinedOutput()
-	if err != nil {
+	// The time budget is shared out rather than multiplied. Fuzzing every
+	// package for the full twenty seconds would make this stage's cost scale
+	// with a layout the run was encouraged to choose.
+	each := fuzzSecondsEach(len(packages))
+	deadline, cancel := context.WithTimeout(
+		ctx, time.Duration(len(packages))*time.Duration(each+10)*time.Second)
+	defer cancel()
+	for _, target := range packages {
+		command := exec.CommandContext(deadline,
+			"go", "test", "-run=^$", "-fuzz=.",
+			fmt.Sprintf("-fuzztime=%ds", each), target)
+		command.Dir = worktree
+		output, err := command.CombinedOutput()
+		if err == nil {
+			continue
+		}
 		// A fuzzer that could not run has found nothing, and saying it did
 		// sends a run looking for a defect that was never reported. The two are
 		// different outcomes and the ledger has to tell them apart.
 		if why := fuzzingCouldNotRun(string(output)); why != "" {
-			return broke("fuzzing could not be run: "+why, boundaryEvidence)
+			return broke("fuzzing could not be run for "+target+": "+why,
+				boundaryEvidence)
 		}
-		return broke("fuzzing found a failing input: "+
+		return broke("fuzzing found a failing input in "+target+": "+
 			firstLineOf(strings.TrimSpace(string(output))), boundaryEvidence)
 	}
 	return held(fmt.Sprintf(
-		"%d fuzz target(s) covering %d decoding boundary(ies) ran for 20s "+
-			"without finding a failing input", targets, len(boundaries)),
+		"%d fuzz target(s) covering %d decoding boundary(ies) ran for %ds "+
+			"across %d package(s) without finding a failing input",
+		targets, len(boundaries), each, len(packages)),
 		boundaryEvidence)
+}
+
+// fuzzSecondsEach shares one fuzzing budget across the packages that have
+// targets.
+//
+// Twenty seconds when there is one package, and never below five: a fuzzer
+// given less than a few seconds reports that it found nothing, which is true
+// and worthless, and this stage would then hold on evidence it did not gather.
+func fuzzSecondsEach(packages int) int {
+	if packages <= 1 {
+		return 20
+	}
+	each := 20 / packages
+	if each < 5 {
+		return 5
+	}
+	return each
 }
 
 // producedGoFiles lists the Go source this run actually wrote.
@@ -632,12 +670,13 @@ func producedGoFiles(worktree string) ([]string, error) {
 	return files, nil
 }
 
-// packageHoldingFuzzTargets names the package directory whose tests declare a
-// fuzz target, as a relative pattern go test accepts.
+// packagesHoldingFuzzTargets names every package directory whose tests declare
+// a fuzz target, as relative patterns go test accepts.
 //
-// Empty when nothing declares one, or when several packages do: the first is
-// nothing to fuzz, and the second is a choice this has no basis to make.
-func packageHoldingFuzzTargets(worktree string, files []string) string {
+// Empty when nothing declares one, which is nothing to fuzz. Several is not an
+// ambiguity to resolve: each of them has a target and each of them gets fuzzed,
+// one go test invocation at a time, because that is the only way Go accepts.
+func packagesHoldingFuzzTargets(worktree string, files []string) []string {
 	holding := map[string]bool{}
 	for _, file := range files {
 		if !strings.HasSuffix(file, "_test.go") {
@@ -651,16 +690,18 @@ func packageHoldingFuzzTargets(worktree string, files []string) string {
 			holding[pathpkg.Dir(filepath.ToSlash(file))] = true
 		}
 	}
-	if len(holding) != 1 {
-		return ""
-	}
+	patterns := make([]string, 0, len(holding))
 	for directory := range holding {
 		if directory == "." || directory == "" {
-			return "."
+			patterns = append(patterns, ".")
+			continue
 		}
-		return "./" + directory
+		patterns = append(patterns, "./"+directory)
 	}
-	return ""
+	// Sorted, so the stage reports the same thing twice for the same worktree
+	// and a failure names a package a reader can find again.
+	sort.Strings(patterns)
+	return patterns
 }
 
 // fuzzingCouldNotRun reports why the fuzzer never examined anything, or empty

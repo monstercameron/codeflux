@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-175
+Date: 2026-08-04
+Status: Committed as CL-20260803-165
+Change-ID: CL-20260803-165
+Request-or-TODO: Ladder rung 16
+Goal: Let the fuzz stage run on a program that spans packages
+Assumptions: None. The stage's own comment named the several-packages case and
+  said it had no basis to choose; the caller's fallback turned that into a
+  certain refusal
+Decisions: Fuzz all of them rather than pick one. Picking would leave a
+  boundary unexamined and call the stage satisfied. Shared the time budget
+  rather than multiplying it: the run was just given the freedom to split its
+  work across packages, and charging it for doing so would be the pipeline
+  taking back with one hand what it gave with the other
+Files-or-schemas: internal/coordinator/agent_stage_checks.go --
+  packagesHoldingFuzzTargets, fuzzSecondsEach, the loop in the fuzz stage
+Validation: Four new tests, two existing ones updated
+Failures-or-discarded-approaches: None
+Known-limitations: With many packages each gets five seconds, which is a weaker
+  examination than one package getting twenty. The alternative is a stage whose
+  wall-clock grows without bound
+Next-safe-step: Rung 16 pass 10
+
 Dev-Log: DL-20260803-174
 Date: 2026-08-04
 Status: Committed as CL-20260803-164

@@ -23,13 +23,13 @@ func TestFuzzingTargetsTheOnePackageThatDeclaresIt(t *testing.T) {
 			"func FuzzParse(f *testing.F) {\n\tf.Add(\"a\")\n"+
 			"\tf.Fuzz(func(t *testing.T, s string) { _ = parse(s) })\n}\n")
 
-	got := packageHoldingFuzzTargets(worktree, []string{
+	got := packagesHoldingFuzzTargets(worktree, []string{
 		"main.go", "cmd/generated/main.go", "cmd/generated/main_test.go",
 	})
-	if got != "./cmd/generated" {
-		t.Errorf("fuzzing would run against %q; go refuses -fuzz across more "+
-			"than one package, so it has to name the one that declares the "+
-			"target", got)
+	if len(got) != 1 || got[0] != "./cmd/generated" {
+		t.Errorf("fuzzing would run against %v; go refuses -fuzz across more "+
+			"than one package, so it has to name the ones that declare a "+
+			"target and run them one at a time", got)
 	}
 }
 
@@ -41,9 +41,9 @@ func TestNoFuzzTargetNamesNoPackage(t *testing.T) {
 	writeEchoFixture(t, worktree, "cmd/generated/main_test.go",
 		"package main\n\nimport \"testing\"\n\nfunc TestParse(t *testing.T) {}\n")
 
-	if got := packageHoldingFuzzTargets(worktree,
-		[]string{"cmd/generated/main_test.go"}); got != "" {
-		t.Errorf("a workspace with no fuzz target named %q", got)
+	if got := packagesHoldingFuzzTargets(worktree,
+		[]string{"cmd/generated/main_test.go"}); len(got) != 0 {
+		t.Errorf("a workspace with no fuzz target named %v", got)
 	}
 }
 
