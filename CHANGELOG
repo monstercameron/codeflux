@@ -50,8 +50,35 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-157
+Change-ID: CL-20260803-158
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- one unchanged suite result was handed back as many times as it was
+  asked for
+Request-or-TODO: Ladder rung 16
+Outcome: A suite run against bytes the suite has already seen is answered from
+  the last run, and the note says the files have not moved and says not to ask
+  again until one does. A run that asks anyway was given the same output every
+  time, labelled succeeded or failed exactly as before, which is the pipeline
+  agreeing the call was worth making. Rung 16 on 2026-08-04 spent 40 of its 73
+  rounds this way across 14 attempts, wrote six times in all, and exhausted its
+  whole attempt budget without once acting on the compile error its last real
+  suite run had reported. After two such answers the call is now refused, with a
+  message naming the one thing that would make it worth making. Refused rather
+  than withheld: withholding the tool for the attempt is how this was once
+  handled, and it is worse, because an attempt is sent back precisely to change
+  files and the moment its first patch lands the tool that would say whether the
+  patch held is already gone. Any write resets the count, so the very next
+  change makes the suite answerable again.
+Affected-behavior: A run cannot spend an attempt asking for an answer it already
+  has.
+Compatibility-or-migration: None.
+Verification: Three new tests covering the bound, the reset on a write, and the
+  refusal naming its condition.
+Dev-Log: DL-20260803-168
+
+Change-ID: CL-20260803-157
+Commit: 773806f
 Date: 2026-08-04
 Type: Fix -- the client killed its own requests and the pipeline read it as the
   provider going away
@@ -86,7 +113,7 @@ Considered-and-rejected: Raising the outer infrastructure allowance from one
 Dev-Log: DL-20260803-167
 
 Change-ID: CL-20260803-156
-Commit: pending
+Commit: 0089e8a
 Date: 2026-08-04
 Type: Fix -- a ladder rung asked for one more package than its own requirement
   described

@@ -67,8 +67,12 @@ type narratingExecutor struct {
 	// last ran, so a suite answered from that run can say whether nothing
 	// was written or whether what was written cancelled itself out.
 	writesSinceLastTest int
-	lastTestOutput      string
-	lastTestFailed      bool
+	// unchangedTestsInARow counts suite calls answered from the last run with
+	// nothing written between them. Reset by any write and by a real run,
+	// because either makes the next call worth answering.
+	unchangedTestsInARow int
+	lastTestOutput       string
+	lastTestFailed       bool
 	// worktree is where the produced work lives, needed to fingerprint it.
 	worktree string
 	// wholeFileWrites counts how many times each path has been rewritten
@@ -151,6 +155,42 @@ func (narrator *narratingExecutor) ExecuteTool(
 	// time it arrives here. What is saved is the execution, and what is gained
 	// is that the answer is now instant rather than late.
 	if unchanged && narrator.lastTestOutput != "" {
+		narrator.unchangedTestsInARow++
+		// Answering the same question a third time is not answering it.
+		//
+		// The note already says the files have not moved and says not to run the
+		// suite again until one does. A run that asks anyway has not read it,
+		// and handing it the same output once more — labelled succeeded, or
+		// failed with the same failure — is the pipeline agreeing that the call
+		// was worth making. Rung 16 on 2026-08-04 spent 40 of its 73 rounds
+		// this way across 14 attempts, writing six times in all, and exhausted
+		// its whole attempt budget without ever reaching the compile error its
+		// last real suite run had reported.
+		//
+		// Refused rather than withheld. Withholding the tool for the attempt was
+		// how this was once handled and it is worse: an attempt is sent back
+		// precisely to change files, and the moment its first patch lands the
+		// tool that would say whether the patch held is already gone. A refusal
+		// costs one round, says exactly what would make the call worth making,
+		// and the very next write makes it callable again.
+		if narrator.unchangedTestsInARow > maximumUnchangedSuiteAnswers {
+			why := "The produced files have not changed since the suite last " +
+				"ran, and this is the " +
+				ordinal(narrator.unchangedTestsInARow) +
+				" time in a row you have asked for it. The answer cannot " +
+				"differ until a file does, so it is not being given again. " +
+				"Write the change first — the last result is above, in the " +
+				"round that ran it — and then run the suite."
+			tracef("tool", "%-12s %-10s %s", name, "refused",
+				"asked for an unchanged suite "+
+					counted(narrator.unchangedTestsInARow, "time")+" in a row")
+			narrator.execution.publishTool(narrator.ctx, narrator.scope,
+				events.KindToolCompleted, executionID, name,
+				string(domain.CommandExecutionStateFailed),
+				detail+" — refused: the files have not changed")
+			narrator.lastFailure = why
+			return narrator.refuse(request, why), nil
+		}
 		state := domain.CommandExecutionStateSucceeded
 		if narrator.lastTestFailed {
 			state = domain.CommandExecutionStateFailed
@@ -368,6 +408,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 			completed != domain.CommandExecutionStateSucceeded
 		narrator.filesChangedSinceValidation = false
 		narrator.writesSinceLastTest = 0
+		narrator.unchangedTestsInARow = 0
 		narrator.lastTestFingerprint = producedTreeDigest(narrator.worktree)
 		narrator.lastTestOutput = strings.TrimSpace(
 			result.StdoutRedacted + "\n" + result.StderrRedacted)
@@ -402,6 +443,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 		// reasons apart: nothing was written at all, or things were written and
 		// they cancelled each other out.
 		narrator.writesSinceLastTest++
+		narrator.unchangedTestsInARow = 0
 	}
 	operationNode := narrator.recordInGraph(request, name, detail,
 		completed == domain.CommandExecutionStateSucceeded)
@@ -1167,6 +1209,32 @@ func plural(count int, noun string) string {
 // first actually makes.
 func isWriteTool(name executor.ToolName) bool {
 	return name == executor.ToolApplyEdit || name == executor.ToolApplyPatch
+}
+
+// maximumUnchangedSuiteAnswers is how many times one unchanged suite result is
+// handed back before the call is refused instead.
+//
+// Two. The first is the run checking, which is reasonable — it may not have
+// known. The second is the note being read and acted on anyway, which happens.
+// The third is a loop, and a loop here is expensive: every round in it costs a
+// model turn and buys nothing, because the answer is a copy of an answer the
+// run already has.
+const maximumUnchangedSuiteAnswers = 2
+
+// ordinal renders a small count as a place, for a sentence a run reads once.
+func ordinal(count int) string {
+	switch count {
+	case 1:
+		return "first"
+	case 2:
+		return "second"
+	case 3:
+		return "third"
+	case 4:
+		return "fourth"
+	default:
+		return itoaPlan(count) + "th"
+	}
 }
 
 // maximumPatchEchoBytes bounds the file a failed patch is answered with.

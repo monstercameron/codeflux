@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-168
+Date: 2026-08-04
+Status: Committed as CL-20260803-158
+Change-ID: CL-20260803-158
+Request-or-TODO: Ladder rung 16
+Goal: Stop a run spending its budget asking a question it already has the
+  answer to
+Assumptions: None. The tally is in the trace: 40 unchanged suite answers, 6
+  writes, 73 rounds, 14 attempts, all 14 sendbacks on integration-tests
+Decisions: Refuse the call rather than withhold the tool. Withholding was the
+  original design and it produced blind refinement -- an attempt is sent back to
+  change files, and withholding the suite for the whole attempt means the first
+  patch cannot be checked. A refusal costs one round, names the condition, and
+  is undone by the next write
+Files-or-schemas: internal/coordinator/agent_narration.go --
+  unchangedTestsInARow, maximumUnchangedSuiteAnswers, ordinal
+Validation: Three new tests. Rung 16 rerun in progress
+Failures-or-discarded-approaches: Considered tightening the offerTest condition
+  in agent_execution.go instead. It is decided once per attempt and cannot see a
+  round, so it can only withhold for the whole attempt, which is the design that
+  was already tried and reverted
+Known-limitations: Two answers before refusing is a judgement, not a measurement
+Next-safe-step: Rung 16
+
 Dev-Log: DL-20260803-167
 Date: 2026-08-04
 Status: Committed as CL-20260803-157
