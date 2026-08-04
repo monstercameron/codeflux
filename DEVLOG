@@ -25,6 +25,466 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-156
+Date: 2026-08-03
+Status: Committed as CL-20260803-147
+Change-ID: CL-20260803-147
+Request-or-TODO: Unblocking the commits for this session's ladder work
+Goal: Get the repository lint green so the session's changes can be committed
+Assumptions: Debt staticcheck reports as unreferenced is genuinely dead, since
+  its analysis includes tests
+Decisions: Recorded the atom-name case as an atom-name-exception rather than
+  renaming the function. Renaming validateContainerCommand to a recognised verb
+  would name the mechanism instead of the outcome, and the name already carries
+  the object it validates and the result it returns. Removed the seven
+  unreferenced declarations rather than adding references to them, because a
+  reference written to satisfy a linter hides the fact that nothing needs the
+  code
+Files-or-schemas: internal/coordinator/run_launcher_wiring.go,
+  discard_refinement.go, agent_adversarial_review.go, trace.go,
+  refinement_round_test.go, agent_execution_persistence_test.go,
+  pipe105_finder_false_positive_measurement_test.go,
+  internal/agent/loop_types.go. No schema change
+Validation: go run ./cmd/codeflux-dev lint exits zero, gofmt clean, go vet
+  passes, and the agent, executor and openaimodel suites pass
+Failures-or-discarded-approaches: None. One of the seven removals,
+  toolIsApproved, was this session's own dead code: added for the completion
+  guard, then superseded by toolCanStillBeCalled, which asks whether an open
+  step can accept the tool rather than whether the tool is approved
+Known-limitations: The lint was already failing before this session, so the
+  last commit on dev was made either when it passed or with the hook bypassed;
+  this does not establish which
+Next-safe-step: Commit the session's ladder work
+
+Dev-Log: DL-20260803-155
+Date: 2026-08-03
+Status: Uncommitted; rungs 1-6 pass, rung 7 running on a 10-minute budget
+Change-ID: None until a commit is authorized
+Request-or-TODO: Same user request, continued: climb the rungs, fix what each
+  one surfaces
+Goal: Clear what rungs 5, 6 and 7 surfaced
+Assumptions: The ladder's own cap is a deadline, not a gate. Rung 4 was
+  confirmed healthy by a single longer run before any further change was made,
+  and rung 7 was reaching real gates at 290s of a 300s window
+Decisions: (1) lastAttempt treated a rung above and a decomposition as
+  available allowances, but record grants those only on a stall, so a
+  converging run was told an attempt would follow when none would. It now
+  counts them only when the run is actually stalling
+  (2) converging read any repeat as a stall while record escalates at three.
+  Since the fingerprint is over the gate and its one-line reason, a review
+  bounded to two findings a round records as the same failure twice. Both now
+  use one threshold, including the halved bar for regression-prone gates
+  (3) Completeness gaps name the file with the function. A generated workspace
+  holds a stub main.go beside cmd/generated/main.go, so "main has no doc
+  comment" described two declarations
+  (4) The write and patch arguments inherited the loop's 4KB default for an
+  unbounded argument. A produced test file passes that as soon as it has a
+  table in it, and the bound is checked while the turn is decoded, so exceeding
+  it spends the attempt rather than the call. Both are 32KB, half the loop's
+  own ceiling for a whole call
+  (5) A patch states its target twice — the path argument and the payload's
+  "*** Update File:" header — and stepOwningPath now tries the payload when the
+  argument owns nothing. The argument is the label; the payload is the work
+  (6) atom-fuzz was the fourth hard gate measured only after the loop. Asked
+  alongside the rest, because the check is a scan for a FuzzXxx function; the
+  expensive part of that stage is reached only once a target exists
+  (7) A patch naming a second file was applied to whichever file was named
+  last, because the request carries one path and one flat hunk list. Every hunk
+  was then searched for in the wrong file — a hunk written for main.go reported
+  as matching thirty-nine places in main_test.go. Refused rather than partially
+  applied: a call is bound to one step and a step names one file. The tool
+  descriptor now says one file per call, so the model is told before it is
+  refused
+  (8) ApplyPatch searched the whole file for every hunk. A diff is a sequence,
+  and that ordering is what makes repeated context unambiguous in a table test.
+  Each hunk is now located after the previous one landed, falling back to the
+  whole-file search so an out-of-order patch still applies
+Files-or-schemas: internal/coordinator/agent_convergence.go,
+  internal/coordinator/agent_stage_completeness.go,
+  internal/coordinator/agent_narration.go,
+  internal/coordinator/agent_outstanding.go,
+  internal/coordinator/agent_execution.go,
+  internal/coordinator/agent_stage_registration.go, internal/agent/loop.go,
+  internal/executor/patch_tool.go, internal/executor/protocol.go; new
+  internal/coordinator/attempt_budget_agreement_test.go,
+  internal/coordinator/registration_scope_test.go,
+  internal/coordinator/tool_argument_bounds_test.go,
+  internal/agent/mislabelled_closed_step_test.go,
+  internal/executor/ordered_hunks_test.go. No schema change
+Validation: Rung 5 passes at 219s with zero scope refusals, rung 6 at 159s.
+  Rung 7's patch record across three passes: 4 of 25 landing, then 10 of 23,
+  then 17 of 27, with multi-file refusals falling from three to one once the
+  descriptor said one file per call
+Failures-or-discarded-approaches: Two of mine, both measured rather than
+  argued. Echoing the produced sources only when they had changed cut median
+  round latency from 6.5s to 5.0s and cut landed patches from 13 of 28 to 9 of
+  25: a round carries only the previous round's results, so a note saying the
+  files are unchanged since they were last shown points at text no longer in
+  the prompt. Reverted. Separately, the ordered-hunk change is kept as correct
+  diff semantics but cannot be shown to have helped on its own — the counts
+  moved between failure categories within run-to-run variance, and the
+  multi-file defect was what actually mattered. An earlier claim that
+  forty-seven of fifty failures were ambiguity was wrong: the real figure was
+  sixteen of twenty, inflated by the failure text being echoed into later
+  prompts
+Known-limitations: Six hunks a run still fail as ambiguous, two of them
+  matching thirty-seven places, which is thin context rather than a tool
+  defect. Making an ambiguous hunk take the first match after the cursor was
+  considered and rejected: it trades a refusal costing one round for a silent
+  misapplication. The phase report's aggregation is correct but its inputs are
+  not — several stages record an elapsed time measured from the run's start, so
+  their intervals span the whole run and the unaccounted remainder reads near
+  zero. TestPIPE001_AFailingRunKeepsItsRealAdversarialAndEvidenceVerdicts hangs
+  and is not this lane's
+Next-safe-step: Finish rung 7, then rung 8
+
+Dev-Log: DL-20260803-154
+Date: 2026-08-03
+Status: Uncommitted; rungs 1-3 pass, rung 4 converging
+Change-ID: None until a commit is authorized
+Request-or-TODO: Same user request, continued: climb the rungs, keep the
+  pipeline honest, and cut what a rung spends
+Goal: Remove what rung 4 surfaced, all of it machinery rather than gate policy
+Assumptions: Speed is round count. Measured on rung 4: 53 rounds, 276s of
+  model latency in a 300s run, so the pipeline's own stage work is about 24s
+  and every gain has to come from removing rounds
+Decisions: (1) Completing a step froze the file it named. After two patches
+  both write steps closed, the patch tool vanished, and a run with a compile
+  error left to fix spent the attempt emitting turns nothing could bind. One
+  predicate now governs binding, offering and advice: a step is spent only when
+  failed or skipped, which are the states meaning this route is closed rather
+  than this route has been used
+  (2) The narrator's own refusals — a second whole-file rewrite, a patch
+  broader than the round allows, a write out of scope — were built without the
+  request ID or schema version, so the loop rejected them as malformed results
+  rather than reading them as refusals and the coordinator ended the attempt.
+  All three now go through one helper that carries both
+  (3) The model's view of its own files went stale three separate ways: a
+  failed patch was not answered with the file it failed against, a successful
+  patch was not answered with the file it had just changed, and a suite run was
+  not answered with anything. The third was the expensive one — a patch written
+  straight after a test call failed 15 times out of 21, against 2 of 7
+  otherwise
+  (4) An unchanged suite run is answered from the previous result rather than
+  performed again. This protection existed before as a withheld tool; making a
+  completed check callable again removed it, which was necessary and which
+  reintroduced the waste it guarded
+  (5) Findings group by shared subject or shared lineage. The cap of two is
+  untouched, so the bisection argument survives; what changed is which second
+  finding may join the first. Five open findings asked one at a time was the
+  whole 300-second budget
+  (6) A run of identical tool failures no longer records the step as failed.
+  Stopping is right; recording it outlives the attempt, nothing can move a step
+  out of failed, and completion evidence must attribute to an implemented step
+  (7) Two more hard gates were evaluated only after the loop that was supposed
+  to inform them, so a run was failed for something nothing had asked it to
+  fix: the hostile-input probe and the mutation score. Both now report into
+  outstandingWork. The probe is asked alongside whatever else is outstanding
+  because it costs a second; the mutation check is deferred behind everything
+  else because it costs a suite execution per planted defect
+Files-or-schemas: internal/agent/loop.go, internal/agent/loop_types.go,
+  internal/openaimodel/model.go, internal/openaimodel/wire.go,
+  internal/coordinator/agent_narration.go,
+  internal/coordinator/agent_outstanding.go,
+  internal/coordinator/agent_execution.go, internal/coordinator/trace.go,
+  internal/coordinator/refinement_round.go; new
+  internal/coordinator/refused_tool_identity_test.go,
+  internal/coordinator/phase_accounting_test.go; extended
+  internal/agent/unverified_completion_test.go. No schema change
+Validation: Rung 4 pass 14 reached every required gate held with only advisory
+  stages unmet, at 170s against a 300s cap. Measured effects: patch failures
+  after a test call 71% to 8%; empty turns 10 to 2; unchanged suite runs 12 to
+  7 and no longer executed; review rounds for one finding set 3 to 1; tool
+  identity errors 2 to 0. Every new test was run against the previous
+  implementation first
+Failures-or-discarded-approaches: Two of my own mistakes, both caught by the
+  ladder. Leaving repeatable checks permanently open made
+  implementationStepsComplete unsatisfiable, so every attempt ended
+  awaiting-direction; reverted in favour of letting a closed check still be
+  called. Placing the hostile-input probe behind len(parts) == 0 copied the
+  pattern of the refinement checks beside it and meant a hard gate sat behind
+  soft ones and never fired at all — six further attempts lost to the defect
+  the fix was written for
+Known-limitations: TestPIPE001_AFailingRunKeepsItsRealAdversarialAndEvidenceVerdicts
+  hangs. Confirmed not mine: it still hangs with both of this session's
+  coordinator changes disabled, and its stack is an HTTP server under
+  Supervisor.Start. Left alone, per the rule about files this lane did not
+  change. atom-registration and molecule-registration remain unheld advisories
+  on rungs 2 and 4 — nothing produced reaches the registry, which is the
+  premise of shared mode and means no later rung can reuse earlier work
+Next-safe-step: Finish rung 4, then look at why nothing reaches the registry
+
+Dev-Log: DL-20260803-153
+Date: 2026-08-03
+Status: Uncommitted; rungs 1-3 pass, rung 4 running
+Change-ID: None until a commit is authorized
+Request-or-TODO: Same user request, continued, plus "this is a little too
+  slow": refine the pipeline for wall-clock as well as for passing
+Goal: Cut what a rung spends, and fix the report that was supposed to say
+  where it went
+Assumptions: Speed is round count. Measured on rung 3: 54 model rounds, 250s
+  of a 371s run in model latency, median 3.8s per round. So the lever is
+  rounds that achieve nothing, not the cost of a round
+Decisions: (1) Thirty of forty patch calls were failing. The refusal tells the
+  run to read the file and copy the lines from it, which it cannot: the file is
+  shown once at attempt start and every patch that lands makes that copy a
+  description of a file that no longer exists. A failed patch now comes back
+  with the file's current text. Confined to the worktree here rather than
+  trusting the executor, because this reads on the failure path of a call that
+  may have been refused for escaping, and bounded at 16000 bytes against a
+  60000-byte result ceiling
+  (2) A tool is offered only while some open step names it, so the verification
+  step closing on its first call took the suite away for the rest of the
+  attempt. First attempt at this left the step open, which was a regression:
+  implementationStepsComplete reads every step's state, so a step held open
+  forever made completion unreachable and every attempt ended
+  awaiting-direction. Reverted. The step closes as before; what changed is that
+  a closed repeatable check can still be offered and bound. Both places share
+  one predicate so they cannot drift
+  (3) The completion guard was bounded to one refusal, so a run claimed
+  completion, was refused, tested, saw the failure, patched, and claimed
+  completion again with the refusal spent. Now three, it also refuses when the
+  last test failed, and it asks whether an open step can accept the tool rather
+  than asking the approved list, which still names a tool after the last step
+  that could bind it has closed
+  (4) Every malformed turn ended the attempt. Right for a turn proposing
+  something impossible; far too expensive for a turn proposing nothing, which
+  the next round fixes. The empty turn is now answered in place, bounded to
+  two. A turn carrying both tool calls and completion still costs the attempt
+  (5) The phase report summed per-stage durations. Stages inside a phase run
+  concurrently and are re-decided every attempt, so the same seconds were
+  counted many times: "specification 2991.96s 77.6% of measured" for a
+  371-second run. The unaccounted remainder is wall minus measured, so the
+  inflated total made it negative, and the negative case was silently not
+  printed — the one line docs/testing.md says to read first was guaranteed
+  missing exactly when a run was slow. Phases now report their wall-clock span,
+  shares are of the run, and the remainder always prints
+Files-or-schemas: internal/coordinator/agent_narration.go,
+  internal/coordinator/trace.go, internal/agent/loop.go,
+  internal/agent/loop_types.go, internal/openaimodel/wire.go; new
+  internal/coordinator/patch_failure_echo_test.go,
+  internal/agent/unverified_completion_test.go. No schema change
+Validation: Rung 3 passes at 268s, having failed at 425s, 371s and a 300s
+  timeout. Patch failure rate fell from 75% to 40% and test runs rose from 8 to
+  17 across those passes. Every new test was run against the previous
+  implementation first: the repeat-check test recorded "plan step
+  \"verification\" is not executable"; the completion guard's control shows a
+  run that tests before finishing is not sent round again; the empty-turn
+  control shows a contract-contradicting turn still costs the attempt; the
+  echo's controls cover path traversal, an absent file and one past the bound.
+  gofmt clean, build and vet pass, internal/agent, internal/openaimodel and
+  internal/pipeline suites pass
+Failures-or-discarded-approaches: Leaving repeatable checks permanently open,
+  described above — it made completion unreachable and was caught by rung 3
+  pass 3 failing integration-tests four times in a row. Also considered
+  reopening a closed step by transition; rejected because implemented-to-pending
+  is not an allowed transition and widening the state machine would recreate
+  the loop-versus-storage disagreement the attribution trigger exists to catch
+Known-limitations: One "provider call the model failed: invalid-request" cost
+  an attempt on rung 4 pass 1. It appears once across every captured log and is
+  not from the patch echo, which fires only on failed patches; left alone
+  rather than chased at n=1. The corrected phase report has not yet been read
+  on a real run. molecule-registration remains unheld as an advisory on rung 2
+Next-safe-step: Finish rung 4 and keep ascending
+
+Dev-Log: DL-20260803-152
+Date: 2026-08-03
+Status: Uncommitted; rungs 1 and 2 pass, rung 3 running
+Change-ID: None until a commit is authorized
+Request-or-TODO: Same user request, continued: run the rungs, refine the
+  pipeline until each passes, escalate
+Goal: Clear what rung 2 surfaced. All three are the prompt describing itself
+  inaccurately to the model, not a gate being wrong
+Assumptions: The atom-case-synthesis gate is correct on rung 2 and was not
+  relaxed. Its produced tests shell out to the built binary, and addValues(nil)
+  and addValues([]int{}) cannot be reached that way — a nil slice does not
+  exist on a command line — so "27 of 27 synthesised case(s) are never tried"
+  was true on both failing runs
+Decisions: (1) ApprovedTools is computed once per attempt from the tree digest
+  at attempt start and then handed to every round in that attempt, so an
+  attempt beginning byte-identical to the last test run was denied the suite
+  for its whole length, including after its own first patch landed. A
+  checkpoint restore puts the tree back to the last tested state, which makes
+  the next attempt start identical again, so it compounds. Rung 2 pass 1 spent
+  sixteen rounds with only the patch tool. The suite is now also offered when
+  the attempt's plan has a step that writes a file, which every refinement
+  attempt does; a wasted call is the cheaper failure and the narrator already
+  marks a run against unchanged bytes
+  (2) producedTestFilesFor appended "These tests must still pass after your
+  change." to each test file's content, the same defect as DL-20260803-151's
+  patch context and in the same prompt. Moved to a
+  tests-that-must-keep-passing note
+  (3) sendBack assigns every gate's instruction to the failure variable, and
+  that variable reached the model labelled "last-test-run-output". The name was
+  true when it only ever held narrator.lastFailure. So the one item in the
+  prompt asking for new work was named as a log of something already finished,
+  while what_to_do_now said to work through the plan and the plan was still the
+  original write-the-program plan. Renamed to work-this-attempt-must-do
+Files-or-schemas: internal/coordinator/agent_execution.go,
+  internal/coordinator/patch_context.go; updated
+  internal/coordinator/patch_context_test.go,
+  internal/coordinator/engine_refinement_test.go. No schema change
+Validation: Rung 2 passes at 242s, having failed at 424s and 244s. The label
+  change is visible in the trace as a different gate each attempt —
+  adversarial-review, completeness, atom-case-synthesis, assembly,
+  atom-documentation — where the two failing runs alternated between
+  integration-tests and completeness and never satisfied either. Evidence for
+  the tool defect: sixteen rounds logged tools=[apply-patch] against fifteen
+  tools=[apply-patch test], and pass 2's prompts show the test tool restored.
+  Evidence for the instruction defect: six attempts told that addValues,
+  printSum and readArguments have no direct test, four patches to
+  main_test.go, and not one direct unit test written. gofmt clean, build and
+  vet pass, refinement and patch-context tests pass
+Failures-or-discarded-approaches: Considered relaxing atom-case-synthesis to
+  accept a test that drives an atom through the built binary, on the theory
+  that the gate was over-strict the way rung 1's property gate had been.
+  Rejected after reading the produced tests: the cases it names genuinely
+  cannot be reached through a command line, so the gate was right both times
+  and relaxing it would have hidden the real defect. Also considered that the
+  refinement plan might forbid writing test files, making the instruction
+  unfollowable; disproved by the trace, which shows four successful patches to
+  main_test.go
+Known-limitations: Rung 2 leaves molecule-registration unheld as an advisory —
+  "0 of 1 produced molecule(s) reached the registry" — so a later task cannot
+  find the work, which is the premise of shared mode. Not investigated yet.
+  The per-attempt context is still assembled once, so a second patch inside one
+  attempt is written against a stale copy
+Next-safe-step: Finish rung 3 and keep ascending
+
+Dev-Log: DL-20260803-150
+Date: 2026-08-03
+Status: Uncommitted; rung 1 passes, 69s over 2 attempts. Rung 2 running
+Change-ID: None until a commit is authorized
+Request-or-TODO: User analysis of the rung 1 trace of 2026-08-03: gates must be
+  applicability-aware and mutually satisfiable for the task's actual
+  behavioural surface, and a gate must not create code solely for another gate
+  to reject
+Goal: Remove the three defects that kept ladder rung 1 from converging on a
+  program that was correct, compiling, passing and acceptance-matched at
+  eighteen seconds
+Assumptions: The adversarial review's demand on main is legitimate and stays.
+  The run wrote writeGreeting(w io.Writer) error itself, on attempt 1, before
+  any gate spoke; main then called it and exited zero regardless, which is a
+  real defect the review is right to name. Only the gates that refused the
+  compliance were changed
+Decisions: Three separate defects, deliberately not one mechanism.
+  (1) path-coverage. checkControlTests and wholeModuleFunctionCoverage both
+  exempt main because no Go test can call it; the changed-line measurement
+  that replaced the latter did not, so whether main had to be covered depended
+  on which gate asked. Lines no test in the same process can execute are now
+  excluded before they are counted, and reported separately rather than
+  dropped: main's body, and any block that ends the process. A terminating
+  block is exempt from below its opening brace, not including it, because that
+  brace shares a line with the condition that guards it and deciding whether
+  to fail is ordinary reachable code. Rejected a gate-provenance ledger for
+  this: main's lines are unreachable whoever asked for them, so provenance
+  would record the contradiction rather than remove it
+  (2) The plan-step attribution constraint. Not gate policy at all. The
+  mislabelled-call correction moved stepIndex and left proposed.PlanStepID
+  alone, so the tool request, its result and both checkpoints named the
+  model's label while the transition named the corrected step. The durable
+  trigger matches those two on step, refused the transition, and the loop
+  returned the error, which discards the attempt. All five records now read
+  one bound step ID
+  (3) atom-property-tests. It read atom-case-synthesis' answer to decide
+  whether an input space exists. Case synthesis asks what is worth trying and
+  synthesises a failure case for any atom returning an error, which is right
+  for it and wrong here: a failure arriving through an injected dependency is
+  not a set of values to state a property over. The gate now asks its own
+  narrower question. io.Reader deliberately still counts, because the bytes it
+  yields are an input space
+Files-or-schemas: internal/coordinator/agent_stage_unit_verification.go,
+  internal/coordinator/agent_stage_obligations.go, internal/agent/loop.go;
+  new internal/coordinator/coverage_unreachable_lines_test.go,
+  internal/agent/mislabelled_step_attribution_test.go; extended
+  internal/coordinator/property_tests_no_input_space_test.go. No schema change
+Validation: Every new test was run against the previous implementation and
+  recorded the defect before being run against the new one. Coverage:
+  "5 of 9 changed line(s) this run wrote are never executed by any test (44.4%
+  covered): main.go:16 .. main.go:20". Attribution: tool start under
+  "step-002" while its transition claimed "step-001". Property tests: "all 1
+  test(s) check a single example". Each has a control that still fails as
+  before: a reachable uncovered branch, a reader-typed input space, a slice
+  parameter. gofmt clean, go build ./... and go vet pass, internal/agent
+  suite passes. Ladder rung 1 pass 2 confirmed defects 1 and 2 gone from a
+  real run: no path-coverage sendback, no refused attempt
+Failures-or-discarded-approaches: First cut exempted the whole terminating
+  block, which excused the guarding condition; second cut exempted only its
+  statements, which left the closing brace behind as an uncoverable gap, since
+  the block Go instruments ends there. The span below the opening brace
+  through the closing one is the only version that is both. A one-line block
+  has no such interior and is left measured, which is the safe direction
+Known-limitations: decodeModelToolCall still receives the model's original
+  label and renders it into the request's human-readable purpose string; the
+  consistency trigger does not read that field, and correcting it would mean
+  reordering the decode past the scope validation. Rung 1 pass 2 also showed
+  an attempt making thirteen consecutive patches to one test file without once
+  running the suite, and attempts 5 to 8 beginning with no sendback recorded;
+  neither is addressed here and both may be downstream of the property gate
+Next-safe-step: Escalate through rung 2 and up, fixing what each rung surfaces
+
+Dev-Log: DL-20260803-151
+Date: 2026-08-03
+Status: Uncommitted; rung 1 passed with these in
+Change-ID: None until a commit is authorized
+Request-or-TODO: Same user request, continued: run the rungs, refine the
+  pipeline until each passes, escalate
+Goal: Remove the three further defects rung 1 surfaced once the gate
+  contradictions were gone, none of which is gate policy
+Assumptions: A rung is passed only when the program is correct AND the
+  pipeline converged, per the ladder's own rule. Pass 4 satisfied the first and
+  failed the second, which is the case the rule exists to catch
+Decisions: (1) patchContextItems appended its own explanation to the file's
+  content field, so a run reading {"path": "main.go", "content": "...}
+
+This
+  is main.go exactly as it stands now, revision ..."} concluded the sentence
+  was in the file and wrote hunks deleting it. Those can never match, because
+  the sentence is not there. The instruction to match character for character
+  is what made it expensive rather than untidy: it tells the run the sentence
+  is part of what it must match. Content is now the file verbatim and the
+  guidance moved to a how-to-patch pseudo-item, the convention
+  planning-request already uses
+  (2) The refinement loop's exit read narrator.lastFailure, which is sticky by
+  design so the next attempt can be told what broke. That asks whether
+  anything ever failed, not whether this tree fails, so one mismatched hunk
+  kept the loop alive for every attempt after it. It cannot be right in any
+  case: reaching that line means revalidateAfterWrite held on this exact tree
+  and acceptance passed, so it read a fact from the past to contradict one
+  established in the present. It now breaks
+  (3) persistProducedFile stored only apply-edit, so every refinement left the
+  record holding the first draft. apply-patch persists too, and is drawn as a
+  file edit rather than falling to recordCommand, which also left the stored
+  artifact with no operation node to attach to
+Files-or-schemas: internal/coordinator/patch_context.go,
+  internal/coordinator/agent_execution.go,
+  internal/coordinator/agent_narration.go; updated
+  internal/coordinator/patch_context_test.go. No schema change
+Validation: Rung 1 passes: 69s, 2 attempts, one legitimate completeness
+  sendback, against 181s / 9 attempts / failed before. Pass 4 evidence for
+  each: "the program is on disk but not in the record: 2 artifact(s) stored;
+  file is 544 bytes / stored 472 bytes"; seven consecutive rounds of "open 0,
+  addressed 2, verified 2, exhausted 0; asking for 0 this round"; hunks
+  deleting "This is cmd/generated/main.go exactly as it stands now" from a
+  file that never contained it. patch_context_test.go now asserts the content
+  offered for a file is exactly that file. gofmt clean, go build and go vet
+  pass, internal/agent and the coordinator tests covering the changed areas
+  pass
+Failures-or-discarded-approaches: Considered clearing lastFailure on a
+  subsequent success; rejected, because the field's documented purpose is to
+  survive so the next attempt can be told what broke. The defect was the
+  consumer, not the field. Also considered adding -count=1 to the model's test
+  recipe after seeing "(cached)" in a trace; dropped it as a non-defect, since
+  Go's test cache is content-addressed and cannot serve a stale pass for
+  changed code, and the gates re-run with -count=1 regardless
+Known-limitations: patch_context.go and agent_execution.go carry another
+  lane's uncommitted work in other regions of the same files; only the hunks
+  described here are this change's. The per-attempt context is still assembled
+  once, so a second patch within one attempt is written against a stale copy —
+  reduced but not removed
+Next-safe-step: Escalate through rung 2 and up, fixing what each rung
+  surfaces
+
 Dev-Log: DL-20260803-149
 Date: 2026-08-03
 Status: Rung 8 running; items 7 and 10 in

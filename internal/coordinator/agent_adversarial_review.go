@@ -136,30 +136,6 @@ func findingObligationID(finding adversarialFinding) string {
 	return "ADV-" + hex.EncodeToString(digest[:])[:16]
 }
 
-// reviewAdversarially attacks the work rather than waiting for a gate to trip.
-//
-// The gates ask whether declared conditions hold. This asks the different and
-// harder question a reviewer asks: given that everything passed, where is this
-// still weak? A suite can be green because the code is right or because the
-// tests do not look anywhere interesting, and only one of those is worth
-// shipping.
-//
-// It is deliberately run when the work already compiles and passes. Attacking
-// broken code tells you what you already know.
-//
-// This runs every finder unconditionally, which is the pre-PIPE-095 policy:
-// callers that have not been updated to select checks by task risk get
-// exactly the coverage they got before. reviewAdversariallyForRisk
-// (PIPE-095) is the risk-selecting entry point; it is additive and is not
-// yet reached from the pipeline (see its own comment).
-func (execution *AgentExecution) reviewAdversarially(
-	ctx context.Context,
-	worktree string,
-) ([]adversarialFinding, error) {
-	return execution.reviewAdversariallyWithPlan(
-		ctx, worktree, adversarialCheckPlan{MutationAnalysis: true})
-}
-
 // reviewAdversariallyWithPlan is reviewAdversarially with which finders run
 // selected by an adversarialCheckPlan (PIPE-095), and is where the findings
 // this review produces are given their proof-obligation identity (PIPE-096)

@@ -88,8 +88,10 @@ func TestAFindingAddressedTwiceStopsBeingAsked(t *testing.T) {
 	ledger.record(workable)
 
 	workable, exhausted = ledger.reconcile([]adversarialFinding{finding})
-	if len(workable) != 1 {
-		t.Fatalf("second pass dropped a finding tried only once")
+	if len(workable) != 1 || len(exhausted) != 0 {
+		t.Fatalf("second pass: %d workable, %d exhausted — a finding tried "+
+			"once is still worth a second attempt", len(workable),
+			len(exhausted))
 	}
 	ledger.record(workable)
 

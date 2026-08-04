@@ -100,7 +100,9 @@ func buildRunLauncher(
 //	  - nil when the command is usable as configured.
 //	  - an error naming the defect when it is not.
 //	Preconditions:
-//	  None.
+//	  None: every slice is a valid argument, including nil and empty, because
+//	  the absence of a container command is what "run without one" looks like
+//	  and is answered here rather than refused by the caller.
 //	Postconditions:
 //	  None: pure validation, no state changes.
 //	Effects:
@@ -133,6 +135,7 @@ func buildRunLauncher(
 //	  container command validation, worker isolation, M11-033, AUDIT-017.
 //
 //codeflux:atom
+//codeflux:atom-name-exception action-verb: validation is itself the domain action; a recognised verb would name the mechanism rather than the outcome
 func validateContainerCommand(command []string) error {
 	if len(command) == 0 {
 		return nil

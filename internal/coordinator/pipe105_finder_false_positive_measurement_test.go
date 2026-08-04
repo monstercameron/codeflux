@@ -145,10 +145,9 @@ func TestPIPE105_SwallowedErrorFinderFalsePositiveRateOnCleanFixtures(t *testing
 // measurement for findUncheckedBoundaries's two repaired checks.
 func TestPIPE105_BoundaryFinderFalsePositiveRateOnCleanFixtures(t *testing.T) {
 	type fixture struct {
-		name          string
-		files         map[string]string
-		wantFinding   string // substring that must NOT appear for a clean fixture
-		wantDefective string // substring that MUST appear for a defective fixture
+		name        string
+		files       map[string]string
+		wantFinding string // substring that must NOT appear for a clean fixture
 	}
 
 	fixtures := []fixture{

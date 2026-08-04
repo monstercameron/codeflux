@@ -50,6 +50,234 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-147
+Commit: pending
+Date: 2026-08-03
+Type: Chore -- remove code nothing calls, and satisfy the atom lint the commit
+  hook enforces
+Request-or-TODO: Unblocking the commit of CL-20260803-140 through -146
+Outcome: The repository lint refused every commit until this landed, on debt
+  that predated this session: an atom whose Preconditions said "None" without
+  the reason the schema requires, an atom name the verb list does not
+  recognise, and seven declarations staticcheck reports as unreferenced --
+  traceEnvironment, changedFileSummary, terminalStatus, reviewAdversarially,
+  and three unused test fields. The naming case is recorded as an
+  atom-name-exception rather than renamed, because validation is itself the
+  domain action and a recognised verb would name the mechanism instead of the
+  outcome. One of the seven, toolIsApproved, was this session's own: it was
+  added for the completion guard and superseded by toolCanStillBeCalled, which
+  asks whether an open step can accept the tool rather than whether the tool is
+  approved.
+Affected-behavior: None. Every removal is unreferenced by staticcheck's
+  analysis, which includes tests.
+Compatibility-or-migration: None.
+Verification: go run ./cmd/codeflux-dev lint passes, gofmt is clean, go vet
+  passes, and the agent, executor and openaimodel suites pass.
+Dev-Log: None: this is cleanup carried out to land the entries above, and it is
+  described here rather than in the development log because it implements
+  nothing.
+
+Change-ID: CL-20260803-146
+Commit: pending
+Date: 2026-08-03
+Type: Checkpoint -- unrelated in-flight work swept in at the user's request
+Request-or-TODO: User asked for everything in the working tree to be committed
+Outcome: This commit collapses work that was already uncommitted in the tree when
+  this session began and that this session did not review: the regenerated
+  protobuf and its .proto, the codeflux-dev and codeflux command changes
+  including the seed-stale-lock helpers, the atom-collection and pipeline-ledger
+  frontend work, one addition to the patch-tool tests, and the TODOS.md edits.
+  It is labelled a checkpoint because it is exactly what the commit rules
+  otherwise forbid -- several unrelated purposes in one commit -- and its
+  contents are listed rather than explained, because explaining work nobody read
+  would be inventing a rationale for it.
+Affected-behavior: Unknown to this session. Nothing here was exercised by the
+  ladder runs that verified the rest of this batch.
+Compatibility-or-migration: Unassessed. The protobuf regeneration is the part
+  most likely to matter to a consumer.
+Verification: go build ./... and gofmt pass over the whole tree. No behavioural
+  verification was performed on this commit's contents.
+Dev-Log: None. This work has no development-log entry because this session did
+  not do it.
+
+Change-ID: CL-20260803-145
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the patch tool applied a two-file patch to whichever file was named
+  last, and searched every hunk against the whole file
+Request-or-TODO: Ladder rungs 7 and 9
+Outcome: A patch request carries one path and one flat list of hunks, and every
+  "*** Update File:" header overwrote that path while its hunks joined the same
+  list. A patch naming two files therefore had every hunk searched for in the
+  file named last: a hunk written for main.go was reported as matching
+  thirty-nine places in main_test.go, naming a file it was never about, and no
+  amount of the added context the message asked for could have helped. Such a
+  patch is now refused, naming both files, because a call is bound to one plan
+  step and a step names one file -- applying half would attribute work to a step
+  that did not ask for it, and dropping the other half would lose changes the run
+  believes it made. The tool descriptor states one file per call, so a run is
+  told before it is refused. Separately, hunks are now located in what remains of
+  the file after the previous hunk landed, which is what makes repeated context
+  unambiguous in a table-driven test; a hunk the remainder cannot place still
+  falls back to the whole-file search, so an out-of-order patch applies exactly
+  as before.
+Affected-behavior: apply-patch. A two-file patch fails with an actionable message
+  instead of being misapplied; ordered hunks over repeated context now apply.
+Compatibility-or-migration: None. No schema change.
+Verification: Rung 7's patch record across four passes: 4 of 25 landing, then 10
+  of 23, then 17 of 27, then 22 of 48 on the passing run; multi-file refusals
+  fell from three a run to one once the descriptor carried the rule. Five new
+  tests in internal/executor/ordered_hunks_test.go cover ordered placement, the
+  out-of-order fallback, a genuinely ambiguous hunk that is still refused, the
+  two-file refusal, and a file named twice.
+Dev-Log: DL-20260803-155
+
+Change-ID: CL-20260803-144
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- four hard gates were measured only after the loop that was meant to
+  inform them, and two of them said things that were not true
+Request-or-TODO: Ladder rungs 2, 4, 6, 7 and 9
+Outcome: atom-case-synthesis, the hostile-input probe, the mutation score and
+  atom-fuzz each fail a run, and each was evaluated only in the final stage wave.
+  A run was therefore failed for work nothing had asked it to do: rung 4 ended on
+  "given nothing at all: accepted it, printed nothing, and exited zero", first
+  said at 254 seconds with the last send-back at 250. All four now report into
+  the refinement loop. The probe and the fuzz-target scan are asked alongside
+  whatever else is outstanding because both are cheap; the mutation score is
+  deferred behind everything else because it costs a suite execution per planted
+  defect. Two of these gates also misdescribed their own findings. The coverage
+  instruction ended by telling a run to explain a genuinely unreachable line in a
+  comment and leave it, and nothing read that explanation -- rung 7 obeyed it and
+  was asked for the same lines three times -- so the escape is now the
+  //codeflux:unreachable directive, whose reason is required because a checker
+  can verify a marker and cannot verify a sentence. And atom-fuzz ran
+  "go test -fuzz=. ./...", which Go refuses across more than one package, then
+  reported the refusal as "fuzzing found a failing input": fuzzing now targets
+  the single package declaring the target, and a refusal is reported as a
+  refusal.
+Affected-behavior: Runs are told about hostile input, missing fuzz targets,
+  untried cases and weak tests while they still have attempts. A declared
+  unreachable branch is no longer asked for again. A fuzzer that could not run no
+  longer accuses the program of a defect.
+Compatibility-or-migration: Produced code may now carry //codeflux:unreachable
+  comments. No schema change.
+Verification: Rungs 4, 6 and 7 pass, each having failed on the gate the change
+  surfaces. New tests cover the directive and its bare-marker control, the fuzz
+  package scoping, and a refusal that must not read as a finding.
+Dev-Log: DL-20260803-153, DL-20260803-154, DL-20260803-155
+
+Change-ID: CL-20260803-143
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the attempt budget and the stall tracker disagreed with themselves
+Request-or-TODO: Ladder rungs 5 and 9
+Outcome: Three predicates answered one question three ways. lastAttempt treated a
+  rung above and a decomposition as available allowances, but record grants those
+  only on a stall, so a converging run was told an attempt would follow when none
+  would: rung 5 was sent back for one uncovered line at 155 seconds and the next
+  line in the trace is the run finishing. converging read any repeat as a stall
+  while record escalates at three. And the stall fingerprint was taken over the
+  gate and its one-line reason, which is a fixed sentence per gate, so a review
+  raising three different findings across three rounds -- each addressed, each
+  verified -- recorded as the same failure three times and cost rung 9 its
+  extension with four minutes of budget unused. The hatches now count only when
+  the run is stalling, converging uses record's own threshold including the
+  halved bar for regression-prone gates, and the fingerprint includes what was
+  actually asked.
+Affected-behavior: A run that clears a different gate every attempt keeps its
+  extension. A run repeating one failure still stalls, escalates and stops.
+Compatibility-or-migration: None.
+Verification: Rung 5 passes. New tests in
+  internal/coordinator/attempt_budget_agreement_test.go pin the agreement between
+  the two predicates, the shared threshold, and the regression-prone control;
+  each was run against the previous implementation first.
+Dev-Log: DL-20260803-155
+
+Change-ID: CL-20260803-142
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the loop spent whole attempts on mistakes a round could correct
+Request-or-TODO: Ladder rungs 1, 4, 5 and 9
+Outcome: Completing a step froze the file it named, so after two patches the
+  patch tool vanished and a run with a compile error left to fix spent the
+  attempt emitting turns nothing could bind; a step is now spent only when it
+  failed or was skipped. A turn that said nothing ended the attempt, and now
+  costs a round. Reaching outside the plan ended the attempt, and now costs a
+  round that names the files the plan owns -- on a generated workspace the wrong
+  file is nearly always the stub main.go in the opening context. An attempt could
+  end on a write no test had seen, which the coordinator then discarded
+  wholesale; the loop refuses that ending while the suite is still callable. A
+  mislabelled call was corrected in one place and left uncorrected in the four
+  records written about it, so the durable consistency trigger refused the
+  transition and discarded the attempt. And a run of identical tool failures no
+  longer records the step as failed, because nothing can move a step out of
+  failed and completion evidence must attribute to an implemented one.
+Affected-behavior: Attempts are spent on work rather than on correctable
+  mistakes. Every record of a tool call names the step the loop bound it to.
+Compatibility-or-migration: None.
+Verification: Rungs 1, 5, 6, 7 and 8 pass. New tests in internal/agent cover each
+  retry and its bound, the repeat-write case, the failed-step control, and the
+  attribution agreement; each was run against the previous implementation.
+Dev-Log: DL-20260803-150, DL-20260803-152, DL-20260803-155
+
+Change-ID: CL-20260803-141
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- the prompt described the run's own files inaccurately
+Request-or-TODO: Ladder rungs 1, 4, 5 and 6
+Outcome: patchContextItems appended its own explanation to the file's content
+  field, so a run reading a file that ended "This is cmd/generated/main.go
+  exactly as it stands now" wrote hunks deleting that sentence, which could never
+  match; producedTestFilesFor did the same to every test file. Both now carry the
+  file and nothing else, with the guidance in a pseudo-item. Every gate's
+  instruction reached the model labelled "last-test-run-output", so the one item
+  asking for new work was named as a log of something already finished while
+  what_to_do_now pointed at the original plan. A patch was answered with nothing
+  and a suite run with nothing, so a hunk written after either was written
+  against a file that had already moved -- a patch straight after a test call
+  failed 15 times out of 21, against 2 of 7 otherwise. A refusal the narrator
+  issued itself carried no request identity, so the loop rejected it as a
+  malformed result and the coordinator ended the attempt on it. And completeness
+  gaps now name the file with the function, because a generated workspace holds
+  two declarations called main.
+Affected-behavior: The model sees its files as they are, is told what it must do
+  in an item named for that, and is refused in a way it can read.
+Compatibility-or-migration: None.
+Verification: Rungs 1 through 8 pass. The patch failure rate for a patch written
+  after a test call fell from 71% to 8%. New and updated tests cover the echo,
+  its worktree confinement, the size bound, and the refusal identity.
+Dev-Log: DL-20260803-151, DL-20260803-152, DL-20260803-153
+
+Change-ID: CL-20260803-140
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- gates that contradicted each other, and a time report that could not
+  be read
+Request-or-TODO: Ladder rungs 1, 2 and 4
+Outcome: path-coverage demanded coverage of lines no test in the same process can
+  execute -- main's body, and any block that ends the process -- which were the
+  very lines the adversarial review had just demanded be written; two sibling
+  gates already exempted main and this one did not. atom-property-tests read
+  atom-case-synthesis' answer to decide whether an input space exists, and case
+  synthesis counts a failure case for any atom returning an error, so a program
+  printing a constant through an injected writer was asked for a property over
+  inputs it does not have. Atom registration counted declarations the
+  documentation ask deliberately never requested, reporting "0 of 3 reached the
+  registry" when one had been asked for, written and refused on a missing field
+  and the other two were correctly never mentioned. And the phase report summed
+  per-stage durations across concurrent, repeatedly-decided stages, reporting
+  2991.96s of a 371-second run, which drove the unaccounted remainder negative
+  and silently omitted the one line the report exists for.
+Affected-behavior: Gates no longer refuse what another gate required. The time
+  report's phases are the union of when each was running, and the remainder
+  always prints.
+Compatibility-or-migration: None.
+Verification: Rungs 1, 2 and 4 pass. New tests cover the coverage exemptions and
+  their reachable-line control, the property gate's sink-versus-reader
+  distinction, the registration scope, and the interval arithmetic.
+Dev-Log: DL-20260803-150, DL-20260803-152, DL-20260803-153
+
 Change-ID: CL-20260803-139
 Commit: pending
 Date: 2026-08-03
