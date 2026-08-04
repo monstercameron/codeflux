@@ -3,10 +3,12 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
 	"codeflux.dev/codeflux/internal/providers"
+	"codeflux.dev/codeflux/internal/storage"
 )
 
 // planFromRequirement decides how a request is broken into steps.
@@ -57,7 +59,7 @@ func (execution *AgentExecution) planFromRequirement(
 	}
 	// The schema first, the line parser as the fallback for a model that could
 	// not honour it.
-	behaviours, structured := decodedBehaviours(turn.MessageRedacted)
+	behaviours, named, structured := decodedBehaviours(turn.MessageRedacted)
 	if !structured {
 		behaviours = parseBehaviours(turn.MessageRedacted)
 	}
@@ -65,9 +67,34 @@ func (execution *AgentExecution) planFromRequirement(
 		return parsed, "parsed from the request, because the planning model " +
 			"named no distinct behaviours"
 	}
+	// The layout is the planner's only when the request did not give one.
+	//
+	// A path in the request is the person saying where the work goes, and it
+	// outranks anything inferred; filesNamedIn already prefers it, so a request
+	// that named files reaches here with those files and must keep them. What
+	// is being replaced is the case where filesNamedIn had nothing to go on and
+	// answered with a constant.
+	layout := ""
+	if requirementNamesNoFile(requirement) {
+		if files := layoutFromPlanner(named); len(files) > 0 {
+			parsed = agentPlanStepsForFiles(worktree, requirement, files)
+			layout = ", laid out in " + counted(len(files), "file")
+		}
+	}
 	return stepsForBehaviours(worktree, behaviours, parsed),
 		"planned on " + execution.settings.PlanningRung + ": " +
-			counted(len(behaviours), "behaviour") + " named"
+			counted(len(behaviours), "behaviour") + " named" + layout
+}
+
+// requirementNamesNoFile reports that the request left the layout open.
+//
+// Asked of the same extractor filesNamedIn consults, so the two cannot disagree
+// about whether a request named a path. Two readers of one requirement drifting
+// is how a plan came to name a file no step covered, and it is not worth
+// repeating for this.
+func requirementNamesNoFile(requirement string) bool {
+	analysis, err := storage.AnalyzeTaskRequirement(requirement)
+	return err != nil || len(analysis.ExplicitFiles) == 0
 }
 
 // planningInstruction asks for a decomposition and nothing else.
@@ -89,6 +116,22 @@ func planningInstruction(requirement string) string {
 			"file, not a step, not a heading. Do not number them. Do not " +
 			"explain. If the request asks for one behaviour, answer with one " +
 			"line.\n\n")
+	// The layout, because the alternative was a constant.
+	//
+	// Where the work goes was not anybody's decision: when the request named no
+	// path, the plan was cmd/generated/main.go and its test whatever had been
+	// asked for. A request whose point is that a command imports a package it
+	// exports from was planned into one directory, and the run could not have
+	// produced otherwise — the plan's files are the scope every write is checked
+	// against, so a second package was unreachable rather than merely unplanned.
+	instruction.WriteString(
+		"Then say which files the work goes in, as module-relative paths " +
+			"ending .go. Group it the way the request describes: code that one " +
+			"part imports from another has to be in a package that part can " +
+			"import, and a package cannot import a command. Name only source " +
+			"files — a test file is added beside each one for you. If the " +
+			"request already says where the work goes, answer with no files at " +
+			"all.\n\n")
 	instruction.WriteString("The request:\n\n")
 	instruction.WriteString(strings.TrimSpace(requirement))
 	return instruction.String()
@@ -234,7 +277,8 @@ func behaviourSchema() *providers.StructuredOutputRequirement {
 	return &providers.StructuredOutputRequirement{
 		Name: "decomposition",
 		Description: "the distinct behaviours a request asks for, each one " +
-			"something that could be got right while another is got wrong",
+			"something that could be got right while another is got wrong, and " +
+			"the files they are written in",
 		Strict: true,
 		Schema: json.RawMessage(`{
   "type": "object",
@@ -246,9 +290,16 @@ func behaviourSchema() *providers.StructuredOutputRequirement {
         "type": "string",
         "description": "a short imperative phrase naming what the program must do, not a file and not a step"
       }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "a module-relative path ending .go, such as internal/stats/stats.go or cmd/report/main.go. Empty when the request already says where the work goes."
+      }
     }
   },
-  "required": ["behaviours"],
+  "required": ["behaviours", "files"],
   "additionalProperties": false
 }`),
 	}
@@ -261,12 +312,13 @@ func behaviourSchema() *providers.StructuredOutputRequirement {
 // planner cannot honour a schema should get a worse decomposition rather than
 // no plan — which is the same reasoning that makes the whole planning call a
 // fallback rather than an error path.
-func decodedBehaviours(answer string) ([]string, bool) {
+func decodedBehaviours(answer string) ([]string, []string, bool) {
 	var decoded struct {
 		Behaviours []string `json:"behaviours"`
+		Files      []string `json:"files"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(answer)), &decoded); err != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	var behaviours []string
 	for _, behaviour := range decoded.Behaviours {
@@ -274,5 +326,102 @@ func decodedBehaviours(answer string) ([]string, bool) {
 			behaviours = append(behaviours, trimmed)
 		}
 	}
-	return behaviours, len(behaviours) > 0
+	return behaviours, decoded.Files, len(behaviours) > 0
+}
+
+// maximumPlannedFiles bounds a layout.
+//
+// Six source files and their tests is already a larger program than any single
+// request here describes, and a plan with thirty steps is not a plan: every one
+// of them has to be written, tested and documented inside one attempt budget.
+const maximumPlannedFiles = 12
+
+// layoutFromPlanner turns the files a planner named into a plan's file list, or
+// returns nothing when what it named cannot be used.
+//
+// The layout is asked for only when the request names no path, and it is asked
+// for because the fallback was a constant: cmd/generated/main.go and its test,
+// whatever was requested. A request whose whole point is that a command imports
+// a package it exports from — rung 16 — was planned into one directory, and
+// then every gate judged the plan and passed, because the gates check the plan
+// and the plan was already wrong. Nothing downstream could have caught it: the
+// loop refuses writes outside the plan's files, so a second package was not
+// merely unplanned, it was unreachable.
+//
+// Validated hard and discarded whole. A layout is not a suggestion the run can
+// partly follow — the plan's file list is the scope every write is checked
+// against — so a list with one unusable path in it is not repaired here, where
+// repairing means inventing the path the planner did not give. It falls back to
+// the pair, which is a worse layout and a working run, and that is the same
+// trade planFromRequirement already makes when the planner does not answer.
+func layoutFromPlanner(named []string) []string {
+	files := make([]string, 0, len(named)*2)
+	seen := map[string]bool{}
+	command := false
+	for _, raw := range named {
+		path, ok := canonicalPlannedPath(raw)
+		if !ok {
+			return nil
+		}
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		files = append(files, path)
+		// A test file names no package of its own and cannot hold the program,
+		// so it settles nothing about whether there is something to run.
+		if !strings.HasSuffix(path, "_test.go") && isCommandPath(path) {
+			command = true
+		}
+	}
+	// Nothing to run is not a layout. Every request here asks for a program
+	// that is built and executed, and the ladder runs the binary; a plan of
+	// libraries would satisfy its own steps and produce nothing to invoke.
+	if !command {
+		return nil
+	}
+	// A test beside every source file, added rather than demanded: the gates
+	// ask each function for a direct test, and a run asked for one with nowhere
+	// to write it is refused for the plan's omission rather than its own.
+	for _, path := range slices.Clone(files) {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		test := strings.TrimSuffix(path, ".go") + "_test.go"
+		if seen[test] {
+			continue
+		}
+		seen[test] = true
+		files = append(files, test)
+	}
+	if len(files) > maximumPlannedFiles {
+		return nil
+	}
+	return files
+}
+
+// canonicalPlannedPath accepts a module-relative Go source path and refuses
+// anything else.
+//
+// canonicalRelativePath is the loop's own rule, shared rather than restated so
+// a path this accepts cannot be one the plan validator later refuses. What is
+// added here is that it must be Go source: the plan's files are what the write
+// tools are scoped to, and a run cannot be asked to write a behaviour into a
+// README.
+func canonicalPlannedPath(raw string) (string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || !strings.HasSuffix(trimmed, ".go") {
+		return "", false
+	}
+	return agentloop.CanonicalPlanPath(trimmed)
+}
+
+// isCommandPath reports whether a path is somewhere a main package lives.
+//
+// By convention rather than by parsing, because at planning time the file does
+// not exist and there is no package clause to read. Both shapes the ladder's
+// requirements produce are covered: a cmd/ directory, and a main.go at the
+// module root.
+func isCommandPath(path string) bool {
+	return strings.HasPrefix(path, "cmd/") || path == "main.go"
 }

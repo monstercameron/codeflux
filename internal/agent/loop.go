@@ -1882,3 +1882,16 @@ func stepOwningPathInState(
 func ValidatePlanStep(step PlanStep) error {
 	return validatePlanStepContract(step)
 }
+
+// CanonicalPlanPath is the loop's own rule about what a plan step may name,
+// reachable from the side that builds the plan.
+//
+// Nothing here is new logic. A path this accepts is one validatePlanStepContract
+// accepts, which is the point: the coordinator decides a layout and the loop
+// then decides whether that layout is admissible, and the two disagreeing means
+// a plan refused before the first prompt is sent. That has happened once
+// already, over completion tools rather than paths, and cost three attempts and
+// a diagnosis that blamed the model.
+func CanonicalPlanPath(path string) (string, bool) {
+	return canonicalRelativePath(path)
+}

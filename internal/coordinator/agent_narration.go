@@ -583,7 +583,19 @@ func (execution *AgentExecution) publish(
 // so each file gets its own: a single step covering two files leaves the second
 // write with nowhere to bind.
 func agentPlanSteps(worktree, requirement string) []agentloop.PlanStep {
-	files := filesNamedIn(requirement)
+	return agentPlanStepsForFiles(worktree, requirement, filesNamedIn(requirement))
+}
+
+// agentPlanStepsForFiles is the same builder over a layout somebody else chose.
+//
+// Split out so a planner that named the files can produce steps through exactly
+// the code path the parser's files go through — the step kinds, the summaries,
+// the verification step and its bounds are one implementation, not two that
+// have to be kept agreeing.
+func agentPlanStepsForFiles(
+	worktree, requirement string,
+	files []string,
+) []agentloop.PlanStep {
 	steps := make([]agentloop.PlanStep, 0, len(files)+1)
 	for index, file := range files {
 		// How the file is going to be written, from whether it is already

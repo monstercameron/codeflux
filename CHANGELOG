@@ -50,8 +50,46 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-154
+Change-ID: CL-20260803-155
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- LAD-001. The layout was a constant, and the cause walk added
+  yesterday did not reach the cause
+Request-or-TODO: LAD-001, ladder rung 16
+Outcome: filesNamedIn answered with cmd/generated/main.go and its test whenever
+  a request named no path, so how many packages a run could produce was a
+  constant rather than a decision. Nothing downstream could recover from it: the
+  plan's files are the scope every write is checked against, so a second package
+  was unreachable rather than merely unplanned. The planner already reads the
+  requirement to name behaviours and now names the files too, asked for only
+  when the request named none -- a path in the request is the person saying
+  where the work goes and still outranks it. The layout is validated against the
+  loop's own path rule, must contain something runnable, gets a test beside every
+  source file, and is bounded; a layout with one unusable path in it is
+  discarded whole rather than repaired, because repairing means inventing the
+  path the planner did not give. Falling back is a worse layout and a working
+  run, which is the trade planning already makes when the planner does not
+  answer. Separately, withUnderlyingCause walked the single-parent chain only,
+  and the retry layer builds fmt.Errorf("%w: %w", ...) -- two verbs, so
+  Unwrap() returns a slice and errors.Unwrap returns nil. The walk stopped at
+  the top and appended nothing, which is why the trace after that change read
+  exactly as it had before.
+Affected-behavior: A request that leaves the layout open can be planned into
+  more than one package. An infrastructure death names the error under the
+  classification, through either wrapping shape.
+Compatibility-or-migration: The decomposition schema gains a required "files"
+  array, which may be empty. A planner that cannot honour the schema still falls
+  back to the line parser and the parsed layout, as before.
+Verification: Rung 16 produced two packages (cmd/stats and stats) where every
+  previous pass produced one; the run reported "4 behaviours named, laid out in
+  4 files". It still fails the rung's own bar of three. Nine new tests cover the
+  layout, the nothing-to-run control, the discard-whole control, the bound, the
+  empty-layout case, the request-names-a-file precedence, the loop's acceptance
+  of a planner layout, and the multi-error cause walk.
+Dev-Log: DL-20260803-165
+
+Change-ID: CL-20260803-154
+Commit: f1dd8d4
 Date: 2026-08-04
 Type: Fix -- an infrastructure death named a category and never the error
 Request-or-TODO: Asked whether the dead provider was rate-limiting

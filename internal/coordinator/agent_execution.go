@@ -2256,21 +2256,46 @@ func withUnderlyingCause(err error) string {
 		return ""
 	}
 	rendered := err.Error()
-	deepest := err
-	for {
-		// errors.Join produces a tree rather than a chain. Unwrap() error only
-		// walks the single-parent case, which is the one that hides a cause
-		// behind a Failure; a join already prints every branch it holds.
-		next := errors.Unwrap(deepest)
-		if next == nil {
-			break
+	var extra []string
+	seen := map[string]bool{}
+	var walk func(error, int)
+	walk = func(current error, depth int) {
+		if current == nil || depth > 8 {
+			return
 		}
-		deepest = next
+		// Both wrapping shapes, because the one that matters here is the tree.
+		// The retry layer builds fmt.Errorf("%w: %w", …), which produces an
+		// Unwrap() []error and makes errors.Unwrap return nil — so a walk that
+		// followed the chain alone stopped at the top and appended nothing,
+		// which is what the first version of this did.
+		switch unwrapped := current.(type) {
+		case interface{ Unwrap() []error }:
+			for _, branch := range unwrapped.Unwrap() {
+				walk(branch, depth+1)
+			}
+			return
+		case interface{ Unwrap() error }:
+			if next := unwrapped.Unwrap(); next != nil {
+				walk(next, depth+1)
+				return
+			}
+		}
+		// A leaf. Worth saying only if the rendered message does not already
+		// say it, which most of them do: almost everything here wraps with %w
+		// and prints what it wrapped. providers.Failure is the exception this
+		// exists for — it renders its kind and never its cause.
+		text := strings.TrimSpace(current.Error())
+		if text == "" || seen[text] || strings.Contains(rendered, text) {
+			return
+		}
+		seen[text] = true
+		extra = append(extra, text)
 	}
-	if cause := deepest.Error(); cause != "" && !strings.Contains(rendered, cause) {
-		return rendered + " (" + cause + ")"
+	walk(err, 0)
+	if len(extra) == 0 {
+		return rendered
 	}
-	return rendered
+	return rendered + " (" + strings.Join(extra, "; ") + ")"
 }
 
 // providerOutcomeOf names what the transport did, as a typed outcome rather

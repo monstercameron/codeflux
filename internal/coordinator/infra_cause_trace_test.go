@@ -89,3 +89,37 @@ func TestAnErrorThatAlreadySaysItsCauseIsNotRepeated(t *testing.T) {
 		t.Error("no error is no text")
 	}
 }
+
+// TestTheCauseIsFoundThroughAMultiError is the shape the first version of this
+// missed, and the shape the ladder actually produces.
+//
+// The retry layer builds fmt.Errorf("%w: %w", ErrRetryBudgetExhausted,
+// outcome.Err). Two %w verbs produce an Unwrap() []error rather than an
+// Unwrap() error, so errors.Unwrap returns nil and a walk that followed the
+// single-parent chain stopped at the top and appended nothing. That is exactly
+// what happened: the change shipped, the next ladder run died, and its trace
+// read the same as before.
+//
+// Proven to discriminate: with a chain-only walk this returns the rendered text
+// unchanged, because the multi-error's own message is what rendered already is.
+func TestTheCauseIsFoundThroughAMultiError(t *testing.T) {
+	underlying := errors.New("read tcp 10.0.0.2:51234->1.2.3.4:443: wsarecv: " +
+		"An existing connection was forcibly closed by the remote host")
+	failure := &providers.Failure{
+		Operation: "call the model",
+		Kind:      providers.FailureTransport,
+		Cause:     errors.Join(providers.ErrTransport, underlying),
+	}
+	// The exact construction from internal/providers/retry.go.
+	exhausted := fmt.Errorf("%w: %w", providers.ErrRetryBudgetExhausted, failure)
+	wrapped := fmt.Errorf("agent fixed model turn: %w", exhausted)
+
+	rendered := withUnderlyingCause(wrapped)
+	if !strings.Contains(rendered, "retry budget exhausted") {
+		t.Errorf("the classification must stay in the line: %q", rendered)
+	}
+	if !strings.Contains(rendered, "forcibly closed") {
+		t.Fatalf("the socket error is three levels down through a multi-error "+
+			"and still the only thing that says what happened: %q", rendered)
+	}
+}

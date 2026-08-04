@@ -163,7 +163,7 @@ func fileNamesOf(steps []agentloop.PlanStep) []string {
 
 // TestAPlanningAnswerIsReadFromItsSchema covers the structured path.
 func TestAPlanningAnswerIsReadFromItsSchema(t *testing.T) {
-	behaviours, ok := decodedBehaviours(
+	behaviours, _, ok := decodedBehaviours(
 		`{"behaviours":["print the greeting","refuse an empty name"]}`)
 	if !ok || len(behaviours) != 2 {
 		t.Fatalf("a schema-shaped answer decoded to %v (ok=%t)", behaviours, ok)
@@ -176,7 +176,7 @@ func TestAPlanningAnswerIsReadFromItsSchema(t *testing.T) {
 // TestAProseAnswerFallsBackToTheLineParser keeps a model that cannot honour a
 // schema working, which is why the line parser stays.
 func TestAProseAnswerFallsBackToTheLineParser(t *testing.T) {
-	if _, ok := decodedBehaviours("- print the greeting\n- refuse an empty name"); ok {
+	if _, _, ok := decodedBehaviours("- print the greeting\n- refuse an empty name"); ok {
 		t.Error("prose was read as a schema answer")
 	}
 	if got := parseBehaviours("- print the greeting\n- refuse an empty name"); len(got) != 2 {
@@ -199,8 +199,32 @@ func TestTheBehaviourSchemaIsStrictAndClosed(t *testing.T) {
 	if extra, ok := decoded["additionalProperties"].(bool); !ok || extra {
 		t.Error("the planning schema permits properties nobody asked for")
 	}
+	// Every property is required, which is the Responses API's own rule for a
+	// strict schema: it refuses one that leaves any property optional. "files"
+	// is required and may be empty, which is how a request that already says
+	// where the work goes is answered.
 	required, ok := decoded["required"].([]any)
-	if !ok || len(required) != 1 || required[0] != "behaviours" {
-		t.Errorf("the planning schema requires %v", decoded["required"])
+	if !ok {
+		t.Fatalf("the planning schema requires %v", decoded["required"])
+	}
+	properties, ok := decoded["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("the planning schema declares no properties")
+	}
+	if len(required) != len(properties) {
+		t.Errorf("a strict schema must require every property it declares: "+
+			"requires %v, declares %v", required, properties)
+	}
+	for name := range properties {
+		found := false
+		for _, entry := range required {
+			if entry == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%q is declared and not required, which the Responses "+
+				"API refuses", name)
+		}
 	}
 }

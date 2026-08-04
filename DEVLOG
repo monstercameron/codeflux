@@ -25,6 +25,43 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-165
+Date: 2026-08-04
+Status: Committed as CL-20260803-155
+Change-ID: CL-20260803-155
+Request-or-TODO: LAD-001, ladder rung 16
+Goal: Make the layout a decision instead of a constant, and make the cause walk
+  actually reach a cause
+Assumptions: That the planner, which already reads the requirement well enough
+  to name its behaviours, can name where they go. Checked: it produced
+  cmd/stats and stats for rung 16 on the first run
+Decisions: The layout is discarded whole when any path is unusable. The plan's
+  file list is the scope every write is checked against, so keeping the good
+  paths and dropping the bad one would silently narrow what the run may write,
+  and repairing the bad one means inventing a path nobody chose. The path rule
+  is the loop's own, exported rather than restated, because the last time the
+  coordinator and the loop held one fact separately every plan was refused
+  before the first prompt
+Files-or-schemas: internal/coordinator/agent_planning.go -- the schema gains
+  files, layoutFromPlanner, canonicalPlannedPath, isCommandPath,
+  requirementNamesNoFile; agent_narration.go -- agentPlanStepsForFiles split out
+  so a planner layout and a parsed one build steps through one implementation;
+  internal/agent/loop.go -- CanonicalPlanPath; agent_execution.go -- the cause
+  walk handles Unwrap() []error
+Validation: Nine new tests. Rung 16 went from one package to two
+Failures-or-discarded-approaches: The cause walk shipped yesterday followed
+  errors.Unwrap only. The retry layer wraps with two %w verbs, which produces a
+  multi-error whose Unwrap returns a slice, so errors.Unwrap returned nil at the
+  first hop and the walk appended nothing. I recorded that change as closing the
+  diagnosis gap and it had not; the next run's trace was byte-identical to the
+  one before it
+Known-limitations: Rung 16 asks for three packages and its prose describes one
+  package plus a command. The engine now produces two. Whether the remaining gap
+  is the planner grouping too coarsely or the fixture being stricter than its own
+  requirement is not settled here, and I have not changed the fixture to find out
+Next-safe-step: Rerun rung 16; if it settles at two packages, put the question
+  to Cam rather than adjusting the bar
+
 Dev-Log: DL-20260803-164
 Date: 2026-08-04
 Status: Committed as CL-20260803-154
