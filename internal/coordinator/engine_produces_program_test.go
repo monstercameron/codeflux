@@ -274,7 +274,22 @@ func ladderRungs() []generatedProgram {
 			expected:  "This    is    an\nexample  of text\njustification.",
 		},
 		{
-			name: "16 spans two packages with a real import",
+			// The bar is what this requirement describes: one package that
+			// exports, and the command that imports it. It asked for three,
+			// which is one more package than the prose ever mentions, and the
+			// two directories it counts include the command — so a run that
+			// grouped the work exactly as written was failed for it.
+			//
+			// The name is where the confusion came from: "two packages" reads
+			// as two libraries, and the requirement names one. Rung 17 sets two
+			// for the same shape (one pure package and a command) and rung 18
+			// sets three for a requirement that genuinely describes two
+			// libraries, so two is what this rung's siblings already mean by it.
+			//
+			// Cam settled this on 2026-08-04 after the engine produced
+			// cmd/stats and stats on two independent runs, having produced one
+			// package on every run before the planner chose its own layout.
+			name: "16 spans a package and its command with a real import",
 			requirement: "Write a program in the module codeflux.test/workspace. The " +
 				"layout is yours: nothing here names a file, a package or a " +
 				"function, and how the work is grouped is part of what is being " +
@@ -285,7 +300,7 @@ func ladderRungs() []generatedProgram {
 				"and the max separated by a space.",
 			arguments:   []string{"1", "2", "3", "4"},
 			expected:    "2 4",
-			minPackages: 3,
+			minPackages: 2,
 		},
 		{
 			// The same ledger as rung 5, asked for as a functional core behind

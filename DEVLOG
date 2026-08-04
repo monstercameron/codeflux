@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-166
+Date: 2026-08-04
+Status: Committed as CL-20260803-156
+Change-ID: CL-20260803-156
+Request-or-TODO: Ladder rung 16
+Goal: Settle whether rung 16's bar or rung 16's prose was wrong
+Assumptions: None. Both readings were stated and the evidence for each was put
+  to Cam rather than resolved here, because changing a bar to make a run pass is
+  the one move that makes a suite stop meaning anything
+Decisions: Lowered the bar rather than rewording the requirement. The deciding
+  evidence was the siblings: rung 17 asserts two for one pure package plus a
+  command, and rung 18 asserts three for a requirement that describes two
+  libraries. Renamed the rung too -- leaving it called "spans two packages" with
+  a bar of two would leave the same disagreement in place for the next reader
+Files-or-schemas: internal/coordinator/engine_produces_program_test.go
+Validation: The package assertion no longer fires
+Failures-or-discarded-approaches: None here. This was deliberately not decided
+  unilaterally
+Known-limitations: Rung 16 still does not pass. Its remaining failure is
+  http2 timeouts awaiting response headers, which took out gpt-5.6-luna:max, then
+  gpt-5.6-luna:low after the step-down, leaving no rung to continue on. That is
+  the environment rather than the pipeline, and whether the outer infrastructure
+  allowance of one retry is too thin for it is not yet established
+Next-safe-step: Rerun. If the timeouts are sustained rather than transient, the
+  question is the infrastructure allowance, not the work
+
 Dev-Log: DL-20260803-165
 Date: 2026-08-04
 Status: Committed as CL-20260803-155

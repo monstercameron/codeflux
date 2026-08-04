@@ -50,8 +50,37 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-155
+Change-ID: CL-20260803-156
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a ladder rung asked for one more package than its own requirement
+  described
+Request-or-TODO: Ladder rung 16; decision taken by Cam on 2026-08-04
+Outcome: Rung 16 asserted minPackages 3 against a requirement describing one
+  package that exports and the command that imports it, which is two
+  directories, and the count includes the command. A run that grouped the work
+  exactly as written was failed for it. The engine produced cmd/stats and stats
+  on two independent runs once the planner chose its own layout, which is the
+  reading the prose supports. The confusion was in the name: "spans two
+  packages" reads as two libraries, and the requirement names one. Rung 17 sets
+  two for the same shape -- one pure package and a command -- and rung 18 sets
+  three for a requirement that genuinely describes two libraries, so two is
+  already what this rung's siblings mean. Bar lowered to 2 and the rung renamed
+  to say what it tests.
+Affected-behavior: The ladder fixture only. No production code.
+Compatibility-or-migration: The rung's subtest name changes, so its artifact
+  directory changes with it.
+Verification: The package-count assertion no longer fires; the run builds, runs,
+  prints exactly what was asked and survives every hostile input. The rung is
+  still not passing, for an unrelated reason recorded below.
+Considered-and-rejected: Sharpening the requirement to ask for two libraries and
+  keeping the bar at 3, and pushing the planner to decompose more finely. Both
+  were put to Cam with the evidence; the fixture was judged the thing that was
+  wrong.
+Dev-Log: DL-20260803-166
+
+Change-ID: CL-20260803-155
+Commit: fba54cf
 Date: 2026-08-04
 Type: Fix -- LAD-001. The layout was a constant, and the cause walk added
   yesterday did not reach the cause
