@@ -88,6 +88,12 @@ const (
 	// either the build has no code for it yet or this attempt never reached
 	// it.
 	ClassificationUnimplemented Classification = "unimplemented"
+	// ClassificationDeclinedByProfile means the run's declared
+	// pipeline.RunProfile marked this stage inapplicable before the run
+	// started (PIPE-046a), which takes priority over the other three
+	// classifications the same way it does server-side in
+	// internal/coordinator's classifySkipAuditEntry.
+	ClassificationDeclinedByProfile Classification = "declined-by-profile"
 )
 
 // Label returns the short human word for a classification, used everywhere
@@ -107,6 +113,8 @@ func (classification Classification) Label() string {
 		return "No check by design"
 	case ClassificationUnimplemented:
 		return "Not implemented"
+	case ClassificationDeclinedByProfile:
+		return "Declined by profile"
 	default:
 		return "Unknown"
 	}
@@ -117,7 +125,11 @@ type ClassifiedStage struct {
 	Stage          StageRow
 	Classification Classification
 	// Ticket names the PIPE-* ticket that resolved this stage as a principled
-	// decline, when pipeline.Section33Resolved names one. Empty otherwise.
+	// decline, when pipeline.Section33Resolved names one. When Classification
+	// is ClassificationDeclinedByProfile, it instead carries the profile's own
+	// one-sentence decline reason (PIPE-046a) -- there is no governing ticket
+	// for a decision the run's profile made, only the profile's stated reason.
+	// Empty otherwise.
 	Ticket string
 }
 
@@ -153,9 +165,9 @@ type SkipSummary struct {
 	Declines []ClassifiedStage
 }
 
-// PrincipledDeclineCount, NoCheckByDesignCount, and UnimplementedCount are the
-// three counts PIPE-044 requires stay visibly distinct rather than collapsing
-// into the single skip ratio.
+// PrincipledDeclineCount, NoCheckByDesignCount, UnimplementedCount, and
+// DeclinedByProfileCount are the four counts PIPE-044/PIPE-046a require stay
+// visibly distinct rather than collapsing into the single skip ratio.
 func (summary SkipSummary) PrincipledDeclineCount() int {
 	return summary.countClassification(ClassificationPrincipledDecline)
 }
@@ -166,6 +178,10 @@ func (summary SkipSummary) NoCheckByDesignCount() int {
 
 func (summary SkipSummary) UnimplementedCount() int {
 	return summary.countClassification(ClassificationUnimplemented)
+}
+
+func (summary SkipSummary) DeclinedByProfileCount() int {
+	return summary.countClassification(ClassificationDeclinedByProfile)
 }
 
 func (summary SkipSummary) countClassification(classification Classification) int {
@@ -179,13 +195,32 @@ func (summary SkipSummary) countClassification(classification Classification) in
 }
 
 // ComputeSkipSummary derives the headline and its per-stage breakdown from
-// one task attempt's rows, in the stage order the wire already returns them.
+// one task attempt's rows, in the stage order the wire already returns them,
+// classifying under the flow's own default profile.
+//
+// PipelineStageView does not carry the run's declared profile on the wire
+// today (see docs/plan.md's "Integration status" note under "Declared Run
+// Profiles"), so every caller reachable from a real mounted page still goes
+// through this default-profile entry point; ComputeSkipSummaryWithProfile is
+// the one real implementation (PIPE-046a), kept reachable so a caller that
+// does carry a profile -- and a test proving the classification actually
+// changes under one -- can use it without waiting on that wire change.
+func ComputeSkipSummary(rows []StageRow) SkipSummary {
+	return ComputeSkipSummaryWithProfile(rows, pipeline.ProfileDefault)
+}
+
+// ComputeSkipSummaryWithProfile is ComputeSkipSummary, extended with the
+// run's declared profile (PIPE-046a): a row the profile declined classifies
+// as ClassificationDeclinedByProfile, the same distinction
+// classifySkipAuditEntry draws server-side, computed here from the row's
+// wire-carried Number and State plus the caller-supplied profile rather than
+// a profile field the wire does not yet carry.
 //
 // It excludes the skip-audit stage's own row from every count, mirroring
 // ComputeSkipAudit's self-exclusion, and it returns Computed false rather
 // than a zero-valued summary that reads as a perfect run when rows carries
 // nothing else to audit.
-func ComputeSkipSummary(rows []StageRow) SkipSummary {
+func ComputeSkipSummaryWithProfile(rows []StageRow, profile pipeline.RunProfile) SkipSummary {
 	var summary SkipSummary
 	for _, row := range rows {
 		if row.Number == pipeline.StageSkipAudit {
@@ -201,10 +236,10 @@ func ComputeSkipSummary(rows []StageRow) SkipSummary {
 			summary.Blocked++
 		case pipeline.StateSkipped:
 			summary.Skipped++
-			summary.Declines = append(summary.Declines, classifyDecline(row))
+			summary.Declines = append(summary.Declines, classifyDecline(row, profile))
 		case pipeline.StateNotImplemented:
 			summary.NotImplemented++
-			summary.Declines = append(summary.Declines, classifyDecline(row))
+			summary.Declines = append(summary.Declines, classifyDecline(row, profile))
 		}
 	}
 	if summary.TotalStages == 0 {
@@ -216,12 +251,13 @@ func ComputeSkipSummary(rows []StageRow) SkipSummary {
 }
 
 // classifyDecline decides why one skipped or not-implemented row established
-// nothing, using only internal/pipeline's static vocabulary -- the same
-// tables classifySkipAuditEntry reads server-side -- combined with this row's
-// own wire-reported state. See Classification's doc comment for what it
-// cannot recover: the run's own free-text detail, which stays server-side.
-func classifyDecline(row StageRow) ClassifiedStage {
-	class, ticket := pipeline.ClassifyDecline(row.Number, row.State)
+// nothing, using internal/pipeline's static vocabulary and the run's declared
+// profile -- the same tables and the same profile classifySkipAuditEntry
+// reads server-side -- combined with this row's own wire-reported state. See
+// Classification's doc comment for what it cannot recover: the run's own
+// free-text detail, which stays server-side.
+func classifyDecline(row StageRow, profile pipeline.RunProfile) ClassifiedStage {
+	class, ticket := pipeline.ClassifyDeclineForProfile(row.Number, row.State, profile)
 	return ClassifiedStage{
 		Stage:          row,
 		Classification: Classification(class),

@@ -102,6 +102,85 @@ func projectAtomSymbols(response *codefluxv1.ListCodeSymbolsResponse) atomCollec
 	return answer
 }
 
+// registeredAtomKeyPrefix marks a row that came from the project's registered
+// catalog rather than from a declaration in the open checkout.
+//
+// The prefix is what keeps the two collections apart everywhere a key is used.
+// A registered atom has no declaration to inspect, so the inspector must be
+// able to tell before it asks: a key it forwarded to InspectCodeSymbol would
+// come back not-found, and the surface would report a missing symbol for an
+// atom that is present and correct.
+const registeredAtomKeyPrefix = "registered:"
+
+// isRegisteredAtomKey reports whether a selection names a registered atom.
+func isRegisteredAtomKey(key string) bool {
+	return strings.HasPrefix(key, registeredAtomKeyPrefix)
+}
+
+// appendRegisteredAtoms adds the project's registered atoms to a source
+// listing.
+//
+// They are merged into one list rather than given a tab of their own because
+// the question the page answers is "what atoms does this project have", and an
+// answer split across two places is one a person has to assemble. What they
+// are is carried on the row: the kind chip says the entry is registered, and
+// the promise line is the documented purpose, which is the only thing a
+// catalog entry has to show — it has no file and no line, because no file
+// declares it.
+func appendRegisteredAtoms(
+	answer atomCollectionAnswer,
+	response *codefluxv1.ListRegisteredAtomsResponse,
+) atomCollectionAnswer {
+	for _, atom := range response.GetAtoms() {
+		identity := atom.GetAtomId()
+		if identity == "" {
+			continue
+		}
+		row := atomcollection.AtomRow{
+			Key:  registeredAtomKeyPrefix + identity,
+			Name: atom.GetName(),
+			// An atom documented but never named is shown by its identity and
+			// said to be unnamed, rather than silently given the identity as a
+			// name: those are different states and only one of them is a
+			// naming.
+			Kind:           "registered",
+			Admitted:       true,
+			MatchedPromise: atom.GetPurpose(),
+		}
+		if row.Name == "" {
+			row.Name = identity
+			row.Problem = "registered without a name"
+		}
+		answer.Rows = append(answer.Rows, row)
+		answer.Admitted++
+	}
+	answer.Collection += response.GetTotalRegistered()
+	if response.GetPage().GetHasMore() {
+		answer.Truncated = true
+	}
+	return answer
+}
+
+// registeredAtomDetail builds what is known about a registered atom from the
+// listing already in hand.
+//
+// The catalog's documented purpose is the one field this surface can honestly
+// show: the rest of the schema is persisted and is not carried on the listing,
+// and inventing empty sections would make a documented atom look undocumented.
+func registeredAtomDetail(answer atomCollectionAnswer, key string) atomcollection.AtomDetail {
+	for _, row := range answer.Rows {
+		if row.Key != key {
+			continue
+		}
+		detail := atomcollection.AtomDetail{Row: row, OpeningSentence: row.MatchedPromise}
+		if promise := strings.TrimSpace(row.MatchedPromise); promise != "" {
+			detail.Fields = []atomcollection.AtomField{{Label: "Purpose", Text: promise}}
+		}
+		return detail
+	}
+	return atomcollection.AtomDetail{Row: atomcollection.AtomRow{Key: key, Admitted: true}}
+}
+
 // filterAtomRows applies the search, the package filter, and the refused
 // toggle in the browser.
 //

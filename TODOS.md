@@ -5427,3 +5427,82 @@ Server-side GitHub configuration is included because it exists nowhere in Git:
   - `cmd/codeflux-dev/provider_key_gate.go`, registered in `runRepositoryChecks`. AST-based: a `_test.go` function calling `ReadProviderKey`, qualified or not, must earlier in the same function both read a distinct non-provider-key environment variable and reach a `t.Skip`/`Skipf` inside an `if` — the shape `CODEFLUX_LADDER` establishes in `engine_produces_program_test.go`.
   - **Two false-positive rounds against real files preceded the final shape**, both worth recording because they show what the rule must *not* match: a redaction fixture that prints `OPENAI_API_KEY`, and `internal/worker/environment_test.go`, which reads the variable back to assert it is empty after credential stripping. Neither reaches a provider. The header comment names both cases so the next person to widen the rule sees what widening costs.
   - Nine tests: ungated `ReadProviderKey` fires bare and package-qualified, a gate placed *after* the access still fires, a correctly gated fixture passes, unrelated tests are ignored, raw environment reads of key-shaped names are ignored, and all three real files pass. `engine_produces_program_test.go` was the only one, and it ran on the strength of a key being present, so any `go test ./...` -- including the pre-push hook's -- spent real money on 250 model runs. It is now gated. Nothing prevents the next one from being written the same way: `lint` could refuse a test that reads `ReadProviderKey` without an environment gate, or the key could be reachable only through a helper that itself requires the opt-in.
+
+# Frontend as a Front End (2026-08-03)
+
+The browser client renders every surface the plan describes and cannot operate
+the product. It is bound at page load to one `(repository, workspace)` pair the
+server picks as the oldest row in the database, over a hierarchy whose top two
+levels it can neither list, switch between, nor create, while the work its runs
+actually produce sits in SQLite with no RPC to read it. Each of those is a
+separate defect and they are separate tickets here.
+
+The diagnosis that orders this section: `projects` exists in the schema and
+nowhere in the product. `EnsureLocalBootstrap` mints exactly one project per
+repository and names it after the directory, no service lists them, no route
+names one, and every repository-scoped surface reaches a project only by joining
+through a repository. A database holding many projects is already producible --
+the storage layer keys bootstrap on canonical path, so distinct paths give
+distinct projects with no change at all -- and the frontend would show the
+oldest one and refuse to serve the rest.
+
+The critical path is `FE-001` and `FE-002`. Nothing else in this section is
+visible in the browser until those two land, and neither has partial credit.
+`FE-006` is deliberately off that path: it works today against the single bound
+project, so it can ship first and be immediately useful.
+
+Scope note: this section is about the client being able to *operate* what
+already exists. Creating projects from the browser is `FE-011`, and it is a
+decision, not an implementation. The 250-rung ladder in
+`internal/coordinator/engine_produces_program_test.go` is used throughout as the
+proving workload because it is the largest multi-project database the repository
+can actually produce, not because this work is for the ladder.
+
+- [ ] `FE-001 BLOCKER` Resolve the browser's scope from the route it is on rather than from one row chosen at boot. `ReadFrontendRouteAccess` returns a single `Selected{Session,Thread,Repository,Workspace}` picked as the first row in identity order (`internal/storage/frontend_route_access.go:110-136`) -- the oldest bootstrap in the database. It never consults the `--repository` the coordinator was started against, so a process started against one repository can serve a document naming a different one. Replace the four scalars with a resolver that answers "for this repository, which workspace, default thread and session", plus one entry route for the front door.
+  - **Do not grow the served document.** `RouteAccess` already embeds every accessible repository and thread identity (`internal/frontendserver/handler.go:52-57`) and the whole envelope is marshalled into the HTML at handler construction (`:158`). At 250 projects that is roughly 25 KB of identifiers on every page load, growing with the database and bounded only by `maxFrontendRouteAccessIdentities = 10_000`. The resolver must be an RPC the client calls for the route it is on; the document keeps only what the first route needs.
+  - The front door should land on the repository the coordinator was started against. Landing on the oldest row is what makes a freshly started coordinator open somebody else's project.
+  - Verify against a database holding many bootstraps: the document is a constant size regardless of how many, and resolving any one of them returns its own workspace, thread and session rather than the first.
+
+- [ ] `FE-002 BLOCKER` Let the thread client follow the route instead of the boot document. `web/client/threadrail_transport.go:43` reads `SelectedWorkspaceID` out of the bootstrap envelope once, and `threadrail.GRPCClient` then refuses any query naming a different repository or workspace (`web/frontend/threadrail/client.go:103`). Together these make the bound scope a page-lifetime constant: navigating to another repository's thread is accepted by `routes.Restore`, because every repository is in the accessible set, and the rail cannot serve it. Depends on `FE-001`.
+  - **Keep the refusal.** It is what stops a client that has moved on from answering for the scope it used to hold, and deleting it would trade a visible failure for a silent wrong answer. Re-key it to the client's current scope and make that scope a value that changes, rather than removing the check.
+  - Verify by navigating between two repositories' threads within one page session: each rail lists its own threads, no reload occurs, and a query issued against the scope the client has just left is refused rather than answered.
+
+- [ ] `FE-003` Resubscribe the session stream when the selected thread changes. `web/client/main.go:629` already streams `selectedThread.SessionID()`, so the plumbing exists, but `ListThreads` is workspace-scoped and the workspace is fixed, so the client can never hold a thread from anywhere else and the path is never exercised. Depends on `FE-002`.
+  - Switching across repositories must tear down the previous stream, subscribe to the new session, replay to its boundary, and never interleave two sessions' events into one timeline.
+  - Decide explicitly what happens to in-flight composer text and pending approvals on a switch. Carrying a half-written message into a different project's conversation is worse than discarding it, and discarding silently is worse than saying so.
+
+- [ ] `FE-004` Give projects an API. There is no `ProjectService` in `api/proto/codeflux/v1/product_api.proto`: no `ListProjects`, no `GetProject`, nothing addressable. Every project in the database is reachable today only by holding a repository and reading `repository.ProjectID` off it. Read-only to begin with; creation is `FE-011`.
+  - A listing row has to be worth reading and clickable: name, whatever `FE-005` records, per-project counts (repositories, threads, tasks, artifacts, registered atoms, memory artifacts), and the entry route that opens it.
+  - Paging is not optional here -- see `FE-009`, which is the bound that already truncates.
+
+- [ ] `FE-005` Give a project something worth showing. `projects` carries id, name, timestamps, revision and a deletion column, and nothing else (`migrations/000001_initial_operational_schema.sql:5`). The name is `filepath.Base` of the repository path unless a caller passes one (`internal/storage/local_bootstrap_repository.go:58`) and is never editable afterwards. A project list built on this renders N rows of a directory name.
+  - Add a description and a structured metadata record. The immediate evidence that this matters: every ladder fixture passes the literal name `Engine` (`internal/coordinator/engine_end_to_end_test.go:340`), so a 250-project database is 250 rows reading `Engine` against 250 repositories reading `repo`.
+  - This is eventually where per-project defaults belong -- validation profile, correctness policy, budget, provider -- all of which are global settings today. Do not build that here. Leave the shape able to carry it and say so at the migration.
+
+- [ ] `FE-006` Expose what a run produced. `ListTaskArtifacts` has exactly one non-test caller (`internal/coordinator/agent_stage_delivery.go:204`) and no RPC at all; the only artifact surface in the contract is *memory* artifacts. Meanwhile `artifacts` carries `sanitized_content` alongside `project_id`, `repository_id` and `task_id` (`migrations/000001_initial_operational_schema.sql:402-419`), so the generated programs are already in the database with their content. Add a read-only service that lists a task's artifacts and reads one by identity, carrying type, media type, storage class, size and content hash.
+  - **Independent of `FE-001` and `FE-002`, and worth doing first.** It works today against the single bound project, so it is the one item in this section that is visible in the browser without the scope rework.
+  - Record why this rather than making `/code` show generated work: `/code` reads the canonical path off disk at git HEAD (`internal/coordinator/code_collection_files.go:73`, `code_collection_application.go:332`), and `carryOut` starts a task and returns a worktree without ever calling `AcceptTaskChange` (`engine_produces_program_test.go:6071-6124`), so a rung's program lives on a task branch and its repository renders empty. Accepting would light `/code` up for free and would make git state the source of truth, which `docs/plan.md:2649` explicitly rejects: SQLite is authoritative and worktrees are temporary materialisations. Exposing artifacts follows the plan; accepting inverts it.
+
+- [ ] `FE-007` Give the produced work a surface to be read on. Task detail gains a panel listing the files a run wrote, each readable in place. Depends on `FE-006`.
+  - Reuse the review lane where it already fits rather than building a second reader: `GetDiffSummary` is task-scoped (`api/proto/codeflux/v1/product_api.proto:491`) and the diff review surface already exists.
+
+- [ ] `FE-008` Make a project a place you can be. Add `/projects` and `/project/{project_id}` to the route map, and extend `routes.Restore` with an accessible-projects check alongside the repository and thread checks it already performs (`web/frontend/routes/routes.go:394-408`). Depends on `FE-004` and `FE-005`; only useful once `FE-002` allows switching.
+  - Decide, and record, whether repository-scoped routes become project-nested. If they do not, a URL still cannot say which project it is in -- the project stays inferable only by joining through the repository, which is the thing that makes the current address bar unable to describe where somebody is.
+  - The chooser becomes a project list. Today it is a git working-tree inspector titled "Repositories" (`web/frontend/shell/repository_workspace.go:75`) whose empty state is a sentence telling you to run a CLI command (`:228`). That sentence stays honest until `FE-011` decides otherwise, so do not replace it with a button that cannot work.
+
+- [ ] `FE-009` Stop the surfaces misreporting at scale. Three bounds that are silent today and stop being silent the moment a database holds more than one project.
+  - `MaximumRepositoryPage = 200` (`internal/storage/project_repository.go:237`) and `ListRepositories` clamps an out-of-range limit rather than refusing it (`:244-250`), with no total and no truncation flag on the response. A 250-project database shows 200 rows and says nothing about the other 50.
+  - `repositorySummary` displays `filepath.Base(canonicalPath)` (`internal/transport/workspace_service.go:210`). Every ladder fixture repository is `<root>/repo`, so N repositories render as N rows all reading `repo`. The display name needs the project or a disambiguating segment.
+  - `maxFrontendRouteAccessIdentities = 10_000` (`internal/storage/frontend_route_access.go:10`) is the only bound on the embedded allowlist. State what the document does when it is reached rather than finding out.
+
+- [ ] `FE-010 TEST` Prove the client against a database holding many projects. The browser matrix has one populated thread to look at (commit `7209dd6`), which is exactly the shape that hides every defect in this section. Add a multi-project fixture and check: the list renders completely and distinguishably, two different projects can be entered in one page session, and one run's produced artifact can be read.
+  - **The fixture must not require a ladder pass.** 250 live model runs to test a list view is a test nobody will run, and provider-backed tests are gated for that reason (`REPO-034`). Build the fixture database from synthetic bootstraps -- distinct paths are all it takes -- and reserve real runs for the artifact-reading case, which needs one.
+
+- [ ] `FE-011` Decide how a project comes into existence from the browser. `OpenWorkspace` is refused deliberately (`internal/transport/workspace_service.go:193`): granting a coordinator authority over a directory a browser named needs a durable approval record that does not exist. Until that is answered, the client cannot create the object the whole interface is organised around, and the chooser's CLI instruction is the honest answer rather than a missing feature. This is a decision ticket; nothing above depends on it.
+  - Candidate A: build the durable repository-approval record the refusal names, and let the browser propose a path that a separate approval admits.
+  - Candidate B: managed projects, whose content lives under Codeflux's own data directory. This sidesteps the authority question entirely because no external directory is ever named. It costs a repository kind, a content source behind `collect()` (`internal/coordinator/code_collection_application.go:332`, which today resolves a canonical path and keys its cache on git head and dirty state), and an answer to what replaces a git worktree when a task runs.
+  - Whichever is chosen, `EnsureLocalBootstrap` currently requires an absolute path and a non-empty git identity (`internal/storage/local_bootstrap_repository.go:50`, `:55`), so both candidates change it.
+
+- [ ] `FE-012` Stop the atoms surface calling shipped atoms the project's own. `atom_names.project_id` is `NOT NULL` and `atomcatalog` seeds the fifteen control-flow entries into every project under one shared scope (`internal/atomcatalog/seed.go:56`), with atom identity derived from content -- so the same atoms are copied per project rather than shared. With one project this is invisible. With 250 it is 3,750 duplicate name rows plus documentation revisions plus embeddings, and every project's atoms page shows the same fifteen rows labelled as that project's.
+  - The storage fix is the universal/project/repository tiering, which is a larger piece of work than this ticket and is not attempted here. What this ticket owes is that the surface stops asserting something untrue: a seeded catalog entry is distinguishable from an atom the project admitted.
+  - The same shape applies to memory: `memory_artifact_revisions.content_repository_id` is `NOT NULL` with triggers requiring the same project (`migrations/000025_memory_artifact_schema.sql:55`, `:109-117`), so a memory that is not about one checkout cannot exist and cross-project promotion -- which `docs/plan.md:2828` anticipates -- is structurally impossible. Worth naming in the same place so the two are not solved separately.

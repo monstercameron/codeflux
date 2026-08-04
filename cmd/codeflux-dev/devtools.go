@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -157,6 +156,15 @@ func runSeedServe(
 		fmt.Fprintf(stderr, "%s: root: %v\n", label, err)
 		return exitUsage
 	}
+	// REPO-041c: StartMountedThread's own defer Shutdown only ever runs on a
+	// clean exit, so a hard kill of a previous `seed --serve` can leave its
+	// coordinator and its detached codeflux-worker.exe still holding files
+	// under root open. Reclaim both, by the pidfile a previous clean-or-not
+	// run left and by the worker's own deterministic build path, before ever
+	// asking to remove them -- a stale-lock sweep rather than relying on the
+	// defer that only fires when nothing went wrong.
+	workerExecutablePath := deterministicSeedWorkerPath(root, seedWorkerExecutableName())
+	sweepStaleSeedLock(stdout, root)
 	// The served database describes exactly one run: a stale one from a
 	// previous invocation left sitting under this root would be a second,
 	// silent seeding path that this ticket exists to close off.
@@ -219,6 +227,12 @@ func runSeedServe(
 		fmt.Fprintf(stderr, "%s: drive the seeded requirement: %v\n", label, err)
 		return exitFailure
 	}
+	// Written only now, once the coordinator (and, inside it, the worker) is
+	// actually up: a lock recorded before StartMountedThread could name a PID
+	// that never became this run's coordinator at all.
+	if err := writeSeedServeLock(root, workerExecutablePath); err != nil {
+		fmt.Fprintf(stderr, "%s: record stale-lock pidfile: %v\n", label, err)
+	}
 
 	seconds := defaultSeedServeSeconds
 	if raw := os.Getenv(seedServeSecondsEnvironment); raw != "" {
@@ -247,6 +261,10 @@ func runSeedServe(
 		fmt.Fprintf(stderr, "%s: shutdown: %v\n", label, err)
 		return exitFailure
 	}
+	// A clean shutdown just released everything the lock exists to reclaim;
+	// leaving the record around would only make the next invocation's sweep
+	// try to kill a PID that already exited on its own.
+	clearSeedServeLock(root)
 	return exitSuccess
 }
 
@@ -256,11 +274,7 @@ func runSeedServe(
 // stub would prove only that some process was spawned; the real subprocess
 // proves the coordinator hands it something it can decode.
 func buildSeedWorkerExecutable(ctx context.Context, repository string, root string) (string, error) {
-	name := "codeflux-worker"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	output := filepath.Join(root, "bin", name)
+	output := deterministicSeedWorkerPath(root, seedWorkerExecutableName())
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return "", err
 	}

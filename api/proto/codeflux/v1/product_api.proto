@@ -1165,6 +1165,42 @@ service CodeCollectionService {
   // show a file is a directory nobody can act on, but a read with no ceiling
   // is a way to hand a browser an arbitrarily large file.
   rpc ReadCodeFile(ReadCodeFileRequest) returns (ReadCodeFileResponse);
+  // ListRegisteredAtoms returns the atoms the project has registered, which is
+  // a different collection from the declarations ListCodeSymbols parses out of
+  // the open repository. A registered atom is one the product admitted and
+  // persisted -- seeded from the catalog, or written by a run that produced
+  // it -- and it exists whether or not any file in the working tree still
+  // declares it. Without this the persisted catalog has no reader outside the
+  // coordinator, and every surface reports the collection as empty.
+  rpc ListRegisteredAtoms(ListRegisteredAtomsRequest) returns (ListRegisteredAtomsResponse);
+}
+
+// RegisteredAtomView is one persisted atom-documentation revision.
+message RegisteredAtomView {
+  string atom_id = 1;
+  // name is the canonical name the naming lane recorded. It is empty when an
+  // atom carries documentation but has never been named, which is a real state
+  // and is shown as such rather than filled in with an identity.
+  string name = 2;
+  string purpose = 3;
+  // authoring says how the documentation was written -- a graph-native catalog
+  // entry and an extracted source comment are not the same claim.
+  string authoring = 4;
+  uint32 schema_version = 5;
+  string source_repository_revision = 6;
+  string revision_id = 7;
+}
+
+message ListRegisteredAtomsRequest {
+  StableIdentity repository_id = 1;
+  string search = 2;
+  PageRequest page = 3;
+}
+
+message ListRegisteredAtomsResponse {
+  repeated RegisteredAtomView atoms = 1;
+  PageInfo page = 2;
+  uint32 total_registered = 3;
 }
 
 // CodeFileView is one file in the collection.

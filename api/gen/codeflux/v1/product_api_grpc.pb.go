@@ -2743,11 +2743,12 @@ var SessionService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	CodeCollectionService_ListCodePackages_FullMethodName  = "/codeflux.v1.CodeCollectionService/ListCodePackages"
-	CodeCollectionService_ListCodeSymbols_FullMethodName   = "/codeflux.v1.CodeCollectionService/ListCodeSymbols"
-	CodeCollectionService_InspectCodeSymbol_FullMethodName = "/codeflux.v1.CodeCollectionService/InspectCodeSymbol"
-	CodeCollectionService_ListCodeFiles_FullMethodName     = "/codeflux.v1.CodeCollectionService/ListCodeFiles"
-	CodeCollectionService_ReadCodeFile_FullMethodName      = "/codeflux.v1.CodeCollectionService/ReadCodeFile"
+	CodeCollectionService_ListCodePackages_FullMethodName    = "/codeflux.v1.CodeCollectionService/ListCodePackages"
+	CodeCollectionService_ListCodeSymbols_FullMethodName     = "/codeflux.v1.CodeCollectionService/ListCodeSymbols"
+	CodeCollectionService_InspectCodeSymbol_FullMethodName   = "/codeflux.v1.CodeCollectionService/InspectCodeSymbol"
+	CodeCollectionService_ListCodeFiles_FullMethodName       = "/codeflux.v1.CodeCollectionService/ListCodeFiles"
+	CodeCollectionService_ReadCodeFile_FullMethodName        = "/codeflux.v1.CodeCollectionService/ReadCodeFile"
+	CodeCollectionService_ListRegisteredAtoms_FullMethodName = "/codeflux.v1.CodeCollectionService/ListRegisteredAtoms"
 )
 
 // CodeCollectionServiceClient is the client API for CodeCollectionService service.
@@ -2772,6 +2773,14 @@ type CodeCollectionServiceClient interface {
 	// show a file is a directory nobody can act on, but a read with no ceiling
 	// is a way to hand a browser an arbitrarily large file.
 	ReadCodeFile(ctx context.Context, in *ReadCodeFileRequest, opts ...grpc.CallOption) (*ReadCodeFileResponse, error)
+	// ListRegisteredAtoms returns the atoms the project has registered, which is
+	// a different collection from the declarations ListCodeSymbols parses out of
+	// the open repository. A registered atom is one the product admitted and
+	// persisted -- seeded from the catalog, or written by a run that produced
+	// it -- and it exists whether or not any file in the working tree still
+	// declares it. Without this the persisted catalog has no reader outside the
+	// coordinator, and every surface reports the collection as empty.
+	ListRegisteredAtoms(ctx context.Context, in *ListRegisteredAtomsRequest, opts ...grpc.CallOption) (*ListRegisteredAtomsResponse, error)
 }
 
 type codeCollectionServiceClient struct {
@@ -2832,6 +2841,16 @@ func (c *codeCollectionServiceClient) ReadCodeFile(ctx context.Context, in *Read
 	return out, nil
 }
 
+func (c *codeCollectionServiceClient) ListRegisteredAtoms(ctx context.Context, in *ListRegisteredAtomsRequest, opts ...grpc.CallOption) (*ListRegisteredAtomsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRegisteredAtomsResponse)
+	err := c.cc.Invoke(ctx, CodeCollectionService_ListRegisteredAtoms_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CodeCollectionServiceServer is the server API for CodeCollectionService service.
 // All implementations must embed UnimplementedCodeCollectionServiceServer
 // for forward compatibility.
@@ -2854,6 +2873,14 @@ type CodeCollectionServiceServer interface {
 	// show a file is a directory nobody can act on, but a read with no ceiling
 	// is a way to hand a browser an arbitrarily large file.
 	ReadCodeFile(context.Context, *ReadCodeFileRequest) (*ReadCodeFileResponse, error)
+	// ListRegisteredAtoms returns the atoms the project has registered, which is
+	// a different collection from the declarations ListCodeSymbols parses out of
+	// the open repository. A registered atom is one the product admitted and
+	// persisted -- seeded from the catalog, or written by a run that produced
+	// it -- and it exists whether or not any file in the working tree still
+	// declares it. Without this the persisted catalog has no reader outside the
+	// coordinator, and every surface reports the collection as empty.
+	ListRegisteredAtoms(context.Context, *ListRegisteredAtomsRequest) (*ListRegisteredAtomsResponse, error)
 	mustEmbedUnimplementedCodeCollectionServiceServer()
 }
 
@@ -2878,6 +2905,9 @@ func (UnimplementedCodeCollectionServiceServer) ListCodeFiles(context.Context, *
 }
 func (UnimplementedCodeCollectionServiceServer) ReadCodeFile(context.Context, *ReadCodeFileRequest) (*ReadCodeFileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadCodeFile not implemented")
+}
+func (UnimplementedCodeCollectionServiceServer) ListRegisteredAtoms(context.Context, *ListRegisteredAtomsRequest) (*ListRegisteredAtomsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRegisteredAtoms not implemented")
 }
 func (UnimplementedCodeCollectionServiceServer) mustEmbedUnimplementedCodeCollectionServiceServer() {}
 func (UnimplementedCodeCollectionServiceServer) testEmbeddedByValue()                               {}
@@ -2990,6 +3020,24 @@ func _CodeCollectionService_ReadCodeFile_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CodeCollectionService_ListRegisteredAtoms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRegisteredAtomsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodeCollectionServiceServer).ListRegisteredAtoms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CodeCollectionService_ListRegisteredAtoms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodeCollectionServiceServer).ListRegisteredAtoms(ctx, req.(*ListRegisteredAtomsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CodeCollectionService_ServiceDesc is the grpc.ServiceDesc for CodeCollectionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3016,6 +3064,10 @@ var CodeCollectionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadCodeFile",
 			Handler:    _CodeCollectionService_ReadCodeFile_Handler,
+		},
+		{
+			MethodName: "ListRegisteredAtoms",
+			Handler:    _CodeCollectionService_ListRegisteredAtoms_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -16,6 +16,11 @@ import (
 type localRepositoryScope struct {
 	storage.LocalBootstrap
 	Path string
+	// Revision is the head the scope was bound to. It is carried out of here
+	// rather than re-read by the caller because anything a started coordinator
+	// records against this project has to name the same revision the bootstrap
+	// used, and a second `git rev-parse` can answer differently.
+	Revision string
 }
 
 // localRepositoryStore is the narrow surface opening a repository needs.
@@ -71,7 +76,7 @@ func ensureLocalRepository(
 	if err != nil {
 		return localRepositoryScope{}, fmt.Errorf("open %s: %w", root, err)
 	}
-	return localRepositoryScope{LocalBootstrap: bootstrap, Path: root}, nil
+	return localRepositoryScope{LocalBootstrap: bootstrap, Path: root, Revision: identity}, nil
 }
 
 // resolveGitRepository returns the repository root and its head revision.

@@ -157,3 +157,48 @@ func TestSkipSummaryCountsStayDistinct(t *testing.T) {
 		t.Errorf("len(Declines) = %d, want 3", len(summary.Declines))
 	}
 }
+
+// TestComputeSkipSummaryWithProfileClassifiesADeclinedStageDifferently
+// proves classifyDecline consults the run's declared profile (PIPE-046a)
+// rather than only internal/pipeline's static Checks/Section33Resolved
+// tables.
+//
+// platform-matrix is a stage pipeline.Checks marks MaySatisfy with no
+// Section33Resolved entry, so a skipped row for it classifies
+// ClassificationPrincipledDecline under ComputeSkipSummary's implied
+// ProfileDefault -- the same answer classifyDecline always gave before
+// PIPE-046a. Under ComputeSkipSummaryWithProfile(rows, pipeline.ProfileLibrary)
+// -- the one profile profiles.go actually declines this stage under -- the
+// identical row instead classifies ClassificationDeclinedByProfile.
+//
+// Discrimination: dropping the pipeline.ClassifyDeclineForProfile call in
+// classifyDecline back to the unprofiled pipeline.ClassifyDecline makes the
+// second subtest fail, because the library-profiled summary would then
+// classify the row identically to the default one instead of disagreeing
+// with it.
+func TestComputeSkipSummaryWithProfileClassifiesADeclinedStageDifferently(t *testing.T) {
+	rows := rowsFromFlow(t)
+	rows = setState(rows, pipeline.StagePlatformMatrix, pipeline.StateSkipped)
+
+	t.Run("default profile reads it as a principled decline", func(t *testing.T) {
+		summary := ComputeSkipSummary(rows)
+		decline := findDecline(t, summary, pipeline.StagePlatformMatrix)
+		if decline.Classification != ClassificationPrincipledDecline {
+			t.Errorf("default classification = %v, want principled-decline", decline.Classification)
+		}
+	})
+
+	t.Run("library profile reads the same row as declined by profile", func(t *testing.T) {
+		summary := ComputeSkipSummaryWithProfile(rows, pipeline.ProfileLibrary)
+		decline := findDecline(t, summary, pipeline.StagePlatformMatrix)
+		if decline.Classification != ClassificationDeclinedByProfile {
+			t.Errorf("library classification = %v, want declined-by-profile", decline.Classification)
+		}
+		if decline.Ticket != "no cross-compilation target is declared to answer for" {
+			t.Errorf("library ticket = %q, want the profile's own decline reason", decline.Ticket)
+		}
+		if got := summary.DeclinedByProfileCount(); got != 1 {
+			t.Errorf("DeclinedByProfileCount = %d, want 1", got)
+		}
+	})
+}

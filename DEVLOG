@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-157
+Date: 2026-08-03
+Status: Committed as CL-20260803-146
+Change-ID: CL-20260803-146
+Request-or-TODO: User asked for everything in the working tree to be committed
+Goal: Record, rather than explain, the uncommitted work this session inherited
+Assumptions: None safe to make. This entry exists because the commit rules
+  require one, not because this session knows what the change does
+Decisions: Committed it as a labelled checkpoint rather than splitting it into
+  feature commits. Splitting requires knowing what each part is for, and
+  inventing that from a diff would put a rationale in the ledger that nobody
+  actually held
+Files-or-schemas: api/gen and api/proto for the regenerated protobuf,
+  cmd/codeflux-dev including the new seed-stale-lock helpers,
+  cmd/codeflux/local_repository.go and start.go, web/client/atom_collection*,
+  web/frontend/pipelineledger, TODOS.md. Possible schema change in the protobuf;
+  unassessed
+Validation: go build ./... and gofmt pass over the whole tree, and the
+  repository lint and artifact-check hooks passed. Nothing here was exercised by
+  the ladder runs that verified the rest of this session
+Failures-or-discarded-approaches: The codeflux-dev binary at the repository root
+  was left uncommitted. It is a build artifact, and artifacts belong under
+  .artifacts by policy
+Known-limitations: The protobuf regeneration is the part most likely to matter
+  to a consumer and it has not been reviewed by anyone in this session
+Next-safe-step: Read this commit before relying on any of it
+
 Dev-Log: DL-20260803-156
 Date: 2026-08-03
 Status: Committed as CL-20260803-147

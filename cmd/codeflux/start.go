@@ -13,7 +13,9 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
+	"codeflux.dev/codeflux/internal/atomcatalog"
 	"codeflux.dev/codeflux/internal/coordinator"
 	"codeflux.dev/codeflux/internal/storage"
 )
@@ -203,6 +205,34 @@ func runStart(
 		return exitUnavailable
 	} else if scope.Created {
 		fmt.Fprintf(stdout, "opened repository: %s\n", scope.Path)
+		// A project created here has an empty atom catalog, and an empty
+		// catalog is indistinguishable from a broken one: the retrieval lane
+		// searches it and finds nothing, and every surface built over it shows
+		// nothing, whether or not anything is wrong. Seeding the control-flow
+		// entries at creation gives the project the corpus the product already
+		// declares it has, so the first run to consult it is answered rather
+		// than told the collection is empty.
+		//
+		// Seeding is reported and not fatal. The entries are a starting corpus
+		// rather than a precondition, and refusing to start a coordinator that
+		// is otherwise healthy would trade a working product for a full one.
+		seeded, seedErr := atomcatalog.SeedControlFlowCatalog(
+			ctx, application.Repositories(), scope.ProjectID,
+			scope.Revision, time.Now().UTC(),
+		)
+		if seedErr != nil {
+			fmt.Fprintf(stderr, "codeflux start: seed the atom catalog: %v\n", seedErr)
+		} else {
+			fmt.Fprintf(stdout, "seeded %d catalog atom(s)\n", len(seeded.Written))
+		}
+		named, nameErr := atomcatalog.SeedControlFlowNames(
+			ctx, application.Repositories(), scope.ProjectID, time.Now().UTC(),
+		)
+		if nameErr != nil {
+			fmt.Fprintf(stderr, "codeflux start: name the atom catalog: %v\n", nameErr)
+		} else {
+			fmt.Fprintf(stdout, "named %d catalog atom(s)\n", len(named.Written))
+		}
 	} else {
 		fmt.Fprintf(stdout, "reopened repository: %s\n", scope.Path)
 	}

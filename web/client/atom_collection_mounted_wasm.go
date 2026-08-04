@@ -92,7 +92,26 @@ func useMountedAtoms(repositoryID string, tokens design.Tokens) *atomcollection.
 		if err != nil {
 			return atomCollectionAnswer{}, err
 		}
-		return projectAtomSymbols(response), nil
+		answer := projectAtomSymbols(response)
+		// The registered catalog is read on the same connection and in the
+		// same resource, so the page never shows a half-answered collection:
+		// two independent reads would let the parsed atoms paint while the
+		// registered ones were still in flight, and a list that grows after it
+		// looks finished reads as a bug.
+		registered, err := codefluxv1.NewCodeCollectionServiceClient(connection).ListRegisteredAtoms(
+			ctx,
+			&codefluxv1.ListRegisteredAtomsRequest{
+				RepositoryId: repositoryIdentityFor(repositoryID),
+				Search:       submitted,
+			},
+		)
+		if err != nil {
+			// A project with no registered catalog is the ordinary case for a
+			// repository nobody has run yet, so failing the whole listing
+			// because of it would hide the atoms that were read successfully.
+			return answer, nil
+		}
+		return appendRegisteredAtoms(answer, registered), nil
 	}, dependency)
 
 	detailDependency := "none"
@@ -102,6 +121,13 @@ func useMountedAtoms(repositoryID string, tokens design.Tokens) *atomcollection.
 	detail := fetch.UseResource(func(parent context.Context) (atomcollection.AtomDetail, error) {
 		if detailDependency == "none" {
 			return atomcollection.AtomDetail{}, errAtomScopeUnavailable
+		}
+		if isRegisteredAtomKey(selected.Get()) {
+			// A registered atom has no declaration to inspect. Asking the code
+			// collection about it would return not-found and the surface would
+			// report a missing symbol for an atom that is present, so what is
+			// known about it is returned directly instead.
+			return registeredAtomDetail(listing.Get().Value, selected.Get()), nil
 		}
 		ctx, cancel := context.WithTimeout(parent, mountedAtomTimeout)
 		defer cancel()
