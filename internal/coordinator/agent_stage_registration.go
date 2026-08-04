@@ -60,6 +60,24 @@ func (execution *AgentExecution) registerVerifiedAtoms(
 	names := sortedFunctionNames(atoms)
 	records := make([]registrationRecord, 0, len(names))
 	for _, name := range names {
+		// Only the atoms the run was actually asked to document.
+		//
+		// The documentation ask narrows to what is worth remembering:
+		// worthAdmitting exists because asking for nineteen fields about a
+		// task-local procedure that prints and returns nothing put it in the
+		// same queue as a reusable parser, and ladder rung 2 spent its attempts
+		// oscillating over it. Registration did not narrow the same way, so it
+		// counted declarations nobody had ever been asked about and reported
+		// them as failures.
+		//
+		// Ladder rung 4 on 2026-08-03 read "0 of 3 produced atom(s) reached the
+		// registry" when one atom had been asked for, documented, and refused
+		// on a missing field, and the other two had never been mentioned. Two
+		// places deciding one fact, disagreeing, and the ledger reporting the
+		// stricter one as the truth.
+		if !worthAdmitting(atoms[name]) {
+			continue
+		}
 		records = append(records, admitProducedDeclaration(
 			ctx, execution, scope, worktree, atoms[name], nil, registry))
 	}
@@ -87,6 +105,18 @@ func (execution *AgentExecution) registerVerifiedMolecules(
 	records := make([]registrationRecord, 0, len(names))
 	for _, name := range names {
 		function := molecules[name]
+		// main is never asked to document itself, so it is not counted as
+		// having failed to.
+		//
+		// atomsWithoutRegistrableDocumentation skips it outright, and rightly:
+		// an entry point is not a thing a later task reuses, and Go allows
+		// exactly one of it per program. Counting it here made every run report
+		// a molecule that never reached the registry, for a declaration nothing
+		// had ever asked about — "0 of 1 produced molecule(s) reached the
+		// registry" on ladder rung 4, where the one molecule was main.
+		if function.Name == "main" || isTestScaffolding(function) {
+			continue
+		}
 		records = append(records, admitProducedDeclaration(
 			ctx, execution, scope, worktree, function,
 			dependencyBindingsForMolecule(function, scope), registry))

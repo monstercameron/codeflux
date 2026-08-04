@@ -24,17 +24,27 @@ import (
 // test there failed the gate for work that was correct and complete, and
 // blocked fourteen downstream stages behind it.
 //
-// Whether anything can be varied is not decided again here. It is
-// synthesiseCases', the same judgement atom-case-synthesis records when it
-// skips for this reason. Two stages deciding one fact separately is how they
-// come to disagree, and they had: case-synthesis skipped saying nothing could
-// be varied while this stage failed for not having varied it.
+// What counts as "inputs to vary" is narrower here than in
+// atom-case-synthesis, and the difference is deliberate rather than drift.
+// Case synthesis asks what is worth trying, and a function that can fail is
+// worth trying against a failure, so it synthesises one for every atom that
+// returns an error. This stage asks the different question of whether a
+// property can be stated over a set of inputs, and a failure arriving through
+// an injected dependency is not an input space: writeGreeting(w io.Writer)
+// error can be handed a writer that refuses, which is a case, but there is no
+// set of values over which anything is asserted to hold.
+//
+// Ladder rung 1 on 2026-08-03 is what the conflation costs. Its program was
+// correct at eighteen seconds; this gate then asked it for a property over
+// the inputs of a program that prints a constant, and the attempt spent
+// thirteen consecutive patches to one test file without once running the
+// suite, trying to write a table for an input space that does not exist.
 func checkPropertyTests(worktree string) stageOutcome {
 	produced, err := readProducedFunctions(worktree)
 	if err != nil {
 		return broke("the produced source could not be parsed: "+err.Error(), nil)
 	}
-	if len(synthesiseCases(produced)) == 0 {
+	if !anyAtomTakesVariableData(produced) {
 		return skipped("the run produced no atom whose inputs could be " +
 			"varied, so there is no property over an input set to state")
 	}
@@ -85,6 +95,44 @@ func checkPropertyTests(worktree string) stageOutcome {
 	return held(fmt.Sprintf(
 		"%d of %d test(s) examine a set of cases rather than one example",
 		tabular, tests), evidence)
+}
+
+// typesThatAreNotAnInputDomain names parameter types a test cannot vary as
+// data, so their presence does not give a run an input space to state a
+// property over.
+//
+// Short and reviewable on purpose, in the same style as
+// knownFallibleStdlibCalls: everything not named here counts as data, so a
+// type this list has not thought of fails toward the gate still applying
+// rather than toward excusing a run that owed a property test.
+//
+// io.Writer is the one that matters and the one that shows why the rule is
+// about the direction rather than about interfaces. A writer is where output
+// goes; varying it varies the destination, not the input. io.Reader is
+// deliberately absent for exactly that reason — the bytes a reader yields are
+// an input space, and a run handed one still owes a property over it.
+var typesThatAreNotAnInputDomain = map[string]bool{
+	"io.Writer": true, "io.WriteCloser": true, "io.StringWriter": true,
+	"context.Context": true, "*testing.T": true, "*testing.B": true,
+}
+
+// anyAtomTakesVariableData reports whether the run produced an atom with at
+// least one parameter a test could vary as data.
+func anyAtomTakesVariableData(functions []producedFunction) bool {
+	for _, function := range functions {
+		if isTestScaffolding(function) || !needsOwnTest(function) {
+			continue
+		}
+		for _, parameter := range function.Parameters {
+			base := strings.TrimPrefix(parameter, "...")
+			if typesThatAreNotAnInputDomain[base] ||
+				strings.HasPrefix(base, "func(") {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // iteratesOverCases reports whether a test loops over a collection.

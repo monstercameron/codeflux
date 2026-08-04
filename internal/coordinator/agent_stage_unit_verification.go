@@ -287,13 +287,23 @@ func checkFunctionCoverage(
 		return broke("the coverage profile could not be read: "+err.Error(), nil)
 	}
 	blocks := parseCoverageProfile(string(content))
-	result := coverageOverChangedLines(blocks, attribution)
+	unreachable := linesNoTestCanExecute(worktree, attribution)
+	result := coverageOverChangedLines(blocks, attribution, unreachable)
 	evidence := map[string]any{
 		"changed_coverable_lines": result.CoverableLines,
 		"changed_covered_lines":   result.CoveredLines,
 		"uncovered_changed_lines": result.Uncovered,
+		"unreachable_by_any_test": result.Unreachable,
 		"attribution_established": true,
 		"scope":                   "changed lines only, per PIPE-115",
+	}
+	if result.CoverableLines == 0 && len(result.Unreachable) > 0 {
+		return skippedWith(fmt.Sprintf(
+			"every one of the %d line(s) this run changed sits where no test "+
+				"running in the same process can reach it, so there is no "+
+				"coverage here to measure: %s",
+			len(result.Unreachable), strings.Join(result.Unreachable, ", ")),
+			evidence)
 	}
 	if result.CoverableLines == 0 {
 		return skipped(
@@ -435,6 +445,11 @@ type changedLineCoverageResult struct {
 	// sorted, so a run is told exactly where to add a test rather than only
 	// how much it is missing.
 	Uncovered []string
+	// Unreachable names each changed, instrumented line that was excluded
+	// because no test running in the same process can execute it. They are
+	// reported rather than silently dropped: "we did not check this" and
+	// "this passed" must not read the same way (PIPE-010).
+	Unreachable []string
 }
 
 // coverageOverChangedLines measures coverage restricted to the lines
@@ -447,8 +462,15 @@ type changedLineCoverageResult struct {
 // written on one line produces this) counts as covered if any block covering
 // it ran at least once, since the question is whether the line executed at
 // all, not how the compiler happened to divide it into blocks.
+//
+// A line the compiler instrumented is still not necessarily a line any test
+// can execute, and unreachable says which ones are not: main's body, and any
+// block that ends the process. Those are excluded from the measurement and
+// reported separately rather than counted as gaps.
 func coverageOverChangedLines(
-	blocks []coverageBlock, attribution changeAttribution,
+	blocks []coverageBlock,
+	attribution changeAttribution,
+	unreachable map[string]map[int]bool,
 ) changedLineCoverageResult {
 	coverable := map[string]map[int]bool{}
 	covered := map[string]map[int]bool{}
@@ -468,7 +490,7 @@ func coverageOverChangedLines(
 	}
 
 	var result changedLineCoverageResult
-	var uncovered []string
+	var uncovered, unreached []string
 	for file, ranges := range attribution.Ranges {
 		profileFile := matchingProfileFile(coverable, file)
 		if profileFile == "" {
@@ -477,6 +499,14 @@ func coverageOverChangedLines(
 		for _, span := range ranges {
 			for line := span.Start; line <= span.End; line++ {
 				if !coverable[profileFile][line] {
+					continue
+				}
+				// Excluded before it is counted, not after: a line no test can
+				// execute is not a covered line and not an uncovered one, and
+				// folding it into either number would misdescribe the run.
+				if unreachable[file][line] {
+					unreached = append(unreached,
+						fmt.Sprintf("%s:%d", file, line))
 					continue
 				}
 				result.CoverableLines++
@@ -489,8 +519,164 @@ func coverageOverChangedLines(
 		}
 	}
 	sort.Strings(uncovered)
+	sort.Strings(unreached)
 	result.Uncovered = uncovered
+	result.Unreachable = unreached
 	return result
+}
+
+// processTerminatingCalls names the calls that end the process rather than
+// return from it, keyed the same way observedEffects names an effect.
+//
+// It is deliberately the same list mainReportsAndExits accepts as evidence
+// that main reports a failure (agent_adversarial_review.go). One gate demands
+// a branch that calls one of these and another gate then measures whether that
+// branch was covered, so the two must agree about which calls they are: they
+// did not, and rung 1 is what that disagreement costs.
+var processTerminatingCalls = map[string]bool{
+	"os.Exit": true, "log.Fatal": true, "log.Fatalf": true, "log.Fatalln": true,
+}
+
+// linesNoTestCanExecute reports, per repository-relative file, the lines the
+// compiler instruments but no test running in the same process can reach.
+//
+// Two kinds, and neither is a policy preference:
+//
+// main's body, because no Go test can call main. checkControlTests and
+// wholeModuleFunctionCoverage in this same package already say so and already
+// exempt it; changed-line coverage did not, so the same fact was answered
+// three ways depending on which gate asked. Ladder rung 1 on 2026-08-03
+// failed here on main.go:21-23 — the error branch the adversarial review had
+// demanded on the attempt before, for a program that was already correct.
+//
+// A block that ends the process, because a test that executed it would take
+// the test binary down with it. Coverage of such a line is not merely absent;
+// it is unobtainable, and the profile could not record it even if the line
+// ran, since the process dies before the profile is written.
+//
+// The files come from attribution rather than producedGoFiles: a run that has
+// committed to its own worktree leaves git status clean, and enumerating from
+// there would exempt nothing at exactly the moment exemption is needed.
+// Anything that cannot be parsed is left out of the exemption set, so a file
+// this cannot read is measured as before rather than silently excused.
+func linesNoTestCanExecute(
+	worktree string, attribution changeAttribution,
+) map[string]map[int]bool {
+	unreachable := map[string]map[int]bool{}
+	fileSet := token.NewFileSet()
+	for file := range attribution.Ranges {
+		if !strings.HasSuffix(file, ".go") {
+			continue
+		}
+		tree, err := parser.ParseFile(
+			fileSet, filepath.Join(worktree, filepath.FromSlash(file)), nil,
+			parser.ParseComments|parser.SkipObjectResolution)
+		if err != nil {
+			continue
+		}
+		// A branch the run has declared unreachable, with its reason.
+		//
+		// The coverage instruction ends "if a line genuinely cannot be reached
+		// — a defensive check for a state the types forbid — say so in a
+		// comment on that line and leave it". That was a promise nothing kept:
+		// the run wrote the comment, left the branch, and the gate reported the
+		// same lines again. Ladder rung 7 on 2026-08-03 was asked three times
+		// for lines whose branch carried exactly that explanation, and spent
+		// eight attempts and ten minutes on it.
+		//
+		// A directive rather than prose, because the difference matters: a
+		// checker can verify that a marker is present and carries a reason, and
+		// cannot verify that a sentence is true. The reason is required so the
+		// marker stays an argument a reviewer can weigh rather than a way to
+		// silence the gate.
+		markUnreachableDirectives(unreachable, file, fileSet, tree)
+		for _, declaration := range tree.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body == nil {
+				continue
+			}
+			if function.Recv == nil && function.Name != nil &&
+				function.Name.Name == "main" {
+				// The whole body, brace to brace. The block Go instruments for
+				// a function starts at its opening brace, so exempting only the
+				// statements would leave that first instrumented line behind as
+				// an uncoverable gap — which is the defect, not a smaller
+				// version of it.
+				markLines(unreachable, file,
+					fileSet.Position(function.Body.Lbrace).Line,
+					fileSet.Position(function.Body.End()).Line)
+				continue
+			}
+			ast.Inspect(function.Body, func(node ast.Node) bool {
+				block, isBlock := node.(*ast.BlockStmt)
+				if !isBlock || !blockTerminatesProcess(block) {
+					return true
+				}
+				// Everything below the opening brace, closing brace included.
+				//
+				// Not the whole block: its opening brace shares a line with the
+				// condition that guards it, and that condition is ordinary
+				// reachable code — excusing it would excuse deciding whether to
+				// fail along with failing. Not the statements alone either: the
+				// block Go instruments ends at the closing brace, so stopping
+				// short of it leaves that line behind as an uncoverable gap,
+				// which is the same defect one line smaller. A block written
+				// entirely on one line has no such interior and is left
+				// measured, which is the safe direction to fail in.
+				if len(block.List) == 0 {
+					return false
+				}
+				markLines(unreachable, file,
+					fileSet.Position(block.Lbrace).Line+1,
+					fileSet.Position(block.End()).Line)
+				return false
+			})
+		}
+	}
+	return unreachable
+}
+
+// markLines records an inclusive span of one file's lines as unreachable,
+// creating the file's entry on first use. An empty or inverted span records
+// nothing, which is how a block with no interior leaves itself measured.
+func markLines(unreachable map[string]map[int]bool, file string, start, end int) {
+	if start > end {
+		return
+	}
+	if unreachable[file] == nil {
+		unreachable[file] = map[int]bool{}
+	}
+	for line := start; line <= end; line++ {
+		unreachable[file][line] = true
+	}
+}
+
+// blockTerminatesProcess reports whether a block calls something that ends the
+// process directly, rather than somewhere deeper inside a nested block that is
+// judged on its own terms.
+func blockTerminatesProcess(block *ast.BlockStmt) bool {
+	for _, statement := range block.List {
+		expression, isExpression := statement.(*ast.ExprStmt)
+		if !isExpression {
+			continue
+		}
+		call, isCall := expression.X.(*ast.CallExpr)
+		if !isCall {
+			continue
+		}
+		selector, isSelector := call.Fun.(*ast.SelectorExpr)
+		if !isSelector {
+			continue
+		}
+		pkg, isIdent := selector.X.(*ast.Ident)
+		if !isIdent {
+			continue
+		}
+		if processTerminatingCalls[pkg.Name+"."+selector.Sel.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 // matchingProfileFile finds the coverage profile's own key for a
@@ -509,4 +695,77 @@ func matchingProfileFile(coverable map[string]map[int]bool, relativeFile string)
 		}
 	}
 	return ""
+}
+
+// unreachableDirective is how a run declares a line no test can reach.
+//
+// It must carry a reason after the colon. A marker with nothing behind it is a
+// way to switch the gate off; a marker with an argument is a claim a reviewer
+// can disagree with.
+const unreachableDirective = "//codeflux:unreachable"
+
+// markUnreachableDirectives exempts the branch each unreachable directive
+// introduces.
+//
+// The directive applies to the statement it sits above or beside, and to that
+// statement's body when it has one: a defensive "if err != nil { return err }"
+// is one claim about one branch, not a claim about the line the comment
+// happens to occupy.
+func markUnreachableDirectives(
+	unreachable map[string]map[int]bool,
+	file string,
+	fileSet *token.FileSet,
+	tree *ast.File,
+) {
+	for _, group := range tree.Comments {
+		for _, comment := range group.List {
+			if !strings.Contains(comment.Text, unreachableDirective) {
+				continue
+			}
+			reason := strings.TrimSpace(strings.SplitN(
+				comment.Text, unreachableDirective, 2)[1])
+			reason = strings.TrimPrefix(reason, ":")
+			if strings.TrimSpace(reason) == "" {
+				// A marker with no reason exempts nothing. Saying why is the
+				// whole of what makes the claim reviewable.
+				continue
+			}
+			commentLine := fileSet.Position(comment.Pos()).Line
+			markStatementAt(unreachable, file, fileSet, tree, commentLine)
+		}
+	}
+}
+
+// markStatementAt exempts the statement introduced at or just after a line.
+func markStatementAt(
+	unreachable map[string]map[int]bool,
+	file string,
+	fileSet *token.FileSet,
+	tree *ast.File,
+	line int,
+) {
+	var best ast.Stmt
+	ast.Inspect(tree, func(node ast.Node) bool {
+		statement, isStatement := node.(ast.Stmt)
+		if !isStatement {
+			return true
+		}
+		start := fileSet.Position(statement.Pos()).Line
+		if start < line || start > line+1 {
+			return true
+		}
+		// The outermost statement starting here, so an if takes its whole body
+		// rather than only its condition.
+		if best == nil || fileSet.Position(best.Pos()).Line > start {
+			best = statement
+		}
+		return true
+	})
+	if best == nil {
+		markLines(unreachable, file, line, line)
+		return
+	}
+	markLines(unreachable, file,
+		fileSet.Position(best.Pos()).Line,
+		fileSet.Position(best.End()).Line)
 }
