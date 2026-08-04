@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-181
+Date: 2026-08-04
+Status: Committed as CL-20260803-171
+Change-ID: CL-20260803-171
+Request-or-TODO: Ladder rung 18
+Goal: Stop a hard gate failing a run for a demand it heard once, five attempts
+  earlier
+Assumptions: None. The ask is at 174.9s in the trace and the run continues to
+  attempt nine at 381.3s without it being mentioned again
+Decisions: Bounded at three rather than made unconditional. The original
+  reasoning is sound about consecutive tellings and only wrong about buried
+  ones, so the fix is to allow it to resurface rather than to nag
+Files-or-schemas: internal/coordinator/agent_outstanding.go --
+  propertyRoundBackstop hoisted to a package constant so the policy can be
+  asserted rather than described; TODOS.md -- LAD-002
+Validation: Two new tests
+Failures-or-discarded-approaches: First wrote a control test that grepped the
+  source for the guard expression. Removed: a test that reads the
+  implementation asserts the implementation has not changed, not that the
+  behaviour is right, and it would pass a rewrite that broke the property
+Known-limitations: Three is a judgement. Also checked and ruled out first: that
+  the detector might miss the ordinary Go table idiom. It accepts any loop in a
+  test, including a range over a variable, so the run genuinely wrote twenty
+  tests with no table in any of them
+Next-safe-step: Rung 18 pass 4
+
 Dev-Log: DL-20260803-180
 Date: 2026-08-04
 Status: Committed as CL-20260803-170

@@ -50,6 +50,37 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-171
+Commit: pending
+Date: 2026-08-04
+Type: Fix -- a hard gate was asked for once and then buried, and the registry
+  gap is recorded
+Request-or-TODO: Ladder rung 18
+Outcome: atom-property-tests fails a run outright, and it was asked exactly once
+  per run on the reasoning that a run told this precisely and not doing it will
+  not do it on the third telling. That holds when the tellings are consecutive.
+  It does not hold when the demand is raised and then buried: rung 18 on
+  2026-08-04 was asked at attempt four, spent attempts five through nine on
+  integration-tests, path-coverage and atom-documentation, was never reminded,
+  and failed the run on this gate two hundred seconds later -- having been told
+  in that same message that "every one of these is checked again, together, on
+  the next attempt", which was true of the checking and false of the asking. It
+  is now bounded at three like the coverage ladder, and still asked only when
+  nothing else is outstanding, so it cannot displace work that has to happen
+  first. Also adds LAD-002 recording why the atom registry never fills: every
+  run this session ends with registration failing advisorily, so the recall
+  stage searches an empty project and the compounding-effort thesis is unstarted
+  rather than unproven. TestPIPE048_ChangedContractMintsADifferentAtomIdentity
+  is the cheapest way in and was confirmed failing at 5577f21, before this
+  session's work.
+Affected-behavior: A run that never states a property is told up to three times
+  rather than once.
+Compatibility-or-migration: None.
+Verification: Two new tests: the bound is above one and below five, and the
+  instruction says what a property is rather than only naming the unhappy gate —
+  repeating an instruction only helps if it was actionable to begin with.
+Dev-Log: DL-20260803-181
+
 Change-ID: CL-20260803-170
 Commit: d37de09
 Date: 2026-08-04

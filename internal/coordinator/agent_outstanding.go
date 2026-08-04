@@ -62,6 +62,20 @@ func (work outstanding) any() bool { return work.instruction != "" }
 // no number of test cases can compensate for — but the rest is still included,
 // since a run rewriting the program anyway may as well carry the other work
 // with it rather than regress it.
+// propertyRoundBackstop bounds how many times one run is asked for a property
+// test.
+//
+// More than once, because atom-property-tests is a hard gate and a demand
+// raised early gets buried. Rung 18 on 2026-08-04 was asked at attempt four,
+// spent five more attempts on other gates, was never reminded, and failed the
+// run on this two hundred seconds later — having been told in that same message
+// that "every one of these is checked again, together, on the next attempt",
+// which was true of the checking and false of the asking.
+//
+// Not unboundedly: a run told three times what a property test is, and given
+// the shape wanted in plain Go, will not write one on the fourth telling.
+const propertyRoundBackstop = 3
+
 func (execution *AgentExecution) outstandingWork(
 	ctx context.Context,
 	scope agentScope,
@@ -192,11 +206,21 @@ func (execution *AgentExecution) outstandingWork(
 	// test: the gate was hard, the run had attempts left, and nothing told it.
 	// That is the same late-gate defect path coverage had, in a second place.
 	//
-	// Asked once. A property test is a small, well-defined piece of work — one
-	// table over a set of inputs asserting a relationship rather than a value —
-	// and a run that was told exactly that and did not do it will not do it on
-	// the third telling.
-	if len(parts) == 0 && propertyRounds == 0 {
+	// Bounded like the coverage ladder rather than asked exactly once.
+	//
+	// Once was the rule, on the reasoning that a run told this precisely and
+	// not doing it will not do it on the third telling. That holds when the
+	// tellings are consecutive. It does not hold when the demand is raised and
+	// then buried: rung 18 on 2026-08-04 was asked at attempt four, spent
+	// attempts five through nine on integration-tests, path-coverage and
+	// atom-documentation, was never reminded, and failed the run on this gate
+	// two hundred seconds later. The instruction it had been given says "every
+	// one of these is checked again, together, on the next attempt" — which is
+	// true of the checking and was not true of the asking.
+	//
+	// Still bounded, and still only when nothing else is outstanding, so it
+	// cannot crowd out work that has to happen first.
+	if len(parts) == 0 && propertyRounds < propertyRoundBackstop {
 		if outcome := checkPropertyTests(scope.worktree); !outcome.Held &&
 			!outcome.Skipped {
 			work.gate = "atom-property-tests"
