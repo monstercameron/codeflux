@@ -51,7 +51,7 @@ func (model *refiningModel) ObserveThink(
 ) (agentloop.ModelTurn, error) {
 	toldItFailed := false
 	for _, item := range input.RepositoryContext {
-		if strings.Contains(item.Path, "last-test-run-output") {
+		if strings.Contains(item.Path, "work-this-attempt-must-do") {
 			toldItFailed = true
 		}
 	}

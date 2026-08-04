@@ -144,17 +144,27 @@ func findCompletenessGaps(
 		if !scope.Contains(function.Name) {
 			continue
 		}
+		// Named with the file they are in.
+		//
+		// A bare function name is ambiguous exactly where it matters most. A
+		// generated workspace holds a stub main.go beside the real
+		// cmd/generated/main.go, so "main has no doc comment" describes two
+		// declarations and the run has to guess which. Ladder rung 5 on
+		// 2026-08-03 guessed the stub twice, patched a file no plan step
+		// names, and lost both attempts to "tool path is outside plan step
+		// scope" — for work it had understood correctly and aimed at the wrong
+		// target.
+		where := qualifiedFunctionName(function)
 		if settings.RequireTests && needsOwnTest(function) &&
 			len(naming[function.Name]) == 0 {
-			gaps.UntestedAtoms = append(gaps.UntestedAtoms, function.Name)
+			gaps.UntestedAtoms = append(gaps.UntestedAtoms, where)
 		}
 		if settings.RequireDocComments && needsDocComment(function) &&
 			!documented[function.Name] {
-			gaps.UndocumentedAtoms = append(
-				gaps.UndocumentedAtoms, function.Name)
+			gaps.UndocumentedAtoms = append(gaps.UndocumentedAtoms, where)
 		}
 		if !isTestScaffolding(function) && function.Branches >= unreadable {
-			gaps.TangledFunctions = append(gaps.TangledFunctions, function.Name)
+			gaps.TangledFunctions = append(gaps.TangledFunctions, where)
 		}
 	}
 	sort.Strings(gaps.UntestedAtoms)
@@ -252,4 +262,17 @@ func checkAtomDocumentation(worktree string, cache *producedFunctionCache) stage
 	return held(fmt.Sprintf(
 		"all %d function(s) carry a doc comment on the declaration itself",
 		total), evidence)
+}
+
+// qualifiedFunctionName names a function with the file it lives in, so an
+// instruction about it cannot be aimed at a different declaration of the same
+// name.
+//
+// The file is omitted when it is not known rather than guessed at: a name with
+// no file is ambiguous, and a name with the wrong file is worse.
+func qualifiedFunctionName(function producedFunction) string {
+	if function.File == "" {
+		return function.Name
+	}
+	return filepath.ToSlash(function.File) + ":" + function.Name
 }

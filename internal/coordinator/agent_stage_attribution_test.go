@@ -731,6 +731,13 @@ func stringSliceHas(values []string, text string) bool {
 		if value == text {
 			return true
 		}
+		// Completeness gaps name a function with the file it lives in, so that
+		// an instruction about "main" cannot be aimed at a different
+		// declaration of the same name. These assertions are about which
+		// function was named, not about how it was qualified.
+		if strings.HasSuffix(value, ":"+text) {
+			return true
+		}
 	}
 	return false
 }

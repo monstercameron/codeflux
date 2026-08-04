@@ -5,8 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -120,6 +123,51 @@ func (narrator *narratingExecutor) ExecuteTool(
 		beforeWrite = producedTreeDigest(narrator.worktree)
 	}
 
+	// A suite run against bytes the suite has already seen is answered from the
+	// last run rather than performed again.
+	//
+	// The result cannot differ — the files are identical — so executing it buys
+	// nothing and costs whatever the suite costs. The note already told the run
+	// so, but only after paying for it.
+	//
+	// This protection existed before as a withheld tool: the suite was not
+	// offered when nothing had changed. Making a completed check callable again
+	// removed it, which was necessary — a run that tests, patches and must test
+	// again had no way to — and reintroduced the waste it had been guarding.
+	// Ladder rung 4 on 2026-08-03 ran the suite twenty-five times in one run
+	// and twelve of those were against unchanged files.
+	//
+	// The round is still spent, because the call has already been made by the
+	// time it arrives here. What is saved is the execution, and what is gained
+	// is that the answer is now instant rather than late.
+	if unchanged && narrator.lastTestOutput != "" {
+		state := domain.CommandExecutionStateSucceeded
+		if narrator.lastTestFailed {
+			state = domain.CommandExecutionStateFailed
+		}
+		tracef("tool", "%-12s %-10s %s", name, "unchanged",
+			"answered from the last run; the suite was not executed again")
+		narrator.execution.publishTool(narrator.ctx, narrator.scope,
+			events.KindToolCompleted, executionID, name, string(state),
+			detail+" — answered from the last run")
+		result := executor.ToolResult{
+			RequestID:     request.Request.ID,
+			SchemaVersion: executor.ToolSchemaVersion,
+			State:         "succeeded",
+			StdoutRedacted: strings.TrimSpace(narrator.lastTestOutput) +
+				unchangedTestNote(),
+		}
+		if narrator.lastTestFailed {
+			result.State = "failed"
+			result.ExitCode = 1
+			narrator.lastFailure = strings.TrimSpace(result.StdoutRedacted)
+		}
+		if sources := narrator.producedSourcesNow(); sources != "" {
+			result.StdoutRedacted += sources
+		}
+		return result, nil
+	}
+
 	// A wholesale rewrite of a file that already exists is refused after the
 	// first, and pointed at the tool for the job.
 	//
@@ -151,7 +199,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 				string(domain.CommandExecutionStateFailed),
 				detail+" — refused: already written whole this attempt")
 			narrator.lastFailure = why
-			return executor.ToolResult{State: "failed", StdoutRedacted: why}, nil
+			return narrator.refuse(request, why), nil
 		}
 	}
 
@@ -178,8 +226,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 					string(domain.CommandExecutionStateFailed),
 					detail+" — refused: broader than this round allows")
 				narrator.lastFailure = why
-				return executor.ToolResult{
-					State: "failed", StdoutRedacted: why}, nil
+				return narrator.refuse(request, why), nil
 			}
 		}
 		if allowed, why := narrator.permitted.permits(
@@ -192,8 +239,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 				string(domain.CommandExecutionStateFailed),
 				detail+" — refused: outside this round's scope")
 			narrator.lastFailure = why
-			return executor.ToolResult{State: "failed", StdoutRedacted: why},
-				nil
+			return narrator.refuse(request, why), nil
 		}
 	}
 
@@ -242,6 +288,51 @@ func (narrator *narratingExecutor) ExecuteTool(
 			"same command, same files as the last run")
 		result.StdoutRedacted = strings.TrimSpace(result.StdoutRedacted) +
 			unchangedTestNote()
+	}
+	// Every patch is answered with the file as it now stands.
+	//
+	// The refusal already says to read the file and copy the lines from it,
+	// which the run cannot do: the file is put in front of it once, when the
+	// attempt starts, and every patch that lands after that makes the copy it
+	// is holding a description of a file that no longer exists. So it retypes
+	// the lines from memory, misses again, and spends another round.
+	//
+	// Ladder rung 3 on 2026-08-03: thirty of forty patch calls failed, and at
+	// roughly five seconds of model latency each they were most of the run.
+	// The whole file is a thousand-odd bytes against a sixty-thousand-byte
+	// result ceiling, so answering with it is cheap in exactly the place that
+	// is currently expensive.
+	// A suite run answers with the code it ran against.
+	//
+	// The produced files reach the model on a patch result and nowhere else, so
+	// a round that ran the tests instead put the model back on the snapshot it
+	// was given when the attempt began. Ladder rung 4 on 2026-08-03 measured
+	// the cost exactly: a patch written straight after a test call failed 15
+	// times out of 21, while a patch written after another patch failed twice
+	// out of seven. The run interleaves the two constantly, so most of its
+	// patches were written against a file that had already moved.
+	if executor.ToolName(name) == executor.ToolTest &&
+		completed == domain.CommandExecutionStateSucceeded {
+		result.StdoutRedacted = strings.TrimSpace(result.StdoutRedacted) +
+			narrator.sourcesIfTheyMoved()
+	}
+	if executor.ToolName(name) == executor.ToolApplyPatch {
+		if current := narrator.currentContentOf(
+			toolArgument(request.Request, "path")); current != "" {
+			if completed == domain.CommandExecutionStateSucceeded {
+				// A patch that landed changed the file, so the copy the run is
+				// holding is now wrong in exactly the way that makes the next
+				// hunk miss. Answering a success with the new text is what
+				// keeps a second patch in the same attempt writable at all:
+				// the file is offered once, when the attempt begins, and
+				// nothing else refreshes it.
+				result.StdoutRedacted = strings.TrimSpace(
+					result.StdoutRedacted) + current
+			} else {
+				result.StderrRedacted = strings.TrimSpace(
+					result.StderrRedacted) + current
+			}
+		}
 	}
 	if completed != domain.CommandExecutionStateSucceeded {
 		narrator.lastFailure = strings.TrimSpace(
@@ -594,7 +685,7 @@ func agentApprovedTools(offerTest bool) []agentloop.ApprovedTool {
 			Descriptor: catalog[executor.ToolApplyEdit],
 			Arguments: []agentloop.ToolArgumentDefinition{
 				{Name: "path", Required: true},
-				{Name: "content", Required: true},
+				{Name: "content", Required: true, MaxBytes: producedSourceMaxBytes},
 			},
 			DefaultTimeout:    30 * time.Second,
 			MaterialEdit:      true,
@@ -611,7 +702,7 @@ func agentApprovedTools(offerTest bool) []agentloop.ApprovedTool {
 			Descriptor: catalog[executor.ToolApplyPatch],
 			Arguments: []agentloop.ToolArgumentDefinition{
 				{Name: "path", Required: true},
-				{Name: "patch", Required: true},
+				{Name: "patch", Required: true, MaxBytes: producedSourceMaxBytes},
 			},
 			DefaultTimeout:    30 * time.Second,
 			MaterialEdit:      true,
@@ -731,7 +822,11 @@ func (narrator *narratingExecutor) recordInGraph(
 		return domain.NodeID{}
 	}
 	switch executor.ToolName(tool) {
-	case executor.ToolApplyEdit:
+	// A patch is a file edit and is drawn as one. Falling to the default drew
+	// it as a command, so the diagram showed a run issuing commands at a file
+	// nothing had ever edited, and persistProducedFile had no operation node
+	// to hang the stored artifact from.
+	case executor.ToolApplyEdit, executor.ToolApplyPatch:
 		return recorder.recordFileEdit(narrator.ctx, attribution.PlanStepID, detail,
 			attribution.PlanRevision, succeeded)
 	case executor.ToolTest:
@@ -758,7 +853,21 @@ func (narrator *narratingExecutor) persistProducedFile(
 	succeeded bool,
 	operationNode domain.NodeID,
 ) {
-	if !succeeded || executor.ToolName(request.Request.Name) != executor.ToolApplyEdit {
+	// A patch changes a file exactly as much as a write does.
+	//
+	// Only apply-edit was stored, which was right when a write was the only
+	// way to change a file and became wrong the moment the patch tool was
+	// offered. Every refinement after the first write left the record holding
+	// the first draft: ladder rung 1 on 2026-08-03 produced a correct 544-byte
+	// program and stored the 472-byte version it had started from, and the run
+	// was failed for it — "the program is on disk but not in the record".
+	//
+	// Both tools declare the file they change as a required path argument, so
+	// the file is read back from disk here either way and what is stored is
+	// what the file actually holds, whichever tool put it there.
+	tool := executor.ToolName(request.Request.Name)
+	if !succeeded ||
+		(tool != executor.ToolApplyEdit && tool != executor.ToolApplyPatch) {
 		return
 	}
 	path := toolArgument(request.Request, "path")
@@ -999,4 +1108,222 @@ func unchangedTestNote() string {
 		"the last time these tests ran, so this result is that result. If you " +
 		"meant to change something, the write did not land — check the path " +
 		"and the content, and do not run the tests again until a file differs."
+}
+
+// maximumPatchEchoBytes bounds the file a failed patch is answered with.
+//
+// Generated programs are small and the result ceiling is sixty thousand bytes,
+// so this never binds in practice. It exists so that a large file cannot turn
+// one mistyped hunk into a result that crowds out everything else the round
+// needs to read.
+const maximumPatchEchoBytes = 16000
+
+// currentContentOf reads a produced file as it stands right now, for answering
+// a failed patch with the text its hunks have to match.
+//
+// Returns empty for anything it cannot read or resolve inside the worktree,
+// and for a file larger than the echo bound: a patch failure that also cannot
+// show the file is still a patch failure, and saying less is better than
+// saying something that is not the file.
+func (narrator *narratingExecutor) currentContentOf(path string) string {
+	if path == "" || narrator.worktree == "" {
+		return ""
+	}
+	// The path came from a model tool argument, so it is resolved and confined
+	// here rather than trusted. The executor has already refused an escaping
+	// write, but this reads on the failure path of a call that may have been
+	// refused for any reason, so it does its own check instead of inheriting
+	// one.
+	root, err := filepath.Abs(narrator.worktree)
+	if err != nil {
+		return ""
+	}
+	resolved, err := filepath.Abs(
+		filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		return ""
+	}
+	relative, err := filepath.Rel(root, resolved)
+	if err != nil || relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return ""
+	}
+	content, err := os.ReadFile(resolved)
+	if err != nil || len(content) > maximumPatchEchoBytes {
+		return ""
+	}
+	answer := "\n\nThis is " + path + " as it stands now, after everything this " +
+		"attempt has already changed. Your hunks must match this text, not " +
+		"the copy you were shown when the attempt began. Copy the lines you " +
+		"are changing from here.\n\n" + string(content)
+	return answer + narrator.siblingsOf(path, len(answer))
+}
+
+// siblingsOf offers the other produced files beside the one just patched.
+//
+// A tool result reaches the model carrying the previous round's results and
+// nothing else, so echoing only the file this call touched leaves every other
+// file at whatever the attempt-start snapshot said. Ladder rung 4 on
+// 2026-08-03: one round patched main_test.go, the next patched main.go from
+// context predating a change made to main.go two rounds earlier, and the hunk
+// matched nothing. Twenty-four of thirty-three patches failed in that run.
+//
+// Only the produced sources beside it, and only inside the same total bound, so
+// this cannot grow into shipping a repository through a tool result.
+func (narrator *narratingExecutor) siblingsOf(path string, used int) string {
+	directory := pathpkg.Dir(filepath.ToSlash(path))
+	entries, err := os.ReadDir(
+		filepath.Join(narrator.worktree, filepath.FromSlash(directory)))
+	if err != nil {
+		return ""
+	}
+	var offered strings.Builder
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		sibling := pathpkg.Join(directory, name)
+		if sibling == filepath.ToSlash(path) {
+			continue
+		}
+		content, readErr := os.ReadFile(
+			filepath.Join(narrator.worktree, filepath.FromSlash(sibling)))
+		if readErr != nil {
+			continue
+		}
+		if used+offered.Len()+len(content) > maximumPatchEchoBytes {
+			continue
+		}
+		offered.WriteString("\n\nThis is " + sibling +
+			" as it stands now.\n\n" + string(content))
+	}
+	return offered.String()
+}
+
+// refuse builds the result for a tool this narrator turned down itself.
+//
+// It has to carry the request's own identity and the tool schema version. The
+// loop validates both before it will accept any result — a result that names a
+// different request, or no request, is how a confused executor would look — and
+// a refusal built without them was rejected as an invalid result rather than
+// read as a refusal. That ended the whole attempt, reported only as "tool
+// result identity or schema does not match the request", for what should have
+// cost one round and taught the run something specific.
+//
+// Ladder rung 4 on 2026-08-03 lost two attempts to it in a single run, one of
+// them the escalation to the most expensive rung.
+func (narrator *narratingExecutor) refuse(
+	request executor.AuthorizedToolRequest, why string,
+) executor.ToolResult {
+	return executor.ToolResult{
+		RequestID:      request.Request.ID,
+		SchemaVersion:  executor.ToolSchemaVersion,
+		State:          "failed",
+		ExitCode:       -1,
+		StdoutRedacted: why,
+	}
+}
+
+// producedSourcesNow offers every produced Go file as it currently stands.
+//
+// Used to answer a suite run, which otherwise tells the model what happened
+// without telling it what it happened to. Bounded by the same echo limit as a
+// patch answer, and silent when it cannot read the tree: an incomplete picture
+// of a file is worse than none, because a hunk copied from half a file matches
+// nothing.
+func (narrator *narratingExecutor) producedSourcesNow() string {
+	if narrator.worktree == "" {
+		return ""
+	}
+	var paths []string
+	walkErr := filepath.WalkDir(narrator.worktree,
+		func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				if entry.Name() == ".git" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if strings.HasSuffix(entry.Name(), ".go") {
+				paths = append(paths, path)
+			}
+			return nil
+		})
+	if walkErr != nil {
+		return ""
+	}
+	sort.Strings(paths)
+	var offered strings.Builder
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		relative, relErr := filepath.Rel(narrator.worktree, path)
+		if relErr != nil {
+			continue
+		}
+		if offered.Len()+len(content) > maximumPatchEchoBytes {
+			continue
+		}
+		offered.WriteString(producedFileHeading(filepath.ToSlash(relative)) +
+			string(content))
+	}
+	if offered.Len() == 0 {
+		return ""
+	}
+	return "\n\nThe suite ran against these files. Patch hunks must match " +
+		"this text, not the copy you were shown when the attempt began." +
+		offered.String()
+}
+
+// producedFileHeading introduces one file's current text inside a tool result.
+func producedFileHeading(path string) string {
+	return "\n\nThis is " + path + " as it stands now.\n\n"
+}
+
+// producedSourceMaxBytes is how large a file write or a patch may be.
+//
+// Both inherited the loop's four-kilobyte default for an unbounded argument,
+// which is generous for a path and far too small for the thing being written.
+// A produced test file passes four kilobytes as soon as it has a table in it,
+// and a patch that adds a handful of cases to one passes it too.
+//
+// The cost of getting this wrong is not a refused call, which the run could
+// answer. The bound is checked while the turn is decoded, so the whole turn is
+// malformed and the attempt is spent: ladder rung 5 on 2026-08-03 lost attempt
+// 5 to "model tool argument \"patch\" exceeds its bound", then ran out of
+// attempts one line short of passing path-coverage.
+//
+// Thirty-two kilobytes, against the loop's own sixty-four-kilobyte ceiling for
+// a whole tool call. Large enough for any file these runs produce and still
+// half the ceiling, so a single argument cannot crowd out the rest of the call.
+const producedSourceMaxBytes = 32 << 10
+
+// sourcesIfTheyMoved attaches the produced sources, or says they have not
+// changed since the last time they were attached.
+//
+// The echo is there so a hunk is written against the file as it now stands.
+// Once the model has been shown that text, sending it again every round adds
+// prompt without adding information — and prompt is what a round costs. The
+// note keeps the guarantee explicit, so a run is never left guessing whether
+// silence means unchanged or means nobody looked.
+func (narrator *narratingExecutor) sourcesIfTheyMoved() string {
+	// Sent every time, even when nothing has moved.
+	//
+	// Skipping the repeat looked free and was not. A round is given the results
+	// of the round before it and nothing earlier, so text echoed three rounds
+	// ago is not in the prompt at all — and a note saying the files are
+	// unchanged since they were last shown points at something the model can no
+	// longer see. Suppressing the echo suppressed the fix it was optimising.
+	//
+	// Measured on ladder rung 6, 2026-08-03: echoing every time landed 13
+	// patches of 28, echoing only on change landed 9 of 25, while median round
+	// latency fell from 6.5s to 5.0s. The cheaper round was not worth the
+	// missed patch, because a patch that misses costs a whole round of its own.
+	return narrator.producedSourcesNow()
 }

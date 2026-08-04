@@ -28,26 +28,70 @@ func TestAFileBeingPatchedIsShownInFull(t *testing.T) {
 		ExpectedFiles: []string{"cmd/generated/main.go"},
 	}}
 	items := patchContextItems(worktree, steps)
-	if len(items) != 1 {
-		t.Fatalf("%d file(s) offered for a one-file patch step", len(items))
+	// One item for the file, one note carrying the guidance and the revisions.
+	if len(items) != 2 {
+		t.Fatalf("%d item(s) offered for a one-file patch step, want the file "+
+			"and the note", len(items))
+	}
+	if items[0].Path != "cmd/generated/main.go" {
+		t.Fatalf("the first item is %q, not the file being patched",
+			items[0].Path)
 	}
 	if !strings.Contains(items[0].ContentRedacted, "func run() error {") {
 		t.Error("the file's actual text was not included, so no hunk can be " +
 			"matched against it")
 	}
-	// The revision travels with it: a hunk that fails because the file moved is
-	// a different problem from one that never matched.
-	if !strings.Contains(items[0].ContentRedacted, "revision ") {
-		t.Errorf("no revision was named:\n%s", items[0].ContentRedacted)
+	// The content field holds the file and nothing else. Anything appended to
+	// it is read as part of the file, because that is what the field means:
+	// rung 1 on 2026-08-03 spent most of two runs' patch rounds writing hunks
+	// that deleted the explanatory sentence from a file that never contained
+	// it, and every one failed to match.
+	if items[0].ContentRedacted != source {
+		t.Errorf("the content offered for a file is not exactly that file, so "+
+			"a hunk copied from it cannot match what is on disk:\n%q",
+			items[0].ContentRedacted)
+	}
+	// The revision still travels with it, in the note: a hunk that fails
+	// because the file moved is a different problem from one that never
+	// matched.
+	if items[1].Path != "how-to-patch" {
+		t.Fatalf("the note is at %q, which could be mistaken for a file",
+			items[1].Path)
+	}
+	if !strings.Contains(items[1].ContentRedacted, "revision ") {
+		t.Errorf("no revision was named:\n%s", items[1].ContentRedacted)
+	}
+	if !strings.Contains(items[1].ContentRedacted, "cmd/generated/main.go") {
+		t.Errorf("the note does not say which file it is about:\n%s",
+			items[1].ContentRedacted)
 	}
 
+	// One test file, one note. The note is separate for the same reason the
+	// patch guidance is: these items sit in the same prompt as files being
+	// patched, and a sentence inside a field called content, on an item named
+	// after a file, is read as part of that file.
 	tests := producedTestFilesFor(worktree, steps)
-	if len(tests) != 1 {
-		t.Fatalf("%d test file(s) offered beside the file being changed",
-			len(tests))
+	if len(tests) != 2 {
+		t.Fatalf("%d item(s) offered beside the file being changed, want the "+
+			"test file and the note", len(tests))
+	}
+	if tests[0].Path != "cmd/generated/main_test.go" {
+		t.Fatalf("the first item is %q, not the test file", tests[0].Path)
 	}
 	if !strings.Contains(tests[0].ContentRedacted, "func TestRun") {
 		t.Error("the tests that must keep passing were not shown")
+	}
+	if strings.Contains(tests[0].ContentRedacted, "must still pass") {
+		t.Errorf("prose was appended to a test file's content, so a hunk "+
+			"anchored on it can never match:\n%q", tests[0].ContentRedacted)
+	}
+	if tests[1].Path != "tests-that-must-keep-passing" {
+		t.Fatalf("the note is at %q, which could be mistaken for a file",
+			tests[1].Path)
+	}
+	if !strings.Contains(tests[1].ContentRedacted, "must still pass") {
+		t.Errorf("the note does not say the tests must keep passing:\n%s",
+			tests[1].ContentRedacted)
 	}
 }
 
