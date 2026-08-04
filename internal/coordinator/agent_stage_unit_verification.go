@@ -83,15 +83,42 @@ func testsNamingInFiles(
 					return true
 				}
 				var callee string
-				switch target := call.Fun.(type) {
+				// A generic call is instantiated before it is called, and the
+				// instantiation is what wraps the name.
+				//
+				// Err[int](e) parses as an IndexExpr whose X is the identifier,
+				// and Map[A, B](f) as an IndexListExpr, so a switch that knows
+				// only Ident and SelectorExpr sees no callee at all. It matters
+				// most for exactly the functions that cannot be called any
+				// other way: Err[T any](error) Result[T] has no argument to
+				// infer T from, so every call site must instantiate it
+				// explicitly, so every call to it was invisible. completeness
+				// then demanded a direct test for a function that had one,
+				// every attempt — and completeness is a gate that never
+				// escalates, so ladder rung 18 on 2026-08-04 asked for a test
+				// of fp/result.go:Err three times running with the test already
+				// written.
+				target := call.Fun
+				for {
+					switch instantiated := target.(type) {
+					case *ast.IndexExpr:
+						target = instantiated.X
+						continue
+					case *ast.IndexListExpr:
+						target = instantiated.X
+						continue
+					}
+					break
+				}
+				switch named := target.(type) {
 				case *ast.Ident:
 					// A plain call: helper(...)
-					callee = target.Name
+					callee = named.Name
 				case *ast.SelectorExpr:
 					// A method or package-qualified call: value.Method(...)
 					// or package.Function(...). The selector is the name
 					// that matches a produced function.
-					callee = target.Sel.Name
+					callee = named.Sel.Name
 				}
 				if callee == "" || seen[callee] {
 					return true

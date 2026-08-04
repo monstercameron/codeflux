@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-179
+Date: 2026-08-04
+Status: Committed as CL-20260803-169
+Change-ID: CL-20260803-169
+Request-or-TODO: Ladder rung 18
+Goal: Let the completeness gate see a test that exists
+Assumptions: None. The trace repeats the identical demand for fp/result.go:Err
+  across three sendbacks, and Err is the one function in that file whose type
+  parameter cannot be inferred
+Decisions: Unwrapped the instantiation in a loop rather than adding two more
+  cases to the switch. A call can be wrapped more than once in principle, and a
+  loop says "strip the instantiation, whatever shape it took" rather than
+  enumerating shapes
+Files-or-schemas: internal/coordinator/agent_stage_unit_verification.go --
+  testsNamingInFiles
+Validation: Three new tests, including the control that an uncalled generic is
+  still reported
+Failures-or-discarded-approaches: None
+Known-limitations: This reads calls syntactically. A function called only
+  through a variable holding it is still invisible, which was true before and is
+  a different problem
+Next-safe-step: Rung 18 pass 2
+
 Dev-Log: DL-20260803-178
 Date: 2026-08-04
 Status: Committed as CL-20260803-168
