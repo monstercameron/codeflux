@@ -137,13 +137,53 @@ func (execution *AgentExecution) recordDurablePlan(
 	// The loop's step identities and the durable plan's are different
 	// vocabularies, so they are paired by position. A run attributing its work
 	// to a step the plan does not have would be worse than no attribution.
-	result := durablePlan{Revision: recorded.Revision, Steps: map[string]string{}}
+	//
+	// Paired against what the store returned, not against the plan built to
+	// send it. Those are the same object on an ordinary write and need not be
+	// on an idempotent one, where the store answers with the revision it
+	// already had — and the identities the run then adopts would be ones the
+	// store never issued. Every later read of such a step is refused with
+	// "step does not belong to run plan", which is a true sentence about a
+	// situation nothing else reports and which names neither the step nor the
+	// cause. See LAD-003.
+	durableSteps := recorded.Plan.Steps
+	if len(durableSteps) == 0 {
+		// A store that does not echo the plan back leaves nothing to pair
+		// against; the locally built one is all there is, and using it is what
+		// this has always done.
+		durableSteps = plan.Steps
+	}
+	return durablePlan{
+		Revision: recorded.Revision,
+		Steps:    pairStepIdentities(steps, durableSteps),
+	}, nil
+}
+
+// pairStepIdentities maps each of the run's step identities onto the durable
+// one at the same position.
+//
+// By position, because the two are different vocabularies with nothing in
+// common to join on. That is safe only while the two lists describe the same
+// steps in the same order, which is true of a plan the store has just written
+// and is worth saying out loud when the lengths disagree: a step with no
+// durable identity is one every later read is refused for, and the refusal —
+// "step does not belong to run plan" — names neither the step nor the reason.
+func pairStepIdentities(
+	steps []agentloop.PlanStep,
+	durable []storage.AgentPlanStep,
+) map[string]string {
+	if len(durable) != len(steps) {
+		tracef("plan", "the recorded plan holds %d step(s) and the run holds "+
+			"%d, so %d will have no durable identity",
+			len(durable), len(steps), len(steps)-len(durable))
+	}
+	paired := make(map[string]string, len(steps))
 	for index, step := range steps {
-		if index < len(plan.Steps) {
-			result.Steps[step.ID] = plan.Steps[index].ID
+		if index < len(durable) {
+			paired[step.ID] = durable[index].ID
 		}
 	}
-	return result, nil
+	return paired
 }
 
 // durablePlanStepKind maps a loop step onto the plan vocabulary.

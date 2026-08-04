@@ -50,8 +50,39 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-177
+Change-ID: CL-20260803-178
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- LAD-003. The run adopted step identities it generated itself and
+  assumed the store had written the same ones
+Request-or-TODO: LAD-003
+Outcome: The run's step identities and the store's are different vocabularies,
+  paired by position. The pairing read the plan built to send to the store
+  rather than the one the store returned. Those are the same object on an
+  ordinary write and need not be on an idempotent one, where the store answers
+  with the revision it already had -- and the identities the run then adopts are
+  ones the store never issued. Every later read of such a step is refused with
+  "load plan step state: database constraint: step does not belong to run plan",
+  which is a true sentence about a situation nothing else reports and which
+  names neither the step nor the cause. It cost two entire ladder passes on
+  2026-08-04 before the widened stage trace made it legible at all. Pairing now
+  reads recorded.Plan.Steps, falls back to the local build only when the store
+  echoes nothing, and traces the mismatch when the two lengths disagree.
+  Together with CL-20260803-174, which drops an unpaired step rather than
+  keeping it, a run now carries only steps the store knows about.
+Affected-behavior: A run adopts the identities the store issued. A mismatch is
+  visible in the trace instead of surfacing as a constraint violation three
+  attempts later.
+Compatibility-or-migration: None.
+Verification: Three new tests over the extracted pairing: identities come from
+  the store, a short recorded plan leaves the extra steps unpaired and adoption
+  then drops them, and an empty plan pairs nothing rather than half of
+  something. The ladder cannot confirm this today -- the OpenAI account has no
+  credits remaining and every run 429s at about fifteen seconds.
+Dev-Log: DL-20260803-188
+
+Change-ID: CL-20260803-177
+Commit: 622d8c2
 Date: 2026-08-04
 Type: Fix -- a hard gate deferred itself behind every softer one and was never
   reached

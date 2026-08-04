@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-188
+Date: 2026-08-04
+Status: Committed as CL-20260803-178
+Change-ID: CL-20260803-178
+Request-or-TODO: LAD-003
+Goal: Make the run adopt identities the store actually issued
+Assumptions: That recorded.Plan carries the stored steps. Checked: PlanRevision
+  declares a Plan AgentPlan field, which is the plan as the store holds it
+Decisions: Kept the local build as a fallback for a store that echoes no plan,
+  because removing it would turn a degraded write into no mapping at all. Traced
+  rather than refused on a length mismatch, because the caller already handles a
+  missing pairing by dropping the step and this should not become a second way
+  to end a run
+Files-or-schemas: internal/coordinator/agent_plan_record.go --
+  pairStepIdentities extracted so the rule can be tested without a store
+Validation: Three new tests. The pre-existing PIPE048 failure is unchanged and
+  is LAD-002's, not this
+Failures-or-discarded-approaches: None here, though this took three earlier
+  wrong readings to reach, all recorded in LAD-003
+Known-limitations: Unproven against the ladder. It explains the symptom and the
+  message exactly, and the run that produced them cannot be repeated until the
+  account has credits
+Next-safe-step: Rerun rung 19 once credits are restored, and watch for the new
+  "the recorded plan holds N step(s)" line
+
 Dev-Log: DL-20260803-187
 Date: 2026-08-04
 Status: Committed as CL-20260803-177
