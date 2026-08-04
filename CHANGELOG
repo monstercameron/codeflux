@@ -50,8 +50,29 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-167
+Change-ID: CL-20260803-168
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a failed stage's line stopped before its reason
+Request-or-TODO: Diagnosing the registration failures on rungs 16 and 17
+Outcome: Every stage line was truncated to 110 characters, which is enough to
+  skim a satisfied stage and too few to act on a failed one. atom-registration
+  reported "0 of 1 produced atom(s) reached the registry, so no later task can
+  find this work: Calculate: documentation wa" -- the line ends exactly where
+  the only actionable part begins, and reading the reason means opening the
+  run's database. That is the same shape as the provider failures fixed earlier
+  today, which named a category and stopped before the cause. A stage that did
+  not hold now gets 420 characters; a satisfied one keeps its 110, because
+  widening every line would bury the failures among the thirty that passed.
+Affected-behavior: The trace only.
+Compatibility-or-migration: None.
+Verification: Two new tests: a failed stage's detail reaches its reason at the
+  wider width and demonstrably does not at the old one, and a satisfied stage
+  stays short.
+Dev-Log: DL-20260803-178
+
+Change-ID: CL-20260803-167
+Commit: 675c6f9
 Date: 2026-08-04
 Type: Fix -- the decomposition paraphrased away the names the request gave
 Request-or-TODO: Ladder rung 17; standing goal to optimise the prompting

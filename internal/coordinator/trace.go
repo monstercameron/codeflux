@@ -66,9 +66,22 @@ func traceStage(
 	if took > 0 {
 		elapsed = fmt.Sprintf("%6.2fs", took.Seconds())
 	}
+	// A stage that did not hold gets room to say why.
+	//
+	// One hundred and ten characters is enough to skim a satisfied stage and
+	// too few to act on a failed one: "0 of 1 produced atom(s) reached the
+	// registry, so no later task can find this work: Calculate: documentation
+	// wa" is where the only actionable part begins and the line ends. Reading
+	// the reason then means opening the run's database, which is the same
+	// diagnosis gap the provider failures had — a line that names a category
+	// and stops before the cause.
+	width := 110
+	if state != pipeline.StateSatisfied {
+		width = 420
+	}
 	tracef("stage", "%2d %-26s %-16s %-8s %8s  %s",
 		int(stage), name, state, severityOf(stage), elapsed,
-		traceOneLine(detail, 110))
+		traceOneLine(detail, width))
 	if state != pipeline.StateSatisfied && gate != "" {
 		tracef("gate", "   %-26s wanted: %s", "", traceOneLine(gate, 130))
 	}

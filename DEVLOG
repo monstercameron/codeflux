@@ -25,6 +25,25 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-178
+Date: 2026-08-04
+Status: Committed as CL-20260803-168
+Change-ID: CL-20260803-168
+Request-or-TODO: Diagnosing registration failures
+Goal: Be able to read why a stage failed without opening a database
+Assumptions: None. The truncation is visible in every recent ladder log
+Decisions: Widened only the failing lines. The value of a trace is that the
+  important line stands out, and widening all of them would hide the two that
+  matter among the thirty that passed
+Files-or-schemas: internal/coordinator/trace.go
+Validation: Two new tests, one asserting the fixture actually truncates at the
+  old width before asserting it does not at the new one
+Failures-or-discarded-approaches: None
+Known-limitations: 420 is a judgement. A stage with a genuinely longer reason
+  will still be cut, and the run's database remains the complete record
+Next-safe-step: Read the registration rejection on the next run and fix what it
+  names
+
 Dev-Log: DL-20260803-177
 Date: 2026-08-04
 Status: Committed as CL-20260803-167
