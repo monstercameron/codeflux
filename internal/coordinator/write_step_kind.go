@@ -50,3 +50,29 @@ func writeToolFor(kind agentloop.StepKind) executor.ToolName {
 	}
 	return executor.ToolApplyEdit
 }
+
+// writeToolsFor is what a write step actually declares, which for a step that
+// creates a file is two tools rather than one.
+//
+// The kind is resolved once, when the plan is built, from whether the file is
+// on disk. That fact does not survive the attempt: the step's own first call
+// creates the file, and every call after it is revising one that exists. The
+// step kept saying "edit" while the file had moved on, and the two write tools
+// disagreed with each other about it — apply-edit refused the second wholesale
+// rewrite and told the run to send a patch, on a step whose only tool was
+// apply-edit. Ladder rung 9 lost an attempt to it on 2026-08-03: the correct
+// fix for its failing test was written at 41.9s, refused, rewritten at 50.8s,
+// refused again, and the attempt ended reporting that its tests did not pass.
+//
+// So the plan stops trying to predict which tool the round will need and
+// declares both, and the tools decide: apply-edit refuses a rewrite it has
+// already accepted once, and apply-patch has nothing to match against in a file
+// that is not there. A patch step is not widened the same way, because there
+// the file exists from the start and a wholesale rewrite is the churn the patch
+// tool was added to stop.
+func writeToolsFor(kind agentloop.StepKind) []executor.ToolName {
+	if kind == agentloop.StepKindPatch {
+		return []executor.ToolName{executor.ToolApplyPatch}
+	}
+	return []executor.ToolName{executor.ToolApplyEdit, executor.ToolApplyPatch}
+}

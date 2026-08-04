@@ -50,8 +50,73 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-147
+Change-ID: CL-20260803-149
 Commit: pending
+Date: 2026-08-03
+Type: Fix -- a patch could not say which of several identical places it meant,
+  and trailing text became part of the hunk
+Request-or-TODO: Ladder rung 9
+Outcome: A patch names the scope a change is inside in one of two ways: a
+  heading on the "@@" line, or a hunk of nothing but context immediately before
+  the change. Both were discarded -- the heading as envelope, the context block
+  as a hunk that changes nothing -- so a hunk whose context was a closing brace
+  and its indent was searched for across the whole file and matched once per
+  function. Rung 9 sent the same six-line patch six times in a row, told each
+  time to add more context, with the context it needed sitting in the hunk above
+  it. Both forms now travel as a hunk's Anchor: it is never applied and never
+  required to match, and its only effect is to narrow where the hunk is looked
+  for, so a stale scope name costs nothing. Separately, the parser accepts an
+  unprefixed line as context written without its leading space, which is right
+  inside a hunk and wrong after "*** End Patch": a run that finished its patch
+  and wrote a stray "EOF" had that EOF folded into the last hunk, which then
+  asked the file to contain a line no file contains.
+Affected-behavior: apply-patch. Ambiguity refusals fall; a patch followed by
+  trailing text applies.
+Compatibility-or-migration: None. No schema change.
+Verification: Rung 9 passes in 502s after six failing passes. Its patch failures
+  by kind: "does not match anything" fell to 6 of 109 after the end-marker fix,
+  from dominant before it; "matches N places" was 103 of 109 before the anchor
+  fix. Six new tests cover both anchor forms, the line-range control that must
+  not become an anchor, an anchor that resolves to nothing, trailing text after
+  the end marker, and a second envelope whose hunks must not be dropped.
+Dev-Log: DL-20260803-159
+
+Change-ID: CL-20260803-148
+Commit: pending
+Date: 2026-08-03
+Type: Fix -- a step could not use the tool its own first call made necessary,
+  and the suite told a run its writes had not landed when they had
+Request-or-TODO: Ladder rung 9
+Outcome: A write step's kind is resolved once, when the plan is built, from
+  whether the file is on disk. That stops being true the moment the step's first
+  call lands. The two write tools then contradicted each other: apply-edit
+  refuses a second wholesale rewrite and tells the run to send a patch instead,
+  on a step whose only permitted tool was apply-edit. There was no call the run
+  could make that would change the file. Rung 9 lost an attempt to it: the fix
+  for its one failing test was written at 41.9s, refused, rewritten at 50.8s,
+  refused again, and the attempt ended reporting that its tests did not pass. A
+  creating step now declares both write tools and the tools themselves decide --
+  apply-edit refuses a rewrite it has already accepted once, and apply-patch has
+  nothing to match against in a file that is not there. A patch step is not
+  widened, because there the file exists from the start. Separately, the no-op
+  write detection, the staleness flag and the write counter all asked
+  "== apply-edit", written when that was the only write tool, so from the second
+  attempt onward -- when every run switches to patching -- none of them saw a
+  write. A suite answered from the last run therefore told a run "the write did
+  not land" while four patches had applied cleanly and undone each other; it now
+  says which of those two things happened.
+Affected-behavior: A run can revise the file it just created. A suite answered
+  from cache names the real reason it is unchanged.
+Compatibility-or-migration: None. An edit step's plan now declares two
+  completion tools; the loop's contract accepts that pair and no other.
+Verification: Rung 9 reached its integration tests passing for the first time in
+  five passes, and reached path-coverage. New tests cover the pair, the
+  patch-step control, the loop's acceptance of the pair, both notes, and the
+  write-tool set.
+Dev-Log: DL-20260803-158
+
+Change-ID: CL-20260803-147
+Commit: 4237a5d
 Date: 2026-08-03
 Type: Chore -- remove code nothing calls, and satisfy the atom lint the commit
   hook enforces
@@ -78,7 +143,7 @@ Dev-Log: None: this is cleanup carried out to land the entries above, and it is
   nothing.
 
 Change-ID: CL-20260803-146
-Commit: pending
+Commit: 5577f21
 Date: 2026-08-03
 Type: Checkpoint -- unrelated in-flight work swept in at the user's request
 Request-or-TODO: User asked for everything in the working tree to be committed
@@ -101,7 +166,7 @@ Dev-Log: None. This work has no development-log entry because this session did
   not do it.
 
 Change-ID: CL-20260803-145
-Commit: pending
+Commit: 6a5aaa9
 Date: 2026-08-03
 Type: Fix -- the patch tool applied a two-file patch to whichever file was named
   last, and searched every hunk against the whole file
@@ -133,7 +198,7 @@ Verification: Rung 7's patch record across four passes: 4 of 25 landing, then 10
 Dev-Log: DL-20260803-155
 
 Change-ID: CL-20260803-144
-Commit: pending
+Commit: a965e8b
 Date: 2026-08-03
 Type: Fix -- four hard gates were measured only after the loop that was meant to
   inform them, and two of them said things that were not true
@@ -168,7 +233,7 @@ Verification: Rungs 4, 6 and 7 pass, each having failed on the gate the change
 Dev-Log: DL-20260803-153, DL-20260803-154, DL-20260803-155
 
 Change-ID: CL-20260803-143
-Commit: pending
+Commit: 658a746
 Date: 2026-08-03
 Type: Fix -- the attempt budget and the stall tracker disagreed with themselves
 Request-or-TODO: Ladder rungs 5 and 9
@@ -195,7 +260,7 @@ Verification: Rung 5 passes. New tests in
 Dev-Log: DL-20260803-155
 
 Change-ID: CL-20260803-142
-Commit: pending
+Commit: ae366b1
 Date: 2026-08-03
 Type: Fix -- the loop spent whole attempts on mistakes a round could correct
 Request-or-TODO: Ladder rungs 1, 4, 5 and 9
@@ -222,7 +287,7 @@ Verification: Rungs 1, 5, 6, 7 and 8 pass. New tests in internal/agent cover eac
 Dev-Log: DL-20260803-150, DL-20260803-152, DL-20260803-155
 
 Change-ID: CL-20260803-141
-Commit: pending
+Commit: 1fb3d24
 Date: 2026-08-03
 Type: Fix -- the prompt described the run's own files inaccurately
 Request-or-TODO: Ladder rungs 1, 4, 5 and 6
@@ -250,7 +315,7 @@ Verification: Rungs 1 through 8 pass. The patch failure rate for a patch written
 Dev-Log: DL-20260803-151, DL-20260803-152, DL-20260803-153
 
 Change-ID: CL-20260803-140
-Commit: pending
+Commit: 004d2f7
 Date: 2026-08-03
 Type: Fix -- gates that contradicted each other, and a time report that could not
   be read

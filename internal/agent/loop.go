@@ -1336,9 +1336,32 @@ func requestArgument(
 }
 
 type planStepKindContract struct {
-	completionTool     executor.ToolName
+	completionTool executor.ToolName
+	// alsoCompletedBy is the one other tool this kind may declare, or empty
+	// when the kind admits exactly one. It exists for the write kinds, where
+	// which tool is right depends on whether the file is there, and that
+	// changes during the attempt rather than between attempts.
+	alsoCompletedBy    executor.ToolName
 	materialEdit       bool
 	validationRequired bool
+}
+
+// permits reports whether a declared completion-tool set is the one this kind
+// allows.
+//
+// The primary tool is required and must come first, because it is the tool the
+// step is named for and the one a run reaches for by default. The alternate is
+// optional: a plan may declare it or not, and both are the same kind of step.
+func (contract planStepKindContract) permits(declared []executor.ToolName) bool {
+	if len(declared) == 0 || declared[0] != contract.completionTool {
+		return false
+	}
+	if len(declared) == 1 {
+		return true
+	}
+	return len(declared) == 2 &&
+		contract.alsoCompletedBy != "" &&
+		declared[1] == contract.alsoCompletedBy
 }
 
 func validatePlanStepContract(step PlanStep) error {
@@ -1346,8 +1369,7 @@ func validatePlanStepContract(step PlanStep) error {
 	if !ok {
 		return fmt.Errorf("%w: step kind is invalid", ErrPlanContract)
 	}
-	if len(step.CompletionTools) != 1 ||
-		step.CompletionTools[0] != contract.completionTool {
+	if !contract.permits(step.CompletionTools) {
 		return fmt.Errorf(
 			"%w: a %s step is completed by %s and this one declares %v",
 			ErrPlanContract, step.Kind, contract.completionTool,
@@ -1425,7 +1447,15 @@ func planStepContract(kind StepKind) (planStepKindContract, bool) {
 	case StepKindEdit:
 		return planStepKindContract{
 			completionTool: executor.ToolApplyEdit,
-			materialEdit:   true, validationRequired: true,
+			// A step is planned as an edit because the file it names does not
+			// exist yet, and it stops being true the moment the step's first
+			// call lands. The rest of the attempt is revising a file that is
+			// now there, which is what apply-patch is for, so an edit step
+			// carries both and the write tools themselves decide which is
+			// right: apply-edit refuses a second wholesale rewrite, and
+			// apply-patch cannot create a file it has no context for.
+			alsoCompletedBy: executor.ToolApplyPatch,
+			materialEdit:    true, validationRequired: true,
 		}, true
 	case StepKindPatch:
 		return planStepKindContract{

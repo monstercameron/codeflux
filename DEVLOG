@@ -25,6 +25,74 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-159
+Date: 2026-08-03
+Status: Committed as CL-20260803-149
+Change-ID: CL-20260803-149
+Request-or-TODO: Ladder rung 9
+Goal: Stop the patch tool refusing patches that said exactly where they went
+Assumptions: That a hunk of pure context immediately before a change is naming
+  the scope of that change, rather than being decorative. Checked against the
+  patches rung 9 actually sent: every one of them used the two-marker form with
+  the enclosing test function in the first block
+Decisions: An anchor never causes a failure. It narrows the search and nothing
+  else, so an anchor naming something the file no longer has -- a renamed
+  function, a stale copy -- leaves the hunk exactly as findable as it was
+  without one. Refusing on a bad anchor would have converted a class of
+  successful patches into a new class of failures, which is the opposite of the
+  point. A context block AFTER the last change still anchors nothing and is
+  still dropped, which is the case the earlier forgiveness was added for
+Files-or-schemas: internal/executor/patch_tool.go -- PatchHunk gains Anchor;
+  ParsePatch folds context-only hunks and "@@" headings into it; ApplyPatch
+  searches from just past a resolved anchor. No storage schema touched
+Validation: internal/executor passes. Six new tests, each run against the
+  previous implementation first: the context-block anchor records
+  "hunk 2 matches 2 places", the heading anchor records "does not match
+  anything", the trailing-EOF case records a hunk whose Before ends in EOF.
+  Rung 9 passes end to end in 502s
+Failures-or-discarded-approaches: First attempt treated the anchor as an
+  ordinary context-only hunk inside ApplyPatch, which never ran: ParsePatch had
+  already dropped every context-only hunk before ApplyPatch saw the request.
+  Second attempt appended a "@@" heading to the hunk's own context, which made
+  the hunk unmatchable -- the heading and the hunk body are not contiguous in
+  the file. The anchor has to be a separate field for that reason
+Known-limitations: Ambiguity is still possible when neither form is used. The
+  message asking for more context is unchanged for that case
+Next-safe-step: Rung 10
+
+Dev-Log: DL-20260803-158
+Date: 2026-08-03
+Status: Committed as CL-20260803-148
+Change-ID: CL-20260803-148
+Request-or-TODO: Ladder rung 9
+Goal: Let an attempt change the file it created, and stop misreporting why a
+  suite result is unchanged
+Assumptions: None. Both defects are visible in the rung 9 pass 4 trace: the
+  refusal at 41.9s naming a tool the round did not offer, and the "unchanged"
+  answers at 66.9s and 76.1s after four patches had applied
+Decisions: Widened the plan rather than relaxing the refusal. Refusing a second
+  wholesale rewrite is right -- it is the churn the patch tool exists to stop --
+  and the defect was that the alternative it names was not callable. Only the
+  edit kind is widened; a patch step's file exists from the start, so nothing
+  about it changes during the attempt and admitting a rewrite there would
+  reopen the churn
+Files-or-schemas: internal/agent/loop.go -- planStepKindContract gains
+  alsoCompletedBy and a permits method; internal/coordinator/write_step_kind.go
+  -- writeToolsFor; agent_planning.go and agent_narration.go call it;
+  agent_narration.go -- isWriteTool, writesSinceLastTest, and a two-way
+  unchangedTestNote
+Validation: internal/agent passes. New coordinator tests, each run against the
+  previous implementation first: the pair test records "an edit step permits
+  [apply-edit], so the run has no way to revise the file its first call
+  created". Rung 9 reached passing integration tests for the first time
+Failures-or-discarded-approaches: Considered relaxing the rewrite refusal when
+  apply-patch is unavailable. Rejected: on attempt one every write step is an
+  edit step, so that is the common case, and it would have removed the churn
+  control entirely rather than fixing the contradiction
+Known-limitations: The step kind is still resolved once per attempt. Only the
+  tool set is now tolerant of the file moving underneath it
+Next-safe-step: DL-20260803-159
+
 Dev-Log: DL-20260803-157
 Date: 2026-08-03
 Status: Committed as CL-20260803-146

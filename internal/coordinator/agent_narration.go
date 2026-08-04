@@ -63,6 +63,10 @@ type narratingExecutor struct {
 	// turn of the model's attention. Ladder rung 3 ran the same failing test
 	// three times in a row without an edit between them.
 	lastTestFingerprint string
+	// writesSinceLastTest counts the writes that landed since the suite
+	// last ran, so a suite answered from that run can say whether nothing
+	// was written or whether what was written cancelled itself out.
+	writesSinceLastTest int
 	lastTestOutput      string
 	lastTestFailed      bool
 	// worktree is where the produced work lives, needed to fingerprint it.
@@ -118,8 +122,14 @@ func (narrator *narratingExecutor) ExecuteTool(
 	}
 	// The tree as it stands before a write, so a write that changes nothing can
 	// be told from one that does.
+	//
+	// Both write tools, because a patch that changes nothing is the same event
+	// as a rewrite that changes nothing and reads to the run as the same
+	// progress. This checked apply-edit alone, so a run that had moved to
+	// patching — which is every run after its first attempt — was no longer
+	// told when its writes did nothing.
 	beforeWrite := ""
-	if executor.ToolName(name) == executor.ToolApplyEdit && narrator.worktree != "" {
+	if isWriteTool(executor.ToolName(name)) && narrator.worktree != "" {
 		beforeWrite = producedTreeDigest(narrator.worktree)
 	}
 
@@ -155,7 +165,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 			SchemaVersion: executor.ToolSchemaVersion,
 			State:         "succeeded",
 			StdoutRedacted: strings.TrimSpace(narrator.lastTestOutput) +
-				unchangedTestNote(),
+				unchangedTestNote(narrator.writesSinceLastTest),
 		}
 		if narrator.lastTestFailed {
 			result.State = "failed"
@@ -287,7 +297,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 		tracef("tool", "%-12s %-10s %s", name, "unchanged",
 			"same command, same files as the last run")
 		result.StdoutRedacted = strings.TrimSpace(result.StdoutRedacted) +
-			unchangedTestNote()
+			unchangedTestNote(narrator.writesSinceLastTest)
 	}
 	// Every patch is answered with the file as it now stands.
 	//
@@ -357,6 +367,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 		narrator.validationFailed =
 			completed != domain.CommandExecutionStateSucceeded
 		narrator.filesChangedSinceValidation = false
+		narrator.writesSinceLastTest = 0
 		narrator.lastTestFingerprint = producedTreeDigest(narrator.worktree)
 		narrator.lastTestOutput = strings.TrimSpace(
 			result.StdoutRedacted + "\n" + result.StderrRedacted)
@@ -370,7 +381,7 @@ func (narrator *narratingExecutor) ExecuteTool(
 	// 5 wrote an identical main.go twice in one attempt. Saying so is the
 	// remedy — the model believes it edited something, and the only way it
 	// finds out otherwise is an identical failure two steps later.
-	if executor.ToolName(name) == executor.ToolApplyEdit &&
+	if isWriteTool(executor.ToolName(name)) &&
 		completed == domain.CommandExecutionStateSucceeded &&
 		beforeWrite != "" && beforeWrite == producedTreeDigest(narrator.worktree) {
 		tracef("tool", "%-12s %-10s %s", name, "no-op",
@@ -382,11 +393,15 @@ func (narrator *narratingExecutor) ExecuteTool(
 			summary+" — changed nothing")
 		return result, nil
 	}
-	if executor.ToolName(name) == executor.ToolApplyEdit &&
+	if isWriteTool(executor.ToolName(name)) &&
 		completed == domain.CommandExecutionStateSucceeded {
 		// A successful write supersedes whatever the last test run judged.
 		// A failed one changed nothing, so it leaves the verdict standing.
 		narrator.filesChangedSinceValidation = true
+		// Counted so that a suite answered from the last run can tell the two
+		// reasons apart: nothing was written at all, or things were written and
+		// they cancelled each other out.
+		narrator.writesSinceLastTest++
 	}
 	operationNode := narrator.recordInGraph(request, name, detail,
 		completed == domain.CommandExecutionStateSucceeded)
@@ -593,7 +608,7 @@ func agentPlanSteps(worktree, requirement string) []agentloop.PlanStep {
 			SummaryRedacted: "Write " + file + " — " + requirementSummary(requirement),
 			MaterialEdit:    true, ValidationRequired: true,
 			ExpectedFiles:   []string{file},
-			CompletionTools: []executor.ToolName{writeToolFor(kind)},
+			CompletionTools: writeToolsFor(kind),
 		})
 	}
 	return append(steps, agentloop.PlanStep{
@@ -1103,11 +1118,43 @@ func noOpWriteNote() string {
 // records the tool in the run's journal; the loop then refused the turn and
 // ended the run, and ladder rung 3 lost all thirty-seven of its remaining
 // stages to a saving of one test run.
-func unchangedTestNote() string {
-	return "\n\n[codeflux] Not one byte of the produced files changed since " +
-		"the last time these tests ran, so this result is that result. If you " +
-		"meant to change something, the write did not land — check the path " +
-		"and the content, and do not run the tests again until a file differs."
+func unchangedTestNote(writes int) string {
+	note := "\n\n[codeflux] Not one byte of the produced files changed since " +
+		"the last time these tests ran, so this result is that result. "
+	if writes == 0 {
+		return note + "Nothing was written since that run. If you meant to " +
+			"change something, the write did not land — check the path and " +
+			"the content, and do not run the tests again until a file differs."
+	}
+	// The writes landed. Sending the run to check its paths and its content
+	// would send it looking for a failure that did not happen: rung 9 on
+	// 2026-08-03 spent attempt 2 adding a guard, removing it again, adding it
+	// back and removing it again, and was told twice that its write had not
+	// landed while all four patches had applied cleanly.
+	return note + plural(writes, "write") + " landed since that run and the " +
+		"files are byte for byte what they were, so they undid each other. " +
+		"The failure below is still the current failure. Decide what " +
+		"behaviour the failing test is asking for and change that, rather " +
+		"than moving the same lines back and forth."
+}
+
+// plural renders a small count with its noun, for a sentence a run reads once.
+func plural(count int, noun string) string {
+	if count == 1 {
+		return "1 " + noun
+	}
+	return itoaPlan(count) + " " + noun + "s"
+}
+
+// isWriteTool is the one place that says which tools change produced files.
+//
+// It had been spelled out as "== apply-edit" in four places, written when
+// apply-edit was the only write tool there was. apply-patch was added and none
+// of them were revisited, so the no-op detection, the staleness flag and the
+// write counter all stopped seeing the writes that every attempt after the
+// first actually makes.
+func isWriteTool(name executor.ToolName) bool {
+	return name == executor.ToolApplyEdit || name == executor.ToolApplyPatch
 }
 
 // maximumPatchEchoBytes bounds the file a failed patch is answered with.

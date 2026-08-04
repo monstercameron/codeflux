@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	agentloop "codeflux.dev/codeflux/internal/agent"
-	"codeflux.dev/codeflux/internal/executor"
 	"codeflux.dev/codeflux/internal/providers"
 )
 
@@ -185,7 +184,7 @@ func stepsForBehaviours(
 			SummaryRedacted: "Write " + file + " — " + shared,
 			MaterialEdit:    true, ValidationRequired: true,
 			ExpectedFiles:   []string{file},
-			CompletionTools: []executor.ToolName{writeToolFor(kind)},
+			CompletionTools: writeToolsFor(kind),
 		}
 		steps = append(steps, step)
 	}
