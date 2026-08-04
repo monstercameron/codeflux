@@ -54,3 +54,32 @@ func TestThePropertyInstructionSaysWhatAPropertyIs(t *testing.T) {
 			instruction)
 	}
 }
+
+// TestThePropertyInstructionShowsTheShape is what two tellings could not do.
+//
+// The instruction described a property well — a round trip, a sorted result
+// holding its input's elements, a total equalling the sum of its parts — and
+// ladder rung 18 on 2026-08-04 read that twice and wrote twenty-two tests
+// without a loop in any of them, on a rung whose requirement asks for the monad
+// laws. A law is a property in the only sense this gate means, so the idea was
+// not the missing part. The five lines that say what an answer looks like were.
+func TestThePropertyInstructionShowsTheShape(t *testing.T) {
+	instruction := propertyTestInstruction("all 22 test(s) check a single example")
+
+	// A loop over several inputs, which is the whole of what the gate detects.
+	if !strings.Contains(instruction, "for _, in := range") {
+		t.Errorf("the instruction describes a property and never shows one, "+
+			"which is what two tellings already failed to convey:\n%s",
+			instruction)
+	}
+	// An assertion inside it, so the example is a test and not a loop.
+	if !strings.Contains(instruction, "t.Errorf") {
+		t.Errorf("the example loops and asserts nothing:\n%s", instruction)
+	}
+	// And it stays an example rather than becoming a specification: the run
+	// has to choose the relationship, which is the part that needs thought.
+	if !strings.Contains(instruction, "The relationship is the part to think about") {
+		t.Errorf("nothing tells the run the loop is the easy part:\n%s",
+			instruction)
+	}
+}

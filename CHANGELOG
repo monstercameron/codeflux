@@ -50,8 +50,31 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-171
+Change-ID: CL-20260803-172
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- the property instruction described the answer and never showed one
+Request-or-TODO: Ladder rung 18; standing goal to optimise the prompting
+Outcome: The instruction says what a property is, in the code's terms and not in
+  testing vocabulary: a decoded value round-tripping to what encoded it, a
+  sorted result holding its input's elements, a total equalling the sum of its
+  parts. Rung 18 read that twice -- the repeat ask landed, and it did work -- and
+  wrote twenty-two tests without a loop in any of them, on a rung whose
+  requirement asks for the monad laws. A law is a property in the only sense
+  this gate means, so the idea was not what was missing. Five lines of Go now
+  show the shape: one range over a handful of inputs, one assertion inside it.
+  The instruction still leaves the relationship to the run, because choosing it
+  is the part that needs thought and the loop is not.
+Affected-behavior: The atom-property-tests instruction carries a worked example.
+Compatibility-or-migration: None.
+Verification: A new test asserting the example loops, asserts, and still leaves
+  the relationship open. Checked first, against the produced worktree rather
+  than the trace, that the run really had written no loop: the gate was right
+  and the detector was not at fault.
+Dev-Log: DL-20260803-182
+
+Change-ID: CL-20260803-171
+Commit: 4c2a1bd
 Date: 2026-08-04
 Type: Fix -- a hard gate was asked for once and then buried, and the registry
   gap is recorded

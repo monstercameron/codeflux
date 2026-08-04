@@ -515,7 +515,23 @@ func propertyTestInstruction(detail string) string {
 		"holds the same elements as its input, that a total equals the sum of " +
 		"its parts, that an operation on two values agrees with the operator " +
 		"it implements. Keep the values small enough that overflow is not the " +
-		"thing under test."
+		"thing under test.\n\n" +
+		// The shape, not only the idea.
+		//
+		// Described and not shown, this was read and not acted on. Ladder rung
+		// 18 on 2026-08-04 was told twice, in exactly the words above, and
+		// wrote twenty-two tests without a loop in any of them — on a rung
+		// whose requirement asks for the monad laws, which are properties in
+		// the only sense this gate means. What was missing was the five lines
+		// that say what an answer looks like.
+		"The shape wanted, which is all it has to be:\n\n" +
+		"\tfor _, in := range []int{0, 1, 2, 7, 50} {\n" +
+		"\t\tif got := Decode(Encode(in)); got != in {\n" +
+		"\t\t\tt.Errorf(\"round trip of %d gave %d\", in, got)\n" +
+		"\t\t}\n" +
+		"\t}\n\n" +
+		"One loop, several inputs, one relationship asserted for every one of " +
+		"them. The relationship is the part to think about; the loop is not."
 }
 
 // hostileInputInstruction is what a run is told about input it mishandles.

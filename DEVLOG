@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-182
+Date: 2026-08-04
+Status: Committed as CL-20260803-172
+Change-ID: CL-20260803-172
+Request-or-TODO: Ladder rung 18
+Goal: Convey a shape that two descriptions did not
+Assumptions: None, and one was checked rather than assumed. Before changing the
+  instruction I opened the produced worktree from pass 4 and counted the loops
+  in its test files. There were none: my first grep found the word "for" inside
+  a comment and a string and I nearly acted on that, which would have sent me
+  hunting a detector defect that does not exist
+Decisions: An example rather than a stricter rule. The gate detects any loop in
+  any test, which is deliberately loose, and tightening it would fail runs that
+  are doing the right thing. What was missing was on the instruction side
+Files-or-schemas: internal/coordinator/agent_outstanding.go --
+  propertyTestInstruction
+Validation: Three property-instruction tests now, one of them asserting the
+  example does not become a specification
+Failures-or-discarded-approaches: Wrote the change through a Python heredoc
+  first and mangled every escape in the Go string literal, for the sixth or
+  seventh time this session. Reverted and used the editor. Multi-line Go string
+  literals do not go through heredocs
+Known-limitations: Whether an example moves this model is unmeasured until the
+  next pass reports
+Next-safe-step: Rung 18 pass 5
+
 Dev-Log: DL-20260803-181
 Date: 2026-08-04
 Status: Committed as CL-20260803-171
