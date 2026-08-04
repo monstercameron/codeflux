@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-184
+Date: 2026-08-04
+Status: Committed as CL-20260803-174
+Change-ID: CL-20260803-174
+Request-or-TODO: Ladder rung 18
+Goal: Make a plan-identity mismatch say what it is instead of ending the run
+Assumptions: None, and the one hypothesis I had was tested and refuted. The
+  error appears only in the two passes after rung 18's requirement gained its
+  purity definition, so I checked whether the new sentence -- which lists
+  database/sql and math/rand -- was being read as naming files by the
+  requirement analyser. It is not: requirementNamesNoFile still reports true and
+  filesNamedIn still returns the fallback pair
+Decisions: Fixed the mismatch handling rather than chasing the trigger. A step
+  the durable plan does not know cannot be the subject of a tool call, so
+  keeping it can only produce refusals; dropping it and saying so is right
+  whatever put it there. The trigger stays open and the next run's trace will
+  name the step
+Files-or-schemas: internal/coordinator/agent_execution.go --
+  adoptDurablePlanSteps
+Validation: Three new tests, including the two controls that stop this becoming
+  a way to lose work
+Failures-or-discarded-approaches: Two wrong readings before this. First that the
+  requirement text was being parsed as file paths, refuted above. Second that
+  the durable plan was being refused outright, which the log contradicts -- "the
+  plan could not be recorded" appears zero times in both failing passes
+Known-limitations: The cause is still unidentified. This makes it visible and
+  non-fatal; it does not explain why a step went unmapped
+Next-safe-step: Read the plan trace on pass 8 and follow the named step
+
 Dev-Log: DL-20260803-183
 Date: 2026-08-04
 Status: Committed as CL-20260803-173

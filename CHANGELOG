@@ -50,8 +50,40 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-173
+Change-ID: CL-20260803-174
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a step the recorded plan did not know was kept, and every read of
+  it was refused
+Request-or-TODO: Ladder rung 18
+Outcome: Adoption maps each step's local identity onto the one the store
+  recorded. A step with no mapping was kept with its local identity, and the
+  store then refuses it on every read: "load plan step state: database
+  constraint: step does not belong to run plan". That arrives mid-attempt, names
+  no step, and reaches the coordinator as an unrecognised loop error -- which
+  costs an attempt each time and, three times over, the run. Rung 18 on
+  2026-08-04 lost two entire passes to it, ending in seventy-seven and
+  a hundred and forty-two seconds, and the trace said only "the loop refused the
+  attempt". Such a step is now dropped rather than kept, and the drop is traced
+  with the identities: a step the plan never recorded is one no tool call can be
+  attributed to, so keeping it offers the run work it will be refused for doing.
+Affected-behavior: A plan-adoption mismatch is visible and survivable instead of
+  fatal three attempts later.
+Compatibility-or-migration: None.
+Verification: Three new tests: an unmapped step is dropped while the mapped ones
+  take their durable identities, a fully recorded plan comes back whole and in
+  order, and a run with no recorded plan keeps its own identities so a degraded
+  run does not become no run.
+Considered-and-rejected: Reverting rung 18's requirement, which is the only
+  thing that changed between the last clean pass and the two that failed. The
+  correlation is real and unexplained -- filesNamedIn still reports the
+  requirement as naming no file, so the layout path is unchanged, and the plan
+  was recorded successfully in both failing passes. Fixing the silent mismatch
+  is right whatever triggered it, and the trace will now name the step.
+Dev-Log: DL-20260803-184
+
+Change-ID: CL-20260803-173
+Commit: b8f0891
 Date: 2026-08-04
 Type: Fix -- three defects rung 18 exposed in sequence: an undefined word in the
   requirement, a template that taught the wrong shape, and a slip priced as an

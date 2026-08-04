@@ -1922,11 +1922,31 @@ func adoptDurablePlanSteps(
 		return steps
 	}
 	adopted := make([]agentloop.PlanStep, 0, len(steps))
+	var unmapped []string
 	for _, step := range steps {
 		if durable, present := plan.Steps[step.ID]; present {
 			step.ID = durable
+			adopted = append(adopted, step)
+			continue
 		}
-		adopted = append(adopted, step)
+		// A step the durable plan does not know is dropped, and said so.
+		//
+		// It used to be kept with its local identity, which the store then
+		// refuses on every read: "load plan step state: database constraint:
+		// step does not belong to run plan". That arrives mid-attempt, names no
+		// step, and reaches the coordinator as an unrecognised loop error —
+		// which costs an attempt each time and, three times over, the run.
+		// Ladder rung 18 on 2026-08-04 lost two whole passes to it and the
+		// trace said only "the loop refused the attempt".
+		//
+		// Dropped rather than kept, because a step the plan never recorded is
+		// one no tool call can be attributed to: keeping it offers the run work
+		// it will be refused for doing.
+		unmapped = append(unmapped, step.ID)
+	}
+	if len(unmapped) > 0 {
+		tracef("plan", "%d step(s) are not in the recorded plan and were "+
+			"dropped: %s", len(unmapped), strings.Join(unmapped, ", "))
 	}
 	return adopted
 }
