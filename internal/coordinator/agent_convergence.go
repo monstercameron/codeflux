@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -192,6 +193,15 @@ func (tracker *convergence) converging() bool {
 	//
 	// The regression-prone gates keep their lower bar, because losing a
 	// property you had already satisfied is a cycle at two and record says so.
+	// Counted per failure and deliberately not per gate.
+	//
+	// Counting visits to a gate instead would read "cleared example 1, now
+	// example 2 fails" as going round, when it is the clearest possible sign of
+	// progress. Ladder rung 15 on 2026-08-03 returned to integration-tests
+	// three times with a different set of tests red each time, and that is the
+	// same shape: some fixed, others revealed. Escalating on it would raise the
+	// price of every run that is working to catch the few that are not, which
+	// is the trade TestARunThatConvergesCostsWhatItAlwaysDid exists to refuse.
 	for print, count := range tracker.seen {
 		threshold := tracker.settings.StallBeforeEscalation
 		if gate, _, found := strings.Cut(print, fingerprintSeparator); found &&
@@ -438,8 +448,53 @@ var varying = regexp.MustCompile(
 		`([A-Za-z]:\\[^\s:]+|/tmp/[^\s:]+|/var/folders/[^\s:]+)|` + // temp paths
 		`(\b[0-9]{4,}\b)`) // long numbers: pids, seeds, sizes
 
+// failingTests matches the line a Go test suite prints for each test that
+// failed, capturing the name.
+var failingTests = regexp.MustCompile(`(?m)^\s*--- FAIL: (\S+)`)
+
+// suiteFingerprint identifies a failing suite by which tests failed.
+//
+// A suite failure's prose is dominated by the values it compared, and those
+// change on every round a run spends getting closer without arriving. The thing
+// that identifies the failure is which tests are red. Ladder rung 15 on
+// 2026-08-03 failed TestGivesLeftmostGapsRemainderSpaces and
+// TestDistributesExtraSpacesEvenly eighteen times each across eight attempts,
+// and escalated for none of them, because each round's expected-versus-actual
+// text was new.
+//
+// Empty when the failure is not a suite run, so every other failure keeps the
+// prose fingerprint it has always had. Fixing one of three failing tests does
+// change this, which is right: that is progress, and the tracker should see it.
+func suiteFingerprint(failure string) string {
+	matches := failingTests.FindAllStringSubmatch(failure, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	seen := map[string]bool{}
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		// Subtests are the parent's failure said again. The parent line is
+		// always present, so counting both would make one failing test look
+		// like several and a run splitting a test look like a new failure.
+		name := match[1]
+		if slash := strings.Index(name, "/"); slash >= 0 {
+			name = name[:slash]
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return "failing tests: " + strings.Join(names, " ")
+}
+
 // failureFingerprint reduces a failure to what identifies it.
 func failureFingerprint(failure string) string {
+	if suite := suiteFingerprint(failure); suite != "" {
+		return suite
+	}
 	reduced := varying.ReplaceAllString(failure, "#")
 	reduced = strings.ToLower(strings.Join(strings.Fields(reduced), " "))
 	// Long output is dominated by its tail — a stack trace, a diff of every

@@ -178,25 +178,39 @@ func TestAnUntestedAtomIsReported(t *testing.T) {
 }
 
 // TestASingleExampleSuiteIsNotAPropertySuite keeps the two apart.
+//
+// Both fixtures declare an atom that takes a value, and both assert the gate
+// did not skip. Without that the fixtures were "package main; func main() {}",
+// which has no input space at all: the gate correctly declines to judge such a
+// program, a declined outcome is not held, and so the single-example half
+// passed for the wrong reason while the table-driven half failed for it.
 func TestASingleExampleSuiteIsNotAPropertySuite(t *testing.T) {
+	const atom = "package main\n\n" +
+		"// Double returns twice value.\nfunc Double(value int) int {\n" +
+		"\treturn value * 2\n}\n\nfunc main() {}\n"
+
 	single := writeWorktree(t, map[string]string{
-		"cmd/thing/main.go": "package main\n\nfunc main() {}\n",
+		"cmd/thing/main.go": atom,
 		"cmd/thing/main_test.go": "package main\n\nimport \"testing\"\n\n" +
-			"func TestOne(t *testing.T) {\n\tif 1 != 1 {\n\t\tt.Fatal(\"no\")\n\t}\n}\n",
+			"func TestOne(t *testing.T) {\n\tif Double(1) != 2 {\n\t\tt.Fatal(\"no\")\n\t}\n}\n",
 	})
-	if checkPropertyTests(single).Held {
-		t.Error("a suite of one example was accepted as examining a property")
+	if outcome := checkPropertyTests(single); outcome.Held || outcome.Skipped {
+		t.Errorf("a suite of one example over an atom that takes a value is "+
+			"the defect this gate exists to name, got held=%t skipped=%t: %s",
+			outcome.Held, outcome.Skipped, outcome.Detail)
 	}
 
 	tabular := writeWorktree(t, map[string]string{
-		"cmd/thing/main.go": "package main\n\nfunc main() {}\n",
+		"cmd/thing/main.go": atom,
 		"cmd/thing/main_test.go": "package main\n\nimport \"testing\"\n\n" +
 			"func TestMany(t *testing.T) {\n" +
 			"\tfor _, value := range []int{1, 2, 3} {\n" +
-			"\t\tif value < 1 {\n\t\t\tt.Fatal(\"no\")\n\t\t}\n\t}\n}\n",
+			"\t\tif Double(value) != value*2 {\n\t\t\tt.Fatal(\"no\")\n\t\t}\n\t}\n}\n",
 	})
-	if !checkPropertyTests(tabular).Held {
-		t.Error("a table-driven suite was not recognised as examining a set")
+	if outcome := checkPropertyTests(tabular); !outcome.Held {
+		t.Errorf("a table-driven suite was not recognised as examining a set, "+
+			"got held=%t skipped=%t: %s",
+			outcome.Held, outcome.Skipped, outcome.Detail)
 	}
 }
 

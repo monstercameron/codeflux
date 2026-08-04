@@ -50,8 +50,46 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-150
+Change-ID: CL-20260803-151
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a failing suite was identified by its prose, so a run circling two
+  red tests never counted a repeat; and an infrastructure death said nothing
+  about what killed it
+Request-or-TODO: Ladder rung 15
+Outcome: A suite failure's text is mostly the values it compared, and a run
+  getting closer without arriving changes those on every round. What identifies
+  the failure is which tests are red. Rung 15 failed
+  TestGivesLeftmostGapsRemainderSpaces and TestDistributesExtraSpacesEvenly
+  eighteen times each across eight attempts and escalated for none of them; with
+  the suite identified by its failing tests it escalated on attempt 3. Subtests
+  fold into their parent, so splitting one test into a table is not a new
+  failure, and clearing one of three red tests still reads as the progress it is.
+  Separately, an infrastructure death traced only its classification --
+  "retry-budget-exhausted" -- which says the adapter gave up and not what it gave
+  up on: three ladder runs died there naming neither a status code nor a message.
+  The refusal's own text is now in the line, and it identified the cause as a
+  transport failure on long max-effort requests rather than anything the pipeline
+  was doing. Also corrects TestASingleExampleSuiteIsNotAPropertySuite, whose
+  fixtures were "package main; func main() {}" -- a program with no input space,
+  which the property gate now correctly declines to judge, so its single-example
+  half passed for the wrong reason and its table-driven half failed for it.
+Affected-behavior: A run circling the same red tests escalates. An
+  infrastructure failure names its cause.
+Compatibility-or-migration: None.
+Verification: Rung 15 escalated at attempt 3 rather than 9. Four new tests cover
+  the suite fingerprint, the subtest fold, the progress control and the
+  non-suite control, each run against the previous implementation first.
+Considered-and-rejected: Counting visits per gate rather than per failure, to
+  catch a run alternating between two gates. It reads "cleared example 1, now
+  example 2 fails" as going round when it is the clearest sign of progress, and
+  would raise the price of every working run to catch the few that are not --
+  the trade TestARunThatConvergesCostsWhatItAlwaysDid exists to refuse. There is
+  no evidence escalating earlier would have helped rung 15.
+Dev-Log: DL-20260803-161
+
+Change-ID: CL-20260803-150
+Commit: 5c33239
 Date: 2026-08-03
 Type: Fix -- a repeated finding read as a new one because it had moved down the
   file

@@ -25,6 +25,40 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-161
+Date: 2026-08-04
+Status: Committed as CL-20260803-151
+Change-ID: CL-20260803-151
+Request-or-TODO: Ladder rung 15
+Goal: Let the tracker see a run circling the same red tests, and let an
+  infrastructure death be diagnosed from its trace
+Assumptions: That a suite failing the same two tests twice is one failure even
+  when the compared values differ. Checked against rung 15's trace: the same two
+  test names appear eighteen times each
+Decisions: Suite failures are keyed by test name and everything else keeps the
+  prose fingerprint, so the change says nothing about a compiler error or a
+  review finding. Subtests fold into the parent because Go prints both, and
+  counting both would make a run that split a test into a table look like it had
+  more failures than before
+Files-or-schemas: internal/coordinator/agent_convergence.go -- suiteFingerprint
+  and the failingTests pattern; agent_execution.go -- the infra trace carries
+  the refusal text; agent_stage_checks_test.go -- the property fixture gains an
+  atom that takes a value
+Validation: The convergence and fingerprint suites pass. Four new tests, each
+  run against the previous implementation first. Rung 15 escalated at attempt 3
+  rather than 9
+Failures-or-discarded-approaches: Tried counting visits per gate to catch a run
+  alternating between two gates. It broke
+  TestARunThatConvergesCostsWhatItAlwaysDid, and correctly so: a run that clears
+  one acceptance example and is then shown the next is converging, and the rule
+  called it stalled. Reverted rather than weakened, because there is no evidence
+  escalating earlier would have helped the run that suggested it
+Known-limitations: rung 15 still fails. Its remaining problem is a transport
+  failure on long max-effort requests, which the trace now names and which is
+  not something the pipeline caused
+Next-safe-step: Establish whether the max-effort transport failure is this
+  machine's network or the provider
+
 Dev-Log: DL-20260803-160
 Date: 2026-08-03
 Status: Committed as CL-20260803-150

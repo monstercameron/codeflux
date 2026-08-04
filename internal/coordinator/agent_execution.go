@@ -493,10 +493,17 @@ func (execution *AgentExecution) Run(
 	sendBackInfrastructure := func(refusal error, instruction string) {
 		decision := decideCircuit(
 			refusal, infrastructure, checkpoint.taken, time.Now())
+		// The refusal's own text goes in the line, because the classification
+		// alone cannot be acted on. "retry-budget-exhausted" says the adapter
+		// gave up and not what it gave up on, so a run killed by a provider is
+		// indistinguishable from a run killed by a bad request until somebody
+		// reproduces it — three ladder runs on 2026-08-03 died here and the
+		// trace named neither a status code nor a message.
 		tracef("infra", "gate=provider-availability outcome=%s "+
-			"disposition=%s worktree_changed=false budget=%d",
+			"disposition=%s worktree_changed=false budget=%d because=%s",
 			providerOutcomeOf(refusal), decision.Disposition,
-			infrastructure.AttemptsRemaining)
+			infrastructure.AttemptsRemaining,
+			traceOneLine(refusal.Error(), 220))
 		failure = instruction
 		sentBackBecause = "the provider did not answer"
 		// The work's budget is refunded because the run learned nothing. The
