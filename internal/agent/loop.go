@@ -115,6 +115,9 @@ func (loop *ExecutionLoop) Run(
 	factualEvents := append([]FactualEvent(nil), input.FactualEvents...)
 	started := loop.dependencies.Now().UTC()
 	deadline := started.Add(input.Limits.MaximumWallClock)
+	// writesSinceContextRead counts material writes made since the repository
+	// context was last read, so it is re-read exactly when it has gone stale.
+	writesSinceContextRead := 0
 	var (
 		rounds          uint32
 		toolCalls       uint32
@@ -212,6 +215,26 @@ func (loop *ExecutionLoop) Run(
 				}
 			}
 			return LoopOutcome{}, err
+		}
+		// The files are re-read once a write has landed on them.
+		//
+		// Read once at the start of the attempt and reused, the context
+		// presents files as they were before this attempt touched anything —
+		// confidently, in a field called content, at the top of the document.
+		// A patch is matched against a file's exact text, so a hunk written
+		// from that copy cannot apply, and the current copy exists only inside
+		// the previous round's tool result. Rung 16 on 2026-08-04 failed 90
+		// patches in one run with "does not match anything", every one of them
+		// against context several edits old.
+		//
+		// Only after a write, because re-reading before one would cost a walk
+		// of the worktree per round to produce the bytes already in hand.
+		if writesSinceContextRead > 0 && loop.dependencies.RefreshContext != nil {
+			contextItems = mergeContextByPath(
+				contextItems,
+				loop.dependencies.RefreshContext(context.WithoutCancel(ctx)),
+			)
+			writesSinceContextRead = 0
 		}
 		turn, turnErr := loop.dependencies.Model.ObserveThink(
 			turnContext,
@@ -735,6 +758,8 @@ func (loop *ExecutionLoop) Run(
 			}
 			if tool.MaterialEdit && succeeded {
 				writesSinceLastTest = true
+				// The context the next round reads has just gone stale.
+				writesSinceContextRead++
 				if err := loop.dependencies.Checkpoints.CreateCheckpoint(
 					context.WithoutCancel(ctx),
 					CheckpointRequest{
@@ -1894,4 +1919,41 @@ func ValidatePlanStep(step PlanStep) error {
 // a diagnosis that blamed the model.
 func CanonicalPlanPath(path string) (string, bool) {
 	return canonicalRelativePath(path)
+}
+
+// mergeContextByPath replaces the items a refresh re-read and keeps the rest.
+//
+// A refresher answers for the files it can re-read, which is the files the run
+// may change. Everything else in the context — the selection's excerpts, what
+// the project already knows — was gathered from sources this cannot consult and
+// has not gone stale, so replacing the whole list with the refresher's answer
+// would throw away most of what the round is supposed to know.
+func mergeContextByPath(
+	existing, fresh []RepositoryContextItem,
+) []RepositoryContextItem {
+	if len(fresh) == 0 {
+		return existing
+	}
+	replaced := make(map[string]RepositoryContextItem, len(fresh))
+	for _, item := range fresh {
+		replaced[item.Path] = item
+	}
+	merged := make([]RepositoryContextItem, 0, len(existing)+len(fresh))
+	for _, item := range existing {
+		if updated, ok := replaced[item.Path]; ok {
+			merged = append(merged, updated)
+			delete(replaced, item.Path)
+			continue
+		}
+		merged = append(merged, item)
+	}
+	// Anything the refresh knows about that the context did not: a file this
+	// attempt created after the context was read.
+	for _, item := range fresh {
+		if _, unused := replaced[item.Path]; unused {
+			merged = append(merged, item)
+			delete(replaced, item.Path)
+		}
+	}
+	return merged
 }

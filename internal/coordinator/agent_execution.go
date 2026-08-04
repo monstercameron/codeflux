@@ -383,6 +383,12 @@ func (execution *AgentExecution) Run(
 			PlanApprovalCheckpoints: agentNoDurableJournal{},
 			Control:                 agentActiveControl{},
 			Interrupts:              agentActiveControl{},
+			// Re-read the files the run may change, for the rounds after one
+			// of them has been written. The loop holds the context it was
+			// given; only this side can read the worktree it came from.
+			RefreshContext: func(context.Context) []agentloop.RepositoryContextItem {
+				return patchContextItems(scope.worktree, steps)
+			},
 		})
 	}
 	loop, err := buildLoop(execution.model)

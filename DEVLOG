@@ -25,6 +25,32 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-173
+Date: 2026-08-04
+Status: Committed as CL-20260803-163
+Change-ID: CL-20260803-163
+Request-or-TODO: Ladder rung 16
+Goal: Stop the round document describing files that have moved
+Assumptions: None. Read directly: contextItems is captured once before the round
+  loop and passed to every ObserveThink unchanged. The failing hunk sampled from
+  the trace was correct for the file as it stood two edits earlier
+Decisions: Merge by path rather than replace. The refresher can only answer for
+  files it can re-read; replacing the whole list with its answer would discard
+  the selection's excerpts and the project's own knowledge, which is most of
+  what the round knows. Refresh only after a write, because refreshing before
+  one costs a worktree walk per round to produce bytes already in hand
+Files-or-schemas: internal/agent/loop.go -- writesSinceContextRead, the refresh
+  at the top of the round, mergeContextByPath; loop_types.go -- RefreshContext;
+  internal/coordinator/agent_execution.go -- supplies patchContextItems
+Validation: internal/agent passes. Three new tests
+Failures-or-discarded-approaches: First version replaced contextItems wholesale
+  when the refresh returned anything, which would have dropped every item the
+  refresher does not read. Caught while writing the test for it
+Known-limitations: Only the plan's own files are re-read. A file outside the
+  plan that the run reads and something else changes is still shown as it was,
+  which is correct for this pipeline because nothing else changes it
+Next-safe-step: Rung 16 pass 9 carries this
+
 Dev-Log: DL-20260803-172
 Date: 2026-08-04
 Status: Committed as CL-20260803-162

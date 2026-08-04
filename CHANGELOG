@@ -50,8 +50,36 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-162
+Change-ID: CL-20260803-163
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- the round showed the run files as they were before it changed them
+Request-or-TODO: Ladder rung 16; standing goal to optimise the prompting
+Outcome: The repository context is read once, when an attempt begins, and handed
+  to every round of that attempt unchanged. From the moment the run's first write
+  lands, the document therefore presents files as they no longer are --
+  confidently, in a field called content, at the top of the round. A patch is
+  matched against a file's exact text, so a hunk written from that copy cannot
+  apply; the only current copy of the file is inside the previous round's tool
+  result, after a long error message. Rung 16 on 2026-08-04 failed 90 patches in
+  one run with "does not match anything", and the sample examined was against a
+  file that had since grown a whole extra test and a fuzz target in the region
+  being patched. The loop now re-reads the files the run may change on the first
+  round after a write, and merges them by path rather than replacing the list:
+  the selection's excerpts and what the project already knows come from sources
+  the refresher cannot consult and have not gone stale. A file the attempt
+  created is appended, since it was in no revision when the context was read.
+Affected-behavior: A round after a write sees the files as they are. Rounds
+  before any write are unchanged, and a caller with no worktree to re-read
+  supplies no refresher and behaves exactly as before.
+Compatibility-or-migration: LoopDependencies gains an optional RefreshContext.
+Verification: Three new tests: a refresh replaces only what it re-read and keeps
+  order, a file created this attempt is appended, and an empty refresh does not
+  empty the context.
+Dev-Log: DL-20260803-173
+
+Change-ID: CL-20260803-162
+Commit: 9503011
 Date: 2026-08-04
 Type: Fix -- the round document never said which files the run could write
 Request-or-TODO: Ladder rung 16; standing goal to optimise the prompting

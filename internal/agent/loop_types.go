@@ -454,6 +454,21 @@ type LoopDependencies struct {
 	Control                 ControlReader
 	Interrupts              ControlInterruptBridge
 	Now                     func() time.Time
+	// RefreshContext re-reads the files the run may change, for the rounds
+	// after one of them has been written.
+	//
+	// The repository context is otherwise read once, when the attempt begins,
+	// and handed to every round unchanged — so from the moment a run's first
+	// write lands, the document confidently presents files as they no longer
+	// are. A patch is matched against a file's exact text, so a hunk written
+	// from that copy cannot apply, and the only current copy is inside a tool
+	// result the round before. Ladder rung 16 on 2026-08-04 failed 90 patches
+	// in one run with "does not match anything", against context showing a
+	// version several edits old.
+	//
+	// Optional: a nil refresher leaves the behaviour exactly as it was, which
+	// is what every caller that has no filesystem to re-read wants.
+	RefreshContext func(context.Context) []RepositoryContextItem
 }
 
 // ApprovedToolSchema returns the strict JSON schema sent to the model.
