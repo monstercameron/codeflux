@@ -1454,3 +1454,28 @@ func (narrator *narratingExecutor) sourcesIfTheyMoved() string {
 	// missed patch, because a patch that misses costs a whole round of its own.
 	return narrator.producedSourcesNow()
 }
+
+// filesInSteps is the layout a plan is written across, in the order its steps
+// name it.
+//
+// A run decides where its work goes once. Later attempts rebuild their steps so
+// the step kinds can follow the filesystem — attempt one creates a file,
+// attempt three patches the file attempt one wrote — and rebuilding them from
+// the requirement again re-derives the layout too, through the fallback parser,
+// which answers cmd/generated/main.go for any request naming no path. That is
+// how a run whose planner chose cmd/stats and stats came to be told on its
+// second attempt to write somewhere else entirely.
+func filesInSteps(steps []agentloop.PlanStep) []string {
+	var files []string
+	seen := map[string]bool{}
+	for _, step := range steps {
+		for _, file := range step.ExpectedFiles {
+			if file == "" || seen[file] {
+				continue
+			}
+			seen[file] = true
+			files = append(files, file)
+		}
+	}
+	return files
+}

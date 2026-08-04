@@ -50,8 +50,37 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-158
+Change-ID: CL-20260803-159
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- every attempt after the first was told to write somewhere else
+Request-or-TODO: Ladder rung 16
+Outcome: A run decides where its work goes once, and every attempt after the
+  first rebuilt its steps so the step kinds could follow the filesystem --
+  attempt one creates a file, attempt three patches the file attempt one wrote.
+  That rebuild called agentPlanSteps, which re-derives the layout through the
+  fallback parser, and the fallback answers cmd/generated/main.go and its test
+  for any request naming no path. So a run whose planner chose cmd/stats and
+  stats wrote there on attempt one and was told to write somewhere else
+  entirely on attempt two, abandoning everything it had built. Rung 16 on
+  2026-08-04 shows it exactly: the planner's layout is present in all seven
+  attempts' repository context, and the model is editing cmd/generated, asking
+  for direction about cmd/generated, and rewriting package clauses trying to
+  reconcile the two -- including a //go:build ignore on its own test file. The
+  comment above that rebuild already claimed "the plan itself is unchanged --
+  the same files"; the layout is now captured once and reused, which is what
+  makes that true.
+Affected-behavior: Attempts after the first write the files the run planned.
+  Step kinds still follow the filesystem, which is the whole reason for the
+  rebuild.
+Compatibility-or-migration: None.
+Verification: Two new tests: the layout after a rebuild equals the layout the
+  first attempt used and re-deriving demonstrably differs, and the control that
+  step kinds still move from edit to patch once the files exist.
+Dev-Log: DL-20260803-169
+
+Change-ID: CL-20260803-158
+Commit: c59b927
 Date: 2026-08-04
 Type: Fix -- one unchanged suite result was handed back as many times as it was
   asked for

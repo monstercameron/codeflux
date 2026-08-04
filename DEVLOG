@@ -25,6 +25,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-169
+Date: 2026-08-04
+Status: Committed as CL-20260803-159
+Change-ID: CL-20260803-159
+Request-or-TODO: Ladder rung 16
+Goal: Stop the second attempt writing somewhere the first attempt never went
+Assumptions: None. The trace holds both facts side by side -- the planner's
+  layout in every attempt's context, and the model editing cmd/generated
+Decisions: Captured the layout from the first attempt's steps rather than
+  re-running the planner per attempt. Re-running it would be a second model call
+  per attempt and could return a different layout each time, which is the same
+  defect with a more expensive cause
+Files-or-schemas: internal/coordinator/agent_execution.go -- layout captured
+  once, later attempts build from it; agent_narration.go -- filesInSteps
+Validation: Two new tests, one of which asserts the fixture can discriminate
+  before asserting anything else
+Failures-or-discarded-approaches: None
+Known-limitations: The layout is fixed for the run. A run that genuinely should
+  restructure mid-run cannot, which is the right trade: restructuring is what it
+  was accidentally doing
+Next-safe-step: Rung 16 pass 7
+
 Dev-Log: DL-20260803-168
 Date: 2026-08-04
 Status: Committed as CL-20260803-158

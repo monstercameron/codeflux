@@ -276,6 +276,12 @@ func (execution *AgentExecution) Run(
 	// operation named a step the stored plan had never heard of, and the store
 	// refused each of them.
 	steps = adoptDurablePlanSteps(steps, plan)
+	// The files this run writes, decided once.
+	//
+	// Every later attempt rebuilds its steps so the step kinds can follow the
+	// filesystem — attempt one creates a file, attempt three patches the file
+	// attempt one wrote. What must not follow anything is which files they are.
+	layout := filesInSteps(steps)
 	if planErr == nil {
 		ledger.satisfied(ctx, pipeline.StageAtomicInstructions,
 			"the request was split into the plan steps the run carried out",
@@ -757,8 +763,23 @@ func (execution *AgentExecution) Run(
 			// new plan revision per attempt would claim the plan was revised
 			// when only the attempt was, and would move the revision every
 			// other record attributes itself to.
+			//
+			// Rebuilt from the layout this run already decided, not from the
+			// requirement again. Re-deriving it called agentPlanSteps, which is
+			// the fallback parser and answers cmd/generated/main.go for any
+			// request naming no path — so a run whose planner had chosen
+			// cmd/stats and stats wrote there on attempt one and was told to
+			// write somewhere else on attempt two, abandoning everything it had
+			// built. Rung 16 on 2026-08-04 did exactly that: the layout is
+			// identical in all seven attempts' context, and the model was still
+			// editing cmd/generated, asking for direction about it, and
+			// rewriting package clauses to make the two reconcile. The comment
+			// above already claimed the files were the same; this is what makes
+			// that true.
 			steps = adoptDurablePlanSteps(
-				agentPlanSteps(scope.worktree, scope.requirement), plan)
+				agentPlanStepsForFiles(
+					scope.worktree, scope.requirement, layout),
+				plan)
 			execution.publishPlan(ctx, scope, steps)
 		}
 		approvalID, approvalErr := domain.NewApprovalID()
