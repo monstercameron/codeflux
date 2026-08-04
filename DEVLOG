@@ -25,6 +25,35 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-164
+Date: 2026-08-04
+Status: Committed as CL-20260803-154
+Change-ID: CL-20260803-154
+Request-or-TODO: Asked whether the dead provider was rate-limiting
+Goal: Make the line that ends a run say what ended it
+Assumptions: None. The question could be answered from the classification code
+  -- a 429 maps to FailureRateLimited and transport is the branch taken when the
+  error is not an HTTPStatusError at all -- but not from the trace, which is the
+  defect
+Decisions: Appended the cause rather than substituting it. The kind is what the
+  circuit ruled on and reads first; a line showing only the root cause invites
+  the opposite mistake, where somebody reads a socket message and concludes the
+  provider is fine. Left Failure.Error() alone: changing it would alter every
+  message in the codebase that renders a provider failure, to fix one trace
+Files-or-schemas: internal/coordinator/agent_execution.go -- withUnderlyingCause
+  and the trace site
+Validation: Three new tests, each run against the previous implementation. The
+  old rendering reproduces the ladder log exactly
+Failures-or-discarded-approaches: An earlier change this session put
+  refusal.Error() in the line and I recorded that as solving the diagnosis gap.
+  It did not: it surfaced the classification and the classification is the part
+  that was never in doubt
+Known-limitations: errors.Unwrap walks the single-parent chain only. A cause
+  held in an errors.Join branch is already printed by the join itself, so this
+  is not a gap, but it does mean the appended cause is the deepest single-parent
+  one rather than every cause
+Next-safe-step: LAD-001
+
 Dev-Log: DL-20260803-163
 Date: 2026-08-04
 Status: Committed as CL-20260803-153

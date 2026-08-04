@@ -499,11 +499,17 @@ func (execution *AgentExecution) Run(
 		// indistinguishable from a run killed by a bad request until somebody
 		// reproduces it — three ladder runs on 2026-08-03 died here and the
 		// trace named neither a status code nor a message.
+		//
+		// And the text alone is still not the error. providers.Failure renders
+		// as "provider <operation> failed: <kind>" and never its cause, so the
+		// line said "transport" — which is also the bucket every unrecognised
+		// error falls into — while the socket-level message that would say
+		// whether it was a reset, a TLS failure or an EOF sat one Unwrap away.
 		tracef("infra", "gate=provider-availability outcome=%s "+
 			"disposition=%s worktree_changed=false budget=%d because=%s",
 			providerOutcomeOf(refusal), decision.Disposition,
 			infrastructure.AttemptsRemaining,
-			traceOneLine(refusal.Error(), 220))
+			traceOneLine(withUnderlyingCause(refusal), 320))
 		failure = instruction
 		sentBackBecause = "the provider did not answer"
 		// The work's budget is refunded because the run learned nothing. The
@@ -2229,6 +2235,42 @@ func firstMeaningfulLine(output string) string {
 		return trimmed
 	}
 	return "the suite reported no readable failure"
+}
+
+// withUnderlyingCause renders an error together with the deepest cause its
+// own text leaves out.
+//
+// providers.Failure formats as "provider <operation> failed: <kind>" and never
+// mentions what it wrapped, so an infrastructure death traced as "transport" —
+// which is also the bucket every unrecognised error falls into — while whether
+// it was a connection reset, a TLS failure or an EOF was one Unwrap away and
+// never asked for. That is the difference between a fact about the network and
+// a fact about the provider, and the run that hit it is the only one that had
+// the answer.
+//
+// Appended rather than substituted: the kind is what the circuit decided on and
+// it stays first, because a line that reads as the root cause alone invites the
+// opposite mistake.
+func withUnderlyingCause(err error) string {
+	if err == nil {
+		return ""
+	}
+	rendered := err.Error()
+	deepest := err
+	for {
+		// errors.Join produces a tree rather than a chain. Unwrap() error only
+		// walks the single-parent case, which is the one that hides a cause
+		// behind a Failure; a join already prints every branch it holds.
+		next := errors.Unwrap(deepest)
+		if next == nil {
+			break
+		}
+		deepest = next
+	}
+	if cause := deepest.Error(); cause != "" && !strings.Contains(rendered, cause) {
+		return rendered + " (" + cause + ")"
+	}
+	return rendered
 }
 
 // providerOutcomeOf names what the transport did, as a typed outcome rather

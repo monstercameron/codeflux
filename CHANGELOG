@@ -50,8 +50,33 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-153
+Change-ID: CL-20260803-154
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- an infrastructure death named a category and never the error
+Request-or-TODO: Asked whether the dead provider was rate-limiting
+Outcome: providers.Failure formats as "provider <operation> failed: <kind>" and
+  never mentions what it wrapped, so the line that ends a run read
+  "provider call the model failed: transport" and stopped there. "transport" is
+  also failureSentinel's default, so it doubles as the bucket for every
+  unrecognised error, and whether the cause was a connection reset, a TLS
+  failure or an EOF sat one Unwrap away and was never asked for. That is the
+  difference between a fact about this machine's network and a fact about the
+  provider, and the run that hit it is the only one that had the answer. The
+  deepest cause is now appended after the classification, which stays first
+  because it is what the circuit decided on. A message that already prints its
+  cause is left alone, so nothing doubles.
+Affected-behavior: The provider-availability trace line. Nothing else.
+Compatibility-or-migration: None.
+Verification: Three new tests, run against the previous implementation first;
+  the old rendering reproduces the ladder log byte for byte,
+  "provider retry budget exhausted: provider call the model failed: transport".
+  A second test pins that a 429 classifies as rate-limited and never as
+  transport, which is the question that exposed this.
+Dev-Log: DL-20260803-164
+
+Change-ID: CL-20260803-153
+Commit: 933c19f
 Date: 2026-08-04
 Type: Ticket -- records why rung 16 fails, without guessing at the fix
 Request-or-TODO: Ladder rung 16
