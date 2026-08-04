@@ -50,8 +50,33 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-166
+Change-ID: CL-20260803-167
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- the decomposition paraphrased away the names the request gave
+Request-or-TODO: Ladder rung 17; standing goal to optimise the prompting
+Outcome: The behaviours the planner names become the instruction a run works
+  from -- a plan step's summary is the numbered list of them and nothing else --
+  so a paraphrase loses the one part of a request nobody can infer. Rung 17 asks
+  for a function called Totals and a struct called Entry; the decomposition
+  rendered those as "Aggregate amounts independently for each name" and "Expose
+  entries with a name and integer amount", and the run built the right shape
+  around a function it called Calculate. It failed on the name alone, having got
+  everything else: one package reaching nothing outside itself, built, run,
+  printing exactly what was asked, surviving every hostile input. The planning
+  instruction now asks for the request's own spelling wherever the request names
+  a function, type, method, field or flag, on the grounds that such a name is a
+  contract with whoever calls it rather than a detail of the description.
+Affected-behavior: Behaviours carry the identifiers the request names.
+Compatibility-or-migration: None.
+Verification: Two new tests: the instruction asks for exact spelling and still
+  carries the request; and the control that it still asks for behaviours and for
+  the layout, so the addition has not turned decomposition into a naming
+  exercise.
+Dev-Log: DL-20260803-177
+
+Change-ID: CL-20260803-166
+Commit: 671d221
 Date: 2026-08-04
 Type: Fix -- two long-failing tests were asserting against premises the code had
   deliberately moved past

@@ -116,6 +116,24 @@ func planningInstruction(requirement string) string {
 			"file, not a step, not a heading. Do not number them. Do not " +
 			"explain. If the request asks for one behaviour, answer with one " +
 			"line.\n\n")
+	// The names the request uses are part of the request.
+	//
+	// The behaviours become the instruction a run works from — the plan step's
+	// summary is the numbered list of them and nothing else — so a paraphrase
+	// loses the one thing about a request that cannot be inferred. Rung 17 on
+	// 2026-08-04 asks for a function called Totals and a struct called Entry;
+	// the decomposition rendered those as "Aggregate amounts independently for
+	// each name" and "Expose entries with a name and integer amount", and the
+	// run built the right shape around a function it called Calculate. It
+	// failed on the name alone, having got everything else: one package
+	// reaching nothing outside itself, built, run, printing exactly what was
+	// asked, surviving every hostile input.
+	instruction.WriteString(
+		"Where the request names something — a function, a type, a method, a " +
+			"field, a flag — use that name in the behaviour, spelled exactly " +
+			"as the request spells it. A name the request gives is a contract " +
+			"with whoever calls it, and it is the one part of a request that " +
+			"cannot be inferred from the description.\n\n")
 	// The layout, because the alternative was a constant.
 	//
 	// Where the work goes was not anybody's decision: when the request named no

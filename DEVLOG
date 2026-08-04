@@ -25,6 +25,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-177
+Date: 2026-08-04
+Status: Committed as CL-20260803-167
+Change-ID: CL-20260803-167
+Request-or-TODO: Ladder rung 17
+Goal: Stop the plan losing the identifiers the request specifies
+Assumptions: None. Read from the trace: the step summaries carry the behaviours
+  and nothing else, and neither Totals nor Entry survives into them
+Decisions: Changed the planning instruction rather than appending the raw
+  requirement to every step summary. The summary is validated as a label -- it
+  is capped and read by a person -- and the earlier defect where prose was
+  appended to a file's content field is a standing reminder of what happens when
+  a field is filled with something it does not claim to hold
+Files-or-schemas: internal/coordinator/agent_planning.go -- planningInstruction
+Validation: Two new tests including the control that the decomposition still
+  asks for behaviours and for the layout
+Failures-or-discarded-approaches: None
+Known-limitations: This asks the planner to preserve names; nothing checks that
+  it did. A run whose behaviours drop a name the request gave will still fail
+  the way rung 17 did, just less often
+Next-safe-step: Rung 17 pass 2
+
 Dev-Log: DL-20260803-176
 Date: 2026-08-04
 Status: Committed as CL-20260803-166
