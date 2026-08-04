@@ -50,8 +50,31 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-179
+Change-ID: CL-20260803-180
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- three tool rules were stated only in the refusal that enforced them
+Request-or-TODO: Standing goal to optimise the prompting
+Outcome: A refusal is a correction after the round is spent; the descriptor is
+  the only place that can stop the round being spent. Three rules were stated
+  only in the refusal. The suite is answered from the last run when nothing has
+  changed and refused after twice -- rung 16 spent 40 of its 73 rounds asking
+  anyway, and wrote six times in all. A second wholesale rewrite of one file in
+  an attempt is refused -- rung 9 hit that seven times in a single pass. Both are
+  now in the descriptors. The test tool's summary was also "Run an approved test
+  recipe", which names a category and no action: the arguments were not guessable
+  from it, so a run had to guess and spend a round finding out. It now says what
+  to call. Adds LAD-004 for a pre-existing catalog/descriptor RPC count mismatch
+  found by the regression sweep and confirmed present at 5577f21.
+Affected-behavior: The apply-edit and test descriptors carry their own rules.
+Compatibility-or-migration: None.
+Verification: Two new tests, one asserting all three rules are stated across the
+  three write-and-verify tools so a fourth rule cannot be added refusal-only.
+  The ladder cannot measure this today: no credits.
+Dev-Log: DL-20260803-190
+
+Change-ID: CL-20260803-179
+Commit: f8fc5f3
 Date: 2026-08-04
 Type: Fix -- a systematic pass over every instruction that asks a run to write
   code, rather than one more reaction to one more rung

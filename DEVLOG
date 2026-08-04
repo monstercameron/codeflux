@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-190
+Date: 2026-08-04
+Status: Committed as CL-20260803-180
+Change-ID: CL-20260803-180
+Request-or-TODO: Standing goal to optimise the prompting
+Goal: Finish the prompting sweep at the tool boundary
+Assumptions: None. Both rules are measured from traces: 40 of 73 rounds on rung
+  16, seven rewrite refusals in one rung 9 pass
+Decisions: Put the rules in the descriptors rather than only tightening the
+  refusals. The refusals stay -- they are what enforces the rule -- but a rule a
+  run only meets by breaking it costs a round every time it is met
+Files-or-schemas: internal/executor/protocol.go -- the apply-edit and test
+  summaries; descriptor_rules_test.go; TODOS.md -- LAD-004
+Validation: internal/executor passes in full. The coordinator's
+  TestRPCContractCatalogMatchesProductDescriptor fails and is pre-existing,
+  confirmed identical at 5577f21, and unrelated -- it counts RPCs, not tools
+Failures-or-discarded-approaches: A shell cd into a scratch clone earlier left
+  the working directory outside the repository, so this entry, its changelog and
+  the ticket were first written into nowhere while the source edit had already
+  landed. Caught by checking the files rather than the command's exit status.
+  The ticket was also first numbered REPO-041, which already exists
+Known-limitations: Unmeasured, like the fuzz example. Both are reasoned from a
+  measured result rather than measured themselves
+Next-safe-step: Credits, then rung 19
+
 Dev-Log: DL-20260803-189
 Date: 2026-08-04
 Status: Committed as CL-20260803-179
