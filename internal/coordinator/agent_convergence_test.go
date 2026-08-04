@@ -45,17 +45,29 @@ func TestARunMakingProgressIsLeftAlone(t *testing.T) {
 }
 
 // TestARunRepeatingItselfIsEscalated is the case escalation exists for.
+//
+// The gate is deliberately not one of regressionProneGates. Those have half the
+// threshold, because losing a property already satisfied is going round rather
+// than going slowly, and this case is about the ordinary bar. Written against
+// "acceptance" it asserted the general rule through a special case and read as
+// an off-by-one in record, which is exactly what it reported once the halved
+// bar arrived.
 func TestARunRepeatingItselfIsEscalated(t *testing.T) {
 	tracker := newConvergence(escalationSettings(3))
-	const stuck = "example 1 differs at line 1: expected \"4\", got \"5\""
+	const gate = "adversarial-review"
+	const stuck = "executeCommands nests 5 levels deep"
+	if regressionProneGates[gate] {
+		t.Fatalf("%s now has the halved threshold, so this case no longer "+
+			"exercises the ordinary bar", gate)
+	}
 
-	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated != "" {
+	if decision := tracker.record(gate, stuck, stuck); decision.Escalated != "" {
 		t.Fatal("the first failure escalated, so nothing was given a chance")
 	}
-	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated != "" {
+	if decision := tracker.record(gate, stuck, stuck); decision.Escalated != "" {
 		t.Fatal("the second identical failure escalated one attempt early")
 	}
-	decision := tracker.record("acceptance", stuck, stuck)
+	decision := tracker.record(gate, stuck, stuck)
 	// The second rung, which is the same model thinking harder — the cheaper
 	// axis. Escalating straight to a different model would raise the rate on
 	// every token before establishing that more thinking would not have done.

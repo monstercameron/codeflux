@@ -50,8 +50,37 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-149
+Change-ID: CL-20260803-150
 Commit: pending
+Date: 2026-08-03
+Type: Fix -- a repeated finding read as a new one because it had moved down the
+  file
+Request-or-TODO: Ladder rung 11
+Outcome: The stall fingerprint normalises what changes between two runs of one
+  defect -- addresses, durations, temporary paths, and a compiler's
+  "main.go:37:12". A review writes "main.go:37" with no column, and every edit
+  above the defect shifts that line, so the same finding at two line numbers
+  fingerprinted as two failures and the tracker never counted a repeat. Rung 11
+  was told "executeCommands nests 5 levels deep" at line 37, then at line 40,
+  then at line 40 again, across four of its nine attempts; it escalated for none
+  of them, stayed on the cheapest model throughout, and ran out of attempts with
+  the defect still there. A file position with no column now normalises too.
+  Separately, TestARunRepeatingItselfIsEscalated asserted the ordinary stall
+  threshold using "acceptance", which is one of the regression-prone gates and
+  has half that threshold, so it had been reporting a policy disagreement as an
+  off-by-one in record. It now uses a gate that is not regression-prone, and
+  fails loudly if that gate is ever added to the list.
+Affected-behavior: A run circling one finding escalates on schedule. Two
+  different findings, and the same finding in two files, are still distinct.
+Compatibility-or-migration: None.
+Verification: Rung 11 passes in 296s over 6 attempts, having failed at 464s over
+  9. Patch success rose to 70% from 53%. Two new tests cover the moved-line case
+  and its two controls; both were run against the previous implementation first.
+  The convergence suite now passes in full for the first time this session.
+Dev-Log: DL-20260803-160
+
+Change-ID: CL-20260803-149
+Commit: e863873
 Date: 2026-08-03
 Type: Fix -- a patch could not say which of several identical places it meant,
   and trailing text became part of the hunk
@@ -82,7 +111,7 @@ Verification: Rung 9 passes in 502s after six failing passes. Its patch failures
 Dev-Log: DL-20260803-159
 
 Change-ID: CL-20260803-148
-Commit: pending
+Commit: 373fc05
 Date: 2026-08-03
 Type: Fix -- a step could not use the tool its own first call made necessary,
   and the suite told a run its writes had not landed when they had

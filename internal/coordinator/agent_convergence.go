@@ -422,10 +422,19 @@ func (tracker *convergence) summary() string {
 // or a line number that moved by one is the same failure. Comparing the raw
 // text would see two different ones and never count a repeat, which would make
 // the whole tracker inert — it would never fire, and nothing would say so.
+//
+// A line number with no column beside it counts too. A compiler writes
+// "main.go:37:12" and a review writes "main.go:37", and the review is the one
+// whose findings move: every edit above the defect shifts it. Ladder rung 11 on
+// 2026-08-03 was told "executeCommands nests 5 levels deep" at line 37, then at
+// line 40, then at line 40 again across four attempts, escalated for none of
+// them because each read as a new failure, and ran out of attempts still on the
+// first model.
 var varying = regexp.MustCompile(
 	`(0x[0-9a-fA-F]+)|` + // addresses
 		`([0-9]+(\.[0-9]+)?(ns|µs|ms|s)\b)|` + // durations
-		`(:[0-9]+:[0-9]+)|` + // file positions
+		`(\.[A-Za-z0-9]+:[0-9]+(:[0-9]+)?)|` + // file positions, with or without a column
+		`(:[0-9]+:[0-9]+)|` + // a position whose file is not named here
 		`([A-Za-z]:\\[^\s:]+|/tmp/[^\s:]+|/var/folders/[^\s:]+)|` + // temp paths
 		`(\b[0-9]{4,}\b)`) // long numbers: pids, seeds, sizes
 

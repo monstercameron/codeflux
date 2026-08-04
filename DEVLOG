@@ -25,6 +25,33 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-160
+Date: 2026-08-03
+Status: Committed as CL-20260803-150
+Change-ID: CL-20260803-150
+Request-or-TODO: Ladder rung 11
+Goal: Let the stall tracker see a repeat that had moved down the file
+Assumptions: That "main.go:37" and "main.go:40" carrying identical prose are one
+  finding. Checked against rung 11's trace: the prose is byte-identical and the
+  function named is the same
+Decisions: Normalised the position rather than dropping line numbers wholesale.
+  A bare number can be part of what identifies a finding -- "nests 5 levels
+  deep" is not the same finding as "nests 9 levels deep" -- so only a number
+  attached to a file extension is treated as a position
+Files-or-schemas: internal/coordinator/agent_convergence.go -- the varying
+  pattern gains a file-position alternative without a column.
+  agent_convergence_test.go -- TestARunRepeatingItselfIsEscalated moved off a
+  regression-prone gate
+Validation: The convergence suite passes in full. Two new tests, run against the
+  previous implementation first. Rung 11 passes in 296s over 6 attempts, from
+  464s over 9
+Failures-or-discarded-approaches: Considered normalising every ":<digits>".
+  Rejected: it would collapse messages that use a colon before a count, and the
+  extension anchor is enough for both forms seen in traces
+Known-limitations: A finding that moves between files still reads as two, which
+  is correct for a review and arguable for a refactor that renamed a file
+Next-safe-step: Rung 12
+
 Dev-Log: DL-20260803-159
 Date: 2026-08-03
 Status: Committed as CL-20260803-149
