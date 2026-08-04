@@ -50,8 +50,33 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-160
+Change-ID: CL-20260803-161
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a documentation round refused the documentation it had been asked
+  for
+Request-or-TODO: Ladder rung 16
+Outcome: atom-documentation names every undocumented declaration in a file and
+  asks for a comment on each. The comments-only round it then opens capped a
+  patch at forty lines, six hunks and half the file -- and on a small file with
+  several declarations, a full documentation pass is most of the lines. Rung 16
+  on 2026-08-04 was refused thirteen times for changing 71% of a stats.go it had
+  just been told to document. The size limits were never what made the round
+  safe: permits applies the patch in memory and requires the syntax trees to be
+  byte-identical with comments stripped, which no quantity of comment lines can
+  defeat. That check stays and the size limits go. A test round keeps its limits,
+  because it has no equivalent proof -- permits only checks the path ends
+  _test.go, so size is the only bound there is.
+Affected-behavior: A documentation round may write as much comment as the gate
+  asked for, and still cannot change a declaration, statement, import or
+  signature.
+Compatibility-or-migration: None.
+Verification: Three new tests: the round is unbounded by size, it still refuses
+  a behaviour change, and a test round keeps its limits.
+Dev-Log: DL-20260803-171
+
+Change-ID: CL-20260803-160
+Commit: fe66985
 Date: 2026-08-04
 Type: Fix -- a hunk with no context was told its text was wrong
 Request-or-TODO: Ladder rung 16

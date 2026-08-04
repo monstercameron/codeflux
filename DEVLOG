@@ -25,6 +25,31 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-171
+Date: 2026-08-04
+Status: Committed as CL-20260803-161
+Change-ID: CL-20260803-161
+Request-or-TODO: Ladder rung 16
+Goal: Stop one rule refusing what another rule demanded
+Assumptions: That executableCodeIsIdentical is a complete guarantee for this
+  scope. Checked rather than assumed: it renders both syntax trees with comments
+  discarded and compares them byte for byte, so declarations, statements,
+  imports and signatures all have to match, and it is applied to the file the
+  patch would produce rather than to the patch text
+Decisions: Removed the size limits rather than raising them. A raised limit is
+  the same defect with a larger number in it -- there is no ceiling that is
+  right for every file, and there does not need to be one when the round is
+  enforced by proof
+Files-or-schemas: internal/coordinator/edit_scope.go -- editCommentsOnly returns
+  UnboundedPatch
+Validation: Three new tests, including the control that a behaviour change is
+  still refused, which is what makes removing the limits safe
+Failures-or-discarded-approaches: None
+Known-limitations: A test round still has only size limits, because there is no
+  equivalent proof for "this is a test change". Worth revisiting if it starts
+  refusing legitimate work the same way
+Next-safe-step: Rung 16 pass 9
+
 Dev-Log: DL-20260803-170
 Date: 2026-08-04
 Status: Committed as CL-20260803-160

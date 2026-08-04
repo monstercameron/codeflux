@@ -189,14 +189,22 @@ func (scope editScope) String() string {
 func (scope editScope) patchLimits() executor.PatchLimits {
 	switch scope {
 	case editCommentsOnly:
-		// A doc comment is a handful of lines above one declaration. Two
-		// declarations documented at once is still one round's work; six is a
-		// rewrite with comments as the excuse.
-		return executor.PatchLimits{
-			MaximumChangedLines: 40,
-			MaximumHunks:        6,
-			MaximumFileShare:    0.5,
-		}
+		// Unbounded, because this scope is enforced by proof rather than by
+		// size. permits applies the patch in memory and requires the syntax
+		// trees to be byte-identical with comments stripped, so a patch it
+		// accepts cannot have changed a declaration, a statement, an import or
+		// a signature however many lines it moved. Nothing a size limit could
+		// catch here is still reachable once that check has passed.
+		//
+		// The limits it had — forty lines, six hunks, half the file — refused
+		// the work the gate had just demanded. atom-documentation names every
+		// undocumented declaration in a file, and on a small file with several
+		// of them a full documentation pass is most of the lines: rung 16 on
+		// 2026-08-04 was refused thirteen times for changing 71% of a
+		// stats.go it had been told to document. That is the same shape as the
+		// gates that used to contradict each other, arrived at from the other
+		// direction — one rule asking for the work and another forbidding it.
+		return executor.UnboundedPatch
 	case editTestsOnly:
 		// A test round adds cases. It is legitimately larger than a comment
 		// round — a table-driven test for four inputs is thirty lines — and it
