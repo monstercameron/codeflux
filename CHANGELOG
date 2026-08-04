@@ -50,6 +50,41 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-157
+Commit: pending
+Date: 2026-08-04
+Type: Fix -- the client killed its own requests and the pipeline read it as the
+  provider going away
+Request-or-TODO: Ladder rung 16; Cam asked whose side the outage was on
+Outcome: ResponseHeaderTimeout was thirty seconds while RequestTimeout was five
+  minutes. That is not a stricter bound, it is a contradictory one: a reasoning
+  model at high effort thinks for longer than thirty seconds before emitting a
+  single response header, so the client cancelled the request every time and
+  reported "http2: timeout awaiting response headers". The adapter then retried
+  three times, each retry thought just as long, and the three failures together
+  produced about ninety seconds of nothing with no status code -- which is
+  indistinguishable from an outage and was diagnosed as one, by me, repeatedly.
+  It ended runs whose programs were already correct: rung 16 built, ran, printed
+  exactly what was asked and survived every hostile input, twice, and was
+  recorded as paused. The header timeout is now the request's own, so one
+  timeout governs a request. It is kept as a field rather than removed so a
+  server that accepts a connection and says nothing is still bounded, and an
+  injected client keeps whatever timeouts its caller chose.
+Affected-behavior: Long high-effort requests complete instead of being cancelled
+  at thirty seconds.
+Compatibility-or-migration: None.
+Verification: The next rung 16 run recorded zero provider-availability failures,
+  against two in each of the two runs before it. Two new tests: the header
+  timeout is never shorter than the request timeout at three different request
+  timeouts, and an injected client's own timeouts are not rewritten.
+Considered-and-rejected: Raising the outer infrastructure allowance from one
+  retry to three over two minutes. It was written, and reverted on finding this:
+  it would have spent more retries against a deterministic client-side timeout
+  and buried the cause further. The escalation step-down committed earlier is
+  kept -- it is sound on its own terms -- but its stated reason was wrong, and
+  what it was really surviving was this.
+Dev-Log: DL-20260803-167
+
 Change-ID: CL-20260803-156
 Commit: pending
 Date: 2026-08-04

@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-167
+Date: 2026-08-04
+Status: Committed as CL-20260803-157
+Change-ID: CL-20260803-157
+Request-or-TODO: Ladder rung 16
+Goal: Find out whose side the provider failures were on
+Assumptions: None, in the end. Every earlier assumption here was wrong and is
+  recorded below
+Decisions: Made the header timeout the request timeout rather than deleting the
+  field. Two timeouts disagreeing is the defect; one timeout and no bound at all
+  are both worse than one timeout that agrees with itself
+Files-or-schemas: internal/providers/transport.go
+Validation: Zero provider-availability failures on the next rung 16 run, against
+  two on each of the two before it. Two new tests
+Failures-or-discarded-approaches: Three wrong readings, in order. First I called
+  it a provider outage specific to gpt-5.6-luna:max and built the escalation
+  step-down around that. Then a run took out gpt-5.6-luna:low too, falsifying
+  "specific to max", and I called it a sustained outage and raised the outer
+  infrastructure allowance. Cam asked whether it was OpenAI 429-ing, which it was
+  not, and asking which side it was on at all is what produced the answer: it was
+  this client, cancelling its own request, every time, deterministically. The
+  ninety-second gap I had measured and attributed to a network was three
+  thirty-second self-cancellations
+Known-limitations: The step-down's comment attributes rung 15's deaths to the
+  rung above being unavailable. The mechanism is sound and stays; the attribution
+  is superseded by this entry
+Next-safe-step: Rung 16 now reaches the ten-minute cap instead, because
+  high-effort attempts genuinely take minutes once they are allowed to finish.
+  Whether that is a cap to raise or work to make cheaper is the next question
+
 Dev-Log: DL-20260803-166
 Date: 2026-08-04
 Status: Committed as CL-20260803-156

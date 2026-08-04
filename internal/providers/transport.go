@@ -163,14 +163,36 @@ func NewHTTPTransport(options TransportOptions) (*HTTPTransport, error) {
 	if client == nil {
 		client = &http.Client{
 			Transport: &http.Transport{
-				Proxy:                 nil,
-				DialContext:           (&net.Dialer{}).DialContext,
-				ForceAttemptHTTP2:     true,
-				MaxIdleConns:          20,
-				MaxIdleConnsPerHost:   4,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ResponseHeaderTimeout: 30 * time.Second,
+				Proxy:               nil,
+				DialContext:         (&net.Dialer{}).DialContext,
+				ForceAttemptHTTP2:   true,
+				MaxIdleConns:        20,
+				MaxIdleConnsPerHost: 4,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 10 * time.Second,
+				// One timeout governs a request, and it is the request's own.
+				//
+				// This was thirty seconds while RequestTimeout was five
+				// minutes, which is not a stricter bound but a contradictory
+				// one: a reasoning model at high effort thinks for longer than
+				// thirty seconds before it emits a single response header, so
+				// the client killed its own request every time and reported
+				// "http2: timeout awaiting response headers". The adapter then
+				// retried three times, each retry thought just as long, and the
+				// three failures together looked exactly like a provider that
+				// had gone away: about ninety seconds of nothing, no status
+				// code, and nothing to tell it apart from an outage.
+				//
+				// It ended runs whose programs were already correct. Ladder rung
+				// 16 on 2026-08-04 built, ran, printed exactly what was asked and
+				// survived every hostile input, twice, and was recorded as paused
+				// because of this. It is also what the escalation step-down was
+				// built to survive, and escalating is what made the model think
+				// past the timer in the first place.
+				//
+				// Kept as a field rather than removed, so a server that accepts
+				// a connection and then says nothing at all is still bounded.
+				ResponseHeaderTimeout: options.RequestTimeout,
 			},
 		}
 	} else {

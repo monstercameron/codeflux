@@ -350,3 +350,58 @@ func TestHTTPTransportBoundsSingleAndAggregateSSEData(t *testing.T) {
 		})
 	}
 }
+
+// TestTheHeaderTimeoutDoesNotContradictTheRequestTimeout is the contradiction
+// that read as a provider outage.
+//
+// ResponseHeaderTimeout was thirty seconds while RequestTimeout was five
+// minutes. A reasoning model at high effort thinks for longer than thirty
+// seconds before emitting a single response header, so the client killed its
+// own request, the adapter retried three times into the same wall, and the
+// result was ninety seconds of nothing with no status code — indistinguishable
+// from the provider having gone away, and diagnosed as exactly that.
+//
+// Proven to discriminate: against the previous implementation the header
+// timeout is 30s regardless of what the request was given. Ladder rung 16 on
+// 2026-08-04 was recorded as paused twice with a correct program: built, run,
+// printing exactly what was asked, surviving every hostile input.
+func TestTheHeaderTimeoutDoesNotContradictTheRequestTimeout(t *testing.T) {
+	for _, requestTimeout := range []time.Duration{
+		30 * time.Second, DefaultRequestTimeout, 12 * time.Minute,
+	} {
+		transport, err := NewHTTPTransport(TransportOptions{
+			RequestTimeout: requestTimeout,
+		})
+		if err != nil {
+			t.Fatalf("request timeout %s: %v", requestTimeout, err)
+		}
+		inner, ok := transport.client.Transport.(*http.Transport)
+		if !ok {
+			t.Fatalf("request timeout %s: the transport is not the one built "+
+				"here, so nothing about its timeouts is being asserted",
+				requestTimeout)
+		}
+		if inner.ResponseHeaderTimeout < requestTimeout {
+			t.Errorf("a request allowed %s is killed by its own client after "+
+				"%s of thinking, before the model has said anything",
+				requestTimeout, inner.ResponseHeaderTimeout)
+		}
+	}
+}
+
+// TestAnInjectedClientKeepsItsOwnTimeouts is the control.
+//
+// A caller that supplied an http.Client has already decided its timeouts, and
+// overriding them would make this the second place deciding one fact.
+func TestAnInjectedClientKeepsItsOwnTimeouts(t *testing.T) {
+	own := &http.Transport{ResponseHeaderTimeout: 3 * time.Second}
+	if _, err := NewHTTPTransport(TransportOptions{
+		HTTPClient: &http.Client{Transport: own},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if own.ResponseHeaderTimeout != 3*time.Second {
+		t.Errorf("an injected client's own timeout was rewritten to %s",
+			own.ResponseHeaderTimeout)
+	}
+}
