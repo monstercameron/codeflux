@@ -418,6 +418,14 @@ func (execution *AgentExecution) Run(
 	documentationRounds := 0
 	coverageRounds := 0
 	propertyRounds := 0
+	// adversarialRounds is how many times this run has been shown the ways it
+	// mishandles input nobody intended.
+	adversarialRounds := 0
+	// mutationRounds is how many times this run has been shown the deliberate
+	// defects its tests did not notice.
+	mutationRounds := 0
+	// fuzzRounds is how many times this run has been asked for a fuzz target.
+	fuzzRounds := 0
 	// The circuit breaker's state: how many identical infrastructure failures
 	// have happened in a row, against what, and whether it has opened.
 	// carriedAdvisories are the criticisms this run will finish with rather
@@ -565,7 +573,7 @@ func (execution *AgentExecution) Run(
 		// failure: "it did not compile", "the work was not finished". Two
 		// attempts that came back for the same reason are a repeat even when
 		// the surrounding list has moved on.
-		decision := progress.record(gate, because)
+		decision := progress.record(gate, because, instruction)
 		// A gate a project has pinned to a particular rung selects it for the
 		// attempt it is sending back, whatever the ladder has reached. It only
 		// ever moves upward, so a pin cannot undo an escalation a run earned.
@@ -749,11 +757,35 @@ func (execution *AgentExecution) Run(
 		// this run wrote, and they were in no revision when the selection ran.
 		// A patch cannot be written from memory, so offering the patch tool
 		// without the file was offering a tool that could not be used.
+		// Selection's excerpts of a file being patched are dropped first. It
+		// offers a numbered slice, which is right for reading and wrong for
+		// patching: a hunk anchored on four lines of a sixty-line file matches
+		// nothing, and the whole file is about to be added below.
+		context = withoutSlicesOfPatchedFiles(context, steps)
 		context = append(context, patchContextItems(scope.worktree, steps)...)
 		context = append(context, producedTestFilesFor(scope.worktree, steps)...)
 		if failure != "" {
+			// Named for what it is: the work this attempt owes.
+			//
+			// It was labelled "last-test-run-output", which was true when this
+			// variable only ever held narrator.lastFailure. sendBack now
+			// assigns every gate's instruction to it, so a gate's demand
+			// reached the model under the name of a test log — informational,
+			// already-happened, nothing to act on. Meanwhile what_to_do_now
+			// says to work through the plan, and the plan is still the
+			// original write-the-program plan, so the one thing in the prompt
+			// telling the run to do something new was the one thing labelled
+			// as output.
+			//
+			// Rung 2 on 2026-08-03, twice: told across six attempts that
+			// addValues, printSum and readArguments have no test that calls
+			// them directly, it patched main_test.go four times and added only
+			// more end-to-end tests that shell out to the built binary. Those
+			// genuinely cannot reach the cases the gate names — nil and empty
+			// slices do not exist on a command line — so the gate was right
+			// each time and the run never once did the thing being asked.
 			context = append(context, agentContextItem(
-				"last-test-run-output", failure))
+				"work-this-attempt-must-do", failure))
 		}
 		attemptOutcome, runErr := loop.Run(ctx, agentloop.LoopInput{
 			TaskID: taskID, RunID: runID, PlanApprovalID: approvalID,
@@ -769,10 +801,31 @@ func (execution *AgentExecution) Run(
 			// nothing from another run, and the model cannot see that: it
 			// re-ran the same command against the same bytes and each run
 			// looked to it like a step forward.
+			//
+			// "Could have changed" includes what this attempt is about to do.
+			// This is decided once per attempt and then handed to every round
+			// in it, so judging only by the tree as it stands at the start
+			// withheld the suite for the whole attempt from a run that was
+			// sent back precisely to change files — and the moment its first
+			// patch landed, the tool that would have told it whether the patch
+			// held was already gone.
+			//
+			// It compounds through the checkpoint. A restore puts the tree
+			// back to the last state that was tested, so the next attempt
+			// starts byte-identical to the last test run, and the suite is
+			// withheld again. Rung 2 on 2026-08-03 spent sixteen rounds with
+			// only the patch tool: attempts 3 and 5 refined blind, broke the
+			// tests, were restored, and attempt 7 patched three times at the
+			// most expensive rung without once being able to check itself.
+			//
+			// A wasted call is the cheaper failure and is already handled: the
+			// narrator recognises a run against unchanged bytes and says so in
+			// the result rather than letting it read as progress.
 			ApprovedTools: agentApprovedTools(
 				narrator.lastTestFingerprint == "" ||
 					narrator.lastTestFingerprint !=
-						producedTreeDigest(scope.worktree)),
+						producedTreeDigest(scope.worktree) ||
+					anyStepWritesAFile(steps)),
 			Limits: agentLoopLimits(maximumCost),
 		})
 		// A malformed turn is a mistake the model made, not a failure of the
@@ -1054,7 +1107,7 @@ func (execution *AgentExecution) Run(
 		// is almost always a write.
 		outstanding := execution.outstandingWork(
 			ctx, scope, caseRounds, documentationRounds, coverageRounds,
-			propertyRounds, true)
+			propertyRounds, adversarialRounds, mutationRounds, fuzzRounds, true)
 		if outstanding.any() && progress.lastAttempt() {
 			// Out of attempts with work still owed. Saying so is the whole
 			// point: the run used to fall through here and report
@@ -1076,6 +1129,15 @@ func (execution *AgentExecution) Run(
 			if outstanding.askedForProperty {
 				propertyRounds++
 			}
+			if outstanding.askedForAdversarial {
+				adversarialRounds++
+			}
+			if outstanding.askedForMutation {
+				mutationRounds++
+			}
+			if outstanding.askedForFuzz {
+				fuzzRounds++
+			}
 			sendBack(outstanding.gate, outstanding.instruction, outstanding.because)
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d: %s Going back for all of it.",
@@ -1091,13 +1153,35 @@ func (execution *AgentExecution) Run(
 				progress.currentModel(), storage.EpisodeAttemptOutcomeConverged)
 			break
 		}
-		failure = narrator.lastFailure
-		sentBackBecause = "the tests did not pass"
-		if failure == "" {
-			// Nothing failed and nothing completed: another attempt would ask
-			// the same question and get the same answer.
-			break
-		}
+		// Nothing failed and nothing completed: another attempt would ask the
+		// same question and get the same answer.
+		//
+		// This used to continue whenever narrator.lastFailure was non-empty,
+		// which asked "has anything ever failed in this run" rather than "does
+		// this tree fail". lastFailure is sticky by design — the next attempt
+		// needs to be told what broke — so a single mismatched patch hunk in
+		// an early attempt kept the loop alive for every attempt after it.
+		//
+		// It cannot be right here in any case. Reaching this line means
+		// revalidateAfterWrite held on this exact tree a few hundred lines
+		// above, acceptance held, and a checkpoint was captured because both
+		// did; the branch that handles tests not passing has already sent the
+		// work back and continued. So the condition was reading a fact from
+		// the past to contradict one established in the present, and it
+		// labelled what followed "the tests did not pass" while the trace
+		// beside it recorded a checkpoint saying they had.
+		//
+		// Ladder rung 1 on 2026-08-03: one failed hunk in attempt 2, then
+		// seven further attempts over 123 seconds, every one of them reporting
+		// "open 0, addressed 2, verified 2, exhausted 0; asking for 0 this
+		// round" — nothing open, nothing asked for — until the attempts ran
+		// out and a correct program was reported as paused.
+		//
+		// The same hazard is already named for the narrator's own test flags,
+		// which are judged from the run of the suite that just happened rather
+		// than from whether anything ever failed. This is that rule applied to
+		// the loop's own exit.
+		break
 	}
 
 	// The loop is over. If what it left behind is worse than something it
@@ -2156,31 +2240,6 @@ type terminalFacts struct {
 	attempts              int
 	infrastructureRetries int
 	unresolved            string
-}
-
-// terminalStatus names the ending in the vocabulary a reader can act on.
-//
-// The three endings are genuinely different decisions. A run that finished with
-// a verified revision and some opinions left over is work someone can review; a
-// run that lost its provider after verifying something is work someone can
-// review and a machine to look at; a run with nothing verified is neither.
-func terminalStatus(
-	circuitOpen string, checkpoint *verifiedCheckpoint, unfinished string,
-) string {
-	switch {
-	case circuitOpen == "deadline-reserved-for-finalisation" && checkpoint.taken:
-		return "completed-with-advisories"
-	case circuitOpen != "" && checkpoint.taken:
-		return "provider-unavailable-after-verified-result"
-	case circuitOpen != "":
-		return "provider-unavailable-with-nothing-verified"
-	case checkpoint.taken && unfinished != "":
-		return "completed-with-advisories"
-	case checkpoint.taken:
-		return "completed"
-	default:
-		return "stopped-with-nothing-verified"
-	}
 }
 
 // terminalReport renders the ending as something a person reads once and knows

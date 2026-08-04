@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
+	pathpkg "path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -553,11 +554,30 @@ func checkFuzzing(ctx context.Context, worktree string) stageOutcome {
 	}
 	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
+	// One package, because Go refuses to fuzz several at once.
+	//
+	// "go test -fuzz=. ./..." fails with "cannot use -fuzz flag with multiple
+	// packages" on any module holding more than one, which every generated
+	// workspace does: a root package beside cmd/generated. So the moment a run
+	// finally wrote a fuzz target, this stage failed — and reported the refusal
+	// as "fuzzing found a failing input", which accuses the program of a defect
+	// the fuzzer never looked for. Ladder rung 9 on 2026-08-03 was asked for a
+	// target three times and failed the gate as soon as it produced one.
+	target := packageHoldingFuzzTargets(worktree, files)
+	if target == "" {
+		target = "./..."
+	}
 	command := exec.CommandContext(deadline,
-		"go", "test", "-run=^$", "-fuzz=.", "-fuzztime=20s", "./...")
+		"go", "test", "-run=^$", "-fuzz=.", "-fuzztime=20s", target)
 	command.Dir = worktree
 	output, err := command.CombinedOutput()
 	if err != nil {
+		// A fuzzer that could not run has found nothing, and saying it did
+		// sends a run looking for a defect that was never reported. The two are
+		// different outcomes and the ledger has to tell them apart.
+		if why := fuzzingCouldNotRun(string(output)); why != "" {
+			return broke("fuzzing could not be run: "+why, boundaryEvidence)
+		}
 		return broke("fuzzing found a failing input: "+
 			firstLineOf(strings.TrimSpace(string(output))), boundaryEvidence)
 	}
@@ -610,4 +630,55 @@ func producedGoFiles(worktree string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// packageHoldingFuzzTargets names the package directory whose tests declare a
+// fuzz target, as a relative pattern go test accepts.
+//
+// Empty when nothing declares one, or when several packages do: the first is
+// nothing to fuzz, and the second is a choice this has no basis to make.
+func packageHoldingFuzzTargets(worktree string, files []string) string {
+	holding := map[string]bool{}
+	for _, file := range files {
+		if !strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(worktree, file))
+		if err != nil {
+			continue
+		}
+		if strings.Contains(string(body), "func Fuzz") {
+			holding[pathpkg.Dir(filepath.ToSlash(file))] = true
+		}
+	}
+	if len(holding) != 1 {
+		return ""
+	}
+	for directory := range holding {
+		if directory == "." || directory == "" {
+			return "."
+		}
+		return "./" + directory
+	}
+	return ""
+}
+
+// fuzzingCouldNotRun reports why the fuzzer never examined anything, or empty
+// when it ran and had something to say.
+//
+// Only the refusals go/test itself emits before running. Anything else is a
+// finding and is reported as one.
+func fuzzingCouldNotRun(output string) string {
+	for _, refusal := range []string{
+		"cannot use -fuzz flag with multiple packages",
+		"no fuzz tests to run",
+		"will not fuzz, -fuzztime",
+		"build failed",
+		"no required module provides package",
+	} {
+		if strings.Contains(output, refusal) {
+			return refusal
+		}
+	}
+	return ""
 }

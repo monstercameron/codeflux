@@ -3,6 +3,8 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -32,6 +34,15 @@ type outstanding struct {
 	// askedForCoverage records whether this instruction named uncovered lines,
 	// so the caller can count the round it has spent.
 	askedForCoverage bool
+	// askedForAdversarial records whether this instruction named hostile-input
+	// failures, so the caller can count the round it has spent.
+	askedForAdversarial bool
+	// askedForMutation records whether this instruction named defects the
+	// tests did not notice, so the caller can count the round it has spent.
+	askedForMutation bool
+	// askedForFuzz records whether this instruction named a decoding boundary
+	// with no fuzz target, so the caller can count the round it has spent.
+	askedForFuzz bool
 	// askedForProperty records whether this instruction asked for a property
 	// test, which is asked at most once per run.
 	askedForProperty bool
@@ -64,6 +75,15 @@ func (execution *AgentExecution) outstandingWork(
 	// propertyRounds is how many times this run has already been asked for a
 	// property test.
 	propertyRounds int,
+	// adversarialRounds is how many times this run has already been shown the
+	// ways it mishandles input nobody intended.
+	adversarialRounds int,
+	// mutationRounds is how many times this run has already been shown the
+	// deliberate defects its tests did not notice.
+	mutationRounds int,
+	// fuzzRounds is how many times this run has already been asked for a fuzz
+	// target over a decoding boundary.
+	fuzzRounds int,
 	// testsPassed is whether the run's own suite is actually known to have
 	// passed. Three instruction builders used to assert that it had, whether or
 	// not anything established it — see validationPreamble.
@@ -222,6 +242,107 @@ func (execution *AgentExecution) outstandingWork(
 		}
 	}
 
+	// Hostile input, while there are still attempts to answer it.
+	//
+	// The probe runs every produced command against input nobody intended, and
+	// it is a hard gate: a program that accepts nothing at all and exits zero
+	// fails the rung. It was measured only after the loop, in
+	// examineStructure, so a run converged, finished, and was then failed for
+	// something it was never asked about.
+	//
+	// Ladder rung 4 on 2026-08-03 lost every pass to this. The stage failed at
+	// 254 seconds with "given nothing at all: accepted it, printed nothing, and
+	// exited zero"; the last send-back had happened at 250 seconds, for
+	// something else. Six attempts, none of them told.
+	//
+	// Bounded like the others. The probe costs a build and a run of each
+	// produced command, so a run that has been shown its hostile-input
+	// failures twice and not fixed them will not be helped by a third telling.
+	const adversarialRoundBackstop = 2
+	// Asked alongside whatever else is outstanding, not after it.
+	//
+	// The neighbouring checks defer themselves behind len(parts) == 0 because
+	// they are refinements: a run with a broken build does not need to hear
+	// about an untried empty slice yet. This one is not a refinement. It is a
+	// hard gate, and a program that accepts input nobody intended and exits
+	// zero fails the rung whatever else is true of it.
+	//
+	// Deferring it meant it was never reached: rung 4 on 2026-08-03 always had
+	// something softer outstanding — completeness, then property tests — so
+	// the probe went unasked for six attempts and then failed the run at 203
+	// seconds for a defect nothing had ever mentioned.
+	if adversarialRounds < adversarialRoundBackstop {
+		if findings, probed, probeErr := execution.probeProducedCommands(
+			ctx, scope.worktree,
+		); probeErr == nil && probed > 0 && len(findings) > 0 {
+			work.gate = "adversarial"
+			work.because = "it mishandles input nobody intended"
+			work.askedForAdversarial = true
+			parts = append(parts, hostileInputInstruction(findings, testsPassed))
+			summaries = append(summaries, fmt.Sprintf(
+				"%d way(s) it mishandles unintended input", len(findings)))
+		} else if probeErr == nil && probed > 0 {
+			satisfied = append(satisfied,
+				"Every produced command survives input nobody intended.")
+		}
+	}
+
+	// A decoding boundary with nothing fuzzing it, while attempts remain.
+	//
+	// atom-fuzz is a hard gate and it was measured only after the loop, so a
+	// run was failed for a fuzz target nobody had asked it to write. Ladder
+	// rung 6 on 2026-08-03 ended on "1 decoding boundary(ies) were produced and
+	// no fuzz target was written for any of them", first said at 159 seconds
+	// with the last send-back at 93.
+	//
+	// Asked alongside the rest rather than deferred, because the question here
+	// is only whether a FuzzXxx function exists — a scan of the produced
+	// sources. The expensive part of that stage, running the fuzzer, is reached
+	// only once a target exists, and this asks before there is one.
+	const fuzzRoundBackstop = 2
+	if fuzzRounds < fuzzRoundBackstop {
+		if missing := boundariesWithoutFuzzTargets(scope.worktree); len(missing) > 0 {
+			work.gate = "atom-fuzz"
+			work.because = "a decoding boundary has nothing fuzzing it"
+			work.askedForFuzz = true
+			parts = append(parts, fuzzTargetInstruction(missing, testsPassed))
+			summaries = append(summaries, fmt.Sprintf(
+				"%d decoding boundary(ies) with no fuzz target", len(missing)))
+		}
+	}
+
+	// Tests that cannot detect a defect, once everything else holds.
+	//
+	// The mutation stage plants deliberate defects and asks whether the suite
+	// notices. It is a hard gate — a suite that catches three of eight fails
+	// the rung — and like the hostile-input probe it was measured only after
+	// the loop, so a run was failed for a suite nobody had told it was weak.
+	// Ladder rung 4 on 2026-08-03: "the tests caught 3 of 8 deliberate defects
+	// (43%)", first mentioned at 237 seconds, with the last send-back at 141.
+	//
+	// Deferred behind everything else, unlike the probe, and for a reason the
+	// probe does not share: this costs a whole suite execution per planted
+	// defect, ten seconds where the probe costs one. A run with a broken build
+	// or an untried empty slice has cheaper things to fix first, and the
+	// measurement would be answering a question about a suite that is about to
+	// change anyway.
+	const mutationRoundBackstop = 2
+	if len(parts) == 0 && mutationRounds < mutationRoundBackstop {
+		outcome := execution.checkMutations(ctx, scope.worktree, attribution)
+		if survivors, present := outcome.Evidence["survivors"].([]string); present &&
+			!outcome.Held && len(survivors) > 0 {
+			work.gate = "atom-mutation"
+			work.because = "its tests cannot detect a defect"
+			work.askedForMutation = true
+			parts = append(parts, survivingDefectInstruction(survivors, testsPassed))
+			summaries = append(summaries, fmt.Sprintf(
+				"%d deliberate defect(s) its tests did not notice", len(survivors)))
+		} else if outcome.Held {
+			satisfied = append(satisfied,
+				"The tests notice a deliberate defect in what this run wrote.")
+		}
+	}
+
 	// Only once everything else holds, and only once.
 	//
 	// This used to be asked alongside the delivery gates, and the two fought:
@@ -343,8 +464,11 @@ func uncoveredLineInstruction(uncovered []string) string {
 			"branch, make the error happen rather than deleting the branch: a "+
 			"path nothing exercises is a path nothing has ever shown to work. "+
 			"If a line genuinely cannot be reached — a defensive check for a "+
-			"state the types forbid — say so in a comment on that line and "+
-			"leave it.",
+			"state the types forbid — write \"//codeflux:unreachable <why>\" "+
+			"on the line above it and leave the branch alone. The reason is "+
+			"required and is read by a person, not matched: say what makes the "+
+			"state impossible. A marker with nothing after it exempts "+
+			"nothing.",
 		strings.Join(uncovered, ", "))
 }
 
@@ -368,4 +492,103 @@ func propertyTestInstruction(detail string) string {
 		"its parts, that an operation on two values agrees with the operator " +
 		"it implements. Keep the values small enough that overflow is not the " +
 		"thing under test."
+}
+
+// hostileInputInstruction is what a run is told about input it mishandles.
+//
+// The findings name the command and what it did, which is the actionable part:
+// "given nothing at all: accepted it, printed nothing, and exited zero" says
+// both the input and the wrong behaviour, and a run told that can decide what
+// the right behaviour is. A run told only "it is not robust" cannot.
+func hostileInputInstruction(findings []string, testsPassed bool) string {
+	var instruction strings.Builder
+	instruction.WriteString(validationPreamble(testsPassed) +
+		"the program mishandles input nobody intended. Each of these is the " +
+		"built command actually run against that input:\n\n")
+	for _, finding := range findings {
+		instruction.WriteString("  " + finding + "\n")
+	}
+	instruction.WriteString(
+		"\nDecide what each case should do and make it do that. Refusing an " +
+			"input is a correct answer and so is handling it; accepting it " +
+			"silently and exiting zero is not, because a caller cannot tell " +
+			"that from success. Do not change what the acceptance examples " +
+			"already produce.")
+	return instruction.String()
+}
+
+// survivingDefectInstruction is what a run is told about defects its tests
+// missed.
+//
+// Each survivor names the file and the change that was made to it, which is the
+// actionable part: a run told "the tests caught three of eight" knows only that
+// it scored badly, and a run told which line was altered without anything
+// noticing knows what to assert.
+func survivingDefectInstruction(survivors []string, testsPassed bool) string {
+	var instruction strings.Builder
+	instruction.WriteString(validationPreamble(testsPassed) +
+		"a deliberate defect was planted in what this run wrote and the tests " +
+		"did not notice. Each of these was changed, the suite was run, and it " +
+		"still passed:\n\n")
+	for _, survivor := range survivors {
+		instruction.WriteString("  " + survivor + "\n")
+	}
+	instruction.WriteString(
+		"\nAdd or strengthen a test so each one would fail. Assert the value " +
+			"the code produces, not merely that it produced something: a test " +
+			"that runs a function and checks nothing about the answer passes " +
+			"whatever the function does. Do not change the production code to " +
+			"suit a test.")
+	return instruction.String()
+}
+
+// boundariesWithoutFuzzTargets names the decoding boundaries this run produced
+// when nothing fuzzes any of them.
+//
+// All or nothing, deliberately, because that is what the gate measures: it
+// fails when there are boundaries and no target at all, and once one target
+// exists it moves on to running the fuzzer. Naming every boundary when the
+// count is zero tells the run what the targets would be for; naming them once
+// one exists would be asking for work the gate is not waiting on.
+func boundariesWithoutFuzzTargets(worktree string) []string {
+	files, err := producedGoFiles(worktree)
+	if err != nil {
+		return nil
+	}
+	targets := 0
+	for _, file := range files {
+		if !strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(worktree, file))
+		if readErr != nil {
+			continue
+		}
+		targets += strings.Count(string(body), "func Fuzz")
+	}
+	if targets > 0 {
+		return nil
+	}
+	boundaries, err := decodingBoundaries(worktree)
+	if err != nil {
+		return nil
+	}
+	return boundaries
+}
+
+// fuzzTargetInstruction asks for a fuzz target over each decoding boundary.
+func fuzzTargetInstruction(boundaries []string, testsPassed bool) string {
+	var instruction strings.Builder
+	instruction.WriteString(validationPreamble(testsPassed) +
+		"these functions decode input and nothing fuzzes them:\n\n")
+	for _, boundary := range boundaries {
+		instruction.WriteString("  " + boundary + "\n")
+	}
+	instruction.WriteString(
+		"\nWrite a Go fuzz target for each — func FuzzXxx(f *testing.F), with " +
+			"f.Add for a seed or two and f.Fuzz for the body. Assert that it " +
+			"does not panic and that whatever it returns is self-consistent; a " +
+			"decoder is allowed to refuse input, so a returned error is a pass, " +
+			"not a failure. Do not change the decoder to make fuzzing easier.")
+	return instruction.String()
 }
