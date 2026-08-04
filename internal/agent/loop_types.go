@@ -601,3 +601,13 @@ func writableFilesAdvice(plan PlanProjection) string {
 	return "The files this plan lets you change are " +
 		strings.Join(files, " and ") + "."
 }
+
+// WritableFilesAdvice names the files a plan permits, for the round document.
+//
+// Exported because the observation the model reads is built in another package,
+// and the alternative is that package deciding for itself which files are
+// writable — a second answer to a question this one already answers, which is
+// how the plan and its readers drift apart.
+func WritableFilesAdvice(plan PlanProjection) string {
+	return writableFilesAdvice(plan)
+}

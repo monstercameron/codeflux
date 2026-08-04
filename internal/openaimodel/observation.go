@@ -71,9 +71,21 @@ type observedToolResult struct {
 func observationJSON(input agent.ModelInput) string {
 	document := observation{
 		Round: input.Round,
-		WhatToDoNow: "Work through the plan in order. Only the tools listed " +
-			"in tools_you_may_call are available this round. Call one, or " +
-			"reply that the work is finished.",
+		// The writable files are named every round, not only in the refusal
+		// after a write lands somewhere it should not have.
+		//
+		// repository_context holds files the run may read and files it may
+		// write, and nothing in the document told them apart. On a generated
+		// workspace the difference matters immediately: the module's stub
+		// main.go sits in that list beside the files the plan owns, and it is a
+		// main package in a project being asked for a program, so it reads as
+		// the obvious place to write. Runs edited it repeatedly, were refused,
+		// and spent the round finding out what they could have been told at the
+		// start of it.
+		WhatToDoNow: "Work through the plan in order. " +
+			agent.WritableFilesAdvice(input.Plan) +
+			" Only the tools listed in tools_you_may_call are available this " +
+			"round. Call one, or reply that the work is finished.",
 	}
 	for _, item := range input.RepositoryContext {
 		document.RepositoryContext = append(document.RepositoryContext,

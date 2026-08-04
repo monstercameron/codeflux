@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-172
+Date: 2026-08-04
+Status: Committed as CL-20260803-162
+Change-ID: CL-20260803-162
+Request-or-TODO: Standing goal to optimise the prompting while ascending
+Goal: State the constraint before it is broken rather than after
+Assumptions: None. The round document was read directly from a rung 16 trace:
+  repository_context carried main.go, go.mod and the plan's own files with
+  nothing distinguishing them, and what_to_do_now was the same sentence every
+  round
+Decisions: Exported the loop's writableFilesAdvice rather than rebuilding the
+  list in the prompt package. Two places deciding which files are writable is
+  the drift that has already cost this pipeline several defects
+Files-or-schemas: internal/openaimodel/observation.go -- what_to_do_now;
+  internal/agent/loop_types.go -- WritableFilesAdvice
+Validation: internal/openaimodel and internal/agent pass. Two new tests
+Failures-or-discarded-approaches: The control test first asserted over the whole
+  rendered document and failed on the plan listing, which names a failed step's
+  file legitimately. Scoped to the instruction
+Known-limitations: The stub main.go is still in the context. It is there because
+  the module contains it; what changed is that the round now says it is not
+  writable
+Next-safe-step: Rung 16 pass 9 carries this
+
 Dev-Log: DL-20260803-171
 Date: 2026-08-04
 Status: Committed as CL-20260803-161

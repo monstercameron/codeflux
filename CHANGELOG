@@ -50,8 +50,31 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-161
+Change-ID: CL-20260803-162
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- the round document never said which files the run could write
+Request-or-TODO: Ladder rung 16; standing goal to optimise the prompting
+Outcome: repository_context holds files a run may read and files it may write,
+  and nothing in the document told them apart. On a generated workspace the
+  difference bites immediately: the module's stub main.go sits in that list
+  beside the files the plan owns, and it is a main package in a project being
+  asked for a program, so it reads as the obvious place to write. Runs edited it,
+  were refused, and spent the round finding out what they could have been told at
+  the start of it -- the advice existed and was only ever printed in the refusal
+  after the write. what_to_do_now now names the writable files every round. The
+  advice is the loop's own, exported rather than restated, because the
+  alternative is the prompt package deciding for itself which files are writable
+  and drifting from the plan that decides it.
+Affected-behavior: Every round's instruction names the files the plan permits, or
+  says plainly that none are.
+Compatibility-or-migration: None.
+Verification: Two new tests: the instruction names the open step's file, and a
+  plan whose steps are all closed says so rather than listing nothing.
+Dev-Log: DL-20260803-172
+
+Change-ID: CL-20260803-161
+Commit: c96d8e4
 Date: 2026-08-04
 Type: Fix -- a documentation round refused the documentation it had been asked
   for
