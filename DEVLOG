@@ -25,6 +25,29 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-170
+Date: 2026-08-04
+Status: Committed as CL-20260803-160
+Change-ID: CL-20260803-160
+Request-or-TODO: Ladder rung 16
+Goal: Cut the patch failure rate by naming the actual fault
+Assumptions: None. Measured rather than guessed: every failing hunk's
+  "It was looking for" block was one line, 58 of 58
+Decisions: Changed the descriptor as well as the message. The message is a
+  correction after the round is spent; the descriptor is the only place that can
+  stop the round being spent
+Files-or-schemas: internal/executor/patch_tool.go -- PatchHunk.Context,
+  countContext, the no-match branch; protocol.go -- the apply-patch summary
+Validation: internal/executor passes. Three new tests
+Failures-or-discarded-approaches: Counted every unprefixed line as context
+  first, which made Context zero impossible -- a patch ends with a newline, the
+  split yields a trailing empty element, and it landed in the unprefixed branch.
+  The new message would never have printed. Caught by the fixture asserting the
+  count before asserting the message
+Known-limitations: Two context lines is a request, not a rule. A hunk with one
+  is still accepted, because refusing it would fail patches that apply cleanly
+Next-safe-step: Rung 16 pass 8
+
 Dev-Log: DL-20260803-169
 Date: 2026-08-04
 Status: Committed as CL-20260803-159

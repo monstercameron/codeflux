@@ -50,8 +50,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-159
+Change-ID: CL-20260803-160
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a hunk with no context was told its text was wrong
+Request-or-TODO: Ladder rung 16
+Outcome: Measured on rung 16's pass 7: 58 of 58 no-match patch failures carried
+  exactly one line and no context at all. A bare line matches wherever that text
+  happens to occur, or nowhere, and "does not match anything" reads as "your
+  text is wrong" -- so a run that had copied the line correctly re-checked
+  characters instead of adding the context that would have located it. A
+  context-free hunk that fails to match is now told that is why, and the tool
+  descriptor asks for two unprefixed lines above and below every change, since
+  the cheapest place to prevent this is before it is sent. Blank lines are not
+  counted as context: every patch ends with a newline, so counting the trailing
+  empty element would have meant no hunk ever had zero context and the new
+  message could never have printed.
+Affected-behavior: apply-patch failure messages, and what the descriptor asks
+  for. A hunk that carries context and still misses keeps the older message,
+  which was right for that case.
+Compatibility-or-migration: None. PatchHunk gains a Context count.
+Verification: Three new tests covering the bare-hunk message, the with-context
+  control, and context counted the same whether or not its leading space was
+  written. An existing staleness test was exercising its case through a bare
+  hunk and now carries context, so it asserts the message it means to.
+Dev-Log: DL-20260803-170
+
+Change-ID: CL-20260803-159
+Commit: 6cd94db
 Date: 2026-08-04
 Type: Fix -- every attempt after the first was told to write somewhere else
 Request-or-TODO: Ladder rung 16

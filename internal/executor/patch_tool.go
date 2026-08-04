@@ -44,6 +44,10 @@ type PatchHunk struct {
 	// Added and Removed count what this hunk does, for the size limits.
 	Added   int
 	Removed int
+	// Context counts the unprefixed lines this hunk carries. It is what makes
+	// the hunk findable at all: a hunk with none is a bare line, and a bare
+	// line is wherever that text happens to occur, or nowhere.
+	Context int
 	// Anchor is file text this hunk is inside, used only to say which of
 	// several identical places is meant. It is never applied and never
 	// required to match; it narrows where Before is looked for and nothing
@@ -162,11 +166,13 @@ func ParsePatch(raw string) (PatchRequest, error) {
 		case strings.HasPrefix(line, " "):
 			before = append(before, line[1:])
 			after = append(after, line[1:])
+			countContext(current, line[1:])
 		default:
 			// An unprefixed line is context written without its leading space,
 			// which is common and harmless to accept.
 			before = append(before, line)
 			after = append(after, line)
+			countContext(current, line)
 		}
 	}
 	closeHunk()
@@ -255,6 +261,19 @@ func ParsePatch(raw string) (PatchRequest, error) {
 	return request, nil
 }
 
+// countContext records a context line, if it is one that could locate anything.
+//
+// Blank lines do not count. Every patch ends with a newline, so splitting one
+// yields a final empty element that lands in the unprefixed branch — count that
+// and no hunk ever has zero context, which would make "this hunk carries no
+// context" a message that could never be printed. A blank line inside a hunk is
+// excluded for the same reason it is excluded at the end: it locates nothing.
+func countContext(hunk *PatchHunk, line string) {
+	if strings.TrimSpace(line) != "" {
+		hunk.Context++
+	}
+}
+
 // patchHeaderPath pulls the file out of a header line.
 func patchHeaderPath(line string) string {
 	for _, prefix := range []string{
@@ -335,6 +354,25 @@ func ApplyPatch(existing string, request PatchRequest) (string, PatchOutcome, er
 			patched = strings.Replace(patched, hunk.Before, hunk.After, 1)
 			cursor = at + len(hunk.After)
 		case 0:
+			// A hunk with no context is reported as what it is.
+			//
+			// "Does not match anything" reads as "your text is wrong" and sends
+			// a run to re-check characters it has already copied correctly. The
+			// likelier fault in a bare hunk is that it is bare: one line with
+			// nothing around it matches wherever that text happens to occur, or
+			// nowhere at all. Every one of the 58 measured no-match failures on
+			// ladder rung 16 on 2026-08-04 carried exactly one line and no
+			// context — 58 of 58, which is not a tendency, it is the whole
+			// failure mode.
+			if hunk.Context == 0 {
+				return "", PatchOutcome{}, fmt.Errorf(
+					"hunk %d carries no context, so there is nothing to locate "+
+						"it by, and the line it names is not in %s as written. "+
+						"Put at least two unprefixed lines above and below the "+
+						"change, copied exactly from the file.\n\nIt was "+
+						"looking for:\n%s",
+					index+1, request.Path, indentForMessage(hunk.Before))
+			}
 			return "", PatchOutcome{}, fmt.Errorf(
 				"hunk %d does not match anything in %s. Its context and the "+
 					"lines it removes must appear exactly as they are in the "+

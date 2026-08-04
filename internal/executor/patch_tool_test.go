@@ -78,8 +78,14 @@ func TestAnAmbiguousHunkIsRefused(t *testing.T) {
 
 // TestAStaleHunkIsRefusedWithoutTouchingTheFile covers the case where the file
 // moved under the model.
+//
+// The hunk carries context deliberately. A hunk with none fails for a different
+// reason — it cannot be located at all — and is told so in different words, so
+// exercising staleness through a bare hunk would have been asserting the wrong
+// message about the wrong defect.
 func TestAStaleHunkIsRefusedWithoutTouchingTheFile(t *testing.T) {
-	request, err := ParsePatch("*** Update File: main.go\n@@\n-func gone() {\n+func gone2() {\n")
+	request, err := ParsePatch("*** Update File: main.go\n@@\n" +
+		" package main\n-func gone() {\n+func gone2() {\n }\n")
 	if err != nil {
 		t.Fatal(err)
 	}
