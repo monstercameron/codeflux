@@ -41,7 +41,7 @@ func TestThePropertyAskSurvivesBeingBuried(t *testing.T) {
 // chosen inputs — rather than only naming the gate that is unhappy.
 func TestThePropertyInstructionSaysWhatAPropertyIs(t *testing.T) {
 	instruction := propertyTestInstruction(
-		"all 20 test(s) check a single example")
+		"all 20 test(s) check a single example", true)
 	for _, wanted := range []string{"table", "across a range of inputs"} {
 		if !strings.Contains(instruction, wanted) {
 			t.Errorf("the instruction never mentions %q, so telling a run "+
@@ -64,7 +64,7 @@ func TestThePropertyInstructionSaysWhatAPropertyIs(t *testing.T) {
 // laws. A law is a property in the only sense this gate means, so the idea was
 // not the missing part. The five lines that say what an answer looks like were.
 func TestThePropertyInstructionShowsTheShape(t *testing.T) {
-	instruction := propertyTestInstruction("all 22 test(s) check a single example")
+	instruction := propertyTestInstruction("all 22 test(s) check a single example", true)
 
 	// A loop over several inputs, which is the whole of what the gate detects.
 	if !strings.Contains(instruction, "for _, in := range") {
@@ -82,4 +82,41 @@ func TestThePropertyInstructionShowsTheShape(t *testing.T) {
 		t.Errorf("nothing tells the run the loop is the easy part:\n%s",
 			instruction)
 	}
+}
+
+// TestThePropertyAskDoesNotWaitForEverythingElse is the deferral that meant it
+// was never asked at all.
+//
+// The ask sat behind "nothing else is outstanding", which is right for a
+// refinement and wrong for a hard gate: a run that never states a property
+// fails the rung whatever else is true of it. Ladder rung 19 on 2026-08-04
+// spent six sendbacks on other gates, was never once told about this, and then
+// failed on it — with a program that built, ran, printed exactly what was asked
+// and survived every hostile input.
+//
+// This is the same argument the hostile-input probe already carries, and the
+// same failure it was written for: "Deferring it meant it was never reached".
+func TestThePropertyAskDoesNotWaitForEverythingElse(t *testing.T) {
+	// The instruction is honest about the state it is asked in, because being
+	// asked for a property while the build is broken should read as the second
+	// job it is.
+	whilePassing := propertyTestInstruction("all 8 test(s) check one example", true)
+	whileFailing := propertyTestInstruction("all 8 test(s) check one example", false)
+	if whilePassing == whileFailing {
+		t.Error("the instruction reads the same whether or not the tests pass, " +
+			"so a run asked for a property mid-breakage is told its suite is " +
+			"fine")
+	}
+	if !strings.Contains(whilePassing, "tests pass") {
+		t.Errorf("the passing form does not say so: %q",
+			firstLineOfForTest(whilePassing))
+	}
+}
+
+// firstLineOfForTest keeps the failure messages readable.
+func firstLineOfForTest(text string) string {
+	if cut := strings.IndexByte(text, '\n'); cut >= 0 {
+		return text[:cut]
+	}
+	return text
 }

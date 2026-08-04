@@ -50,8 +50,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-176
+Change-ID: CL-20260803-177
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a hard gate deferred itself behind every softer one and was never
+  reached
+Request-or-TODO: Ladder rung 19
+Outcome: atom-property-tests waited for nothing else to be outstanding before it
+  would ask. That is right for a refinement -- a run with a broken build does not
+  need to hear about an untried empty slice yet -- and wrong for a hard gate: a
+  run that never states a property fails the rung whatever else is true of it.
+  Rung 19 on 2026-08-04 spent six sendbacks on other gates, was never once told
+  about this, and then failed on it, with a program that built, ran, printed
+  exactly what was asked and survived every hostile input. This is the same
+  argument the hostile-input probe already carries in this file, written for the
+  same failure on rung 4: "Deferring it meant it was never reached". It is now
+  asked alongside whatever else is outstanding, still bounded at three, and the
+  instruction says whether the suite currently passes -- being asked for a
+  property while the build is broken should read as the second job it is.
+Affected-behavior: A run is told about a missing property while it still has
+  attempts to write one.
+Compatibility-or-migration: None.
+Verification: A new test that the instruction differs by whether the tests
+  passed, so a run asked mid-breakage is not told its suite is fine. The three
+  existing property-instruction tests still hold.
+Dev-Log: DL-20260803-187
+
+Change-ID: CL-20260803-176
+Commit: fbf36b3
 Date: 2026-08-04
 Type: Investigation -- LAD-003 narrowed; one hypothesis refuted and a better one
   found

@@ -220,13 +220,30 @@ func (execution *AgentExecution) outstandingWork(
 	//
 	// Still bounded, and still only when nothing else is outstanding, so it
 	// cannot crowd out work that has to happen first.
-	if len(parts) == 0 && propertyRounds < propertyRoundBackstop {
+	// Asked alongside whatever else is outstanding, for the same reason the
+	// hostile-input probe is.
+	//
+	// It waited for nothing else to be outstanding, which is right for a
+	// refinement and wrong for a hard gate: a run that never states a property
+	// fails the rung whatever else is true of it. Deferring it meant it could
+	// go unasked entirely. Rung 19 on 2026-08-04 spent six sendbacks on other
+	// gates, was never once told about this, and then failed on it with a
+	// program that built, ran, printed exactly what was asked and survived
+	// every hostile input.
+	//
+	// Still bounded, and the instruction says whether the tests currently pass,
+	// because being asked for a property while the build is broken should read
+	// as the second job it is.
+	if propertyRounds < propertyRoundBackstop {
 		if outcome := checkPropertyTests(scope.worktree); !outcome.Held &&
 			!outcome.Skipped {
-			work.gate = "atom-property-tests"
-			work.because = "nothing states a property over a set of inputs"
+			if work.gate == "" {
+				work.gate = "atom-property-tests"
+				work.because = "nothing states a property over a set of inputs"
+			}
 			work.askedForProperty = true
-			parts = append(parts, propertyTestInstruction(outcome.Detail))
+			parts = append(parts,
+				propertyTestInstruction(outcome.Detail, testsPassed))
 			summaries = append(summaries,
 				"no test states a property over a set of inputs")
 		} else if outcome.Held {
@@ -503,8 +520,9 @@ func uncoveredLineInstruction(uncovered []string) string {
 // fuzzing library it does not have; a run told "write one table over several
 // inputs and assert the relationship that holds for all of them" writes the
 // thing that was wanted, in plain Go, in ten lines.
-func propertyTestInstruction(detail string) string {
-	return "No test states a property over a set of inputs — every test " +
+func propertyTestInstruction(detail string, testsPassed bool) string {
+	return validationPreamble(testsPassed) +
+		"no test states a property over a set of inputs — every test " +
 		"checks one example and its one expected answer. " + detail +
 		"\n\nAdd one test that asserts a relationship which must hold across " +
 		"a range of inputs, rather than a value for a single input. Write it " +

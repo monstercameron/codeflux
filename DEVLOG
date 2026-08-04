@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-187
+Date: 2026-08-04
+Status: Committed as CL-20260803-177
+Change-ID: CL-20260803-177
+Request-or-TODO: Ladder rung 19
+Goal: Ask for a hard gate while the run can still answer it
+Assumptions: None. The rung 19 trace lists six sendbacks and
+  atom-property-tests is not among them, yet it is what failed the run
+Decisions: Copied the rule the hostile-input probe already follows rather than
+  inventing one. That block's comment describes this exact failure from rung 4
+  and gives the reason a hard gate cannot defer itself; the property gate is
+  hard for the same reason and the argument transfers without change
+Files-or-schemas: internal/coordinator/agent_outstanding.go -- the property ask
+  no longer requires an empty outstanding list, and propertyTestInstruction
+  takes testsPassed like its neighbours
+Validation: Four property tests pass
+Failures-or-discarded-approaches: None here. Note that CL-20260803-171 raised
+  this gate's round backstop from one to three for a related reason — the ask
+  being buried — and that fix was necessary but not sufficient, because a
+  backstop on repeats does nothing for an ask that never fires once
+Known-limitations: Asking alongside makes instructions longer. The bound and the
+  "nothing else outstanding" rule still govern every neighbouring refinement
+Next-safe-step: Rung 19 pass 2
+
 Dev-Log: DL-20260803-186
 Date: 2026-08-04
 Status: Committed as CL-20260803-176
