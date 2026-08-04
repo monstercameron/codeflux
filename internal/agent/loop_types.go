@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"codeflux.dev/codeflux/internal/domain"
@@ -458,4 +459,145 @@ type LoopDependencies struct {
 // ApprovedToolSchema returns the strict JSON schema sent to the model.
 func ApprovedToolSchema(tool ApprovedTool) (json.RawMessage, error) {
 	return approvedToolSchema(tool)
+}
+
+// maximumUnverifiedCompletionRefusals bounds how many times one attempt may be
+// sent back for ending on work it has not checked.
+//
+// Bounded because the guard must not become the thing that spends the attempt.
+// Not bounded to one, which was the first version and left the hole it was
+// meant to close: the run claimed completion, was refused, tested, saw the
+// failure, patched, and claimed completion again with the refusal already
+// spent. Three is enough for test-fix-test and short of a round budget of
+// sixteen.
+const maximumUnverifiedCompletionRefusals = 3
+
+// toolCanStillBeCalled reports whether an open plan step can accept this tool.
+//
+// The approved list is not the answer: a tool is offered to the model only
+// while some step that is still open names it, so asking the approved list
+// whether the suite can be run could demand a tool the run no longer has —
+// the unfollowable instruction this loop has already paid for twice.
+func toolCanStillBeCalled(plan PlanProjection, name executor.ToolName) bool {
+	for _, step := range plan.Steps {
+		if step.State == StepImplemented || step.State == StepValidated ||
+			step.State == StepSkipped {
+			continue
+		}
+		for _, completion := range step.CompletionTools {
+			if completion == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// errEmptyModelTurn is a turn that called no tool and declared no completion.
+//
+// Named separately from every other malformed turn because it is the one the
+// loop can answer itself. The others are the model disagreeing with the
+// contract — proposing a call and a completion together, or more calls than a
+// round allows — and the next attempt has to be told about those. This one is
+// the model losing its place, and the next round fixes it.
+var errEmptyModelTurn = errors.New(
+	"turn contains neither tool calls nor completion")
+
+// maximumEmptyTurnRetries bounds how many silent turns one run answers before
+// the attempt is spent, so a model that has stopped responding usefully cannot
+// spend the whole round budget saying nothing.
+//
+// Four rather than two. Rung 4 on 2026-08-03 produced three empty turns in a
+// row twice, so a bound of two absorbed the first two and lost the attempt to
+// the third — paying the round cost and the attempt cost. A round is about four
+// seconds against an attempt's thirty to eighty, and the round budget is
+// sixteen, so absorbing more is the cheaper mistake in both directions.
+const maximumEmptyTurnRetries = 4
+
+// openStepAdvice names the steps a call can still be bound to.
+//
+// A turn whose every tool call named a closed step arrives here indistinguishable
+// from a turn that said nothing: the adapter discards a call it cannot bind
+// rather than failing the round over it, so the loop sees an empty turn and the
+// model is told only that nothing happened. Telling it which steps are open
+// turns that into something it can act on.
+func openStepAdvice(plan PlanProjection) string {
+	var open []string
+	for _, step := range plan.Steps {
+		if !StepMayAcceptAnotherCall(step.State) {
+			continue
+		}
+		tools := make([]string, 0, len(step.CompletionTools))
+		for _, tool := range step.CompletionTools {
+			tools = append(tools, string(tool))
+		}
+		open = append(open, step.ID+" ("+strings.Join(tools, ", ")+")")
+	}
+	if len(open) == 0 {
+		return "No step is still open."
+	}
+	return "Still open: " + strings.Join(open, "; ") + "."
+}
+
+// StepMayAcceptAnotherCall reports whether a plan step can still take a tool
+// call, including after it has already been completed once.
+//
+// Completing a step is not the same as freezing what it names. Refinement
+// rewrites the same files repeatedly — a patch that fixes the compile error the
+// previous patch introduced is the ordinary case, not an anomaly — and running
+// the suite again after a change is the whole point of running it at all. A
+// step is spent only when it failed or was skipped, which are the two states
+// that say this route is closed rather than this route has been used.
+//
+// Ladder rung 4 on 2026-08-03 is what the stricter reading costs. After two
+// successful patches both write steps closed, the tool list collapsed from
+// [apply-patch test] to [test], and the run — which still had a file to fix —
+// spent the rest of the attempt emitting turns nothing could bind, five in a
+// row, until the attempt died. The loop already intended to allow this: "a
+// write bound to a closed step is the model rewriting a file the plan named,
+// which stepOwningPath deliberately allows rather than discarding the attempt
+// over". Three checks ahead of it refused first.
+//
+// What still constrains a rewrite is unchanged and lives elsewhere: the file
+// scope a step declares, the whole-file rewrite limit, and the transition that
+// is skipped rather than repeated for a step already implemented.
+func StepMayAcceptAnotherCall(state StepState) bool {
+	return state != StepFailed && state != StepSkipped
+}
+
+// maximumOutOfScopeRetries bounds how many times one attempt is told that the
+// file it reached for is not in the plan.
+//
+// Two, because the answer is short and specific — here are the files you may
+// change — and a run that has not taken it twice is not going to take it a
+// fourth time. Past the bound the attempt ends, which is what the budget is
+// for.
+const maximumOutOfScopeRetries = 2
+
+// writableFilesAdvice names the files this plan actually permits.
+//
+// A refusal that says only "outside plan step scope" leaves the run to guess
+// which file it should have written, and on a generated workspace the wrong
+// guess is right there in its opening context: a stub main.go beside the
+// cmd/generated/main.go the plan owns.
+func writableFilesAdvice(plan PlanProjection) string {
+	seen := map[string]bool{}
+	var files []string
+	for _, step := range plan.Steps {
+		if !StepMayAcceptAnotherCall(step.State) {
+			continue
+		}
+		for _, file := range step.ExpectedFiles {
+			if seen[file] {
+				continue
+			}
+			seen[file] = true
+			files = append(files, file)
+		}
+	}
+	if len(files) == 0 {
+		return "This plan names no file you may change."
+	}
+	return "The files this plan lets you change are " +
+		strings.Join(files, " and ") + "."
 }

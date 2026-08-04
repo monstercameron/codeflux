@@ -376,10 +376,7 @@ func TestExecutionLoopRejectsEditOutsideExpectedFilesBeforeAuthority(
 	t *testing.T,
 ) {
 	harness := newLoopHarness(t)
-	harness.model.steps = []modelStep{func(
-		context.Context,
-		ModelInput,
-	) (ModelTurn, error) {
+	outside := func(context.Context, ModelInput) (ModelTurn, error) {
 		return successfulToolTurn(
 			harness.model.identity,
 			newModelRequestID(t),
@@ -389,7 +386,13 @@ func TestExecutionLoopRejectsEditOutsideExpectedFilesBeforeAuthority(
 			"implementation",
 			true,
 		), nil
-	}}
+	}
+	// Reaching outside the plan is answered, then answered again, and only then
+	// does it end the attempt. The write never happens either way — what the
+	// retries buy is the chance to aim the same change at a file the plan owns,
+	// which on a generated workspace is nearly always what was meant: the stub
+	// main.go in the opening context, mistaken for cmd/generated/main.go.
+	harness.model.steps = []modelStep{outside, outside, outside}
 
 	_, err := harness.loop.Run(t.Context(), harness.input)
 	if !errors.Is(err, ErrMalformedModelTurn) ||
@@ -892,9 +895,27 @@ func TestExecutionLoopStopsAfterRepeatedIdenticalFailedAction(t *testing.T) {
 	}
 	if outcome.Kind != OutcomeAwaitingDirection ||
 		outcome.ToolCalls != 2 ||
-		outcome.Plan.Steps[0].State != StepFailed ||
 		len(harness.journal.results) != 2 {
 		t.Fatalf("outcome = %#v", outcome)
+	}
+	// The step is not written off for this.
+	//
+	// Stopping is right — a call that has failed twice will not work a third
+	// time — and the outcome above says so. Recording the step as failed is a
+	// different thing, and it outlives the attempt: the coordinator rebuilds
+	// the plan for every attempt but the durable step record persists, and
+	// nothing can move a step out of failed, so completion evidence can never
+	// attribute to it again. A run could then fix the work, satisfy every gate,
+	// and still be unable to record that it had.
+	//
+	// Ladder rung 4 on 2026-08-03 ended precisely there: "the program is
+	// correct and the pipeline did not converge", with the reason four lines
+	// below it — "validate attributed plan step: plan step \"step-001\" is
+	// failed, not implemented". Three failed patches in one early attempt had
+	// closed the door on the other five.
+	if outcome.Plan.Steps[0].State == StepFailed {
+		t.Error("the step was recorded as failed, which no later attempt can " +
+			"undo and which blocks completion for the rest of the run")
 	}
 }
 

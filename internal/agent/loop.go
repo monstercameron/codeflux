@@ -121,6 +121,16 @@ func (loop *ExecutionLoop) Run(
 		tokens          domain.TokenCount
 		previousResults []ToolFeedback
 	)
+	// writesSinceLastTest is whether a material edit has landed that no test run
+	// has seen since, and lastTestFailed what the most recent run of the suite
+	// said. Together they decide whether an attempt may end. emptyTurnRetries
+	// and unverifiedCompletionRefusals bound the two places the loop answers a
+	// turn itself, so neither can spend the round budget.
+	writesSinceLastTest := false
+	lastTestFailed := false
+	emptyTurnRetries := 0
+	outOfScopeRetries := 0
+	unverifiedCompletionRefusals := 0
 	failureCounts := make(map[string]uint32)
 	callIDs := make(map[string]struct{})
 	modelRequestIDs := make(map[domain.ModelRequestID]struct{})
@@ -308,6 +318,41 @@ func (loop *ExecutionLoop) Run(
 			turn,
 			input.Limits.MaximumToolCallsPerRound,
 		); err != nil {
+			// A turn that said nothing is answered, not escalated.
+			//
+			// Every malformed turn ends the attempt: the coordinator treats it
+			// as the model's mistake rather than the machinery's, sends the
+			// work back, and starts again. That is right for a turn that
+			// proposed something impossible, because the next attempt needs to
+			// be told. It is far too expensive for a turn that proposed
+			// nothing at all, which is a slip the very next round fixes — an
+			// attempt costs thirty to sixty seconds against a round's four.
+			//
+			// Ladder rung 4 on 2026-08-03 lost attempt 2 to exactly this, with
+			// the whole diagnosis being "turn contains neither tool calls nor
+			// completion".
+			//
+			// Only the empty turn, and only a bounded number of times. A turn
+			// carrying both tool calls and completion, or more calls than the
+			// round allows, is a model disagreeing with the contract rather
+			// than losing its place, and it still costs the attempt.
+			if errors.Is(err, errEmptyModelTurn) &&
+				emptyTurnRetries < maximumEmptyTurnRetries {
+				emptyTurnRetries++
+				previousResults = []ToolFeedback{{
+					Tool:  "none",
+					State: "failed", IsError: true,
+					SummaryRedacted: "that turn did nothing",
+					StdoutRedacted: "Your last turn produced no tool call this " +
+						"round could accept and said nothing, so nothing " +
+						"happened. A call naming a step that is already " +
+						"finished is discarded, which looks exactly like this. " +
+						openStepAdvice(plan) + " Call one of the tools listed " +
+						"in tools_you_may_call against one of those steps, or " +
+						"reply in plain text that the work is finished.",
+				}}
+				continue
+			}
 			return LoopOutcome{}, err
 		}
 		// A durable pause/cancel may arrive with the final stream frame. Re-read
@@ -322,6 +367,50 @@ func (loop *ExecutionLoop) Run(
 			return outcome, nil
 		}
 		if turn.Completion != CompletionNone {
+			// An attempt may not end on a write nobody ran the tests over.
+			//
+			// The coordinator re-runs the suite on whatever the attempt leaves
+			// behind, and when that fails the whole refinement is discarded and
+			// the worktree put back — deliberately, because a broken candidate
+			// makes a worse baseline than the verified revision it replaced.
+			// The expensive part is not the discard, it is that the run had the
+			// test tool the entire time and simply stopped one call short: the
+			// failure it would have seen was its own, in the file it had just
+			// written, and fixing it in the same attempt costs one round.
+			//
+			// Ladder rung 3 on 2026-08-03 lost attempts 5 and 7 that way,
+			// roughly 200 seconds, each time reported as "files were written
+			// after the run's own last test, so the suite was run again here
+			// and did not pass". It had reached 30 of 36 synthesised cases and
+			// gave the work back twice.
+			//
+			// Refused once per run, not every time. If the run tests, still
+			// claims completion, and the suite genuinely disagrees, that is the
+			// coordinator's gate to judge — this guard exists to stop an
+			// unverified ending, not to argue with a verified one.
+			if (writesSinceLastTest || lastTestFailed) &&
+				unverifiedCompletionRefusals < maximumUnverifiedCompletionRefusals &&
+				toolCanStillBeCalled(plan, executor.ToolTest) {
+				unverifiedCompletionRefusals++
+				why := "You have written files since the last time the tests " +
+					"ran, so nothing has checked what you are about to hand back."
+				if lastTestFailed {
+					why = "The last run of the tests did not pass, so what you " +
+						"are about to hand back is known to be broken."
+				}
+				previousResults = []ToolFeedback{{
+					Tool:  string(executor.ToolTest),
+					State: "failed", IsError: true,
+					SummaryRedacted: "the work is not finished yet",
+					StdoutRedacted: why + " Run the tests now. If they pass, say " +
+						"the work is finished; if they do not, fix what they " +
+						"report first — a failure found here costs one round, " +
+						"and the same failure found after this attempt ends " +
+						"costs the whole attempt, because the work is put back " +
+						"to the last revision that passed.",
+				}}
+				continue
+			}
 			return completionOutcome(
 				turn.Completion,
 				control,
@@ -404,6 +493,43 @@ func (loop *ExecutionLoop) Run(
 				// names, or one that several name, is still refused.
 				corrected, ok := stepOwningPath(plan, decoded.request)
 				if !ok {
+					// Writing outside the plan costs a round, not the attempt.
+					//
+					// The contract is unchanged and the write does not happen:
+					// what changes is the price of proposing it. A run reaching
+					// for a file no step names has made a correctable mistake —
+					// on a generated workspace it is nearly always the stub
+					// main.go it was shown in its opening context, mistaken for
+					// the cmd/generated/main.go the plan actually owns — and
+					// ending the attempt spends sixty seconds to say what one
+					// round can say better, while it still has the file open.
+					//
+					// Ladder rung 9 on 2026-08-03 lost three of nine attempts
+					// this way, every one of them to that same stub.
+					//
+					// Bounded, so a run that keeps reaching outside the plan
+					// still ends the attempt rather than spending the round
+					// budget being told no.
+					if outOfScopeRetries < maximumOutOfScopeRetries {
+						outOfScopeRetries++
+						// Appended to this round's results rather than
+						// assigned over the previous ones: this is inside the
+						// loop over a turn's tool calls, so the round's own
+						// tail is what carries results forward, and anything
+						// written straight to previousResults is overwritten
+						// by it before the next round ever sees it.
+						currentResults = append(currentResults, ToolFeedback{
+							CallID: decoded.request.ID,
+							Tool:   string(decoded.request.Name),
+							State:  "failed", IsError: true,
+							SummaryRedacted: "that file is not in this plan",
+							StdoutRedacted: err.Error() + ". " +
+								writableFilesAdvice(plan) + " Nothing was " +
+								"written. Send the same change against one of " +
+								"those files.",
+						})
+						continue
+					}
 					return LoopOutcome{}, err
 				}
 				stepIndex = corrected
@@ -413,6 +539,29 @@ func (loop *ExecutionLoop) Run(
 					return LoopOutcome{}, err
 				}
 			}
+			// Every record this call produces names the step the loop actually
+			// bound it to, not the label the model sent.
+			//
+			// The correction above moved stepIndex and left proposed.PlanStepID
+			// alone, so the tool request, its result, the checkpoints and the
+			// step transition were written from two different answers to the
+			// same question. The durable consistency trigger on
+			// agent_plan_step_transitions requires them to agree — it matches a
+			// transition against a tool request on task, run, plan revision,
+			// step and model request — and transitionStep reads the corrected
+			// step while everything else wrote the mislabelled one.
+			//
+			// So a mislabelled call succeeded, its work landed, and then the
+			// transition recording it was refused with "plan step transition
+			// attribution is inconsistent". The loop returns that error, which
+			// discards the whole attempt: ladder rung 1 lost attempt 2 to it on
+			// 2026-08-03, after four patches, with the message "the last attempt
+			// was refused before any of its work was recorded".
+			//
+			// The correction is what saved rung 5 and is not in question. What
+			// was wrong is that it was applied in one place and not the other
+			// four.
+			boundStepID := plan.Steps[stepIndex].ID
 			authorization, err := loop.dependencies.Authority.RouteTool(
 				ctx,
 				decoded.request,
@@ -445,7 +594,7 @@ func (loop *ExecutionLoop) Run(
 			startRecord := ToolStartRecord{
 				TaskID: input.TaskID, RunID: input.RunID,
 				PlanRevision:          plan.Revision,
-				PlanStepID:            proposed.PlanStepID,
+				PlanStepID:            boundStepID,
 				Round:                 rounds,
 				RequestID:             decoded.request.ID,
 				ModelRequestID:        turn.ModelRequestID,
@@ -469,7 +618,7 @@ func (loop *ExecutionLoop) Run(
 					CheckpointRequest{
 						TaskID: input.TaskID, RunID: input.RunID,
 						PlanRevision:   plan.Revision,
-						PlanStepID:     proposed.PlanStepID,
+						PlanStepID:     boundStepID,
 						ToolRequestID:  decoded.request.ID,
 						ModelRequestID: turn.ModelRequestID,
 						Round:          rounds, Trigger: CheckpointBeforeRisky,
@@ -570,7 +719,7 @@ func (loop *ExecutionLoop) Run(
 				ToolResultRecord{
 					TaskID: input.TaskID, RunID: input.RunID,
 					PlanRevision: plan.Revision,
-					PlanStepID:   proposed.PlanStepID,
+					PlanStepID:   boundStepID,
 					Round:        rounds,
 					RequestID:    decoded.request.ID,
 					Result:       result,
@@ -580,13 +729,18 @@ func (loop *ExecutionLoop) Run(
 				return LoopOutcome{}, err
 			}
 			succeeded := result.State == "succeeded"
+			if executor.ToolName(decoded.request.Name) == executor.ToolTest {
+				writesSinceLastTest = !succeeded && writesSinceLastTest
+				lastTestFailed = !succeeded
+			}
 			if tool.MaterialEdit && succeeded {
+				writesSinceLastTest = true
 				if err := loop.dependencies.Checkpoints.CreateCheckpoint(
 					context.WithoutCancel(ctx),
 					CheckpointRequest{
 						TaskID: input.TaskID, RunID: input.RunID,
 						PlanRevision:   plan.Revision,
-						PlanStepID:     proposed.PlanStepID,
+						PlanStepID:     boundStepID,
 						ToolRequestID:  decoded.request.ID,
 						ModelRequestID: turn.ModelRequestID,
 						Round:          rounds,
@@ -652,20 +806,28 @@ func (loop *ExecutionLoop) Run(
 				failureCounts[fingerprint]++
 				if failureCounts[fingerprint] >=
 					input.Limits.MaximumIdenticalFailures {
-					if plan.Steps[stepIndex].State != StepFailed {
-						if err := loop.transitionStep(
-							context.WithoutCancel(ctx),
-							input,
-							&plan,
-							stepIndex,
-							StepFailed,
-							"identical failed action reached the stop threshold",
-							decoded.request.ID,
-							turn.ModelRequestID,
-						); err != nil {
-							return LoopOutcome{}, err
-						}
-					}
+					// The step is not marked failed for this.
+					//
+					// A run of identical tool failures ends the attempt, which
+					// is right: repeating a call that has failed three times
+					// will not work the fourth. But the plan is rebuilt for
+					// every attempt while the durable step record is not, so a
+					// step written off here stays written off for the rest of
+					// the run — and completion evidence must attribute to an
+					// implemented step, so the run can go on to finish the work,
+					// satisfy every gate, and still be unable to record that it
+					// did.
+					//
+					// Ladder rung 4 on 2026-08-03 ended exactly there: "the
+					// program is correct and the pipeline did not converge",
+					// with the real reason four lines further down — "validate
+					// attributed plan step: plan step \"step-001\" is failed,
+					// not implemented". Three failed patches in one early
+					// attempt had closed the door.
+					//
+					// The attempt still ends, and the outcome below still says
+					// why. What is not done is writing that verdict into a
+					// record the next five attempts inherit.
 					return finishLoopOutcome(
 						OutcomeAwaitingDirection,
 						"identical failed action repeated; user direction is required",
@@ -829,10 +991,7 @@ func validateFixedModelIdentity(model providers.ModelIdentity) error {
 
 func validateModelTurn(turn ModelTurn, perRound uint32) error {
 	if len(turn.ToolCalls) == 0 && turn.Completion == CompletionNone {
-		return fmt.Errorf(
-			"%w: turn contains neither tool calls nor completion",
-			ErrMalformedModelTurn,
-		)
+		return fmt.Errorf("%w: %w", ErrMalformedModelTurn, errEmptyModelTurn)
 	}
 	if len(turn.ToolCalls) != 0 && turn.Completion != CompletionNone {
 		return fmt.Errorf(
@@ -1045,10 +1204,29 @@ func executableStepIndex(plan PlanProjection, stepID string) (int, error) {
 		if step.ID != stepID {
 			continue
 		}
-		if step.State == StepImplemented ||
-			step.State == StepValidated ||
-			step.State == StepFailed ||
-			step.State == StepSkipped {
+		// A check may be performed again after it has been performed.
+		//
+		// Running the suite is not a deliverable a run finishes once; it is how
+		// it finds out whether everything else is finished, and the answer stops
+		// being true the moment the next file is written. Closing the step on
+		// the first call took the tool away for the rest of the attempt, because
+		// a tool is offered only while some step that can accept it is open. A
+		// run that tested early and then kept patching could not check itself
+		// again however much it changed, so it ended on work nothing had seen
+		// and the coordinator discarded the whole attempt.
+		//
+		// Ladder rung 3 on 2026-08-03: attempt 4 was offered [apply-patch test]
+		// for two rounds, ran the suite, and was offered [apply-patch] for the
+		// seven rounds after it. Attempts 5 and 6 went the same way.
+		//
+		// The step still closes on its first successful call, because
+		// implementationStepsComplete reads every step's state to decide whether
+		// completion may be declared, and a step held open forever makes
+		// completion unreachable. What changes is only that a closed check can
+		// be called again: transitionStep is already skipped for a step that is
+		// implemented, so a repeat call records its work and asks for no
+		// transition the state machine would refuse.
+		if !StepMayAcceptAnotherCall(step.State) {
 			return 0, fmt.Errorf(
 				"%w: plan step %q is not executable",
 				ErrMalformedModelTurn,
@@ -1568,6 +1746,20 @@ func stepOwningPath(plan PlanProjection, request executor.ToolRequest) (int, boo
 	if !found {
 		return 0, false
 	}
+	// A patch states its target twice, and the two can disagree.
+	//
+	// The tool takes a path argument, and the diff itself opens with
+	// "*** Update File: <path>" — which is the line the descriptor tells the
+	// model to write, and the one the tool actually applies against. When they
+	// differ, the argument is the label and the payload is the work, so a
+	// mislabelled argument would otherwise discard an attempt whose patch was
+	// aimed at a file the plan names all along.
+	//
+	// The payload is tried only after the argument, and only when the argument
+	// owns nothing: an argument that names a plan file is taken at its word.
+	// What stays refused is a patch whose target is named by no step under
+	// either reading, which is the contract this check exists to keep.
+	declared := patchDeclaredTarget(request)
 	// Two passes, and the order is the point. An open step that owns the path
 	// is always preferred; a step already closed is considered only when no
 	// open one owns it.
@@ -1583,10 +1775,37 @@ func stepOwningPath(plan PlanProjection, request executor.ToolRequest) (int, boo
 	// stays refused is a path no step names, and a path several name — the
 	// first reaches outside the plan, and the second would attribute work by
 	// luck.
-	if index, ok := stepOwningPathInState(plan, path, false); ok {
-		return index, true
+	for _, candidate := range []string{path, declared} {
+		if candidate == "" {
+			continue
+		}
+		if index, ok := stepOwningPathInState(plan, candidate, false); ok {
+			return index, true
+		}
+		if index, ok := stepOwningPathInState(plan, candidate, true); ok {
+			return index, true
+		}
 	}
-	return stepOwningPathInState(plan, path, true)
+	return 0, false
+}
+
+// patchDeclaredTarget reads the file a patch payload says it changes.
+//
+// Empty when the payload declares nothing, so a caller falls back to whatever
+// the argument said rather than to a guess.
+func patchDeclaredTarget(request executor.ToolRequest) string {
+	payload, found := requestArgument(request, "patch")
+	if !found {
+		return ""
+	}
+	for _, line := range strings.Split(payload, "\n") {
+		for _, marker := range []string{"*** Update File:", "*** Add File:"} {
+			if rest, cut := strings.CutPrefix(strings.TrimSpace(line), marker); cut {
+				return strings.TrimSpace(rest)
+			}
+		}
+	}
+	return ""
 }
 
 // stepOwningPathInState finds the one step owning a path, either among the

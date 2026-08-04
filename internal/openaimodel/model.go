@@ -585,8 +585,12 @@ func planStepFor(
 	requested := pathArgumentOf(arguments)
 	var toolMatch string
 	for _, step := range input.Plan.Steps {
-		if step.State == agent.StepImplemented || step.State == agent.StepValidated ||
-			step.State == agent.StepSkipped || claimed[step.ID] {
+		// A completed step can still take another call — refinement patches a
+		// file more than once — so only a failed or skipped step is passed
+		// over here, along with any step already claimed earlier in this turn.
+		// Dropping the call instead produced a turn indistinguishable from one
+		// where the model said nothing, and cost the whole attempt.
+		if !agent.StepMayAcceptAnotherCall(step.State) || claimed[step.ID] {
 			continue
 		}
 		accepts := false

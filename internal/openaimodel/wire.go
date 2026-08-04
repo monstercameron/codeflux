@@ -191,8 +191,12 @@ func (model *Model) buildRequest(input agent.ModelInput) responsesRequest {
 // toolIsCurrentlyUsable reports whether an open step can accept this tool.
 func toolIsCurrentlyUsable(input agent.ModelInput, tool string) bool {
 	for _, step := range input.Plan.Steps {
-		if step.State == agent.StepImplemented || step.State == agent.StepValidated ||
-			step.State == agent.StepSkipped {
+		// A step stays offerable after it has been completed once. Refinement
+		// rewrites the same files and re-runs the same suite, and the loop's
+		// own step binding allows both, so withholding the tool here would hide
+		// an action the run is permitted to take — and did, for whole attempts
+		// at a time.
+		if !agent.StepMayAcceptAnotherCall(step.State) {
 			continue
 		}
 		for _, completion := range step.CompletionTools {
