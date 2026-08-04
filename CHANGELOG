@@ -50,8 +50,49 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-172
+Change-ID: CL-20260803-173
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- three defects rung 18 exposed in sequence: an undefined word in the
+  requirement, a template that taught the wrong shape, and a slip priced as an
+  attempt
+Request-or-TODO: Ladder rung 18
+Outcome: Three separate things, each uncovered by fixing the one before it.
+  First, rung 18 asks for two pure packages and defines "pure" nowhere, while
+  the check is mechanical and strict: importing fmt makes a package impure, and
+  fmt.Errorf is the idiomatic way to build the error a parse failure returns.
+  The run produced a correct program -- monad laws asserted, 31 of 37 stages
+  satisfied, built, run, printing exactly what was asked, surviving every
+  hostile input -- and failed because mean/mean.go imports fmt. Rung 17 spells
+  the definition out; rung 18 now does too. This states the bar rather than
+  lowering it and nothing about what is checked changes. Second, the atom
+  documentation instruction showed every one of the nineteen schema fields with
+  the same indented placeholder, which is the right shape for prose and the
+  wrong shape for the eight that are lists: a list field with a sentence under
+  it parses to text and no items, and validation reports it as empty. A run
+  wrote exactly what it was shown and had three atoms refused for
+  `field "Inputs" is empty`, with Inputs written -- which is why the registry has
+  been empty for every run of this session. The template now shows "- " items
+  for list fields and says what happens if they are filled in as prose. Third, a
+  turn asking for more tool calls than the round takes cost the whole attempt,
+  counted alongside a turn carrying both calls and completion. That is a
+  different thing: the run knows what it wants and got the batching wrong, and
+  one sentence corrects it. Rung 18 opened by writing all three of its files in
+  one turn, lost the attempt, did it again, and the run was over in seventy-seven
+  seconds having produced nothing. It costs a round now, bounded at three, and
+  the message carries both numbers.
+Affected-behavior: Purity is defined where it is required. Atom documentation is
+  shown in the shape its validator accepts. An over-batched turn costs a round.
+Compatibility-or-migration: None. atomdoc gains CanonicalFieldTemplate, exported
+  for the same reason CanonicalFieldLabels is: a caller describing this schema
+  should read it rather than restate it.
+Verification: Six new tests across the three. The per-round bound test was
+  updated to the new policy and still asserts the guarantee that mattered -- that
+  none of the calls run.
+Dev-Log: DL-20260803-183
+
+Change-ID: CL-20260803-172
+Commit: ec89d6f
 Date: 2026-08-04
 Type: Fix -- the property instruction described the answer and never showed one
 Request-or-TODO: Ladder rung 18; standing goal to optimise the prompting

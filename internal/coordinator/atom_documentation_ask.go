@@ -141,9 +141,29 @@ func atomDocumentationInstruction(missing []string) string {
 			"comment, in exactly this form and this field order. Every field " +
 			"is required; where one genuinely does not apply, write \"None: \" " +
 			"and a short reason rather than leaving it out.\n\n")
+	// A list field is shown as a list and a prose field as prose.
+	//
+	// Every label used to be followed by the same indented placeholder, which
+	// is the right shape for prose and the wrong shape for the eight fields the
+	// schema declares as lists. A list field with prose under it parses to text
+	// and no items, and validation then reports it as empty — so a run wrote
+	// exactly what it was shown and had its atoms refused for
+	// `field "Inputs" is empty`, with Inputs written. Ladder rung 18 on
+	// 2026-08-04 lost all three of its atoms that way, and the registry has
+	// been empty for every run of this session.
 	instruction.WriteString("//codeflux:atom\n// Codeflux atom documentation (schema v1):\n")
-	for _, label := range atomdoc.CanonicalFieldLabels() {
-		fmt.Fprintf(&instruction, "//   %s:\n//     …\n", label)
+	for _, field := range atomdoc.CanonicalFieldTemplate() {
+		if field.List {
+			fmt.Fprintf(&instruction,
+				"//   %s:\n//     - …\n//     - …\n", field.Label)
+			continue
+		}
+		fmt.Fprintf(&instruction, "//   %s:\n//     …\n", field.Label)
 	}
+	instruction.WriteString(
+		"\nThe fields shown with \"- \" are lists and need at least one item " +
+			"each, written as a \"- \" line; the rest are prose. A list field " +
+			"filled in with a sentence instead of items is read as empty and " +
+			"the whole record is refused.")
 	return instruction.String()
 }

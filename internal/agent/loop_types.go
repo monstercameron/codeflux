@@ -626,3 +626,20 @@ func writableFilesAdvice(plan PlanProjection) string {
 func WritableFilesAdvice(plan PlanProjection) string {
 	return writableFilesAdvice(plan)
 }
+
+// errTooManyCallsInATurn marks a turn that asked for more tool calls than the
+// round takes.
+//
+// Distinguished from the other malformed turns because it is correctable in one
+// sentence: the run knows what it wants to do and got the batching wrong, so it
+// costs a round rather than the attempt it used to cost.
+var errTooManyCallsInATurn = errors.New(
+	"turn exceeds the per-round tool-call bound")
+
+// maximumBatchingRetries bounds how many times one attempt may be told the
+// per-round bound before the turn costs the attempt after all.
+//
+// Three. A run that has been told the bound three times, with the number it
+// sent and the number allowed in the message, is disagreeing rather than
+// slipping.
+const maximumBatchingRetries = 3

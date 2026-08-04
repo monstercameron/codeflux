@@ -1129,9 +1129,14 @@ func TestExecutionLoopEnforcesRoundTokenTimeAndCostLimits(t *testing.T) {
 		}
 	})
 	t.Run("per-round tool calls", func(t *testing.T) {
+		// An over-batched turn costs a round before it costs the attempt: the
+		// run is told how many it sent and how many the round takes, and gets
+		// maximumBatchingRetries chances to send one. What must not change is
+		// that none of the calls run — the bound is about what executes, and a
+		// turn that breaks it executes nothing.
 		harness := newLoopHarness(t)
 		harness.input.Limits.MaximumToolCallsPerRound = 1
-		harness.model.steps = []modelStep{func(
+		overBatched := func(
 			context.Context,
 			ModelInput,
 		) (ModelTurn, error) {
@@ -1148,7 +1153,11 @@ func TestExecutionLoopEnforcesRoundTokenTimeAndCostLimits(t *testing.T) {
 			second.Call.ID = "second-call"
 			turn.ToolCalls = append(turn.ToolCalls, second)
 			return turn, nil
-		}}
+		}
+		// One more than the retries allow, so the run reaches the refusal.
+		for range maximumBatchingRetries + 1 {
+			harness.model.steps = append(harness.model.steps, overBatched)
+		}
 		_, err := harness.loop.Run(context.Background(), harness.input)
 		if !errors.Is(err, ErrMalformedModelTurn) ||
 			harness.authority.calls != 0 ||

@@ -25,6 +25,36 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-183
+Date: 2026-08-04
+Status: Committed as CL-20260803-173
+Change-ID: CL-20260803-173
+Request-or-TODO: Ladder rung 18
+Goal: Clear the three things standing between rung 18 and a pass
+Assumptions: One, stated: that rung 18 intends the same definition of "pure"
+  rung 17 states. Cam is away, and his ruling on rung 16 was that a bar and its
+  prose must agree; this adds the prose rather than moving the bar, which is the
+  weaker and safer half of that ruling
+Decisions: The atom template reads its shapes from atomdoc rather than
+  restating them, because a template that describes a schema from memory is the
+  same defect one indirection away. Over-batching is bounded at three like the
+  other correctable slips
+Files-or-schemas: engine_produces_program_test.go -- rung 18's requirement;
+  internal/atomdoc/schema.go -- CanonicalFieldTemplate, FieldTemplate;
+  internal/coordinator/atom_documentation_ask.go; internal/agent/loop.go and
+  loop_types.go -- errTooManyCallsInATurn, maximumBatchingRetries
+Validation: internal/agent and the new coordinator tests pass. The property fix
+  from CL-20260803-172 is confirmed working in the same run: atom-property-tests
+  went from failing with 0 of 22 to satisfied with 13 of 31
+Failures-or-discarded-approaches: The widened failed-stage trace from
+  CL-20260803-168 is what made the registration cause readable at all. Before
+  it, the line stopped at "documentation wa" and the only way to the reason was
+  the run's database
+Known-limitations: LAD-002 is not closed. The list-shape defect explains the
+  atoms whose documentation was rejected; it does not explain the molecules
+  reported as carrying no //codeflux:atom block at all
+Next-safe-step: Rung 18 pass 7
+
 Dev-Log: DL-20260803-182
 Date: 2026-08-04
 Status: Committed as CL-20260803-172

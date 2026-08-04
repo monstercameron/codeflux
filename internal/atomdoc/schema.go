@@ -142,3 +142,34 @@ func CanonicalFieldLabels() []string {
 func collapseSpaces(value string) string {
 	return strings.Join(strings.Fields(value), " ")
 }
+
+// CanonicalFieldTemplate returns each schema-v1 field label in canonical order
+// paired with the body shape that field requires: a "- " list item for a list
+// field, and plain indented prose for the rest.
+//
+// The distinction is not cosmetic. A list field with prose under it parses to
+// text and no items, and validation then reports it as empty — which is what
+// the coordinator's documentation instruction produced by showing the same
+// placeholder under every label. Ladder rung 18 on 2026-08-04 wrote the
+// documentation it was shown and had three atoms refused for
+// `field "Inputs" is empty`, with Inputs written.
+//
+// Exported for the same reason CanonicalFieldLabels is: a caller that has to
+// describe this schema should read it from here rather than restate it and
+// drift.
+func CanonicalFieldTemplate() []FieldTemplate {
+	template := make([]FieldTemplate, len(fieldSpecs))
+	for index, spec := range fieldSpecs {
+		template[index] = FieldTemplate{
+			Label: spec.Label,
+			List:  spec.Kind == FieldKindList,
+		}
+	}
+	return template
+}
+
+// FieldTemplate is one schema-v1 field label and whether its body is a list.
+type FieldTemplate struct {
+	Label string
+	List  bool
+}

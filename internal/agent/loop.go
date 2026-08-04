@@ -132,6 +132,10 @@ func (loop *ExecutionLoop) Run(
 	writesSinceLastTest := false
 	lastTestFailed := false
 	emptyTurnRetries := 0
+	// batchingRetries counts turns refused for asking more calls than the round
+	// takes. Bounded, because a run that keeps over-batching after being told
+	// the bound is not going to stop being told it.
+	batchingRetries := 0
 	outOfScopeRetries := 0
 	unverifiedCompletionRefusals := 0
 	failureCounts := make(map[string]uint32)
@@ -355,10 +359,34 @@ func (loop *ExecutionLoop) Run(
 			// the whole diagnosis being "turn contains neither tool calls nor
 			// completion".
 			//
-			// Only the empty turn, and only a bounded number of times. A turn
-			// carrying both tool calls and completion, or more calls than the
-			// round allows, is a model disagreeing with the contract rather
-			// than losing its place, and it still costs the attempt.
+			// A turn with more calls than the round takes costs a round too.
+			//
+			// It was counted as a model disagreeing with the contract rather
+			// than losing its place, and cost the whole attempt. That is the
+			// wrong price: the run knows what it wants to do and got the
+			// batching wrong, which one sentence corrects. Ladder rung 18 on
+			// 2026-08-04 opened by writing all three of its files in one turn,
+			// lost the attempt, did it again, and the run was over in
+			// seventy-seven seconds having produced nothing.
+			if errors.Is(err, errTooManyCallsInATurn) &&
+				batchingRetries < maximumBatchingRetries {
+				batchingRetries++
+				previousResults = []ToolFeedback{{
+					Tool:  "none",
+					State: "failed", IsError: true,
+					SummaryRedacted: "too many tool calls in one turn",
+					StdoutRedacted: "That turn asked for more tool calls than " +
+						"this round takes, so none of them ran. " +
+						err.Error() + ". Send the first one now; the next " +
+						"round is for the one after it. Nothing you have " +
+						"written has been lost.",
+				}}
+				continue
+			}
+			// Only the empty turn and the over-batched one, and only a bounded
+			// number of times. A turn carrying both tool calls and completion
+			// is a model disagreeing with the contract rather than losing its
+			// place, and it still costs the attempt.
 			if errors.Is(err, errEmptyModelTurn) &&
 				emptyTurnRetries < maximumEmptyTurnRetries {
 				emptyTurnRetries++
@@ -1026,8 +1054,9 @@ func validateModelTurn(turn ModelTurn, perRound uint32) error {
 	}
 	if uint32(len(turn.ToolCalls)) > perRound {
 		return fmt.Errorf(
-			"%w: turn exceeds the per-round tool-call bound",
-			ErrMalformedModelTurn,
+			"%w: %w: %d calls in one turn, and this round takes %d",
+			ErrMalformedModelTurn, errTooManyCallsInATurn,
+			len(turn.ToolCalls), perRound,
 		)
 	}
 	switch turn.Completion {
