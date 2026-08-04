@@ -82,7 +82,6 @@ func testsNamingInFiles(
 				if !isCall {
 					return true
 				}
-				var callee string
 				// A generic call is instantiated before it is called, and the
 				// instantiation is what wraps the name.
 				//
@@ -98,28 +97,7 @@ func testsNamingInFiles(
 				// escalates, so ladder rung 18 on 2026-08-04 asked for a test
 				// of fp/result.go:Err three times running with the test already
 				// written.
-				target := call.Fun
-				for {
-					switch instantiated := target.(type) {
-					case *ast.IndexExpr:
-						target = instantiated.X
-						continue
-					case *ast.IndexListExpr:
-						target = instantiated.X
-						continue
-					}
-					break
-				}
-				switch named := target.(type) {
-				case *ast.Ident:
-					// A plain call: helper(...)
-					callee = named.Name
-				case *ast.SelectorExpr:
-					// A method or package-qualified call: value.Method(...)
-					// or package.Function(...). The selector is the name
-					// that matches a produced function.
-					callee = named.Sel.Name
-				}
+				callee := calledFunctionName(call)
 				if callee == "" || seen[callee] {
 					return true
 				}
@@ -795,4 +773,51 @@ func markStatementAt(
 	markLines(unreachable, file,
 		fileSet.Position(best.Pos()).Line,
 		fileSet.Position(best.End()).Line)
+}
+
+// calledFunctionName is the produced function a call site names, or empty when
+// it names none this could match.
+//
+// One implementation, because two stages ask this question and they had two
+// answers. Both knew a plain call and a qualified one; neither knew that a
+// generic call is instantiated before it is called, and that the instantiation
+// wraps the name — Err[int](e) parses as an IndexExpr whose X is the
+// identifier, Map[A, B](f) as an IndexListExpr.
+//
+// It bites hardest on the functions that cannot be called any other way.
+// Err[T any](error) Result[T] has no argument to infer T from, so every call
+// site must instantiate it explicitly, so every call to it was invisible.
+// Ladder rung 18 on 2026-08-04 met it twice: completeness asked three times
+// running for a test of fp/result.go:Err that was already written, and
+// atom-example-tests then failed the run with "no test mentions Err", blocking
+// two further stages behind it.
+//
+// A function invoked indirectly — passed as a value to something that calls it
+// later — is deliberately still not counted. That keeps the check stricter than
+// the truth rather than looser, which is the safe direction for a gate whose
+// whole claim is that something was examined.
+func calledFunctionName(call *ast.CallExpr) string {
+	target := call.Fun
+	for {
+		switch instantiated := target.(type) {
+		case *ast.IndexExpr:
+			target = instantiated.X
+			continue
+		case *ast.IndexListExpr:
+			target = instantiated.X
+			continue
+		}
+		break
+	}
+	switch named := target.(type) {
+	case *ast.Ident:
+		// A plain call: helper(...)
+		return named.Name
+	case *ast.SelectorExpr:
+		// A method or package-qualified call: value.Method(...) or
+		// package.Function(...). The selector is the name that matches a
+		// produced function.
+		return named.Sel.Name
+	}
+	return ""
 }

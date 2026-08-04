@@ -50,8 +50,33 @@ Dev-Log:
 
 Entries
 -------
+Change-ID: CL-20260803-170
+Commit: d37de09
+Date: 2026-08-04
+Type: Fix -- two stages asked which functions the tests call and had two
+  answers, both blind the same way
+Request-or-TODO: Ladder rung 18
+Outcome: CL-20260803-169 taught the completeness gate to see a call to an
+  explicitly instantiated generic. atom-example-tests asks the same question
+  through its own scanner and was left blind, so rung 18 was asked three times
+  for a test of fp/result.go:Err that existed, and then failed at
+  atom-example-tests with "no test mentions Err, so nothing checks them on their
+  own terms" -- with that test in front of it -- blocking the atoms and
+  path-coverage stages behind it. Both now read one function. A function invoked
+  indirectly is still deliberately not counted, which keeps the check stricter
+  than the truth rather than looser, and that is the safe direction for a gate
+  whose whole claim is that something was examined.
+Affected-behavior: atom-example-tests sees generic call sites, and agrees with
+  completeness by construction.
+Compatibility-or-migration: None.
+Verification: A new test asserts the two stages give the same answer for a
+  generic call, a plain call, and a function nothing calls, rather than trusting
+  that they do. Rung 18 reached this stage having produced two pure packages,
+  built, run and printing exactly what was asked.
+Dev-Log: DL-20260803-180
+
 Change-ID: CL-20260803-169
-Commit: pending
+Commit: d37de09
 Date: 2026-08-04
 Type: Fix -- a test calling a generic function did not count as testing it
 Request-or-TODO: Ladder rung 18

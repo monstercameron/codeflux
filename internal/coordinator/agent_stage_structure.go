@@ -466,15 +466,13 @@ func testedNamesInFiles(worktree string, files []string) (map[string]bool, error
 			if !isCall {
 				return true
 			}
-			switch callee := call.Fun.(type) {
-			case *ast.Ident:
-				// A plain call: helper(...)
-				referenced[callee.Name] = true
-			case *ast.SelectorExpr:
-				// A method or package-qualified call: value.Method(...) or
-				// package.Function(...). The selector is the name that matches
-				// a produced function.
-				referenced[callee.Sel.Name] = true
+			// The same reader the completeness gate uses. These two stages
+			// asked one question and had two answers, and both were blind to a
+			// generic call in the same way: rung 18 was asked three times for a
+			// test of Err that existed, and then failed here for "no test
+			// mentions Err" with the very same test in front of it.
+			if callee := calledFunctionName(call); callee != "" {
+				referenced[callee] = true
 			}
 			return true
 		})

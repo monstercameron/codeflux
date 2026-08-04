@@ -98,3 +98,53 @@ func TestAnUncalledGenericIsStillUncalled(t *testing.T) {
 			naming["Unused"])
 	}
 }
+
+// TestBothStagesReadCallsTheSameWay is the drift that cost rung 18 twice.
+//
+// completeness and atom-example-tests each ask which functions the tests call,
+// and each had its own scanner. Both were blind to a generic call in the same
+// way, so fixing one left the other: rung 18 on 2026-08-04 was asked three
+// times for a test of Err that existed, and then failed at atom-example-tests
+// with "no test mentions Err, so nothing checks them on their own terms" — with
+// that test in front of it, blocking two more stages behind it.
+//
+// They read the same function now, and this asserts they agree rather than
+// trusting that they do.
+func TestBothStagesReadCallsTheSameWay(t *testing.T) {
+	worktree := writeWorktree(t, map[string]string{
+		"fp/result.go": "package fp\n\n" +
+			"type Result[T any] struct{ err error }\n\n" +
+			"// Err returns a Result holding an error.\n" +
+			"func Err[T any](e error) Result[T] { return Result[T]{err: e} }\n\n" +
+			"// Plain does a thing.\nfunc Plain(v int) int { return v }\n",
+		"fp/result_test.go": "package fp\n\n" +
+			"import (\n\t\"errors\"\n\t\"testing\"\n)\n\n" +
+			"func TestBoth(t *testing.T) {\n" +
+			"\t_ = Err[int](errors.New(\"no\"))\n\t_ = Plain(1)\n}\n",
+	})
+	files := []string{"fp/result.go", "fp/result_test.go"}
+
+	naming, err := testsNamingInFiles(worktree, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	referenced, err := testedNamesInFiles(worktree, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range []string{"Err", "Plain"} {
+		named := len(naming[name]) > 0
+		if named != referenced[name] {
+			t.Errorf("the two stages disagree about %s: completeness sees "+
+				"%t, atom-example-tests sees %t", name, named, referenced[name])
+		}
+		if !named {
+			t.Errorf("%s is called by a test and neither stage sees it", name)
+		}
+	}
+	// And they still agree about something nothing calls.
+	if len(naming["Missing"]) > 0 || referenced["Missing"] {
+		t.Error("a function nothing calls was counted as called")
+	}
+}

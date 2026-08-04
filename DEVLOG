@@ -25,6 +25,26 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-180
+Date: 2026-08-04
+Status: Committed as CL-20260803-170
+Change-ID: CL-20260803-170
+Request-or-TODO: Ladder rung 18
+Goal: Fix the same blindness in the other place that had it
+Assumptions: None. The trace named it directly: "no test mentions Err" from
+  atom-example-tests, one run after completeness stopped saying the same thing
+Decisions: Shared one reader rather than applying the same patch twice. Two
+  implementations of one question is what produced this: I fixed one yesterday's
+  worth of hours ago and the run failed on the other immediately
+Files-or-schemas: internal/coordinator/agent_stage_unit_verification.go --
+  calledFunctionName; agent_stage_structure.go -- testedNamesInFiles calls it
+Validation: A test asserting the two stages agree, which is the property that
+  was missing rather than either answer individually
+Failures-or-discarded-approaches: None
+Known-limitations: A third reader of the same question may exist. Nothing
+  enumerates them
+Next-safe-step: Rung 18 pass 3
+
 Dev-Log: DL-20260803-179
 Date: 2026-08-04
 Status: Committed as CL-20260803-169
