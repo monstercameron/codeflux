@@ -25,6 +25,27 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-176
+Date: 2026-08-04
+Status: Committed as CL-20260803-166
+Change-ID: CL-20260803-166
+Request-or-TODO: Regression sweep
+Goal: Clear two failures without mistaking a policy for a bug
+Assumptions: None. Both were run against a clean checkout at 5577f21 first, to
+  establish they were not caused by this session
+Decisions: Changed the tests, not the code, in both cases. The exemption for
+  completeness is documented with a reason and the qualification of gap names
+  was made deliberately to stop runs patching the wrong main.go; a test that
+  disagrees with either is the thing that is out of date
+Files-or-schemas: internal/coordinator/agent_convergence_test.go,
+  agent_refinable_test.go
+Validation: Both pass; the wider coordinator suite is unaffected
+Failures-or-discarded-approaches: None
+Known-limitations: This is the second stale test found asserting a general rule
+  through a gate that has a specific exemption. Both now guard against the gate
+  acquiring one, but nothing stops a third being written the same way
+Next-safe-step: Rung 17
+
 Dev-Log: DL-20260803-175
 Date: 2026-08-04
 Status: Committed as CL-20260803-165

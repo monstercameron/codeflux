@@ -212,15 +212,22 @@ func TestAnUndocumentedMainIsAskedForRatherThanOnlyReported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Matched on the qualified name, because that is what a gap is now called.
+	// A bare "main" is ambiguous exactly where it matters most: a generated
+	// workspace holds a stub main.go beside the real cmd/thing/main.go, so the
+	// unqualified name describes two declarations and the run has to guess. The
+	// assertion kept looking for the bare name and read the qualification as
+	// the gate having stopped asking at all.
 	asked := false
 	for _, name := range gaps.UndocumentedAtoms {
-		if name == "main" {
+		if name == "main" || strings.HasSuffix(name, ":main") {
 			asked = true
 		}
 	}
 	if !asked {
-		t.Error("the ledger reports an undocumented main and the gate never " +
-			"asks for one, so no attempt can close it")
+		t.Errorf("the ledger reports an undocumented main and the gate never "+
+			"asks for one, so no attempt can close it: %v",
+			gaps.UndocumentedAtoms)
 	}
 	if checkAtomDocumentation(worktree, newProducedFunctionCache(worktree)).Held {
 		t.Error("the ledger accepts an undocumented main the gate asks for, " +

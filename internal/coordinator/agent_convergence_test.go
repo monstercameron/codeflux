@@ -355,15 +355,27 @@ func TestDecompositionTellsTheRunToStopTryingItInOnePiece(t *testing.T) {
 // stuck on one gate indefinitely as long as something else interrupted now and
 // then. Worse, the interruptions came from the malformed-turn recovery added
 // to make runs survive model slips: one repair quietly disabled another.
+//
+// The gate is deliberately not "completeness", which is what rung 5 actually
+// failed. completeness is in escalationWouldNotHelp: it asks for text the run
+// has already been given in full, so a dearer model cannot satisfy it any
+// better and record declines to escalate on it whatever the tally. Written
+// against completeness this asserted the general rule through a gate that is
+// exempt from it, and reported a deliberate policy as a broken counter.
 func TestAnInterruptedStallIsStillAStall(t *testing.T) {
 	tracker := newConvergence(escalationSettings(3))
-	const stuck = "1 function has no doc comment: main"
+	const gate = "path-coverage"
+	const stuck = "1 changed line is executed by nothing: main.go"
+	if escalationWouldNotHelp[gate] || regressionProneGates[gate] {
+		t.Fatalf("%s now has an exemption, so this case no longer exercises "+
+			"the ordinary counting rule", gate)
+	}
 
-	tracker.record("completeness", stuck, stuck)
-	tracker.record("completeness", stuck, stuck)
-	// An unrelated failure. Nothing was learned about the doc comment.
-	tracker.record("assembly", "the loop refused a malformed turn", "")
-	decision := tracker.record("completeness", stuck, stuck)
+	tracker.record(gate, stuck, stuck)
+	tracker.record(gate, stuck, stuck)
+	// An unrelated failure. Nothing was learned about the uncovered line.
+	tracker.record("model-turn", "the loop refused a malformed turn", "")
+	decision := tracker.record(gate, stuck, stuck)
 	if decision.Escalated == "" {
 		t.Fatal("the third occurrence of an identical failure did not escalate " +
 			"because an unrelated failure happened in between")

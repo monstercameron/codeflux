@@ -50,8 +50,35 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-165
+Change-ID: CL-20260803-166
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- two long-failing tests were asserting against premises the code had
+  deliberately moved past
+Request-or-TODO: Regression sweep after the rung 16 work
+Outcome: Both predate this session's pipeline work -- checked by running them at
+  the pre-session checkpoint -- and both were reporting a deliberate design
+  decision as a broken mechanism. TestAnInterruptedStallIsStillAStall asserted
+  that an identical failure three times escalates, using "completeness" as the
+  gate; completeness is in escalationWouldNotHelp, because it asks for text the
+  run has already been given in full and a dearer model cannot supply it any
+  better, so record declines to escalate on it whatever the tally. It now uses a
+  gate with no exemption and fails loudly if that gate ever acquires one -- the
+  same shape as the fix to TestARunRepeatingItselfIsEscalated earlier today, and
+  the second time this pattern has been found.
+  TestAnUndocumentedMainIsAskedForRatherThanOnlyReported looked for a bare
+  "main" in the reported gaps; gaps have been qualified with their file since
+  CL-20260803-141, because a generated workspace holds a stub main.go beside the
+  real one and the unqualified name describes both. It matches the qualified
+  name now.
+Affected-behavior: None. Both changes are to tests.
+Compatibility-or-migration: None.
+Verification: Both pass. Both were confirmed failing at 5577f21, before any of
+  this session's pipeline changes, so neither was caused by them.
+Dev-Log: DL-20260803-176
+
+Change-ID: CL-20260803-165
+Commit: bf60014
 Date: 2026-08-04
 Type: Fix -- the fuzz stage named the case it could not handle and then did the
   one thing guaranteed to fail
