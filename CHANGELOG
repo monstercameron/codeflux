@@ -50,8 +50,32 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-152
+Change-ID: CL-20260803-153
 Commit: pending
+Date: 2026-08-04
+Type: Ticket -- records why rung 16 fails, without guessing at the fix
+Request-or-TODO: Ladder rung 16
+Outcome: Adds LAD-001. filesNamedIn falls back to exactly cmd/generated/main.go
+  and its test whenever a requirement names no path, so how many packages a run
+  can produce is a constant rather than a decision. Rung 16 asks for a package
+  the command imports, got a plan holding one directory, and then satisfied 31
+  stages with none failing while delivering one package -- every gate judged the
+  plan and the plan was already wrong. The ticket names the fix (the
+  decomposition, which already reads the requirement, should name the files) and
+  names what was tried and rejected, so the next attempt does not repeat it.
+Affected-behavior: None. No code changed.
+Compatibility-or-migration: None.
+Verification: Not applicable.
+Considered-and-rejected: Inferring the layout from the requirement's prose. The
+  symbol extractor reads only backtick-quoted code spans and these requirements
+  write Mean and Max as ordinary words, so a symbol-based rule never fires; the
+  implementation was written, found inert, and removed rather than replaced with
+  a capitalised-word heuristic that would make the plan depend on English
+  punctuation.
+Dev-Log: DL-20260803-163
+
+Change-ID: CL-20260803-152
+Commit: 169ba05
 Date: 2026-08-04
 Type: Fix -- escalating onto a provider that was not answering ended runs that
   were still making progress

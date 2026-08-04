@@ -25,6 +25,30 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-163
+Date: 2026-08-04
+Status: Committed as CL-20260803-153
+Change-ID: CL-20260803-153
+Request-or-TODO: Ladder rung 16
+Goal: Record why rung 16 fails accurately enough that the fix can be done
+  properly rather than quickly
+Assumptions: None. The trace states it: "the requirement asked for the work to
+  be separated into at least 3 packages and it is in 1"
+Decisions: Did not ship the fix. The honest version is a schema change to the
+  decomposition response plus a validator, which is a piece of work that
+  deserves its own verification rather than being appended to a long session.
+  The dishonest version is a prose heuristic, which was written and then removed
+Files-or-schemas: TODOS.md -- LAD-001
+Validation: Not applicable; no code changed
+Failures-or-discarded-approaches: Implemented a rule keying on
+  analysis.ExplicitSymbols, on the reasoning that an exported identifier means
+  nothing in package main so a requirement naming one is asking for an
+  importable package. The reasoning holds; the input does not. The extractor
+  reads only backtick-quoted code spans, and these requirements are plain prose,
+  so the rule never fired. Reverted rather than widened to capitalised words
+Known-limitations: Rungs 16 and above stay blocked until LAD-001 is done
+Next-safe-step: LAD-001
+
 Dev-Log: DL-20260803-162
 Date: 2026-08-04
 Status: Committed as CL-20260803-152
