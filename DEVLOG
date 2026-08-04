@@ -25,6 +25,28 @@ Next-safe-step:
 
 Entries
 -------
+Dev-Log: DL-20260803-174
+Date: 2026-08-04
+Status: Committed as CL-20260803-164
+Change-ID: CL-20260803-164
+Request-or-TODO: Ladder rung 16
+Goal: Stop a protocol slip being recorded and priced as a broken build
+Assumptions: None. Rung 16 pass 6 shows it: "sendback gate=assembly
+  because=the loop refused a malformed turn" -- the trace already said the two
+  things did not agree
+Decisions: A new gate name rather than an exemption keyed on the reason string.
+  The gate is what the convergence tracker keys on and what the lesson records,
+  so the gate is the thing that has to be right; matching on prose would leave
+  both records still saying assembly
+Files-or-schemas: internal/coordinator/agent_execution.go. The gate is free-form
+  in the lesson, scopeOfNextAttempt defaults to editAnything for an unknown
+  name, and the two gate sets are plain lookups, so a new name is safe in all
+  three
+Validation: Three new tests
+Failures-or-discarded-approaches: None
+Known-limitations: None known
+Next-safe-step: Rung 16 pass 9 result
+
 Dev-Log: DL-20260803-173
 Date: 2026-08-04
 Status: Committed as CL-20260803-163

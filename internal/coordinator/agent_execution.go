@@ -903,7 +903,20 @@ func (execution *AgentExecution) Run(
 		// attempt loop exists to absorb exactly this: the next attempt is told
 		// what the loop refused and why, which is information it can act on.
 		if errors.Is(runErr, agentloop.ErrMalformedModelTurn) {
-			sendBack("assembly", malformedTurnInstruction(runErr),
+			// Recorded under its own name rather than as "assembly".
+			//
+			// assembly means the code did not compile, and it is one of the
+			// regression-prone gates: failing it twice halves the stall
+			// threshold, because losing a build you already had is going round
+			// rather than going slowly. A malformed turn is neither of those.
+			// The code may compile perfectly; what failed is the protocol —
+			// two writes to one file in a turn, a call attributed to a step
+			// that cannot accept it — and counting it as a lost build escalated
+			// a protocol slip to a dearer model on its second occurrence, which
+			// is the same mistake the infrastructure path was separated out to
+			// avoid: money spent on the wrong remedy. The lesson written for
+			// the project also said the build broke, which it had not.
+			sendBack("model-turn", malformedTurnInstruction(runErr),
 				"the loop refused a malformed turn")
 			execution.say(ctx, scope, events.KindMessageFinal, fmt.Sprintf(
 				"Attempt %d was refused by the loop: %s. Trying again.",

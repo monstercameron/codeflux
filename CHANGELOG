@@ -50,8 +50,34 @@ Dev-Log:
 
 Entries
 -------
-Change-ID: CL-20260803-163
+Change-ID: CL-20260803-164
 Commit: pending
+Date: 2026-08-04
+Type: Fix -- a protocol slip was recorded as a lost build and bought a dearer
+  model
+Request-or-TODO: Ladder rung 16
+Outcome: A malformed turn was sent back under the assembly gate, which means the
+  code did not compile, and assembly is one of the regression-prone gates:
+  failing it twice halves the stall threshold, because losing a build you
+  already had is going round rather than going slowly. A malformed turn is
+  neither. The code may compile perfectly; what failed is the protocol -- two
+  writes to one file in a turn, a call attributed to a step that cannot accept
+  it -- so a run that slipped twice escalated to a more expensive model. That is
+  the same mistake the infrastructure path was separated out to avoid: money
+  spent on the wrong remedy. The lesson written into the project's memory also
+  said the build broke, which it had not. It has its own gate now, stalls at the
+  ordinary threshold, and still escalates, because honouring a tool protocol is
+  the kind of thing a stronger model does more reliably.
+Affected-behavior: A malformed turn no longer counts as a compile regression.
+  The next attempt's scope is unchanged.
+Compatibility-or-migration: A new gate name appears in traces and lessons.
+Verification: Three new tests: the new gate is not regression-prone while
+  assembly still is, the next attempt keeps a wide scope, and the gate is not in
+  the escalation-would-not-help set.
+Dev-Log: DL-20260803-174
+
+Change-ID: CL-20260803-163
+Commit: a9806d7
 Date: 2026-08-04
 Type: Fix -- the round showed the run files as they were before it changed them
 Request-or-TODO: Ladder rung 16; standing goal to optimise the prompting
