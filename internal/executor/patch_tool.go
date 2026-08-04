@@ -44,6 +44,14 @@ type PatchHunk struct {
 	// Added and Removed count what this hunk does, for the size limits.
 	Added   int
 	Removed int
+	// Anchor is file text this hunk is inside, used only to say which of
+	// several identical places is meant. It is never applied and never
+	// required to match; it narrows where Before is looked for and nothing
+	// else.
+	//
+	// It comes from the two forms a patch uses to name a scope: a heading on
+	// the "@@" line, and a preceding hunk of nothing but context.
+	Anchor string
 }
 
 // PatchOutcome is what applying a patch did, for the record and the reply.
@@ -95,6 +103,17 @@ func ParsePatch(raw string) (PatchRequest, error) {
 		current, before, after = nil, nil, nil
 	}
 
+	// Whether the patch has already said it is over.
+	//
+	// It matters because an unprefixed line is accepted as context, which is
+	// right inside a hunk and wrong after the end marker: a run that wrote
+	// "*** End Patch" and then a stray "EOF" — the shape a shell heredoc
+	// leaves behind, and one models reproduce — had EOF folded into the hunk's
+	// context, so the hunk was searched for as the file's own text plus a line
+	// no file has ever contained and could not match anything. Ladder rung 9 on
+	// 2026-08-03 failed 24 of its 34 patches, and this is what the tool
+	// reported it was looking for.
+	ended := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		switch {
@@ -103,6 +122,7 @@ func ParsePatch(raw string) (PatchRequest, error) {
 			strings.HasPrefix(trimmed, "--- "),
 			strings.HasPrefix(trimmed, "+++ "):
 			closeHunk()
+			ended = false
 			if named := patchHeaderPath(trimmed); named != "" {
 				if request.Path == "" {
 					request.Path = named
@@ -111,14 +131,25 @@ func ParsePatch(raw string) (PatchRequest, error) {
 					alsoNamed = append(alsoNamed, named)
 				}
 			}
-		case strings.HasPrefix(trimmed, "*** Begin Patch"),
-			strings.HasPrefix(trimmed, "*** End Patch"),
-			strings.HasPrefix(trimmed, "diff --git"),
+		case strings.HasPrefix(trimmed, "*** Begin Patch"):
+			// Envelope, and the start of a fresh one: whatever came before is
+			// finished and anything after this belongs to the patch again.
+			closeHunk()
+			ended = false
+		case strings.HasPrefix(trimmed, "*** End Patch"):
+			closeHunk()
+			ended = true
+		case strings.HasPrefix(trimmed, "diff --git"),
 			strings.HasPrefix(trimmed, "index "):
 			// Envelope. Carries nothing this needs.
+		case ended:
+			// Past the end marker. Trailing text is not part of any hunk.
 		case strings.HasPrefix(trimmed, "@@"):
 			closeHunk()
-			current = &PatchHunk{}
+			// "@@ func TestFoo(t *testing.T) {" names the scope the change is
+			// inside, and the whole line was being discarded. Kept as an
+			// anchor, it is what tells a "}" which "}" is meant.
+			current = &PatchHunk{Anchor: hunkHeaderAnchor(trimmed)}
 		case current == nil:
 			// Text outside any hunk. Prose, or a stray line; either way it
 			// changes nothing and saying so would be noise.
@@ -173,18 +204,37 @@ func ParsePatch(raw string) (PatchRequest, error) {
 				"lines to add prefixed \"+\", and enough unprefixed lines " +
 				"around them to say where the change goes")
 	}
-	// A hunk that changes nothing is dropped rather than refused.
+	// A hunk that changes nothing is not applied — but it is not noise either.
 	//
-	// Models emit them for orientation — a block of context around the part
-	// they are about to describe, or a trailing block after the last change —
-	// and refusing the whole patch for one costs the round. Skipping it cannot
-	// change the file, which is the only thing that makes forgiveness safe
-	// here. Ladder rung 8 lost roughly fifteen patches to this.
+	// Models emit them for orientation, and refusing the whole patch for one
+	// costs the round, so they were dropped. Dropping was too much: a block of
+	// context immediately before a change is how a patch names the scope the
+	// change is inside, and it is exactly what makes "	}\n}" mean one closing
+	// brace rather than every closing brace in the file. Ladder rung 9 on
+	// 2026-08-03 sent the same patch six times in a row and was told to add
+	// more context each time, with the context it needed in the hunk above;
+	// 103 of that run's 109 patch failures were "matches N places".
+	//
+	// So it carries forward as the next hunk's anchor instead. A context block
+	// after the last change still anchors nothing and is still dropped, which
+	// is the case forgiveness was added for.
 	changing := request.Hunks[:0:0]
+	pending := ""
 	for _, hunk := range request.Hunks {
 		if hunk.Added == 0 && hunk.Removed == 0 {
+			// The nearest preceding one wins: it is the innermost scope named,
+			// and an outer scope cannot contradict it.
+			if strings.TrimSpace(hunk.Before) != "" {
+				pending = hunk.Before
+			}
 			continue
 		}
+		// A heading on the hunk's own marker line is more specific than a
+		// block that preceded it, so it is not overwritten.
+		if hunk.Anchor == "" {
+			hunk.Anchor = pending
+		}
+		pending = ""
 		changing = append(changing, hunk)
 	}
 	if len(changing) == 0 {
@@ -251,6 +301,26 @@ func ApplyPatch(existing string, request PatchRequest) (string, PatchOutcome, er
 	// exactly as before.
 	cursor := 0
 	for index, hunk := range request.Hunks {
+		// The scope the hunk named, if it named one and the file has it.
+		//
+		// Searching from just after it is what makes "	}\n}" mean this
+		// function's closing brace rather than every function's. An anchor that
+		// resolves to nothing is ignored rather than refused: it only ever
+		// narrows where Before is looked for, so failing on it would turn a
+		// stale scope name into a lost patch.
+		from := cursor
+		if hunk.Anchor != "" {
+			if at := uniqueIndexIn(patched[cursor:], hunk.Anchor); at >= 0 {
+				from = cursor + at + len(hunk.Anchor)
+			}
+		}
+		if at := uniqueIndexIn(patched[from:], hunk.Before); at >= 0 {
+			absolute := from + at
+			patched = patched[:absolute] + hunk.After +
+				patched[absolute+len(hunk.Before):]
+			cursor = absolute + len(hunk.After)
+			continue
+		}
 		if at := uniqueIndexIn(patched[cursor:], hunk.Before); at >= 0 {
 			absolute := cursor + at
 			patched = patched[:absolute] + hunk.After +
@@ -291,6 +361,32 @@ func ApplyPatch(existing string, request PatchRequest) (string, PatchOutcome, er
 		LinesRemove: removed,
 		Hunks:       len(request.Hunks),
 	}, nil
+}
+
+// hunkHeaderAnchor is the file text a "@@" line names, or empty when it names
+// none.
+//
+// A hunk header carries up to two things after its marker: a line range, which
+// is bookkeeping about a file this tool does not have, and a section heading,
+// which is a line copied from the file and is exactly the anchor an ambiguous
+// hunk is missing. The range is dropped and the heading is kept.
+//
+// Empty for a bare "@@", and empty for a header that is only a range: an anchor
+// that is not file text would match nothing and turn a good patch into a
+// refusal, which is worse than the ambiguity it was meant to resolve.
+func hunkHeaderAnchor(line string) string {
+	rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "@@"))
+	// A trailing "@@" closes a range, and everything after it is the heading.
+	if closing := strings.Index(rest, "@@"); closing >= 0 {
+		// One leading space is the format's separator, not indentation.
+		return strings.TrimRight(
+			strings.TrimPrefix(rest[closing+2:], " "), " \t")
+	}
+	// An unclosed range is bookkeeping and nothing else.
+	if strings.HasPrefix(rest, "-") || strings.HasPrefix(rest, "+") {
+		return ""
+	}
+	return strings.TrimRight(rest, " \t")
 }
 
 // indentForMessage renders a hunk's target inside a refusal, bounded.
