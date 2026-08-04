@@ -175,8 +175,30 @@ func (tracker *convergence) topUp() int {
 // It is the direct opposite of the stall condition and reads off the same
 // tally, so the two can never disagree about whether a run is making progress.
 func (tracker *convergence) converging() bool {
-	for _, count := range tracker.seen {
-		if count > 1 {
+	// Converging is the opposite of stalling, and stalling has a definition
+	// already: record escalates when a failure has repeated
+	// StallBeforeEscalation times, three by default. Reading any repeat at all
+	// as not-converging made this the only place in the file where two was
+	// enough, so a run the tracker had never once called stalled was refused
+	// the extension that exists for exactly that run.
+	//
+	// It is not a hypothetical gap. The fingerprint is over the gate and its
+	// one-line reason, not over what was asked, and adversarial-review's reason
+	// is the fixed sentence "a review found it weaker than it looks". So a
+	// review that raises two entirely different findings across two rounds —
+	// which is what a review bounded to two findings a round is built to do —
+	// records as the same failure twice. Ladder rung 5 on 2026-08-03 was denied
+	// its extension that way while every attempt had cleared a different gate.
+	//
+	// The regression-prone gates keep their lower bar, because losing a
+	// property you had already satisfied is a cycle at two and record says so.
+	for print, count := range tracker.seen {
+		threshold := tracker.settings.StallBeforeEscalation
+		if gate, _, found := strings.Cut(print, fingerprintSeparator); found &&
+			regressionProneGates[gate] && threshold > 2 {
+			threshold = 2
+		}
+		if count >= threshold {
 			return false
 		}
 	}
@@ -199,11 +221,31 @@ func (tracker *convergence) lastAttempt() bool {
 	if tracker.spent < tracker.settings.MaximumAttempts {
 		return false
 	}
-	if _, more := tracker.settings.NextRung(tracker.rung); more {
-		return false
-	}
-	if !tracker.decomposed && tracker.settings.DecomposeWhenExhausted {
-		return false
+	// A rung above and a decomposition are allowances only a stall collects.
+	//
+	// Both are granted inside record, and record grants them when a failure has
+	// repeated often enough to count as a stall. A run that never repeats
+	// itself never reaches that branch, so treating them as available made this
+	// predicate answer "something follows this attempt" for a run where nothing
+	// did: the work was sent back, moreAttempts disagreed, and the run stopped
+	// between being told and being able to act.
+	//
+	// Ladder rung 5 on 2026-08-03 ended exactly there, twice. Six attempts, six
+	// different gates, nothing repeated — then path-coverage was raised at
+	// 155.9s naming one uncovered line out of thirty-three, and the next trace
+	// line is the run finishing. It was told, and then denied the attempt.
+	//
+	// So they count only when the run is actually stalling. What remains for a
+	// converging run is the one-time extension below, which moreAttempts grants
+	// on the same terms — which is the point: the two must answer the same
+	// question the same way.
+	if !tracker.converging() {
+		if _, more := tracker.settings.NextRung(tracker.rung); more {
+			return false
+		}
+		if !tracker.decomposed && tracker.settings.DecomposeWhenExhausted {
+			return false
+		}
 	}
 	return tracker.extended || !tracker.converging()
 }
@@ -252,11 +294,32 @@ type verdict struct {
 // Gate and failure are kept separate because the same message from two
 // different gates is two different situations, and the same gate with two
 // different messages is progress.
-func (tracker *convergence) record(gate string, failure string) verdict {
+func (tracker *convergence) record(
+	gate string, failure string, asked string,
+) verdict {
 	if tracker.seen == nil {
 		tracker.seen = map[string]int{}
 	}
-	print := gate + "\x00" + failureFingerprint(failure)
+	// What was asked, not only which gate asked it.
+	//
+	// The reason a gate gives is a fixed sentence per gate:
+	// adversarial-review's is always "a review found it weaker than it looks".
+	// Keyed on that alone, a review raising two entirely different findings
+	// across two rounds records as the same failure twice — and a review
+	// bounded to a couple of findings a round is built to fire more than once.
+	//
+	// Ladder rung 9 on 2026-08-03 ran three review rounds, each addressing a
+	// different finding and each verified, and the tracker read three identical
+	// failures. It called the run stalled, withheld the extension, and the run
+	// ended at 359 seconds with four minutes of budget unused and two gates it
+	// had never been asked about.
+	//
+	// The instruction distinguishes them: the same finding asked again produces
+	// the same instruction and still counts as a repeat, which is what a stall
+	// is. All three are in the key, so a repeat needs the gate, the reason and
+	// the ask to match.
+	print := gate + fingerprintSeparator + failureFingerprint(failure) +
+		fingerprintSeparator + failureFingerprint(asked)
 	tracker.seen[print]++
 	tracker.repeats = tracker.seen[print]
 	// Losing a property twice is a cycle, not a coincidence.
@@ -397,3 +460,8 @@ func (tracker *convergence) currentRung() string {
 	}
 	return tracker.rung
 }
+
+// fingerprintSeparator joins a gate to its failure fingerprint in the key the
+// tracker counts repeats under. Named rather than written inline so the two
+// places that build and read the key cannot drift.
+const fingerprintSeparator = "\x00"

@@ -19,7 +19,7 @@ func TestTheApprovalRequestCarriesEnoughToSayNo(t *testing.T) {
 	tracker := newConvergence(settings)
 	for round := 0; round < 4; round++ {
 		tracker.beginAttempt()
-		tracker.record("end-to-end-tests", "example 1 differs at line 1")
+		tracker.record("end-to-end-tests", "example 1 differs at line 1", "")
 	}
 	request := approvalRequest(
 		pipeline.Rung{Model: pipeline.ModelSol, Effort: pipeline.EffortMax}.String(),

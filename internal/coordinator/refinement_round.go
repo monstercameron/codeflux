@@ -106,13 +106,29 @@ func selectRoundFindings(
 			findingCostRank[ordered[second].Lineage]
 	})
 	selected = append(selected, ordered[0])
-	subject := ordered[0].Where
+	subject, kind := ordered[0].Where, ordered[0].Lineage
 	for _, candidate := range ordered[1:] {
 		if len(selected) >= maximumFindingsPerRound {
 			remaining = append(remaining, candidate)
 			continue
 		}
-		if candidate.Where == subject {
+		// Related by where it lands or by what the change is.
+		//
+		// Same function was the only test, and it misses the case that costs
+		// the most: two findings from the same rule are one piece of work
+		// wherever they sit. "formatCounts swallows fmt.Fprintf's error" and
+		// "main calls something that can fail and exits zero" are both the
+		// swallowed-error rule, and a run told both makes one coherent change
+		// to how the program reports failure. Told them one at a time it
+		// spends two attempts making the same edit twice.
+		//
+		// The cap is untouched, so the argument for it survives intact: two
+		// changes and a verification is still a bisection. What changes is
+		// only which second finding is eligible to join the first.
+		//
+		// Ladder rung 4 on 2026-08-03 held five open findings and was asking
+		// for one per round, at thirty to seventy-five seconds an attempt.
+		if candidate.Where == subject || candidate.Lineage == kind {
 			selected = append(selected, candidate)
 			continue
 		}

@@ -32,7 +32,7 @@ func TestARunMakingProgressIsLeftAlone(t *testing.T) {
 		{"acceptance", "example 2 differs at line 9"},
 		{"completeness", "1 function has no doc comment"},
 	} {
-		if decision := tracker.record(step.gate, step.failure); decision.Escalated != "" ||
+		if decision := tracker.record(step.gate, step.failure, ""); decision.Escalated != "" ||
 			decision.Decompose {
 			t.Fatalf("a run failing something different each time was escalated "+
 				"at %q: %s", step.gate, decision.Why)
@@ -49,13 +49,13 @@ func TestARunRepeatingItselfIsEscalated(t *testing.T) {
 	tracker := newConvergence(escalationSettings(3))
 	const stuck = "example 1 differs at line 1: expected \"4\", got \"5\""
 
-	if decision := tracker.record("acceptance", stuck); decision.Escalated != "" {
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated != "" {
 		t.Fatal("the first failure escalated, so nothing was given a chance")
 	}
-	if decision := tracker.record("acceptance", stuck); decision.Escalated != "" {
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated != "" {
 		t.Fatal("the second identical failure escalated one attempt early")
 	}
-	decision := tracker.record("acceptance", stuck)
+	decision := tracker.record("acceptance", stuck, stuck)
 	// The second rung, which is the same model thinking harder — the cheaper
 	// axis. Escalating straight to a different model would raise the rate on
 	// every token before establishing that more thinking would not have done.
@@ -81,8 +81,8 @@ func TestARunRepeatingItselfIsEscalated(t *testing.T) {
 // one would escalate a run that had just been told something new.
 func TestTheSameFailureFromTwoGatesIsNotARepeat(t *testing.T) {
 	tracker := newConvergence(escalationSettings(2))
-	tracker.record("assembly", "it is wrong")
-	if decision := tracker.record("acceptance", "it is wrong"); decision.Escalated != "" {
+	tracker.record("assembly", "it is wrong", "")
+	if decision := tracker.record("acceptance", "it is wrong", ""); decision.Escalated != "" {
 		t.Error("the same words from a different gate counted as a repeat")
 	}
 }
@@ -96,8 +96,10 @@ func TestTheSameFailureFromTwoGatesIsNotARepeat(t *testing.T) {
 func TestNoiseInAFailureDoesNotHideARepeat(t *testing.T) {
 	tracker := newConvergence(escalationSettings(2))
 	tracker.record("assembly",
+		`C:\Temp\worktree-8814\cmd\thing\main.go:12:6: undefined: parse`,
 		`C:\Temp\worktree-8814\cmd\thing\main.go:12:6: undefined: parse`)
 	decision := tracker.record("assembly",
+		`C:\Temp\worktree-9207\cmd\thing\main.go:14:6: undefined: parse`,
 		`C:\Temp\worktree-9207\cmd\thing\main.go:14:6: undefined: parse`)
 	if decision.Escalated == "" {
 		t.Error("the same compile error from a different temporary directory " +
@@ -117,12 +119,12 @@ func TestTheTopOfTheLadderDecomposesRatherThanRepeats(t *testing.T) {
 	tracker := newConvergence(settings)
 	const stuck = "example 1 differs at line 1"
 
-	tracker.record("acceptance", stuck)
-	if decision := tracker.record("acceptance", stuck); decision.Escalated == "" {
+	tracker.record("acceptance", stuck, stuck)
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated == "" {
 		t.Fatalf("the run did not reach the top of the ladder: %+v", decision)
 	}
-	tracker.record("acceptance", stuck)
-	decision := tracker.record("acceptance", stuck)
+	tracker.record("acceptance", stuck, stuck)
+	decision := tracker.record("acceptance", stuck, stuck)
 	if !decision.Decompose {
 		t.Fatalf("stalling at the top of the ladder did not decompose: %+v",
 			decision)
@@ -134,8 +136,8 @@ func TestTheTopOfTheLadderDecomposesRatherThanRepeats(t *testing.T) {
 
 	// And only once. Repeating the decomposition would produce ever finer units
 	// of a request that is not failing for being coarse.
-	tracker.record("acceptance", stuck)
-	if again := tracker.record("acceptance", stuck); again.Decompose {
+	tracker.record("acceptance", stuck, stuck)
+	if again := tracker.record("acceptance", stuck, stuck); again.Decompose {
 		t.Error("the run decomposed a second time on the same stall")
 	}
 }
@@ -150,9 +152,9 @@ func TestEscalatingResetsTheCount(t *testing.T) {
 	tracker := newConvergence(settings)
 	const stuck = "the same thing again"
 
-	tracker.record("acceptance", stuck)
-	tracker.record("acceptance", stuck)
-	if decision := tracker.record("acceptance", stuck); decision.Decompose {
+	tracker.record("acceptance", stuck, stuck)
+	tracker.record("acceptance", stuck, stuck)
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Decompose {
 		t.Error("the attempt straight after escalating decomposed, so the " +
 			"stronger model was never actually tried")
 	}
@@ -166,8 +168,8 @@ func TestASettingsThatForbidsDecompositionStops(t *testing.T) {
 	settings.DecomposeWhenExhausted = false
 	tracker := newConvergence(settings)
 
-	tracker.record("acceptance", "stuck")
-	if decision := tracker.record("acceptance", "stuck"); decision.Decompose {
+	tracker.record("acceptance", "stuck", "")
+	if decision := tracker.record("acceptance", "stuck", ""); decision.Decompose {
 		t.Error("decomposition happened though the setting turns it off")
 	}
 	if !strings.Contains(tracker.summary(), "converged on "+only) {
@@ -184,9 +186,9 @@ func TestASettingsThatForbidsDecompositionStops(t *testing.T) {
 func TestTheSummarySaysWhatTheRunCost(t *testing.T) {
 	tracker := newConvergence(escalationSettings(1))
 	tracker.beginAttempt()
-	tracker.record("acceptance", "one")
+	tracker.record("acceptance", "one", "")
 	tracker.beginAttempt()
-	tracker.record("acceptance", "one")
+	tracker.record("acceptance", "one", "")
 	summary := tracker.summary()
 	if !strings.Contains(summary, tracker.currentModel()) {
 		t.Errorf("the summary does not name the rung the run moved to: %q",
@@ -215,7 +217,7 @@ func TestEveryRungOfTheLadderIsReachableOnTheShippedDefaults(t *testing.T) {
 	escalated, decomposed := false, false
 	for tracker.moreAttempts() {
 		tracker.beginAttempt()
-		decision := tracker.record("acceptance", stuck)
+		decision := tracker.record("acceptance", stuck, stuck)
 		if decision.Escalated != "" {
 			escalated = true
 		}
@@ -251,7 +253,7 @@ func TestTheAttemptCeilingBoundsWhatARunCanCost(t *testing.T) {
 	attempts := 0
 	for tracker.moreAttempts() {
 		tracker.beginAttempt()
-		tracker.record("acceptance", "unchanged")
+		tracker.record("acceptance", "unchanged", "")
 		attempts++
 		if attempts > 1000 {
 			t.Fatal("a stuck run never ran out of attempts")
@@ -289,7 +291,7 @@ func TestARunThatConvergesCostsWhatItAlwaysDid(t *testing.T) {
 		tracker.beginAttempt()
 		// A different failure every time: the run is learning, so nothing is
 		// ever granted.
-		tracker.record("acceptance", "failure number "+counted(attempts, "x"))
+		tracker.record("acceptance", "failure number "+counted(attempts, "x"), "failure number "+counted(attempts, "x"))
 		attempts++
 	}
 	// The ordinary allowance plus one bounded top-up, and no more. A run that
@@ -345,11 +347,11 @@ func TestAnInterruptedStallIsStillAStall(t *testing.T) {
 	tracker := newConvergence(escalationSettings(3))
 	const stuck = "1 function has no doc comment: main"
 
-	tracker.record("completeness", stuck)
-	tracker.record("completeness", stuck)
+	tracker.record("completeness", stuck, stuck)
+	tracker.record("completeness", stuck, stuck)
 	// An unrelated failure. Nothing was learned about the doc comment.
-	tracker.record("assembly", "the loop refused a malformed turn")
-	decision := tracker.record("completeness", stuck)
+	tracker.record("assembly", "the loop refused a malformed turn", "")
+	decision := tracker.record("completeness", stuck, stuck)
 	if decision.Escalated == "" {
 		t.Fatal("the third occurrence of an identical failure did not escalate " +
 			"because an unrelated failure happened in between")
@@ -366,11 +368,11 @@ func TestAnEscalatedRunDoesNotInheritTheOldTallies(t *testing.T) {
 	tracker := newConvergence(escalationSettings(2))
 	const stuck = "the same failure"
 
-	tracker.record("acceptance", stuck)
-	if decision := tracker.record("acceptance", stuck); decision.Escalated == "" {
+	tracker.record("acceptance", stuck, stuck)
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated == "" {
 		t.Fatal("the run did not escalate at its threshold")
 	}
-	if decision := tracker.record("acceptance", stuck); decision.Escalated != "" ||
+	if decision := tracker.record("acceptance", stuck, stuck); decision.Escalated != "" ||
 		decision.Decompose {
 		t.Errorf("the attempt straight after escalating moved again, so the "+
 			"new rung was never tried: %+v", decision)
