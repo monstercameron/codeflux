@@ -78,6 +78,9 @@ func (outcome PatchOutcome) Summary() string {
 // end marker, blank lines between hunks — is accepted or ignored.
 func ParsePatch(raw string) (PatchRequest, error) {
 	var request PatchRequest
+	// Every other file this patch names, so a patch spanning two files can be
+	// refused with both of them rather than silently applied to one.
+	var alsoNamed []string
 	lines := strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n")
 
 	var current *PatchHunk
@@ -101,7 +104,12 @@ func ParsePatch(raw string) (PatchRequest, error) {
 			strings.HasPrefix(trimmed, "+++ "):
 			closeHunk()
 			if named := patchHeaderPath(trimmed); named != "" {
-				request.Path = named
+				if request.Path == "" {
+					request.Path = named
+				}
+				if named != request.Path {
+					alsoNamed = append(alsoNamed, named)
+				}
 			}
 		case strings.HasPrefix(trimmed, "*** Begin Patch"),
 			strings.HasPrefix(trimmed, "*** End Patch"),
@@ -133,6 +141,27 @@ func ParsePatch(raw string) (PatchRequest, error) {
 	closeHunk()
 
 	switch {
+	// A patch that changes two files is refused rather than applied to one.
+	//
+	// The request carries one path and one flat list of hunks, so a second
+	// "*** Update File:" header used to overwrite the path while its hunks
+	// joined the same list: every hunk was then searched for in whichever file
+	// was named last. That is how a hunk written for main.go came to be
+	// reported as matching thirty-nine places in main_test.go — it was being
+	// looked for in a file it was never about.
+	//
+	// Refused rather than partially applied, because a tool call is bound to
+	// one plan step and one step names one file: applying half of a patch would
+	// attribute work to a step that did not ask for it, and silently dropping
+	// the other half would lose changes the run believes it made. Ladder rung 7
+	// on 2026-08-03 failed twenty of twenty-three patches with this among the
+	// causes.
+	case len(alsoNamed) > 0:
+		return request, fmt.Errorf(
+			"this patch changes more than one file: %s and %s. Send one "+
+				"apply-patch call per file, each with its own "+
+				"\"*** Update File: <path>\" header and only that file's hunks",
+			request.Path, strings.Join(alsoNamed, ", "))
 	case strings.TrimSpace(request.Path) == "":
 		return request, errors.New(
 			"the patch names no file: begin it with " +
@@ -144,12 +173,28 @@ func ParsePatch(raw string) (PatchRequest, error) {
 				"lines to add prefixed \"+\", and enough unprefixed lines " +
 				"around them to say where the change goes")
 	}
-	for index, hunk := range request.Hunks {
+	// A hunk that changes nothing is dropped rather than refused.
+	//
+	// Models emit them for orientation — a block of context around the part
+	// they are about to describe, or a trailing block after the last change —
+	// and refusing the whole patch for one costs the round. Skipping it cannot
+	// change the file, which is the only thing that makes forgiveness safe
+	// here. Ladder rung 8 lost roughly fifteen patches to this.
+	changing := request.Hunks[:0:0]
+	for _, hunk := range request.Hunks {
 		if hunk.Added == 0 && hunk.Removed == 0 {
-			return request, fmt.Errorf(
-				"hunk %d changes nothing: it has context but no line prefixed "+
-					"\"+\" or \"-\"", index+1)
+			continue
 		}
+		changing = append(changing, hunk)
+	}
+	if len(changing) == 0 {
+		return request, errors.New(
+			"every hunk in this patch is context: none of them has a line " +
+				"prefixed \"+\" or \"-\", so it describes the file without " +
+				"changing it")
+	}
+	request.Hunks = changing
+	for index, hunk := range request.Hunks {
 		if strings.TrimSpace(hunk.Before) == "" && hunk.Removed == 0 {
 			return request, fmt.Errorf(
 				"hunk %d adds lines with no context, so it does not say where "+
@@ -187,11 +232,38 @@ func patchHeaderPath(line string) string {
 // about that state.
 func ApplyPatch(existing string, request PatchRequest) (string, PatchOutcome, error) {
 	patched := existing
+	// Hunks are ordered, and each one is looked for after the last one landed.
+	//
+	// Searching the whole file for every hunk independently asks a question a
+	// diff does not pose. A unified diff is a sequence: the second hunk belongs
+	// after the first, and that is what makes context like "	}," or "		{"
+	// unambiguous in a table-driven test where it occurs twenty times. Counting
+	// globally, the same context is ambiguous everywhere, and the patch is
+	// refused for saying nothing wrong.
+	//
+	// Ladder rung 7 on 2026-08-03 failed twenty of twenty-three patches, and
+	// forty-seven of about fifty failures were "matches N places, so it does
+	// not say which is meant".
+	//
+	// The cursor only ever resolves ambiguity; it never creates a failure. A
+	// hunk the remainder cannot place falls back to the whole-file search this
+	// has always done, so a patch whose hunks arrive out of order still applies
+	// exactly as before.
+	cursor := 0
 	for index, hunk := range request.Hunks {
+		if at := uniqueIndexIn(patched[cursor:], hunk.Before); at >= 0 {
+			absolute := cursor + at
+			patched = patched[:absolute] + hunk.After +
+				patched[absolute+len(hunk.Before):]
+			cursor = absolute + len(hunk.After)
+			continue
+		}
 		occurrences := strings.Count(patched, hunk.Before)
 		switch occurrences {
 		case 1:
+			at := strings.Index(patched, hunk.Before)
 			patched = strings.Replace(patched, hunk.Before, hunk.After, 1)
+			cursor = at + len(hunk.After)
 		case 0:
 			return "", PatchOutcome{}, fmt.Errorf(
 				"hunk %d does not match anything in %s. Its context and the "+
@@ -330,4 +402,25 @@ func (limits PatchLimits) WithinLimits(
 		}
 	}
 	return nil
+}
+
+// uniqueIndexIn reports where text occurs in body when it occurs exactly once,
+// and -1 otherwise.
+//
+// Used to place a hunk in what remains of the file after the previous hunk,
+// which is where a diff says it belongs. Returning -1 for both "nowhere" and
+// "several places" is deliberate: the caller falls back to searching the whole
+// file in either case, so this can only add an answer, never remove one.
+func uniqueIndexIn(body, text string) int {
+	if text == "" {
+		return -1
+	}
+	first := strings.Index(body, text)
+	if first < 0 {
+		return -1
+	}
+	if strings.Contains(body[first+len(text):], text) {
+		return -1
+	}
+	return first
 }

@@ -158,3 +158,48 @@ func TestUnifiedDiffHeadersAreUnderstoodToo(t *testing.T) {
 		t.Errorf("applying a git-style patch failed: %v", err)
 	}
 }
+
+// TestAContextOnlyHunkIsSkippedNotRefused covers roughly fifteen patches rung 8
+// lost.
+//
+// Models emit a context-only hunk for orientation — a block around the part
+// they are about to describe, or a trailing block after the last change — and
+// refusing the whole patch for one costs the round. Skipping it cannot change
+// the file, which is what makes the forgiveness safe.
+func TestAContextOnlyHunkIsSkippedNotRefused(t *testing.T) {
+	request, err := ParsePatch(`*** Update File: main.go
+@@
+ func main() {
+ 	if err := run(); err != nil {
+@@
+-func run() error {
++func run() (err error) {
+`)
+	if err != nil {
+		t.Fatalf("a patch with one orientation hunk was refused: %v", err)
+	}
+	if len(request.Hunks) != 1 {
+		t.Fatalf("%d hunk(s) kept, wanted the one that changes something",
+			len(request.Hunks))
+	}
+	patched, outcome, err := ApplyPatch(patchTarget, request)
+	if err != nil {
+		t.Fatalf("applying failed: %v", err)
+	}
+	if !strings.Contains(patched, "func run() (err error) {") {
+		t.Error("the change did not land")
+	}
+	if outcome.Hunks != 1 {
+		t.Errorf("the outcome reports %d hunk(s)", outcome.Hunks)
+	}
+}
+
+// TestAPatchThatChangesNothingIsStillRefused keeps the forgiveness bounded: a
+// patch describing a file without changing it is not a patch.
+func TestAPatchThatChangesNothingIsStillRefused(t *testing.T) {
+	if _, err := ParsePatch(
+		"*** Update File: main.go\n@@\n func main() {\n@@\n func run() error {\n",
+	); err == nil {
+		t.Fatal("a patch with no changes at all was accepted")
+	}
+}
